@@ -9,14 +9,14 @@
 // #include "envoy/common/optref.h"
 // #include "envoy/config/core/v3/base.pb.h"
 // #include "envoy/event/timer.h"
-// #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 // #include "envoy/http/message.h"
 // #include "envoy/server/factory_context.h"
 
 // #include "source/common/common/lock_guard.h"
 // #include "source/common/common/logger.h"
 // #include "source/common/common/thread.h"
-// #include "source/common/config/datasource.h"
+#include "source/common/config/datasource.h"
 // #include "source/common/init/target_impl.h"
 // #include "source/common/protobuf/message_validator_impl.h"
 // #include "source/common/protobuf/utility.h"
@@ -32,7 +32,12 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-
+    constexpr char WEB_IDENTITY_RESPONSE_ELEMENT[] = "AssumeRoleWithWebIdentityResponse";
+    constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult";
+    constexpr char CREDENTIALS[] = "Credentials";
+    constexpr char EXPIRATION[] = "Expiration";
+    constexpr char SESSION_TOKEN[] = "SessionToken";
+    
 /**
  * Retrieve AWS credentials from Security Token Service using a web identity token (e.g. OAuth,
  * OpenID)

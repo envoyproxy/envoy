@@ -25,6 +25,7 @@
 // #include "source/extensions/common/aws/metadata_fetcher.h"
 
 // #include "absl/strings/string_view.h"
+#include "source/extensions/common/aws/cached_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
 namespace Envoy {
@@ -32,7 +33,13 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-
+constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
+constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
+constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
+constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE";
+constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
+constexpr char EXPIRATION[] = "Expiration";
+    
 /**
  * Retrieve AWS credentials from the task metadata.
  *

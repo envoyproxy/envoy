@@ -9,6 +9,9 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/utility.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/common/hex.h"
 
 namespace Envoy {
 namespace Extensions {

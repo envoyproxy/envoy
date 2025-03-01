@@ -37,9 +37,10 @@ envoy_cc_library(
     hdrs = ["credentials_file_credentials_provider.h"],
     deps = [
         "//source/extensions/common/aws:credentials_provider_base_lib",
+        "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
-
 
 envoy_cc_library(
     name = "environment_credentials_provider_lib",

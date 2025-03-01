@@ -5,44 +5,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
-constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
-constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
-constexpr char AWS_ROLE_ARN[] = "AWS_ROLE_ARN";
-constexpr char AWS_WEB_IDENTITY_TOKEN_FILE[] = "AWS_WEB_IDENTITY_TOKEN_FILE";
-constexpr char AWS_ROLE_SESSION_NAME[] = "AWS_ROLE_SESSION_NAME";
-
-constexpr char CREDENTIALS[] = "Credentials";
-constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
-constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
-constexpr char TOKEN[] = "Token";
-constexpr char EXPIRATION[] = "Expiration";
-constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
-constexpr char TRUE[] = "true";
-constexpr char SESSION_TOKEN[] = "SessionToken";
-constexpr char WEB_IDENTITY_RESPONSE_ELEMENT[] = "AssumeRoleWithWebIdentityResponse";
-constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult";
-
-constexpr char AWS_CONTAINER_CREDENTIALS_RELATIVE_URI[] = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
-constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
-constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
-constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE";
-constexpr char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
-
-constexpr std::chrono::hours REFRESH_INTERVAL{1};
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
-constexpr char EC2_METADATA_HOST[] = "169.254.169.254:80";
-constexpr char CONTAINER_METADATA_HOST[] = "169.254.170.2:80";
-constexpr char EC2_IMDS_TOKEN_RESOURCE[] = "/latest/api/token";
-constexpr char EC2_IMDS_TOKEN_HEADER[] = "X-aws-ec2-metadata-token";
-constexpr char EC2_IMDS_TOKEN_TTL_HEADER[] = "X-aws-ec2-metadata-token-ttl-seconds";
-constexpr char EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE[] = "21600";
-constexpr char SECURITY_CREDENTIALS_PATH[] = "/latest/meta-data/iam/security-credentials";
-
-constexpr char EC2_METADATA_CLUSTER[] = "ec2_instance_metadata_server_internal";
-constexpr char CONTAINER_METADATA_CLUSTER[] = "ecs_task_metadata_server_internal";
-constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
-
 
 ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context, AwsClusterManagerOptRef aws_cluster_manager,
@@ -158,8 +120,8 @@ void ContainerCredentialsProvider::extractCredentials(
       Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug, "Found following AWS credentials in the container role: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+            ACCESS_KEY_ID, access_key_id, SECRET_ACCESS_KEY,
+            secret_access_key.empty() ? "" : "*****", TOKEN,
             session_token.empty() ? "" : "*****");
 
   const auto expiration_str =

@@ -31,6 +31,14 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
+  constexpr char EC2_METADATA_HOST[] = "169.254.169.254:80";
+constexpr char EC2_IMDS_TOKEN_RESOURCE[] = "/latest/api/token";
+constexpr char EC2_IMDS_TOKEN_HEADER[] = "X-aws-ec2-metadata-token";
+constexpr char EC2_IMDS_TOKEN_TTL_HEADER[] = "X-aws-ec2-metadata-token-ttl-seconds";
+constexpr char EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE[] = "21600";
+constexpr char SECURITY_CREDENTIALS_PATH[] = "/latest/meta-data/iam/security-credentials";
+
 /**
  * Retrieve AWS credentials from the instance metadata.
  *

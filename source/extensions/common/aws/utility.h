@@ -9,6 +9,8 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
+#include "curl/curl.h"
 
 namespace Envoy {
 namespace Extensions {

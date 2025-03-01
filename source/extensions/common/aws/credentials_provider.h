@@ -6,16 +6,20 @@
 #include "envoy/common/pure.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/common/logger.h"
+// #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 
-#include "absl/strings/string_view.h"
+// #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
+  constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
+  constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
+  constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
 
 /**
  * AWS credentials container
