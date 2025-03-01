@@ -75,12 +75,14 @@ public:
   NiceMock<MockFaultManager> fault_manager_;
 
   Event::SimulatedTimeSystem time_system_;
+  absl::flat_hash_set<std::string> custom_commands_;
   InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
                          *store_.rootScope(),
                          "redis.foo.",
                          time_system_,
                          latency_in_micros_,
-                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
+                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+                         std::move(custom_commands_)};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
