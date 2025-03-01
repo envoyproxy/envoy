@@ -323,6 +323,11 @@ message SubjectAltNameMatcher {
 
   // Matcher for SAN value.
   //
+  // If the `san_type` is `DNS` and the matcher type is `exact`, DNS wildcards are evaluated
+  // according to the rules in https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3.
+  // For example, `*.example.com` would match `test.example.com` but not `example.com` and not
+  // `a.b.example.com`.
+  //
   // The string matching for OTHER_NAME SAN values depends on their ASN.1 type:
   //
   //          * OBJECT: Validated against its dotted numeric notation (e.g., "1.2.3.4")
