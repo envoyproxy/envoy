@@ -90,9 +90,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
       server_context.api().randomGenerator(), server_context.runtime(), proto_config.faults());
-  
+
   absl::flat_hash_set<std::string> custom_commands;
-  for(const auto& cmd : proto_config.custom_commands()) {
+  for (const auto& cmd : proto_config.custom_commands()) {
     custom_commands.insert(cmd);
   }
 

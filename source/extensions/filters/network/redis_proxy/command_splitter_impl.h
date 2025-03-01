@@ -114,7 +114,6 @@ protected:
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
-  Common::Redis::Client::ConfigSharedPtr config_;
 };
 
 /**
