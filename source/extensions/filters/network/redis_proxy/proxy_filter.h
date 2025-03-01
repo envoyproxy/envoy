@@ -66,6 +66,7 @@ public:
   TimeSource& timeSource() const { return time_source_; };
   const bool external_auth_enabled_;
   const bool external_auth_expiration_enabled_;
+  const absl::flat_hash_set<std::string> redis_custom_command_names_;
 
   // DNS cache used for ASK/MOVED responses.
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
