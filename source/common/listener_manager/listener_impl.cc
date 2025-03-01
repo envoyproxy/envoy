@@ -1133,7 +1133,8 @@ bool ListenerImpl::socketOptionsEqual(const ListenerImpl& other) const {
 }
 
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
-  if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size())) {
+  if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size()) ||
+      !ListenerMessageUtil::socketOptionsEqual(config(), other.config())) {
     return false;
   }
 
@@ -1157,13 +1158,6 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
-  // Skip the duplicate address check if this is the case of a listener update with new socket
-  // options.
-  if ((name_ == other.name_) &&
-      !ListenerMessageUtil::socketOptionsEqual(config(), other.config())) {
-    return false;
-  }
-
   if (socket_type_ != other.socket_type_) {
     return false;
   }
