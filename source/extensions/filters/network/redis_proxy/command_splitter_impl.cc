@@ -699,13 +699,13 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
                            Common::Redis::FaultManagerPtr&& fault_manager,
-                           const absl::flat_hash_set<std::string>& custom_commands)
+                           absl::flat_hash_set<std::string>&& custom_commands)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       keys_handler_(*router_), split_keys_sum_result_handler_(*router_),
       transaction_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
                                           POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(std::move(fault_manager)), custom_commands_(custom_commands) {
+      time_source_(time_source), fault_manager_(std::move(fault_manager)), custom_commands_(std::move(custom_commands)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }

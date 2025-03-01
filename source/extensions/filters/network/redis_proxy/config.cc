@@ -100,7 +100,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_,
           server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager),
-          custom_commands);
+          std::move(custom_commands));
 
   auto has_external_auth_provider_ = proto_config.has_external_auth_provider();
   auto grpc_service = proto_config.external_auth_provider().grpc_service();
