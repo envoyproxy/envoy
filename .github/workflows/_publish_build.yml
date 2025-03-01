@@ -6,8 +6,6 @@ permissions:
 on:
   workflow_call:
     secrets:
-      dockerhub-username:
-        required: false
       dockerhub-password:
         required: false
       gcs-cache-key:
@@ -26,6 +24,7 @@ on:
       trusted:
         type: boolean
         required: true
+
 
 concurrency:
   group: >-
@@ -128,7 +127,6 @@ jobs:
       contents: read
       packages: read
     secrets:
-      dockerhub-username: ${{ secrets.dockerhub-username }}
       dockerhub-password: ${{ secrets.dockerhub-password }}
     name: ${{ matrix.name || matrix.target }}
     needs:
