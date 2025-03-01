@@ -255,13 +255,7 @@ def envoy_dependencies(skip_targets = []):
     )
 
 def _boringssl():
-    external_http_archive(
-        name = "boringssl",
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel:boringssl_static.patch",
-        ],
-    )
+    external_http_archive(name = "boringssl")
 
 def _boringssl_fips():
     external_http_archive(
