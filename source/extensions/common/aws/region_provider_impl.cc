@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/region_provider_impl.h"
 
-#include "source/extensions/common/aws/utility.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
