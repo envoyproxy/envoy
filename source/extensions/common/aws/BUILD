@@ -13,9 +13,9 @@ envoy_cc_library(
     name = "signer_interface",
     hdrs = ["signer.h"],
     deps = [
-        "//envoy/http:message_interface",
+        ":credentials_provider_interface",
         "//envoy/common:pure_lib",
-        ":credentials_provider_interface"
+        "//envoy/http:message_interface",
     ],
 )
 
@@ -26,9 +26,9 @@ envoy_cc_library(
     deps = [
         ":utility_lib",
         "//envoy/http:message_interface",
-        "//source/common/singleton:const_singleton",
         "//source/common/common:cleanup_lib",
         "//source/common/init:target_lib",
+        "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -43,25 +43,26 @@ envoy_cc_library(
         ":signer_interface",
         ":utility_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/http:headers_lib",
         "//source/common/common:utility_lib",
         "//source/common/crypto:utility_lib",
-        "//source/common/common:matchers_lib",
+        "//source/common/http:headers_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
 
 envoy_cc_library(
     name = "credentials_provider_interface",
+    srcs = ["credentials_provider.cc"],
     hdrs = [
         "credentials_provider.h",
     ],
     deps = [
-        "@com_google_absl//absl/types:optional",
-        "//source/common/common:thread_lib",
         "//envoy/common:pure_lib",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:thread_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -77,13 +78,13 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "credentials_provider_impl_lib",
-    deps = [
-        # ":credentials_provider_base_lib",
-        "//source/extensions/common/aws/credential_providers:credential_providers_lib"
-    ]
-)
+# envoy_cc_library(
+#     name = "credentials_provider_impl_lib",
+#     deps = [
+#         # ":credentials_provider_base_lib",
+#         "//source/extensions/common/aws/credential_providers:credential_providers_lib"
+#     ]
+# )
 # envoy_cc_library(
 #     name = "credentials_provider_impl_lib",
 #     srcs = ["credentials_provider_impl.cc"],
@@ -111,7 +112,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "credentials_provider_base_lib",
     srcs = ["metadata_credentials_provider_base.cc"],
-    hdrs = ["metadata_credentials_provider_base.h", "cached_credentials_provider_base.h"],
+    hdrs = [
+        "cached_credentials_provider_base.h",
+        "metadata_credentials_provider_base.h",
+    ],
     deps = [
         ":aws_cluster_manager_lib",
         # ":credentials_provider_interface",
@@ -127,8 +131,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
         "@com_google_absl//absl/time",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 
@@ -148,20 +150,20 @@ envoy_cc_library(
     ),
     external_deps = ["curl"],
     deps = [
-        "@com_google_absl//absl/types:optional",
-        "//source/common/common:thread_lib",
-        "//envoy/http:message_interface",
-        "//source/common/common:matchers_lib",
-        "//source/common/common:utility_lib",
         "//envoy/common:pure_lib",
+        "//envoy/http:message_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/crypto:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/common/crypto:utility_lib",
-        "//source/common/common:cleanup_lib",
-        "//source/common/common:minimal_logger_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/singleton:const_singleton",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],

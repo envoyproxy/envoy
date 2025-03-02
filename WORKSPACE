@@ -42,7 +42,9 @@ http_archive(
 )
 
 load("@depend_on_what_you_use//:setup_step_1.bzl", dwyu_setup_step_1 = "setup_step_1")
+
 dwyu_setup_step_1()
 
 load("@depend_on_what_you_use//:setup_step_2.bzl", dwyu_setup_step_2 = "setup_step_2")
+
 dwyu_setup_step_2()

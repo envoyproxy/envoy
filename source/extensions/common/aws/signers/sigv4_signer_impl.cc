@@ -1,19 +1,19 @@
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
-#include <openssl/ssl.h>
+// #include <openssl/ssl.h>
 
-#include <cstddef>
+// #include <cstddef>
 
-#include "envoy/common/exception.h"
+// #include "envoy/common/exception.h"
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
-#include "source/common/crypto/utility.h"
-#include "source/common/http/headers.h"
-#include "source/extensions/common/aws/utility.h"
+// #include "source/common/buffer/buffer_impl.h"
+// #include "source/common/common/fmt.h"
+// #include "source/common/common/hex.h"
+// #include "source/common/crypto/utility.h"
+// #include "source/common/http/headers.h"
+// #include "source/extensions/common/aws/utility.h"
 
-#include "absl/strings/str_join.h"
+// #include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {

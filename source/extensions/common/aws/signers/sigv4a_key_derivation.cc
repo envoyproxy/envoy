@@ -1,10 +1,11 @@
-#include "source/extensions/common/aws/sigv4a_key_derivation.h"
+#include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
-#include <openssl/ssl.h>
+#include "source/extensions/common/aws/signers/sigv4a_signer_impl.h"
 
-#include "source/common/common/logger.h"
-#include "source/common/crypto/utility.h"
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
+// #include <openssl/ssl.h>
+
+// #include "source/common/common/logger.h"
+// #include "source/common/crypto/utility.h"
 
 namespace Envoy {
 namespace Extensions {

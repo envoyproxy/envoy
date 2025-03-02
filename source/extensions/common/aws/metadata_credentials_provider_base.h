@@ -22,16 +22,16 @@
 // #include "source/common/protobuf/utility.h"
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/cached_credentials_provider_base.h"
+#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
 // #include "absl/strings/string_view.h"
 
 namespace Envoy {
-    namespace Extensions {
-    namespace Common {
-    namespace Aws {
+namespace Extensions {
+namespace Common {
+namespace Aws {
 
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
@@ -51,8 +51,8 @@ struct MetadataCredentialsProviderStats {
 /**
  *  CreateMetadataFetcherCb is a callback interface for creating a MetadataFetcher instance.
  */
- using CreateMetadataFetcherCb =
- std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
+using CreateMetadataFetcherCb =
+    std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 using ServerFactoryContextOptRef = OptRef<Server::Configuration::ServerFactoryContext>;
 
 class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,

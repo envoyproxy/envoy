@@ -5,7 +5,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-
 CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&

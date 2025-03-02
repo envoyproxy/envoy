@@ -10,6 +10,7 @@
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -15,6 +15,7 @@
 
 // #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
+
 // #include "source/common/common/thread.h"
 // #include "source/common/config/datasource.h"
 // #include "source/common/init/target_impl.h"
@@ -38,11 +39,11 @@ namespace Aws {
  * https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
  */
 class EnvironmentCredentialsProvider : public CredentialsProvider,
-public Logger::Loggable<Logger::Id::aws> {
+                                       public Logger::Loggable<Logger::Id::aws> {
 public:
-Credentials getCredentials() override;
-bool credentialsPending() override { return false; };
-std::string providerName() override { return "EnvironmentCredentialsProvider"; };
+  Credentials getCredentials() override;
+  bool credentialsPending() override { return false; };
+  std::string providerName() override { return "EnvironmentCredentialsProvider"; };
 };
 
 } // namespace Aws

@@ -1,10 +1,10 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
 namespace Envoy {
-  namespace Extensions {
-  namespace Common {
-  namespace Aws {
-  
+namespace Extensions {
+namespace Common {
+namespace Aws {
+
 // TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so
 // that an optional empty value can be set. Especially in aws iam plugin the cluster manager
 // obtained from server factory context object is not fully initialized due to the

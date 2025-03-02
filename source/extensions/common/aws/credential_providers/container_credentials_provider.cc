@@ -5,7 +5,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-
 ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context, AwsClusterManagerOptRef aws_cluster_manager,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
@@ -121,11 +120,10 @@ void ContainerCredentialsProvider::extractCredentials(
 
   ENVOY_LOG(debug, "Found following AWS credentials in the container role: {}={}, {}={}, {}={}",
             ACCESS_KEY_ID, access_key_id, SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", TOKEN,
-            session_token.empty() ? "" : "*****");
+            secret_access_key.empty() ? "" : "*****", TOKEN, session_token.empty() ? "" : "*****");
 
   const auto expiration_str =
-      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), EXPIRATION, "");
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), CONTAINER_EXPIRATION, "");
 
   if (!expiration_str.empty()) {
     absl::Time expiration_time;

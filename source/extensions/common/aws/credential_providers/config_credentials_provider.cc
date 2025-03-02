@@ -1,6 +1,5 @@
 #include "source/extensions/common/aws/credential_providers/config_credentials_provider.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
