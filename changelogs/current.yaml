@@ -201,7 +201,7 @@ new_features:
     work as an upstream filter.
 - area: adaptive concurrency
   change: |
-    Allow fixing the minimum RTT by introducing ``base_value``.
+    Allow fixing the minimum RTT by introducing ``fixed_value``.
 - area: lua
   change: |
     Added :ref:`clear_route_cache <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.clear_route_cache>` support to
