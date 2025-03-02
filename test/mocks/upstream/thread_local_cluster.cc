@@ -22,12 +22,18 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
   ON_CALL(*this, httpAsyncClient()).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, dropOverload()).WillByDefault(Return(cluster_.drop_overload_));
   ON_CALL(*this, dropCategory()).WillByDefault(ReturnRef(cluster_.drop_category_));
+  ON_CALL(*this, dropOverloadNoHealthyEndpoint())
+      .WillByDefault(Return(cluster_.drop_overload_no_healthy_endpoint_));
   ON_CALL(*this, setDropOverload(_)).WillByDefault(Invoke([this](UnitFloat drop_overload) -> void {
     cluster_.drop_overload_ = drop_overload;
   }));
   ON_CALL(*this, setDropCategory(_))
       .WillByDefault(Invoke([this](absl::string_view drop_category) -> void {
         cluster_.drop_category_ = drop_category;
+      }));
+  ON_CALL(*this, setDropOverloadNoHealthyEndpoint(_))
+      .WillByDefault(Invoke([this](bool drop_overload_no_healthy_endpoint) -> void {
+        cluster_.drop_overload_no_healthy_endpoint_ = drop_overload_no_healthy_endpoint;
       }));
 }
 

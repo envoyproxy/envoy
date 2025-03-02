@@ -1799,6 +1799,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
   // Default drop_overload_ to zero.
   drop_overload_ = UnitFloat(0);
+  drop_overload_no_healthy_endpoint_ = false;
 
   if (!cluster_load_assignment.has_policy()) {
     return absl::OkStatus();
@@ -1853,6 +1854,9 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(MAX_DROP_OVERLOAD_RUNTIME));
   drop_overload_ = UnitFloat(drop_ratio);
   drop_category_ = policy.drop_overloads(0).category();
+  if (drop_ratio == 1.0 && cluster_load_assignment.endpoints().size() == 0) {
+    drop_overload_no_healthy_endpoint_ = true;
+  }
   return absl::OkStatus();
 }
 

@@ -95,8 +95,10 @@ enum CoreResponseFlag : uint16_t {
   DropOverLoad,
   // Downstream remote codec level reset was received on the stream.
   DownstreamRemoteReset,
+  // Drop all traffic due to no healthy endpoint.
+  DropOverloadNoHealthyEndpoint,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamRemoteReset,
+  LastFlag = DropOverloadNoHealthyEndpoint,
 };
 
 class ResponseFlagUtils;
@@ -198,6 +200,9 @@ struct ResponseCodeDetailValues {
   const std::string DropOverload = "drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
+  // The request was rejected by the router filter because there was no healthy endpoint found,
+  // also the DROP_OVERLOAD is configured as 100%.
+  const std::string DropOverloadNoHealthyEndpoint = "drop_overload_no_healthy_endpoint";
   // The request was forwarded upstream but the response timed out.
   const std::string ResponseTimeout = "response_timeout";
   // The final upstream try timed out.

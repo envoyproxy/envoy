@@ -206,13 +206,13 @@ public:
 
   void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, nullptr); }
 
-  void dropOverloadTest(uint32_t numerator, const std::string& status) {
+  void dropOverloadTest(uint32_t numerator, const std::string& status, uint32_t num_endpoints = 2) {
     autonomous_upstream_ = true;
 
     initializeTest(false);
     EndpointSettingOptions options;
-    options.total_endpoints = 2;
-    options.healthy_endpoints = 2;
+    options.total_endpoints = num_endpoints;
+    options.healthy_endpoints = num_endpoints;
     options.drop_overload_numerator = numerator;
     setEndpoints(options);
 
@@ -801,6 +801,11 @@ TEST_P(EdsIntegrationTest, DataplaneTrafficAfterEdsUpdateOfInitializedCluster) {
 TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterNoDrop) { dropOverloadTest(0, "200"); }
 
 TEST_P(EdsIntegrationTest, DropOverloadTestForEdsClusterAllDrop) { dropOverloadTest(100, "503"); }
+
+// Test EDS cluster DROP_OVERLOAD_NO_HEALTHY_ENDPOINT configuration.
+TEST_P(EdsIntegrationTest, DropOverloadNoHealthyEndpointTestForEdsClusterNoDrop) {
+  dropOverloadTest(100, "503", 0);
+}
 
 } // namespace
 } // namespace Envoy
