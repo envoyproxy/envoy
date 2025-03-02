@@ -58,6 +58,10 @@ message GradientControllerConfig {
     // be set to a value in the range (0, 1ms).
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {}}];
 
+    // The base value for the minRTT. This value is used when minRTT is not sampled dynamically.
+    // If dynamic sampling of the minRTT is disabled, this field must be set.
+    google.protobuf.Duration base_value = 6 [(validate.rules).duration = {gt {}}];
+
     // The number of requests to aggregate/sample during the minRTT recalculation window before
     // updating. Defaults to 50.
     google.protobuf.UInt32Value request_count = 2 [(validate.rules).uint32 = {gt: 0}];
@@ -71,10 +75,6 @@ message GradientControllerConfig {
 
     // The concurrency limit set while measuring the minRTT. Defaults to 3.
     google.protobuf.UInt32Value min_concurrency = 4 [(validate.rules).uint32 = {gt: 0}];
-
-    // The base value for the minRTT. This value is used when minRTT is not sampled dynamically.
-    // If dynamic sampling of the minRTT is disabled, this field must be set.
-    google.protobuf.Duration base_value = 6 [(validate.rules).duration = {gt {}}];
 
     // Amount added to the measured minRTT to add stability to the concurrency limit during natural
     // variability in latency. This is expressed as a percentage of the measured value and can be
