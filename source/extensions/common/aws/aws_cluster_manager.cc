@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
-#include <memory>
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

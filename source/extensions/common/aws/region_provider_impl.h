@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/common/aws/region_provider.h"

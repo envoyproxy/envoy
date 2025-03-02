@@ -1,24 +1,5 @@
 #include "source/extensions/common/aws/utility.h"
 
-// #include <cstdint>
-// #include <limits>
-
-// #include "envoy/upstream/cluster_manager.h"
-
-// #include "source/common/common/empty_string.h"
-// #include "source/common/common/fmt.h"
-// #include "source/common/common/utility.h"
-// #include "source/common/json/json_loader.h"
-// #include "source/common/protobuf/message_validator_impl.h"
-// #include "source/common/protobuf/utility.h"
-// #include "source/extensions/common/aws/signer_base_impl.h"
-
-// #include "absl/strings/match.h"
-// #include "absl/strings/str_join.h"
-// #include "absl/strings/str_split.h"
-// #include "curl/curl.h"
-// #include "fmt/printf.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
