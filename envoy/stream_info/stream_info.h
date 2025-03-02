@@ -95,8 +95,10 @@ enum CoreResponseFlag : uint16_t {
   DropOverLoad,
   // Downstream remote codec level reset was received on the stream.
   DownstreamRemoteReset,
+  // Unconditionally drop all traffic due to drop_overload is set to 100%.
+  UnconditionalDropOverload,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamRemoteReset,
+  LastFlag = UnconditionalDropOverload,
 };
 
 class ResponseFlagUtils;
@@ -196,6 +198,9 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
   const std::string DropOverload = "drop_overload";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration is set to
+  // 100%.
+  const std::string UnconditionalDropOverload = "unconditional_drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
