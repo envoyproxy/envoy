@@ -18,11 +18,12 @@ genrule(
         "active_params.html",
         "active_stats.js",
         "histograms.js",
+        "json_viewer.js",
     ],
     outs = ["admin_html_gen.h"],
     cmd = "./$(location :generate_admin_html.sh) \
         $(location admin_head_start.html) $(location admin.css) $(location active_stats.js) \
-        $(location active_params.html) $(location histograms.js) > $@",
+        $(location active_params.html) $(location histograms.js) $(location json_viewer.js)> $@",
     tools = [":generate_admin_html.sh"],
 )
 
@@ -36,5 +37,6 @@ filegroup(
         "admin.css",
         "admin_head_start.html",
         "histograms.js",
+        "json_viewer.js",
     ],
 )

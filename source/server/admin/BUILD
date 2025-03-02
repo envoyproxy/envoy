@@ -352,6 +352,7 @@ envoy_cc_library(
     srcs = ["config_dump_handler.cc"],
     hdrs = ["config_dump_handler.h"],
     deps = [
+        ":admin_html_util",
         ":config_tracker_lib",
         ":handler_ctx_lib",
         ":utils_lib",

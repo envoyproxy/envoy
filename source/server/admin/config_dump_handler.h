@@ -23,6 +23,7 @@ public:
 
   Http::Code handlerConfigDump(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
+  void setUrlHandler(Admin::UrlHandler& url_handler) { url_handler_ = url_handler; }
 
 private:
   absl::optional<std::pair<Http::Code, std::string>>
@@ -47,6 +48,9 @@ private:
   ProtobufTypes::MessagePtr dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const;
 
   ConfigTracker& config_tracker_;
+
+  // Optional because this is initialized after in the constructor body.
+  OptRef<Admin::UrlHandler> url_handler_;
 };
 
 } // namespace Server
