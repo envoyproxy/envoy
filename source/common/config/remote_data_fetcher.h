@@ -62,19 +62,20 @@ public:
    * @param content_hash for verifying data integrity
    * @param callback callback when fetch is done.
    */
-  void fetch();
+  virtual void fetch();
 
   /**
    * Cancel the fetch.
    */
-  void cancel();
+  virtual void cancel();
 
-private:
+protected:
   Upstream::ClusterManager& cm_;
   const envoy::config::core::v3::HttpUri uri_;
   const std::string content_hash_;
   RemoteDataFetcherCallback& callback_;
 
+private:
   Http::AsyncClient::Request* request_{};
 };
 
