@@ -69,7 +69,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
       clear_route_cache_(config.clear_route_cache()),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
-
       // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
       // difference to where the body is written in http requests, and a value of false here will
       // cause non UTF-8 body content to be changed when it doesn't need to.
@@ -119,12 +118,22 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      // If response_cache_config section doesn't exist in the config, set response_cache_config_ to
+      // nullopt.
+      response_cache_config_(config.has_response_cache_config()
+                                 ? absl::make_optional(config.response_cache_config())
+                                 : absl::nullopt),
+      response_cache_remember_body_headers_(config.response_cache_remember_body_headers()),
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
       ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
       ext_authz_invalid_(pool_.add(createPoolStatName(config.stat_prefix(), "invalid"))),
       ext_authz_failure_mode_allowed_(
           pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+
+  // Initialize the appropriate cache, out of two possible caches, based on configuration.
+  initializeCache(factory_context);
+
   auto bootstrap = factory_context.bootstrap();
   auto labels_key_it =
       bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
@@ -159,6 +168,38 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
   if (config.has_disallowed_headers()) {
     disallowed_headers_matcher_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
         config.disallowed_headers(), false, factory_context);
+  }
+}
+
+// Initialize the appropriate cache, out of two possible caches, based on configuration.
+void FilterConfig::initializeCache(Server::Configuration::ServerFactoryContext& factory_context) {
+  // If response_cache_config section doesn't exist in the config, no need to create cache objects.
+  if (!response_cache_config_.has_value()) {
+    response_cache_status_ = nullptr;
+    response_cache_full_ = nullptr;
+    return;
+  }
+
+  if (response_cache_remember_body_headers_) {
+    // Initialize the cache that stores full response (body, header modification, metadata, status).
+    auto cache_result = Envoy::Common::RespCache::createCache<Filters::Common::ExtAuthz::Response>(
+        Envoy::Common::RespCache::CacheType::Simple, response_cache_config_.value(),
+        factory_context.timeSource());
+    if (!cache_result.ok()) {
+      response_cache_full_ = nullptr;
+    } else {
+      response_cache_full_ = std::move(cache_result.value());
+    }
+  } else {
+    // Initialize the cache that stores only status code.
+    auto cache_result = Envoy::Common::RespCache::createCache<uint16_t>(
+        Envoy::Common::RespCache::CacheType::Simple, response_cache_config_.value(),
+        factory_context.timeSource());
+    if (!cache_result.ok()) {
+      response_cache_status_ = nullptr;
+    } else {
+      response_cache_status_ = std::move(cache_result.value());
+    }
   }
 }
 
@@ -276,6 +317,45 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (config_->responseCacheConfig().has_value()) {
+#ifdef CACHE_PERF_TEST
+    // Fill cache for testing
+    if (auth_header_str == "magic_fill_cache_for_testing") {
+      for (std::size_t i = 0; i < config_->responseCache<uint16_t>().getMaxCacheSize() - 10; ++i) {
+        std::string test_key = "test_key_" + std::to_string(i);
+        config_->responseCache<uint16_t>().Insert(test_key, 200);
+      }
+    }
+#endif
+    if (config_->responseCacheRememberBodyHeaders()) {
+      auto cached_response =
+          config_->responseCache<Filters::Common::ExtAuthz::Response>().Get(headers);
+      if (cached_response.has_value()) {
+        onCompleteSub(std::make_unique<Filters::Common::ExtAuthz::Response>(
+            std::move(cached_response.value())));
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+    } else {
+      // Retrieve the HTTP status code from the cache
+      auto cached_status_code = config_->responseCache<uint16_t>().Get(headers);
+      if (cached_status_code.has_value()) {
+        if (*cached_status_code >= 200 && *cached_status_code < 300) {
+          // Any 2xx response is a success: let the request proceed
+          return Http::FilterHeadersStatus::Continue;
+        } else {
+          // Non-2xx response: reject the request
+          decoder_callbacks_->streamInfo().setResponseFlag(
+              StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+          decoder_callbacks_->sendLocalReply(
+              static_cast<Http::Code>(*cached_status_code), "Unauthorized", nullptr, absl::nullopt,
+              Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
+
+          return Http::FilterHeadersStatus::StopIteration;
+        }
+      }
+    }
   }
 
   request_headers_ = &headers;
@@ -467,12 +547,58 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
   return config_->checkDecoderHeaderMutation(operation, Http::LowerCaseString(key), value);
 }
 
+std::string formatHeaders(const Filters::Common::ExtAuthz::UnsafeHeaderVector& headers) {
+  std::string formatted_headers;
+  for (const auto& header : headers) {
+    formatted_headers += fmt::format("{}: {}, ", header.first, header.second);
+  }
+  // Remove the trailing comma and space
+  if (!formatted_headers.empty()) {
+    formatted_headers.pop_back();
+    formatted_headers.pop_back();
+  }
+  return formatted_headers;
+}
+
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
+  // Extract the actual HTTP status code
+  const int http_status_code =
+      static_cast<uint16_t>(response->status_code); // Assuming this static cast is safe because
+                                                    // http status code should be <= 0xffff
+
+  // If response cache is configured, cache the response status code
+  if (config_->responseCacheConfig().has_value()) {
+    // If response_cache_remember_body_headers_ is set, remember the whole response
+    if (config_->responseCacheRememberBodyHeaders()) {
+      config_->responseCache<Filters::Common::ExtAuthz::Response>().Insert(*request_headers_,
+                                                                           *response);
+    } else {
+      config_->responseCache<uint16_t>().Insert(*request_headers_,
+                                                http_status_code); // Store the HTTP status code
+    }
+  }
+
+  // Use std::move to cast the response to an rvalue reference, transferring ownership to
+  // onCompleteSub. This is necessary because onCompleteSub expects an rvalue reference
+  // (ResponsePtr&&).
+  onCompleteSub(std::move(response));
+}
+
+// This code, which handles response headers and metadata, were originally part of onComplete()
+// function. It was moved into a separate method so that it can be invoked from onComplete() and
+// onDecodeHeaders() in case of cache hit.
+void Filter::onCompleteSub(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
   updateLoggingInfo();
+  // ENVOY_STREAM_LOG(info, "ext_authz server response: status_code={}, headers_to_append={},
+  // headers_to_set={}, headers_to_add={}, response_headers_to_add={}, response_headers_to_set={},
+  // body={}", *decoder_callbacks_, static_cast<int>(response->status_code),
+  // formatHeaders(response->headers_to_append), formatHeaders(response->headers_to_set),
+  // formatHeaders(response->headers_to_add), formatHeaders(response->response_headers_to_add),
+  // formatHeaders(response->response_headers_to_set), response->body);
 
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {
