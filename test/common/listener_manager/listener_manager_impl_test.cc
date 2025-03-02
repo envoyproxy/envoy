@@ -53,6 +53,7 @@ using testing::Throw;
 
 // For internal listener test only.
 SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
+SINGLETON_MANAGER_REGISTRATION(reverse_conn_registry);
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
@@ -66,6 +67,9 @@ public:
     ASSERT_NE(nullptr, server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
                            "internal_listener_registry_singleton",
                            [registry = internal_registry_]() { return registry; }));
+    ASSERT_NE(nullptr, server_.singletonManager().getTyped<Network::RevConnRegistry>(
+                           "reverse_conn_registry_singleton",
+                           [registry = rev_conn_registry_]() { return registry; }));
   }
 
   /**
@@ -754,6 +758,76 @@ filter_chains:
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, RejectReverseConnListenerWithNullRegistry) {
+  // When the reverse conn registry is not set, the reverse conn listener
+  // config will not be built.
+  const std::string yaml = R"EOF(
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    reverse_connection_listener_config: {}
+    filter_chains:
+    - filters:
+      name: foo
+      )EOF";
+
+  // Simulate reverse_conn_registry being nullptr
+  rev_conn_registry_ = nullptr;
+
+  EXPECT_NO_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
+
+  const auto& listeners = manager_->listeners();
+  ASSERT_EQ(listeners.size(), 1);
+  EXPECT_FALSE(listeners[0].get().reverseConnectionListenerConfig().has_value());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, RejectReverseConnListenerWithInvalidConfig) {
+  // Reverse conn listener is not built when the listener's reverse conn listener
+  // config has missing fields.
+  const std::string yaml = R"EOF(
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    reverse_connection_listener_config: {}
+    filter_chains:
+    - filters:
+      name: foo
+      )EOF";
+
+  // Set up the expectation that fromAnyConfig will return an InvalidArgumentError
+  EXPECT_CALL(*rev_conn_registry_, fromAnyConfig(_))
+      .WillOnce(Return(ByMove(absl::InvalidArgumentError("Source node ID is missing in reverse connection listener config"))));
+
+  EXPECT_THROW_WITH_REGEX(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+      "failed to unpack reverse connection config");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, AcceptReverseConnListenerWithValidConfig) {
+  // Reverse conn listener built successfully with a valid config.
+  const std::string yaml = R"EOF(
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    reverse_connection_listener_config: {}
+    filter_chains:
+    - filters:
+      name: foo
+      )EOF";
+
+  // Set up the expectation that fromAnyConfig will return a valid configuration
+  EXPECT_CALL(*rev_conn_registry_, fromAnyConfig(_))
+      .WillOnce(Return(ByMove(std::move(reverse_connection_listener_config_))));
+  EXPECT_NO_THROW(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
+
+  const auto& listeners = manager_->listeners();
+  ASSERT_EQ(listeners.size(), 1);
+  EXPECT_TRUE(listeners[0].get().reverseConnectionListenerConfig().has_value());
 }
 
 TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {

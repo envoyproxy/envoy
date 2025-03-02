@@ -102,13 +102,22 @@ private:
   absl::optional<HttpServerPropertiesCache::Origin> origin_;
 };
 
+using CreateConnectionDataFn =
+    std::function<Upstream::Host::CreateConnectionData(HttpConnPoolImplBase& pool)>;
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t effective_concurrent_stream_limit,
-               uint64_t configured_concurrent_stream_limit,
-               OptRef<Upstream::Host::CreateConnectionData> opt_data)
+  ActiveClient(
+      HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+      uint64_t effective_concurrent_stream_limit, uint64_t configured_concurrent_stream_limit,
+      OptRef<Upstream::Host::CreateConnectionData> opt_data,
+      CreateConnectionDataFn connection_fn =
+          [](HttpConnPoolImplBase& parent) {
+            return static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)
+                ->host()
+                ->createConnection(parent.dispatcher(), parent.socketOptions(),
+                                   parent.transportSocketOptions());
+          })
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
                                             configured_concurrent_stream_limit) {
@@ -116,11 +125,8 @@ public:
       initialize(opt_data.value(), parent);
       return;
     }
-    // The static cast makes sure we call the base class host() and not
-    // HttpConnPoolImplBase::host which is of a different type.
-    Upstream::Host::CreateConnectionData data =
-        static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)->host()->createConnection(
-            parent.dispatcher(), parent.socketOptions(), parent.transportSocketOptions());
+    ENVOY_LOG(debug, "Creating CreateConnectionData");
+    Upstream::Host::CreateConnectionData data = connection_fn(parent);
     initialize(data, parent);
   }
 
@@ -204,7 +210,8 @@ class MultiplexedActiveClientBase : public CodecClientCallbacks,
 public:
   MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
                               uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
-                              OptRef<Upstream::Host::CreateConnectionData> data);
+                              OptRef<Upstream::Host::CreateConnectionData> data,
+                              CreateConnectionDataFn connection_fn = nullptr);
   ~MultiplexedActiveClientBase() override = default;
   // Caps max streams per connection below 2^31 to prevent overflow.
   static uint64_t maxStreamsPerConnection(uint64_t max_streams_config);
