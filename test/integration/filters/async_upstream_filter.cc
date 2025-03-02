@@ -60,7 +60,7 @@ public:
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   }
   void onComplete() override { stream_ = nullptr; }
-  void onReset() override {}
+  void onReset() override { stream_ = nullptr; }
 
   ~AsyncUpstreamFilter() {
     if (stream_) {
