@@ -42,15 +42,17 @@ public:
 
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).
+   * @param direction is the direction of the drain.
    * @param drain_complete_cb will be invoked once the drain sequence is finished. The parameter is
    * optional and can be an unassigned function.
    */
-  virtual void startDrainSequence(std::function<void()> drain_complete_cb) PURE;
+  virtual void startDrainSequence(Network::DrainDirection direction,
+                                  std::function<void()> drain_complete_cb) PURE;
 
   /**
-   * @return whether the drain sequence has started.
+   * @return whether the drain sequence has started for this direction.
    */
-  virtual bool draining() const PURE;
+  virtual bool draining(Network::DrainDirection) const PURE;
 
   /**
    * Invoked in the newly launched primary process to begin the parent shutdown sequence. At the end
