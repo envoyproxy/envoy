@@ -40,10 +40,7 @@ message GradientControllerConfig {
     google.protobuf.UInt32Value max_concurrency_limit = 2 [(validate.rules).uint32 = {gt: 0}];
 
     // The period of time samples are taken to recalculate the concurrency limit.
-    google.protobuf.Duration concurrency_update_interval = 3 [(validate.rules).duration = {
-      required: true
-      gt {}
-    }];
+    google.protobuf.Duration concurrency_update_interval = 3 [(validate.rules).duration = {gt {}}];
   }
 
   // Parameters controlling the periodic minRTT recalculation.
