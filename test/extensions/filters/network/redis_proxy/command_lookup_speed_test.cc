@@ -65,13 +65,13 @@ public:
     for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_, custom_command_names_);
     }
 
     for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_, custom_command_names_);
     }
   }
 
@@ -90,6 +90,7 @@ public:
       std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
+  absl::flat_hash_set<std::string> custom_command_names_;
 };
 
 } // namespace RedisProxy
