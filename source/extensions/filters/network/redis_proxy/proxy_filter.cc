@@ -30,7 +30,10 @@ ProxyFilterConfig::ProxyFilterConfig(
       external_auth_expiration_enabled_(external_auth_enabled_ &&
                                         config.external_auth_provider().enable_auth_expiration()),
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
-      time_source_(time_source), redis_custom_command_names_(config.redis_custom_command_names()) {
+      redis_custom_command_names_(
+        absl::flat_hash_set<std::string>(
+          config.redis_custom_command_names().begin(), config.redis_custom_command_names().end())),
+      time_source_(time_source) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
     ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
