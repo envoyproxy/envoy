@@ -417,14 +417,14 @@ TEST(MtlsAuthenticatedMatcher, NoSSL) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
 
-  envoy::config::rbac::v3::Principal::MTlsAuthenticated auth;
-  auth.set_any_validated_client_certificate(true);
-  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+  envoy::config::rbac::v3::Principal principal;
+  principal.mutable_mtls_authenticated()->set_any_validated_client_certificate(true);
+  checkMatcher(*Matcher::create(principal, factory_context), false, conn);
 
-  auto* matcher = auth.mutable_san_matcher();
+  auto* matcher = principal.mutable_mtls_authenticated()->mutable_san_matcher();
   matcher->set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
   matcher->mutable_matcher()->MergeFrom(TestUtility::createRegexMatcher(".*"));
-  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+  checkMatcher(*Matcher::create(principal, factory_context), false, conn);
 }
 
 // This matcher will not match in any configuration if the peer certificate is not validated.
