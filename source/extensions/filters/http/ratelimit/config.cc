@@ -23,9 +23,11 @@ absl::StatusOr<Http::FilterFactoryCb> RateLimitFilterConfig::createFilterFactory
   auto& server_context = context.serverFactoryContext();
 
   ASSERT(!proto_config.domain().empty());
+  absl::Status status = absl::OkStatus();
   FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, server_context.localInfo(),
                                                        context.scope(), server_context.runtime(),
-                                                       server_context.httpContext()));
+                                                       server_context.httpContext(), status));
+  RETURN_IF_NOT_OK_REF(status);
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
 
