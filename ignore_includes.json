@@ -1,0 +1,5 @@
+{
+    "ignore_include_patterns": [
+      "^envoy/.*"
+    ]
+}

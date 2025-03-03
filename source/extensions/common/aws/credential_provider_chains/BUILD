@@ -49,6 +49,8 @@ envoy_cc_library(
     deps = [
         "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//source/extensions/common/aws/credential_provider_chains:credentials_provider_chain_factories_lib",
+        "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
+        "//source/extensions/common/aws:credentials_provider_interface",
     ],
 )
 
