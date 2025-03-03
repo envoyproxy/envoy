@@ -93,10 +93,10 @@ public:
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
-  virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
-                                      SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,
-                                      const StreamInfo::StreamInfo& stream_info,
-                                      absl::flat_hash_set<std::string> redis_custom_command_names) PURE;
+  virtual SplitRequestPtr
+  makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+              Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info,
+              absl::flat_hash_set<std::string> redis_custom_command_names) PURE;
 };
 
 } // namespace CommandSplitter

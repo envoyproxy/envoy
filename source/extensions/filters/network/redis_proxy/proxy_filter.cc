@@ -30,8 +30,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       external_auth_expiration_enabled_(external_auth_enabled_ &&
                                         config.external_auth_provider().enable_auth_expiration()),
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
-      redis_custom_command_names_(
-        absl::flat_hash_set<std::string>(
+      redis_custom_command_names_(absl::flat_hash_set<std::string>(
           config.redis_custom_command_names().begin(), config.redis_custom_command_names().end())),
       time_source_(time_source) {
 
@@ -124,9 +123,9 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
 }
 
 void ProxyFilter::processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request) {
-  CommandSplitter::SplitRequestPtr split =
-      splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher(),
-                            callbacks_->connection().streamInfo(), config_->redis_custom_command_names_);
+  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(
+      std::move(value), request, callbacks_->connection().dispatcher(),
+      callbacks_->connection().streamInfo(), config_->redis_custom_command_names_);
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.

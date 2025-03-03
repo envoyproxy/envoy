@@ -65,13 +65,15 @@ public:
     for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_, custom_command_names_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_,
+                            custom_command_names_);
     }
 
     for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
       Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
       makeBulkStringArray(*request, {command, "hello"});
-      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_, custom_command_names_);
+      splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_,
+                            custom_command_names_);
     }
   }
 
