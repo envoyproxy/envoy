@@ -30,6 +30,11 @@ minor_behavior_changes:
     :ref:`generate_request_id
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
     will generate a request id on non-present and now on empty ``x-request-id`` header.
+- area: aws
+  change: |
+    AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
+    credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
+    then the original behaviour with a signing failure will occur.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -53,6 +58,11 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: ext_authz
+  change: |
+    Removed validation constraint on :ref:`disabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute.disabled>` so
+    that it can be set to false to enable the filter when it is  by :ref:`default-disabled for the filter chain
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`.
 - area: original_src filter
   change: |
     Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the

@@ -9,6 +9,8 @@
 
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -1556,14 +1558,11 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   // Forbidden
   expectDocument(403, std::move(std::string()));
-
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
                                        MetadataCredentialsProviderBase::getCacheDuration()),
                                    nullptr));
-
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
@@ -2358,6 +2357,43 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(WebIdentityCredentialsProviderTest, ExpiredTokenException) {
+  // Setup timer.
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectDocument(400, std::move(R"EOF(
+{
+    "Error": {
+        "Code": "ExpiredTokenException",
+        "Message": "Token expired: current date/time 1740387458 must be before the expiration date/time 1740319004",
+        "Type": "Sender"
+    },
+    "RequestId": "989dcb5c-a58e-492b-92eb-d9b8c836d254"
+}
+)EOF"));
+
+  // No need to restart timer since credentials are fetched from cache.
+  // Even though as per `Expiration` field (in wrong format) the credentials are expired
+  // the credentials won't be refreshed until the next refresh period (1hr) or new expiration
+  // value implicitly set to a value same as refresh interval.
+
+  setupProvider();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
 TEST_F(WebIdentityCredentialsProviderTest, BadExpirationFormat) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
@@ -2560,21 +2596,6 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(WebIdentityCredentialsProviderTest, LibcurlEnabled) {
-  setupProviderWithLibcurl();
-  // Won't call fetch or cancel on metadata fetcher.
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).Times(0);
-  EXPECT_CALL(*raw_metadata_fetcher_, cancel()).Times(0);
-
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-
-  // Below line is not testing anything, will just avoid asan failure with memory leak.
-  metadata_fetcher_.reset(raw_metadata_fetcher_);
-}
-
 class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
 public:
   MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
@@ -2594,23 +2615,20 @@ public:
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
-       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
-      (const));
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
               (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
                const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
                absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-               absl::string_view),
-              (const));
+               absl::string_view));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
               (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
                const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-               absl::string_view),
-              (const));
+               absl::string_view));
 };
 
 class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
@@ -2631,8 +2649,7 @@ public:
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
-       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
-      (const));
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 };
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
@@ -2913,9 +2930,8 @@ TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
-
-  const Credentials creds = chain.getCredentials();
-  EXPECT_EQ(Credentials(), creds);
+  const absl::StatusOr<Credentials> creds = chain.chainGetCredentials();
+  EXPECT_EQ(Credentials(), creds.value());
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
@@ -2931,8 +2947,9 @@ TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  const Credentials ret_creds = chain.getCredentials();
-  EXPECT_EQ(creds, ret_creds);
+  const absl::StatusOr<Credentials> ret_creds = chain.chainGetCredentials();
+
+  EXPECT_EQ(creds, ret_creds.value());
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
@@ -2948,8 +2965,37 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  const Credentials ret_creds = chain.getCredentials();
-  EXPECT_EQ(creds, ret_creds);
+  const absl::StatusOr<Credentials> ret_creds = chain.chainGetCredentials();
+  EXPECT_EQ(creds, ret_creds.value());
+}
+
+TEST(CredentialsProviderChainTest, CheckChainReturnsPendingInCorrectOrder) {
+  auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
+  auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
+
+  EXPECT_CALL(*mock_provider1, getCredentials())
+      .WillRepeatedly(Return(Credentials("provider1", "1")));
+  EXPECT_CALL(*mock_provider2, getCredentials())
+      .WillRepeatedly(Return(Credentials("provider2", "2")));
+  EXPECT_CALL(*mock_provider1, providerName()).WillRepeatedly(Return("provider1"));
+  EXPECT_CALL(*mock_provider2, providerName()).WillRepeatedly(Return("provider2"));
+
+  CredentialsProviderChain chain;
+  chain.add(mock_provider1);
+  chain.add(mock_provider2);
+
+  auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
+  // We want to ensure that if mock_provider1 returns credentialsPending false, then the credentials
+  // from provider1 are used Mock provider 2 credentialsPending will never be called as provider 1
+  // will trigger early exit
+  EXPECT_CALL(*mock_provider1, credentialsPending()).WillOnce(Return(false));
+  EXPECT_CALL(*mock_provider2, credentialsPending()).Times(0);
+
+  bool pending = chain.addCallbackIfChainCredentialsPending(std::move(cb));
+  EXPECT_EQ(pending, false);
+  auto creds = chain.chainGetCredentials();
+  EXPECT_EQ(creds.accessKeyId(), "provider1");
+  EXPECT_EQ(creds.secretAccessKey(), "1");
 }
 
 class CustomCredentialsProviderChainTest : public testing::Test {};
@@ -3028,10 +3074,226 @@ TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
   auto provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
       inline_credential.access_key_id(), inline_credential.secret_access_key(),
       inline_credential.session_token());
-  const Credentials creds = provider->getCredentials();
-  EXPECT_EQ("TestAccessKey", creds.accessKeyId().value());
-  EXPECT_EQ("TestSecret", creds.secretAccessKey().value());
-  EXPECT_EQ("TestSessionToken", creds.sessionToken().value());
+  const absl::StatusOr<Credentials> creds = provider->getCredentials();
+  EXPECT_EQ("TestAccessKey", creds->accessKeyId().value());
+  EXPECT_EQ("TestSecret", creds->secretAccessKey().value());
+  EXPECT_EQ("TestSessionToken", creds->sessionToken().value());
+}
+
+class AsyncCredentialHandlingTest : public testing::Test {
+public:
+  AsyncCredentialHandlingTest()
+      : raw_metadata_fetcher_(new MockMetadataFetcher), message_(new Http::RequestMessageImpl()){};
+
+  void addMethod(const std::string& method) { message_->headers().setMethod(method); }
+
+  void addPath(const std::string& path) { message_->headers().setPath(path); }
+
+  MockMetadataFetcher* raw_metadata_fetcher_;
+  MetadataFetcherPtr metadata_fetcher_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  WebIdentityCredentialsProviderPtr provider_;
+  Event::MockTimer* timer_{};
+  NiceMock<Upstream::MockClusterManager> cm_;
+  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  std::shared_ptr<AwsClusterManager> base_manager_;
+  Http::RequestMessagePtr message_;
+};
+
+TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+      MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  std::chrono::seconds initialization_timer = std::chrono::seconds(2);
+
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+      {};
+
+  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+  manager_optref_.emplace(base_manager_);
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+
+  provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+      context_, manager_optref_, "cluster_2",
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      refresh_state, initialization_timer, cred_provider);
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  auto chain = std::make_shared<CredentialsProviderChain>();
+  chain->add(provider_);
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+      "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
+      Common::Aws::AwsSigningHeaderExclusionVector{});
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).WillRepeatedly(Invoke([&signer]() {
+    // This will check that we see true from credentialsPending by the time we call fetch
+    auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
+    Http::RequestMessagePtr message(new Http::RequestMessageImpl());
+
+    auto result = signer->addCallbackIfCredentialsPending(std::move(cb));
+    EXPECT_TRUE(result);
+  }));
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+}
+
+TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) {
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+      MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  std::chrono::seconds initialization_timer = std::chrono::seconds(2);
+
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+      {};
+  // ::testing::FLAGS_gmock_verbose = "error";
+  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+  manager_optref_.emplace(base_manager_);
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+
+  provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+      context_, manager_optref_, "cluster_2",
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      refresh_state, initialization_timer, cred_provider);
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  auto chain = std::make_shared<MockCredentialsProviderChain>();
+  EXPECT_CALL(*chain, onCredentialUpdate());
+  EXPECT_CALL(*chain, chainGetCredentials()).WillRepeatedly(Return(Credentials("akid", "skid")));
+
+  auto document = R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "akid",
+        "SecretAccessKey": "secret",
+        "SessionToken": "token",
+        "Expiration": 1.514869445E9
+      }
+    }
+  }
+}
+)EOF";
+
+  auto handle = provider_->subscribeToCredentialUpdates(*chain);
+
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+      "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
+      Common::Aws::AwsSigningHeaderExclusionVector{});
+  addMethod("GET");
+  addPath("/");
+
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
+      .WillRepeatedly(
+          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                                     MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(document));
+          }));
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  // We now have credentials so sign should complete immediately
+  auto result = signer->sign(*message_, false, "");
+  ASSERT_TRUE(result.ok());
+}
+
+TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+      MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  std::chrono::seconds initialization_timer = std::chrono::seconds(2);
+
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
+      {};
+
+  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+  manager_optref_.emplace(base_manager_);
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+
+  provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+      context_, manager_optref_, "cluster_2",
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      refresh_state, initialization_timer, cred_provider);
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  auto chain = std::make_shared<MockCredentialsProviderChain>();
+  EXPECT_CALL(*chain, onCredentialUpdate());
+  EXPECT_CALL(*chain, chainGetCredentials()).WillRepeatedly(Return(Credentials("akid", "skid")));
+  auto chain2 = std::make_shared<MockCredentialsProviderChain>();
+
+  auto document = R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "AssumeRoleWithWebIdentityResult": {
+      "Credentials": {
+        "AccessKeyId": "akid",
+        "SecretAccessKey": "secret",
+        "SessionToken": "token",
+        "Expiration": 1.514869445E9
+      }
+    }
+  }
+}
+)EOF";
+
+  auto handle = provider_->subscribeToCredentialUpdates(*chain);
+  auto handle2 = provider_->subscribeToCredentialUpdates(*chain);
+
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+      "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
+      Common::Aws::AwsSigningHeaderExclusionVector{});
+  addMethod("GET");
+  addPath("/");
+
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
+      .WillRepeatedly(
+          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                                     MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(document));
+          }));
+
+  handle2.reset();
+  chain2.reset();
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  // We now have credentials so sign should complete immediately
+  auto result = signer->sign(*message_, false, "");
+  ASSERT_TRUE(result.ok());
 }
 
 } // namespace Aws

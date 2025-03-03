@@ -849,6 +849,54 @@ TEST_F(AwsLambdaFilterTest, SignWithHostRewritePerRoute) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }
 
+// Verify filter decodeData functionality when credentials are pending.
+TEST_F(AwsLambdaFilterTest, DecodeHeadersCredentialsPending) {
+  auto filter_settings =
+      setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
+  EXPECT_CALL(*(filter_settings->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
+  EXPECT_CALL(*(filter_settings->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+  Common::Aws::CredentialsPendingCallback capture;
+  EXPECT_CALL(*(filter_settings->signer_),
+              addCallbackIfCredentialsPending(An<Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+  // We should see continueDecoding called when the captured callback is triggered
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  capture();
+}
+
+// Verify filter decodeHeaders functionality when credentials are pending.
+TEST_F(AwsLambdaFilterTest, DecodeDataCredentialsPending) {
+  auto filter_settings =
+      setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
+  Common::Aws::CredentialsPendingCallback capture;
+  EXPECT_CALL(*(filter_settings->signer_),
+              addCallbackIfCredentialsPending(An<Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
+
+  EXPECT_CALL(*(filter_settings->signer_), sign(An<Http::RequestHeaderMap&>(),
+                                                An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status { return absl::OkStatus(); }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, true));
+  // We should see continueDecoding called when the captured callback is triggered
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  capture();
+}
+
 } // namespace
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters
