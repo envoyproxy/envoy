@@ -3,11 +3,12 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/base/attributes.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-static void releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }
+static ABSL_ATTRIBUTE_NOINLINE void releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }
 
 TEST(ReleaseAssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
