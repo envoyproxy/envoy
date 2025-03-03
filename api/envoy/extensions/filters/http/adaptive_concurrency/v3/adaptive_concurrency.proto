@@ -40,7 +40,10 @@ message GradientControllerConfig {
     google.protobuf.UInt32Value max_concurrency_limit = 2 [(validate.rules).uint32 = {gt: 0}];
 
     // The period of time samples are taken to recalculate the concurrency limit.
-    google.protobuf.Duration concurrency_update_interval = 3 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration concurrency_update_interval = 3 [(validate.rules).duration = {
+      required: true
+      gt {}
+    }];
   }
 
   // Parameters controlling the periodic minRTT recalculation.
@@ -53,10 +56,7 @@ message GradientControllerConfig {
     // The time interval between recalculating the minimum request round-trip time. Has to be
     // positive. If set to zero, dynamic sampling of the minRTT is disabled. This value must not
     // be set to a value in the range (0, 1ms).
-    google.protobuf.Duration interval = 1 [(validate.rules).duration = {
-      required: true
-      gte {nanos: 1000000}
-    }];
+    google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
     // The fixed value for the minRTT. This value is used when minRTT is not sampled dynamically.
     // If dynamic sampling of the minRTT is disabled, this field must be set.
