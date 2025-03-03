@@ -329,7 +329,7 @@ message Principal {
   }
 
   // Authentication attributes for a downstream.
-  // This type is superceded by `MTlsAuthenticated`, which should be used for most
+  // This type is superseded by `MTlsAuthenticated`, which should be used for most
   // use cases due to it's improved security.
   message Authenticated {
     option (udpa.annotations.versioning).previous_message_type =
@@ -375,7 +375,7 @@ message Principal {
     bool any = 3 [(validate.rules).bool = {const: true}];
 
     // Authenticated attributes that identify the downstream.
-    // This field is superceded by `mtls_authenticated`, which should be used for most
+    // This field is superseded by `mtls_authenticated`, which should be used for most
     // use cases due to it's improved security.
     Authenticated authenticated = 4;
 
