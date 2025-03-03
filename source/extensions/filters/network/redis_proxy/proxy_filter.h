@@ -71,6 +71,8 @@ public:
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
 
+  const absl::flat_hash_set<std::string> redis_custom_command_names_;
+
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
