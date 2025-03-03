@@ -63,7 +63,7 @@ public:
 
   /**
    * Initialize the user agent from request headers. This is only done once and the user-agent
-   * is assumed to be the same for further requests.  Downstream request counter is incremented for
+   * is assumed to be the same for further requests. Downstream request counter is incremented for
    * for each request.
    * @param headers supplies the request headers.
    * @param prefix supplies the stat prefix for the UA stats.
