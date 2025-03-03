@@ -342,7 +342,8 @@ message Principal {
     // unset, it applies to any user that is allowed by the downstream TLS configuration.
     // If :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
     // is false or :ref:`trust_chain_verification <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trust_chain_verification>`
-    // is set to `ACCEPT_UNTRUSTED`, then no authentication is required.
+    // is set to :ref:`ACCEPT_UNTRUSTED <envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.CertificateValidationContext.TrustChainVerification.ACCEPT_UNTRUSTED>`,
+    // then no authentication is required.
     type.matcher.v3.StringMatcher principal_name = 2;
   }
 
