@@ -44,11 +44,11 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       case envoy::config::cluster::v3::Cluster::STATIC:
         cluster_name = "envoy.cluster.static";
         break;
-      case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
-        cluster_name = "envoy.cluster.logical_dns";
-        break;
       case envoy::config::cluster::v3::Cluster::STRICT_DNS:
         cluster_name = "envoy.cluster.strict_dns";
+        break;
+      case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
+        cluster_name = "envoy.cluster.logical_dns";
         break;
       case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
         cluster_name = "envoy.cluster.original_dst";

@@ -44,24 +44,6 @@
       "type": "shell",
       "command": "tools/local_fix_format.sh $(git diff --name-only | grep -E '.(h|c|cc|proto)$')",
       "problemMatcher": []
-    },
-    {
-      "label": "Build Debug Envoy (--config=docker-clang)",
-      "type": "shell",
-      "command": "bazel build -c dbg --//source/extensions/wasm_runtime/v8:enabled=false --config=docker-clang envoy",
-      "problemMatcher": []
-    },
-    {
-      "label": "Build Debug Envoy Test (--config=docker-clang)",
-      "type": "shell",
-      //"command": "bazel build -c dbg --config=docker-clang //test/common/router:router_test",
-      //"command": "bazel build -c dbg --config=docker-clang //test/integration:shadow_policy_integration_test",
-      // "command": "bazel build -c dbg --config=docker-clang //test/integration:mixed_upstream_integration_test",
-      //"command": "bazel build -c dbg --config=docker-clang //test/extensions/http/original_ip_detection/xff:xff_detection_test",
-      //"command": "bazel build -c dbg --config=docker-clang //test/common/http:conn_manager_utility_test",
-      "command": "bazel build -c dbg --config=docker-clang //test/extensions/clusters/logical_dns:logical_dns_cluster_test",
-      //"command": "bazel build -c dbg --config=docker-clang //test/common/upstream:cluster_manager_impl_test",
-      "problemMatcher": []
-    },
+    }
   ]
 }

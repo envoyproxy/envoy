@@ -218,6 +218,15 @@ DnsClusterImpl::ResolveTarget::~ResolveTarget() {
   }
 }
 
+bool DnsClusterImpl::ResolveTarget::isSuccessfulResponse(
+    const std::list<Network::DnsResponse>& response,
+    const Network::DnsResolver::ResolutionStatus& status) {
+  return status == Network::DnsResolver::ResolutionStatus::Completed &&
+         (!parent_.all_addresses_in_single_endpoint_ || /* strict DNS accepts empty responses */
+          (parent_.all_addresses_in_single_endpoint_ &&
+           !response.empty())); /* logical DNS doesn't */
+}
+
 void DnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->configUpdateStats().update_attempt_.inc();
@@ -231,10 +240,7 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
 
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
-        if (status == Network::DnsResolver::ResolutionStatus::Completed &&
-            (!parent_.all_addresses_in_single_endpoint_ || /* strict DNS accepts empty responses */
-             (parent_.all_addresses_in_single_endpoint_ &&
-              !response.empty()))) /* logical DNS doesn't */ {
+        if (isSuccessfulResponse(response, status)) {
           parent_.info_->configUpdateStats().update_success_.inc();
 
           HostVector new_hosts;
@@ -295,12 +301,6 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
               all_hosts_.insert({host->address()->asString(), host});
             }
 
-            // Note that this will trigger priority update callbacks everytime a logical
-            // DNS cluster receives a different address. In the previous implementation,
-            // it would only issue that callback the first time a DNS response was received.
-            // After that, it would change the address of the host "in place", without
-            // any changes to priorities and others. Now, as we're fully removing and adding
-            // hosts, we need to trigger the priority update callback every time.
             parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoints_.priority());
           } else {
             parent_.info_->configUpdateStats().update_no_rebuild_.inc();

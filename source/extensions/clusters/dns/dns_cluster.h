@@ -54,6 +54,8 @@ private:
                   const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
     void startResolve();
+    bool isSuccessfulResponse(const std::list<Network::DnsResponse>& response,
+                              const Network::DnsResolver::ResolutionStatus& status);
 
     DnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};

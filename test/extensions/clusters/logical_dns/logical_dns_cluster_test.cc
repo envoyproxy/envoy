@@ -177,8 +177,6 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
-    // Updating the dynamic host, now that the logical DNS implementation
-    // is not using "in-place" address updates anymore.
     logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
@@ -215,15 +213,10 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    // Now that we're moving towards a single implementation of DNS clusters,
-    // this would be expected for logical DNS, as we're reusing the flows
-    // from strict DNS.
     EXPECT_CALL(membership_updated_, ready());
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
-    // Updating the dynamic host, now that the logical DNS implementation
-    // is not using "in-place" address updates anymore.
     logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
