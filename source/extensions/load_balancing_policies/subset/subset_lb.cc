@@ -871,6 +871,33 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   }
 }
 
+void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority, uint64_t seed) {
+  while (host_sets_.size() <= priority) {
+    host_sets_.push_back({HostHashSet(), HostHashSet()});
+  }
+  auto& [old_hosts, new_hosts] = host_sets_[priority];
+
+  HostVector added;
+  HostVector removed;
+
+  for (const auto& host : old_hosts) {
+    if (new_hosts.count(host) == 0) {
+      removed.emplace_back(host);
+    }
+  }
+
+  for (const auto& host : new_hosts) {
+    if (old_hosts.count(host) == 0) {
+      added.emplace_back(host);
+    }
+  }
+
+  subset_.update(priority, new_hosts, added, removed, seed);
+
+  old_hosts.swap(new_hosts);
+  new_hosts.clear();
+}
+
 SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
     LoadBalancerContext* wrapped,
     const std::set<std::string>& filtered_metadata_match_criteria_names)

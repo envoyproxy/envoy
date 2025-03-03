@@ -23,6 +23,28 @@ thread_local absl::InlinedVector<Slice::StoragePtr,
                                  OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::free_list_max_>
     OwnedImpl::OwnedImplReservationSlicesOwnerMultiple::free_list_;
 
+uint64_t Slice::prepend(const void* data, uint64_t size) {
+  const uint8_t* src = static_cast<const uint8_t*>(data);
+  uint64_t copy_size;
+  if (dataSize() == 0) {
+    // There is nothing in the slice, so put the data at the very end in case the caller
+    // later tries to prepend anything else in front of it.
+    copy_size = std::min(size, reservableSize());
+    reservable_ = capacity_;
+    data_ = capacity_ - copy_size;
+  } else {
+    if (data_ == 0) {
+      // There is content in the slice, and no space in front of it to write anything.
+      return 0;
+    }
+    // Write into the space in front of the slice's current content.
+    copy_size = std::min(size, data_);
+    data_ -= copy_size;
+  }
+  memcpy(base_ + data_, src + size - copy_size, copy_size); // NOLINT(safe-memcpy)
+  return copy_size;
+}
+
 void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
   bool new_slice_needed = slices_.empty();
