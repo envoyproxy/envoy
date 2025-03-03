@@ -1007,6 +1007,45 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
   }
 }
 
+TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
+  if (!(GetParam().upstream_protocol == Http::CodecType::HTTP2)) {
+    return;
+  }
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    proxy_config.mutable_tunneling_config()->set_use_post(true);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+
+  upstream_tls_ = true;
+  config_helper_.configureUpstreamTls();
+
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+  EXPECT_EQ(Http::Headers::get().SchemeValues.Https,
+            upstream_request_->headers()
+                .get(Http::LowerCaseString(Http::Headers::get().Scheme))[0]
+                ->value()
+                .getStringView());
+  closeConnection(fake_upstream_connection_);
+}
+
 TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
   downstream_buffer_limit_ = 1024;
   config_helper_.setBufferLimits(1024, 2024);
