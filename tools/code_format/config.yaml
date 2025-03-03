@@ -105,6 +105,7 @@ paths:
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
+    - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
@@ -133,6 +134,7 @@ paths:
     - source/common/secret/sds_api.cc
     - source/common/config/config_provider_impl.h
     - source/common/grpc/google_grpc_creds_impl.cc
+    - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
@@ -171,7 +173,6 @@ paths:
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
     - source/extensions/filters/http/health_check
-    - source/extensions/filters/http/ip_tagging
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
     - source/extensions/filters/http/local_ratelimit
@@ -445,9 +446,12 @@ visibility_excludes:
 - source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
+- source/extensions/filters/http/credential_injector/BUILD
 - source/extensions/filters/network/common/BUILD
 - source/extensions/filters/network/generic_proxy/interface/BUILD
 - source/extensions/http/header_validators/envoy_default/BUILD
+- source/extensions/http/injected_credentials/common/BUILD
+- source/extensions/http/injected_credentials/generic/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/transport_sockets/tap/BUILD
 - source/extensions/udp_packet_writer/default/BUILD

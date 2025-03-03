@@ -20,6 +20,8 @@ public:
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
+  void onDefaultNetworkChangeEvent(int network);
+  // TODO(abeyad): Remove once migrated to onDefaultNetworkChangeEvent().
   void onDefaultNetworkChanged(int network);
   void onDefaultNetworkUnavailable();
   void onDefaultNetworkAvailable();

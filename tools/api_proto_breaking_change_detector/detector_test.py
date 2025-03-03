@@ -85,7 +85,7 @@ class TestAllowedChanges(BreakingChangeDetectorTests):
 
 
 class BufTests(TestAllowedChanges, TestBreakingChanges, unittest.TestCase):
-    _buf_path = runfiles.Create().Rlocation("com_github_bufbuild_buf/bin/buf")
+    _buf_path = runfiles.Create().Rlocation("rules_buf_toolchains/buf")
 
     @classmethod
     def _run_command_print_error(cls, cmd):

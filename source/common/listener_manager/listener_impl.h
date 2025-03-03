@@ -147,6 +147,10 @@ public:
   bool drainClose() const override {
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected function call");
+    return nullptr;
+  }
   Server::DrainManager& drainManager();
   friend class ListenerImpl;
 

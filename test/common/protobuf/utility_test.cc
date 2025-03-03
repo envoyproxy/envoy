@@ -1694,166 +1694,124 @@ TEST_F(ProtobufUtilityTest, GetYamlStringFromProtoInvalidAny) {
 }
 
 TEST(DurationUtilTest, OutOfRange) {
-  // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-  // is deprecated, this test should only validate the "true" case.
-  for (const std::string strict_duration : {"true", "false"}) {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.strict_duration_validation", strict_duration}});
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_seconds(-1);
-      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-    }
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_nanos(-1);
-      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-    }
-    // Invalid number of nanoseconds.
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_nanos(1000000000);
-      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-    }
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
-      EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-    }
-    // Invalid number of seconds.
-    {
-      ProtobufWkt::Duration duration;
-      constexpr int64_t kMaxInt64Nanoseconds =
-          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
-      duration.set_seconds(kMaxInt64Nanoseconds + 1);
-      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-      // is deprecated, this test should only validate EXPECT_THROW.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-        EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-      } else {
-        EXPECT_NO_THROW(DurationUtil::durationToMilliseconds(duration));
-      }
-    }
-    // Max valid seconds and nanoseconds.
-    {
-      ProtobufWkt::Duration duration;
-      constexpr int64_t kMaxInt64Nanoseconds =
-          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
-      duration.set_seconds(kMaxInt64Nanoseconds);
-      duration.set_nanos(999999999);
-      EXPECT_NO_THROW(DurationUtil::durationToMilliseconds(duration));
-    }
-    // Invalid combined seconds and nanoseconds.
-    {
-      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-      // is deprecated, this test should be executed unconditionally. The test is only
-      // with the flag because without the flag set to false it will trigger a
-      // runtime error (crash) with the current ASAN test suite.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-        ProtobufWkt::Duration duration;
-        constexpr int64_t kMaxInt64Nanoseconds =
-            std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-        duration.set_seconds(kMaxInt64Nanoseconds);
-        duration.set_nanos(999999999);
-        EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
-      }
-    }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(-1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(-1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+  }
+  // Invalid number of nanoseconds.
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(1000000000);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+  }
+  // Invalid number of seconds.
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds + 1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
+  }
+  // Max valid seconds and nanoseconds.
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds);
+    duration.set_nanos(999999999);
+    EXPECT_NO_THROW(DurationUtil::durationToMilliseconds(duration));
+  }
+  // Invalid combined seconds and nanoseconds.
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds);
+    duration.set_nanos(999999999);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), EnvoyException);
   }
 }
 
 TEST(DurationUtilTest, NoThrow) {
-  // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-  // is deprecated, this test should only validate the "true" case.
-  for (const std::string strict_duration : {"true", "false"}) {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.strict_duration_validation", strict_duration}});
-    {
-      // In range test
-      ProtobufWkt::Duration duration;
-      duration.set_seconds(5);
-      duration.set_nanos(10000000);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      EXPECT_TRUE(result.ok());
-      EXPECT_TRUE(result.value() == 5010);
-    }
-    // Below are out-of-range tests
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_seconds(-1);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      EXPECT_FALSE(result.ok());
-    }
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_nanos(-1);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      EXPECT_FALSE(result.ok());
-    }
-    // Invalid number of nanoseconds.
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_nanos(1000000000);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      EXPECT_FALSE(result.ok());
-    }
-    {
-      ProtobufWkt::Duration duration;
-      duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      EXPECT_FALSE(result.ok());
-    }
-    // Invalid number of seconds.
-    {
-      ProtobufWkt::Duration duration;
-      constexpr int64_t kMaxInt64Nanoseconds =
-          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
-      duration.set_seconds(kMaxInt64Nanoseconds + 1);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-      // is deprecated, this test should only validate EXPECT_FALSE.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-        EXPECT_FALSE(result.ok());
-      } else {
-        EXPECT_TRUE(result.ok());
-      }
-    }
-    // Max valid seconds and nanoseconds.
-    {
-      ProtobufWkt::Duration duration;
-      constexpr int64_t kMaxInt64Nanoseconds =
-          (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
-      duration.set_seconds(kMaxInt64Nanoseconds);
-      duration.set_nanos(999999999);
-      const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-      EXPECT_TRUE(result.ok());
-    }
-    // Invalid combined seconds and nanoseconds.
-    {
-      // Once the runtime feature "envoy.reloadable_features.strict_duration_validation"
-      // is deprecated, this test should be executed unconditionally. The test is only
-      // with the flag because without the flag set to false it will trigger a
-      // runtime error (crash) with the current ASAN test suite.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-        ProtobufWkt::Duration duration;
-        constexpr int64_t kMaxInt64Nanoseconds =
-            std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-        duration.set_seconds(kMaxInt64Nanoseconds);
-        duration.set_nanos(999999999);
-        const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-        EXPECT_FALSE(result.ok());
-      }
-    }
+  {
+    // In range test
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(5);
+    duration.set_nanos(10000000);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_TRUE(result.ok());
+    EXPECT_TRUE(result.value() == 5010);
+  }
+  // Below are out-of-range tests
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(-1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(-1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  // Invalid number of nanoseconds.
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(1000000000);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  // Invalid number of seconds.
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds + 1);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
+  }
+  // Max valid seconds and nanoseconds.
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds);
+    duration.set_nanos(999999999);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_TRUE(result.ok());
+  }
+  // Invalid combined seconds and nanoseconds.
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds);
+    duration.set_nanos(999999999);
+    const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
+    EXPECT_FALSE(result.ok());
   }
 }
 
 // Validate that the duration in a message is validated correctly.
 TEST_F(ProtobufUtilityTest, MessageDurationValidation) {
-  // Once the runtime key is deprecated, the scoped_runtime should be removed.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.validate_duration_in_configs", "true"}});
-
   {
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     bootstrap.mutable_stats_flush_interval()->set_seconds(1);

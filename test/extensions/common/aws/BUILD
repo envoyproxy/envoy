@@ -18,6 +18,7 @@ envoy_cc_mock(
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/common/aws:aws_cluster_manager_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
@@ -32,6 +33,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -59,6 +61,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -75,6 +78,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -90,6 +94,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4a_key_derivation_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -151,6 +156,7 @@ envoy_cc_test(
         "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
+        "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",

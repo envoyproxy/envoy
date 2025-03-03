@@ -81,8 +81,14 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
       .WillOnce(testing::Return(OptRef(downstream_callbacks)));
   filter->setDecoderFilterCallbacks(callbacks);
 
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillRepeatedly(testing::ReturnPointee(info.downstream_connection_info_provider_));
+  auto addr = Envoy::Network::Utility::parseInternetAddressNoThrow("1.1.1.1", 1234, false);
+  info.downstream_connection_info_provider_->setRemoteAddress(addr);
+
   std::initializer_list<std::pair<std::string, std::string>> headers = {
-      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}, {"to-be-deleted", "value"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
   Http::TestRequestTrailerMapImpl request_trailers{headers};
   Http::TestResponseHeaderMapImpl response_headers{headers};
