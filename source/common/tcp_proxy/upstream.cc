@@ -524,16 +524,18 @@ void CombinedUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers
   responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() {
+Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() { return downstream_headers_.get(); }
+
+void CombinedUpstream::recordUpstreamSslConnection() {
   if ((type_ != Http::CodecType::HTTP1) && (config_.usePost())) {
+    auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
     const std::string& scheme =
-        is_ssl_ ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
     if (downstream_headers_->Scheme()) {
       downstream_headers_->removeScheme();
     }
     downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
-  return downstream_headers_.get();
 }
 
 void CombinedUpstream::doneReading() {

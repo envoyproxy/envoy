@@ -302,10 +302,7 @@ public:
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
-  void recordUpstreamSslConnection() {
-    auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
-    is_ssl_ = is_ssl ? true : false;
-  }
+  void recordUpstreamSslConnection();
   void addBytesSentCallback(Network::Connection::BytesSentCb) override{};
   // HTTP upstream must not implement converting upstream transport
   // socket from non-secure to secure mode.
@@ -407,7 +404,6 @@ private:
   // during destruction.
   UpstreamRequestPtr upstream_request_;
   Http::CodecType type_;
-  bool is_ssl_ = false;
 };
 
 } // namespace TcpProxy
