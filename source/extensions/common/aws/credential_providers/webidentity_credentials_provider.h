@@ -1,5 +1,6 @@
 #pragma once
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/common/config/datasource.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
@@ -51,6 +52,8 @@ private:
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };
+
+using WebIdentityCredentialsProviderPtr = std::shared_ptr<WebIdentityCredentialsProvider>;
 
 } // namespace Aws
 } // namespace Common

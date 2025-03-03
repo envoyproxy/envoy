@@ -1,27 +1,15 @@
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
-// #include "source/extensions/common/aws/cached_credentials_provider_base.h"
-#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
+#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-// #include "source/extensions/common/aws/signer_base_impl.h"
-// #include "source/extensions/common/aws/signers//sigv4_signer_impl.h"
 
 #include "test/extensions/common/aws/mocks.h"
-// #include "test/mocks/api/mocks.h"
-// #include "test/mocks/event/mocks.h"
-// #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
-// #include "test/mocks/server/listener_factory_context.h"
-// #include "test/mocks/upstream/cluster_update_callbacks.h"
-// #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
-
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
-// #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::_;
@@ -36,39 +24,39 @@ namespace Common {
 namespace Aws {
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
-  public:
-    explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
-        : expected_headers_(expected_headers) {}
-  
-    bool MatchAndExplain(Http::RequestMessage& message,
-                         testing::MatchResultListener* result_listener) const override {
-      const bool equal = TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_headers_);
-      if (!equal) {
-        *result_listener << "\n"
-                         << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
-                         << expected_headers_
-                         << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
-                         << "\n"
-                         << message.headers()
-                         << TestUtility::addLeftAndRightPadding("") // line full of padding
-                         << "\n";
-      }
-      return equal;
+public:
+  explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
+      : expected_headers_(expected_headers) {}
+
+  bool MatchAndExplain(Http::RequestMessage& message,
+                       testing::MatchResultListener* result_listener) const override {
+    const bool equal = TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_headers_);
+    if (!equal) {
+      *result_listener << "\n"
+                       << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
+                       << expected_headers_
+                       << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
+                       << "\n"
+                       << message.headers()
+                       << TestUtility::addLeftAndRightPadding("") // line full of padding
+                       << "\n";
     }
-  
-    void DescribeTo(::std::ostream* os) const override { *os << "Message matches"; }
-  
-    void DescribeNegationTo(::std::ostream* os) const override { *os << "Message does not match"; }
-  
-  private:
-    const Http::TestRequestHeaderMapImpl expected_headers_;
-  };
-  
-  testing::Matcher<Http::RequestMessage&>
-  messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
-    return testing::MakeMatcher(new MessageMatcher(expected_headers));
+    return equal;
   }
-  
+
+  void DescribeTo(::std::ostream* os) const override { *os << "Message matches"; }
+
+  void DescribeNegationTo(::std::ostream* os) const override { *os << "Message does not match"; }
+
+private:
+  const Http::TestRequestHeaderMapImpl expected_headers_;
+};
+
+testing::Matcher<Http::RequestMessage&>
+messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
+  return testing::MakeMatcher(new MessageMatcher(expected_headers));
+}
+
 MATCHER_P(WithName, expectedName, "") {
   *result_listener << "\nexpected { name: \"" << expectedName << "\"} but got {name: \""
                    << arg.name() << "\"}\n";

@@ -1,7 +1,9 @@
 #pragma once
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/common/config/datasource.h"
 #include "source/extensions/common/aws/cached_credentials_provider_base.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -13,8 +15,7 @@ namespace Aws {
  * Adheres to conventions specified in:
  * https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
  */
-class CredentialsFileCredentialsProvider : public CachedCredentialsProviderBase                                  
-  {
+class CredentialsFileCredentialsProvider : public CachedCredentialsProviderBase {
 public:
   CredentialsFileCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,

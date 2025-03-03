@@ -13,8 +13,8 @@ envoy_cc_library(
     srcs = ["config_credentials_provider.cc"],
     hdrs = ["config_credentials_provider.h"],
     deps = [
-        "//source/extensions/common/aws:credentials_provider_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/extensions/common/aws:credentials_provider_interface",
     ],
 )
 
@@ -34,6 +34,7 @@ envoy_cc_library(
     deps = [
         "//source/common/config:datasource_lib",
         "//source/extensions/common/aws:credentials_provider_base_lib",
+        "//source/extensions/common/aws:utility_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
@@ -43,8 +44,8 @@ envoy_cc_library(
     srcs = ["environment_credentials_provider.cc"],
     hdrs = ["environment_credentials_provider.h"],
     deps = [
-        "//source/extensions/common/aws:credentials_provider_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/extensions/common/aws:credentials_provider_interface",
     ],
 )
 
@@ -62,9 +63,9 @@ envoy_cc_library(
     srcs = ["webidentity_credentials_provider.cc"],
     hdrs = ["webidentity_credentials_provider.h"],
     deps = [
+        "//source/common/config:datasource_lib",
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
-        "//source/common/config:datasource_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

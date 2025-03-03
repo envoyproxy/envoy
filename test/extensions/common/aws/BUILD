@@ -26,7 +26,6 @@ envoy_cc_mock(
     ],
 )
 
-
 envoy_cc_test(
     name = "aws_cluster_manager_test",
     srcs = ["aws_cluster_manager_test.cc"],
