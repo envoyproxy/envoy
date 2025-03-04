@@ -73,6 +73,9 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const OrMatcher>(principal.or_ids(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated(), context);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kMtlsAuthenticated:
+    return std::make_shared<const MtlsAuthenticatedMatcher>(principal.mtls_authenticated(),
+                                                            context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
     return std::make_shared<const IPMatcher>(principal.source_ip(),
                                              IPMatcher::Type::ConnectionRemote);
@@ -254,6 +257,32 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
     }
   }
   return matcher_.value().match(ssl->subjectPeerCertificate());
+}
+
+MtlsAuthenticatedMatcher::MtlsAuthenticatedMatcher(
+    const envoy::config::rbac::v3::Principal::MTlsAuthenticated& auth,
+    Server::Configuration::CommonFactoryContext& context)
+    : matcher_(auth.has_san_matcher() ? Extensions::TransportSockets::Tls::createStringSanMatcher(
+                                            auth.san_matcher(), context)
+                                      : nullptr) {}
+
+bool MtlsAuthenticatedMatcher::matches(const Network::Connection& connection,
+                                       const Envoy::Http::RequestHeaderMap&,
+                                       const StreamInfo::StreamInfo&) const {
+  const auto& ssl = connection.ssl();
+  if (!ssl) { // connection was not authenticated
+    return false;
+  }
+
+  if (!ssl->peerCertificateValidated()) {
+    return false;
+  }
+
+  if (matcher_ == nullptr) {
+    return true;
+  }
+
+  return ssl->peerCertificateSanMatches(*matcher_);
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
