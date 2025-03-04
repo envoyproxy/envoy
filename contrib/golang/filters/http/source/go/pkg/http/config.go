@@ -53,6 +53,11 @@ var (
 	delayDeleteTime = time.Second * 2 // 2s
 )
 
+type namedConfig struct {
+	name   string
+	config interface{}
+}
+
 func configFinalize(c *httpConfig) {
 	c.Finalize()
 }
@@ -92,7 +97,7 @@ func envoyGoFilterNewHttpPluginConfig(c *C.httpConfig) uint64 {
 		cAPI.HttpLog(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 		return 0
 	}
-	configCache.Store(configNum, parsedConfig)
+	storeConfig(configNum, name, parsedConfig)
 
 	return configNum
 }
@@ -118,8 +123,9 @@ func envoyGoFilterDestroyHttpPluginConfig(id uint64, needDelay int) {
 
 func destroyConfig(id uint64) {
 	c, _ := configCache.LoadAndDelete(id)
-	if conf, ok := c.(api.Config); ok {
-		conf.Destroy()
+	if conf, ok := c.(namedConfig); ok {
+		configParser := getHttpFilterConfigParser(conf.name)
+		configParser.Destroy(conf.config)
 	}
 }
 
@@ -128,17 +134,31 @@ func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint
 	name := utils.BytesToString(namePtr, nameLen)
 	configParser := getHttpFilterConfigParser(name)
 
-	parent, ok := configCache.Load(parentId)
+	parent, ok := loadConfig(parentId)
 	if !ok {
 		panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
 	}
-	child, ok := configCache.Load(childId)
+	child, ok := loadConfig(childId)
 	if !ok {
 		panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
 	}
 
 	new := configParser.Merge(parent, child)
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
-	configCache.Store(configNum, new)
+	storeConfig(configNum, name, new)
 	return configNum
+}
+
+func storeConfig(configNum uint64, name string, config interface{}) {
+	configCache.Store(configNum, namedConfig{
+		name:   name,
+		config: config,
+	})
+}
+
+func loadConfig(configNum uint64) (interface{}, bool) {
+	if c, ok := configCache.Load(configNum); ok {
+		return c.(namedConfig).config, true
+	}
+	return nil, false
 }

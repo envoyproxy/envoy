@@ -9,10 +9,11 @@ package destroyconfig
 */
 import "C"
 import (
+	"unsafe"
+
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 	"google.golang.org/protobuf/types/known/anypb"
-	"unsafe"
 )
 
 const Name = "destroyconfig"
@@ -27,12 +28,6 @@ type config struct {
 	cb api.ConfigCallbackHandler
 }
 
-func (c *config) Destroy() {
-	// call cApi.HttpDefineMetric to store the config pointer
-	c.cb.DefineCounterMetric("")
-	C.envoyGoConfigDestroy(cfgPointer)
-}
-
 type capi struct {
 	api.HttpCAPI
 }
@@ -45,11 +40,17 @@ func (c *capi) HttpDefineMetric(cfg unsafe.Pointer, _ api.MetricType, _ string) 
 }
 
 type parser struct {
-	api.StreamFilterConfigParser
+	api.PassThroughStreamFilterConfigParser
 }
 
 func (p *parser) Parse(_ *anypb.Any, cb api.ConfigCallbackHandler) (interface{}, error) {
 	http.SetHttpCAPI(&capi{})
 	conf := &config{cb}
 	return conf, nil
+}
+
+func (p *parser) Destroy(c interface{}) {
+	// call cApi.HttpDefineMetric to store the config pointer
+	c.(*config).cb.DefineCounterMetric("")
+	C.envoyGoConfigDestroy(cfgPointer)
 }

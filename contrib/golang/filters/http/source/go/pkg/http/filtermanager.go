@@ -45,6 +45,9 @@ func (p *nullParser) Merge(parentConfig interface{}, childConfig interface{}) in
 	return childConfig
 }
 
+func (p *nullParser) Destroy(config interface{}) {
+}
+
 var NullParser api.StreamFilterConfigParser = &nullParser{}
 
 // RegisterHttpFilterFactoryAndConfigParser registers the http filter factory and config parser for the specified plugin.
@@ -61,7 +64,7 @@ func RegisterHttpFilterFactoryAndConfigParser(name string, factory api.StreamFil
 }
 
 func getHttpFilterFactoryAndConfig(name string, configId uint64) (api.StreamFilterFactory, interface{}) {
-	config, ok := configCache.Load(configId)
+	config, ok := loadConfig(configId)
 	if !ok {
 		panic(fmt.Sprintf("config not found, plugin: %s, configId: %d", name, configId))
 	}
