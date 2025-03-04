@@ -73,8 +73,8 @@ message ProtocolConfiguration {
 
   // Specify the filter configuration :ref:`send_body_without_waiting_for_header_response
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
-  // If Envoy is waiting for a header response from the server, setting ``true`` means Envoy will send body to the server
-  // as they arrive. Setting ``false`` means Envoy will buffer the arrived data and not send it to the server immediately.
+  // If the client is waiting for a header response from the server, setting ``true`` means the client will send body to the server
+  // as they arrive. Setting ``false`` means the client will buffer the arrived data and not send it to the server immediately.
   bool send_body_without_waiting_for_header_response = 3;
 }
 
@@ -149,7 +149,7 @@ message ProcessingRequest {
 
   // [#not-implemented-hide:]
   // Specify the filter protocol configurations to be sent to the server.
-  // ``protocol_config`` is only encoded in the first ``ProcessingRequest`` message from Envoy to the server.
+  // ``protocol_config`` is only encoded in the first ``ProcessingRequest`` message from the client to the server.
   ProtocolConfiguration protocol_config = 11;
 }
 
