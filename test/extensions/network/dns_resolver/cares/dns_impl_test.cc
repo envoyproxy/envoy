@@ -819,7 +819,10 @@ public:
           // https://github.com/envoyproxy/envoy/pull/10137#issuecomment-592525544
           if (address == "localhost" && lookup_family == DnsLookupFamily::V4Only) {
             EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
-          } else {
+          } else if (address == "::1" && lookup_family == DnsLookupFamily::V6Only) {
+            EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
+          }
+          else {
             EXPECT_THAT(address_as_string_list, UnorderedElementsAreArray(expected_results));
           }
 
