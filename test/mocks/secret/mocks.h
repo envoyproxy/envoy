@@ -65,5 +65,19 @@ public:
   MOCK_METHOD(absl::Status, onAddOrUpdateSecret, ());
 };
 
+class MockGenericSecretConfigProvider : public GenericSecretConfigProvider {
+public:
+  MockGenericSecretConfigProvider();
+  ~MockGenericSecretConfigProvider() override;
+
+  using SecretType = envoy::extensions::transport_sockets::tls::v3::GenericSecret;
+
+  MOCK_METHOD(SecretType*, secret, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addValidationCallback,
+              (std::function<absl::Status(const SecretType&)>));
+  MOCK_METHOD(Common::CallbackHandlePtr, addUpdateCallback, (std::function<absl::Status()>));
+  MOCK_METHOD(const Init::Target*, initTarget, ());
+};
+
 } // namespace Secret
 } // namespace Envoy
