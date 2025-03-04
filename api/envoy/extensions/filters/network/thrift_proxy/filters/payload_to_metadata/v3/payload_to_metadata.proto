@@ -6,6 +6,8 @@ import "envoy/type/matcher/v3/regex.proto";
 
 import "google/protobuf/struct.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
