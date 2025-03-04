@@ -65,12 +65,12 @@ public:
 
   InstanceImpl getSplitter(absl::flat_hash_set<std::string>&& custom_commands) {
     return InstanceImpl{std::make_unique<NiceMock<MockRouter>>(route_),
-                         *store_.rootScope(),
-                         "redis.foo.",
-                         time_system_,
-                         latency_in_micros_,
-                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
-                         std::move(custom_commands)};
+                        *store_.rootScope(),
+                        "redis.foo.",
+                        time_system_,
+                        latency_in_micros_,
+                        std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+                        std::move(custom_commands)};
   }
 
   const bool latency_in_micros_;
@@ -628,8 +628,8 @@ TEST_F(RedisSingleServerRequestTest, CustomCommands) {
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(*conn_pool_, makeRequest_("test", RespVariantEq(*request), _))
-    .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-  
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+
   handle_ = splitter.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_NE(nullptr, handle_);
 
