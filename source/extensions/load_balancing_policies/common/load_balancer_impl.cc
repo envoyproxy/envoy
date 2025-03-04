@@ -398,6 +398,21 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
           priority_and_source.second};
 }
 
+uint64_t LoadBalancerBase::random(bool peeking) {
+  if (peeking) {
+    stashed_random_.push_back(random_.random());
+    return stashed_random_.back();
+  } else {
+    if (!stashed_random_.empty()) {
+      auto random = stashed_random_.front();
+      stashed_random_.pop_front();
+      return random;
+    } else {
+      return random_.random();
+    }
+  }
+}
+
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
