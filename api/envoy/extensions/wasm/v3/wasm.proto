@@ -134,6 +134,9 @@ message VmConfig {
   EnvironmentVariables environment_variables = 7;
 
   // Secret that contains image pull secret for fetching Wasm plugin from an OCI registry.
+  //
+  // [#comment:TODO(jewertow): Revert hiding once all major OCI registries are supported.]
+  // [#not-implemented-hide:]
   transport_sockets.tls.v3.SdsSecretConfig image_pull_secret = 8;
 }
 
