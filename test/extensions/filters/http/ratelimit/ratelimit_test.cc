@@ -59,9 +59,11 @@ public:
     envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
+    auto status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(
         proto_config, factory_context_.local_info_, *factory_context_.store_.rootScope(),
-        factory_context_.runtime_loader_, factory_context_.http_context_);
+        factory_context_.runtime_loader_, factory_context_.http_context_, status);
+    EXPECT_TRUE(status.ok());
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
