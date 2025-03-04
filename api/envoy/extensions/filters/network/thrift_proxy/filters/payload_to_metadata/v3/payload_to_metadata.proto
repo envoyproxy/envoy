@@ -84,6 +84,7 @@ message PayloadToMetadata {
     KeyValuePair on_missing = 5;
   }
 
+  // The selector to parse thrift struct field
   message FieldSelector {
     // field name to log
     string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -91,8 +92,26 @@ message PayloadToMetadata {
     // field id to match
     int32 id = 2 [(validate.rules).int32 = {lte: 32767 gte: -32768}];
 
-    // next node of the field selector
+    // next node of the field selector -- this takes precedence over the map_child.
     FieldSelector child = 3;
+
+    // next node of the map selector
+    // [#not-implemented-hide:]
+    MapSelector map_child = 4;
+  }
+
+  // The selector to parse thrift map field
+  message MapSelector {
+    option (xds.annotations.v3.message_status).work_in_progress = true;
+
+    // map key to match -- only primitive types are supported.
+    google.protobuf.Value key = 1 [(validate.rules).message = {required: true}];
+
+    // next node of the field selector -- this takes precedence over the map_child.
+    FieldSelector child = 2;
+
+    // next node of the map selector
+    MapSelector map_child = 3;
   }
 
   // The list of rules to apply to requests.
