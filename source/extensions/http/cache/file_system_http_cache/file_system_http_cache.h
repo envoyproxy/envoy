@@ -132,7 +132,9 @@ private:
 // FileSystemHttpCache. The implementation of CacheShared is also split between the
 // two implementation files, accordingly.
 struct CacheShared {
-  CacheShared(ConfigProto config, Stats::Scope& stats_scope);
+  CacheShared(ConfigProto config, Stats::Scope& stats_scope, CacheEvictionThread& eviction_thread);
+  absl::Mutex signal_mu_;
+  std::function<void()> signal_eviction_ ABSL_GUARDED_BY(signal_mu_);
   const ConfigProto config_;
   CacheStatNames stat_names_;
   CacheStats stats_;
@@ -146,6 +148,13 @@ struct CacheShared {
   std::atomic<uint64_t> size_count_ = 0;
   std::atomic<uint64_t> size_bytes_ = 0;
   bool needs_init_ = true;
+
+  /**
+   * When the cache is deleted, cache state metrics may still be being updated - the
+   * cache eviction thread may or may not outlive that, so updates to cache state
+   * must be prevented from triggering eviction beyond that deletion.
+   */
+  void disconnectEviction();
 
   /**
    * @return true if the eviction thread should do a pass over this cache.

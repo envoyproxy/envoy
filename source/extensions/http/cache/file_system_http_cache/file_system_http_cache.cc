@@ -29,16 +29,26 @@ FileSystemHttpCache::FileSystemHttpCache(
     ConfigProto config, std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
     Stats::Scope& stats_scope)
     : owner_(owner), async_file_manager_(async_file_manager),
-      shared_(std::make_shared<CacheShared>(config, stats_scope)),
+      shared_(std::make_shared<CacheShared>(config, stats_scope, cache_eviction_thread)),
       cache_eviction_thread_(cache_eviction_thread), cache_info_(CacheInfo{name()}) {
   cache_eviction_thread_.addCache(shared_);
 }
 
-CacheShared::CacheShared(ConfigProto config, Stats::Scope& stats_scope)
-    : config_(config), stat_names_(stats_scope.symbolTable()),
+CacheShared::CacheShared(ConfigProto config, Stats::Scope& stats_scope,
+                         CacheEvictionThread& eviction_thread)
+    : signal_eviction_([&eviction_thread]() { eviction_thread.signal(); }), config_(config),
+      stat_names_(stats_scope.symbolTable()),
       stats_(generateStats(stat_names_, stats_scope, cachePath())) {}
 
-FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(shared_); }
+void CacheShared::disconnectEviction() {
+  absl::MutexLock lock(&signal_mu_);
+  signal_eviction_ = []() {};
+}
+
+FileSystemHttpCache::~FileSystemHttpCache() {
+  shared_->disconnectEviction();
+  cache_eviction_thread_.removeCache(shared_);
+}
 
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
@@ -238,22 +248,24 @@ std::string FileSystemHttpCache::generateFilename(const Key& key) const {
   return absl::StrCat("cache-", stableHashKey(key));
 }
 
-void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
-  shared_->trackFileAdded(file_size);
-  if (shared_->needsEviction()) {
-    cache_eviction_thread_.signal();
-  }
-}
+void FileSystemHttpCache::trackFileAdded(uint64_t file_size) { shared_->trackFileAdded(file_size); }
 void CacheShared::trackFileAdded(uint64_t file_size) {
   size_count_++;
   size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
+  if (needsEviction()) {
+    {
+      absl::MutexLock lock(&signal_mu_);
+      signal_eviction_();
+    }
+  }
 }
 
 void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
   shared_->trackFileRemoved(file_size);
 }
+
 void CacheShared::trackFileRemoved(uint64_t file_size) {
   // Atomically decrement-but-clamp-at-zero the count of files in the cache.
   //
