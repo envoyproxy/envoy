@@ -56,9 +56,31 @@ service ExternalProcessor {
   }
 }
 
+// This message specifies the filter protocol configurations which will be sent to the ext_proc
+// server in a :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`.
+// If the server does not support these protocol configurations, it may choose to close the gRPC stream.
+// If the server supports these protocol configurations, it should respond based on the API specifications.
+message ProtocolConfiguration {
+  // Specify the filter configuration :ref:`request_body_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.request_body_mode>`
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode request_body_mode = 1
+      [(validate.rules).enum = {defined_only: true}];
+
+  // Specify the filter configuration :ref:`response_body_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.response_body_mode>`
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode response_body_mode = 2
+      [(validate.rules).enum = {defined_only: true}];
+
+  // Specify the filter configuration :ref:`send_body_without_waiting_for_header_response
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
+  // If the client is waiting for a header response from the server, setting ``true`` means the client will send body to the server
+  // as they arrive. Setting ``false`` means the client will buffer the arrived data and not send it to the server immediately.
+  bool send_body_without_waiting_for_header_response = 3;
+}
+
 // This represents the different types of messages that Envoy can send
 // to an external processing server.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message ProcessingRequest {
   reserved 1;
 
@@ -124,6 +146,11 @@ message ProcessingRequest {
   //   are needed.
   //
   bool observability_mode = 10;
+
+  // [#not-implemented-hide:]
+  // Specify the filter protocol configurations to be sent to the server.
+  // ``protocol_config`` is only encoded in the first ``ProcessingRequest`` message from the client to the server.
+  ProtocolConfiguration protocol_config = 11;
 }
 
 // For every ProcessingRequest received by the server with the ``observability_mode`` field
