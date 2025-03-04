@@ -734,7 +734,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   }
 
   for (const std::string& command : custom_commands_) {
-    // treating custom commads to be simple commands for now
+    // treating custom commands to be simple commands for now
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
 }
