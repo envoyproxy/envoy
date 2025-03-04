@@ -120,7 +120,7 @@ Lua script as follows:
 Upstream Filter
 ---------------
 
-The lua filter can be used as an upstream filter. Upstream filters cannot clear the route cache (as 
+The lua filter can be used as an upstream filter. Upstream filters cannot clear the route cache (as
 routing decision has already been made). Clearing the route cache will be a no-op in this case.
 
 Statistics
