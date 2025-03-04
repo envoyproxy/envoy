@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.http.cache.redis_http_cache.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.cache.redis_http_cache.v3";
+option java_outer_classname = "RedisHttpCacheProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/cache/redis_http_cache/v3;redis_http_cachev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: RedisHttpCacheConfig]
+// [#extension: envoy.extensions.http.cache.redis_http_cache]
+
+// Configuration for a cache implementation that caches in Redis database.
+//
+// For implementation details, see `DESIGN.md <https://github.com/envoyproxy/envoy/blob/main/source/extensions/http/cache/file_system_http_cache/DESIGN.md>`_.
+// [#next-free-field: 2]
+message RedisHttpCacheConfig {
+  // Name of the cluster containing redis server.
+  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+}
