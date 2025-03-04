@@ -377,7 +377,7 @@ message Principal {
 
     // Authenticated attributes that identify the downstream.
     // This field is superseded by `mtls_authenticated`, which should be used for most
-    // use cases due to it's improved security.
+    // use cases due to its improved security.
     Authenticated authenticated = 4;
 
     // Authenticated attributes that identify the downstream mTLS peer certificate.
