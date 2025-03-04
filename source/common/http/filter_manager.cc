@@ -58,7 +58,10 @@ void ActiveStreamFilterBase::commonContinue() {
   ScopeTrackedObjectStack encapsulated_object;
   absl::optional<ScopeTrackerScopeState> state;
   if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
-    restoreContextOnContinue(encapsulated_object);
+    if (parent_.connection_.has_value()) {
+      encapsulated_object.add(*parent_.connection_);
+    }
+    encapsulated_object.add(parent_.filter_manager_callbacks_.scope());
     state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
 
@@ -245,11 +248,6 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
 
 const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
-}
-
-void ActiveStreamFilterBase::restoreContextOnContinue(
-    ScopeTrackedObjectStack& tracked_object_stack) {
-  parent_.contextOnContinue(tracked_object_stack);
 }
 
 OptRef<const Tracing::Config> ActiveStreamFilterBase::tracingConfig() const {
@@ -1623,13 +1621,6 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
   }
-}
-
-void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
-  if (connection_.has_value()) {
-    tracked_object_stack.add(*connection_);
-  }
-  tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
 FilterManager::UpgradeResult
