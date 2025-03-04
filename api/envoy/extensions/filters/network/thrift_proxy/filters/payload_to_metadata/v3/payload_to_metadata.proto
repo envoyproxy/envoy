@@ -4,6 +4,8 @@ package envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadat
 
 import "envoy/type/matcher/v3/regex.proto";
 
+import "google/protobuf/struct.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
