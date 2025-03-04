@@ -735,7 +735,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 SplitRequestPtr
 InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                           Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info,
-                          absl::flat_hash_set<std::string> redis_custom_command_names) {
+                          const absl::flat_hash_set<std::string>& redis_custom_command_names) {
   if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;
