@@ -57,7 +57,7 @@ absl::Status
 OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
-  auto exception_msgs =
+  auto [_, exception_msgs] =
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
   status_ = StartStatus::InitialFetchDone;
