@@ -31,20 +31,28 @@ Validate
   The validate fields specify the expected values and test cases to check. At least one test
   case is required.
 
-A simple tool configuration json has one test case and is written as follows. The test
-expects a cluster name match of "instant-server".::
+Basic example
+-------------
 
-   tests
-   - test_name: Cluster_name_test
-     input:
-       authority: api.lyft.com
-       path: /api/locations
-     validate:
-       cluster_name: instant-server
+This test case asserts that GET requests to ``api.lyft.com/api/locations`` are routed to the cluster ``instant-server``.
 
 .. code-block:: yaml
 
-  tests
+  tests:
+  - test_name: cluster_name_test
+    input:
+      authority: api.lyft.com
+      path: /api/locations
+      method: GET
+    validate:
+      cluster_name: instant-server
+
+Available test parameters
+-------------------------
+
+.. code-block:: yaml
+
+  tests:
   - test_name: ...
     input:
       authority: ...
@@ -92,7 +100,7 @@ input
     *(required, string)* The url path. An example path value is "/foo".
 
   method
-    *(required, string)* The request method. If not specified, the default method is GET.
+    *(required, string)* The request method.
 
   internal
     *(optional, boolean)* A flag that determines whether to set x-envoy-internal to "true".
