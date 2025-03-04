@@ -376,8 +376,8 @@ message Principal {
     bool any = 3 [(validate.rules).bool = {const: true}];
 
     // Authenticated attributes that identify the downstream.
-    // This field is superseded by `mtls_authenticated`, which should be used for most
-    // use cases due to its improved security.
+    // This field is superseded by :ref:`mtls_authenticated <envoy_v3_api_field_config.rbac.v3.Principal.mtls_authenticated>`,
+    // which should be used for most use cases due to its improved security.
     Authenticated authenticated = 4;
 
     // Authenticated attributes that identify the downstream mTLS peer certificate.
