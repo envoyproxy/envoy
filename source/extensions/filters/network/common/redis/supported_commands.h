@@ -15,133 +15,27 @@ namespace Common {
 namespace Redis {
 
 struct SupportedCommands {
-
-  SupportedCommands() {
-    simpleCmdHashSet = {// A list of redis commands
-                        "append",
-                        "bf.add",
-                        "bf.card",
-                        "bf.exists",
-                        "bf.info",
-                        "bf.insert",
-                        "bf.loadchunk",
-                        "bf.madd",
-                        "bf.mexists",
-                        "bf.reserve",
-                        "bf.scandump",
-                        "bitcount",
-                        "bitfield",
-                        "bitpos",
-                        "decr",
-                        "decrby",
-                        "dump",
-                        "expire",
-                        "expireat",
-                        "geoadd",
-                        "geodist",
-                        "geohash",
-                        "geopos",
-                        "georadius_ro",
-                        "georadiusbymember_ro",
-                        "get",
-                        "getbit",
-                        "getdel",
-                        "getrange",
-                        "getset",
-                        "hdel",
-                        "hexists",
-                        "hget",
-                        "hgetall",
-                        "hincrby",
-                        "hincrbyfloat",
-                        "hkeys",
-                        "hlen",
-                        "hmget",
-                        "hmset",
-                        "hscan",
-                        "hset",
-                        "hsetnx",
-                        "hstrlen",
-                        "hvals",
-                        "incr",
-                        "incrby",
-                        "incrbyfloat",
-                        "lindex",
-                        "linsert",
-                        "llen",
-                        "lmove",
-                        "lpop",
-                        "lpush",
-                        "lpushx",
-                        "lrange",
-                        "lrem",
-                        "lset",
-                        "ltrim",
-                        "persist",
-                        "pexpire",
-                        "pexpireat",
-                        "pfadd",
-                        "pfcount",
-                        "psetex",
-                        "pttl",
-                        "publish",
-                        "restore",
-                        "rpop",
-                        "rpush",
-                        "rpushx",
-                        "sadd",
-                        "scard",
-                        "set",
-                        "setbit",
-                        "setex",
-                        "setnx",
-                        "setrange",
-                        "sismember",
-                        "smembers",
-                        "spop",
-                        "srandmember",
-                        "srem",
-                        "sscan",
-                        "strlen",
-                        "ttl",
-                        "type",
-                        "xack",
-                        "xadd",
-                        "xautoclaim",
-                        "xclaim",
-                        "xdel",
-                        "xlen",
-                        "xpending",
-                        "xrange",
-                        "xrevrange",
-                        "xtrim",
-                        "zadd",
-                        "zcard",
-                        "zcount",
-                        "zincrby",
-                        "zlexcount",
-                        "zpopmin",
-                        "zpopmax",
-                        "zrange",
-                        "zrangebylex",
-                        "zrangebyscore",
-                        "zrank",
-                        "zrem",
-                        "zremrangebylex",
-                        "zremrangebyrank",
-                        "zremrangebyscore",
-                        "zrevrange",
-                        "zrevrangebylex",
-                        "zrevrangebyscore",
-                        "zrevrank",
-                        "zscan",
-                        "zscore"};
-  }
-
   /**
    * @return commands which hash to a single server
    */
-  static const absl::flat_hash_set<std::string>& simpleCommands() { return simpleCmdHashSet; }
+  static const absl::flat_hash_set<std::string>& simpleCommands() {
+    CONSTRUCT_ON_FIRST_USE(
+        absl::flat_hash_set<std::string>, "append", "bf.add", "bf.card", "bf.exists", "bf.info",
+        "bf.insert", "bf.loadchunk", "bf.madd", "bf.mexists", "bf.reserve", "bf.scandump",
+        "bitcount", "bitfield", "bitpos", "decr", "decrby", "dump", "expire", "expireat", "geoadd",
+        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "get", "getbit",
+        "getdel", "getrange", "getset", "hdel", "hexists", "hget", "hgetall", "hincrby",
+        "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx", "hstrlen",
+        "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop",
+        "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
+        "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush", "rpushx",
+        "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
+        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
+        "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
+        "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
+        "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
+        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+  }
 
   /**
    * @return multi-key commands
@@ -219,11 +113,6 @@ struct SupportedCommands {
   static const std::string& select() { CONSTRUCT_ON_FIRST_USE(std::string, "select"); }
 
   /**
-   * adds custom commands to list of redis commands
-   */
-  static void addCustomCommand(const std::string& cmd) { simpleCmdHashSet.insert(cmd); }
-
-  /**
    * @return commands which alters the state of redis
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {
@@ -249,9 +138,6 @@ struct SupportedCommands {
             mget() == command || mset() == command || keys() == command || ping() == command ||
             time() == command || quit() == command || select() == command);
   }
-
-private:
-  static absl::flat_hash_set<std::string> simpleCmdHashSet;
 };
 
 } // namespace Redis

@@ -26,13 +26,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 12]
+  // [#next-free-field: 11]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -133,13 +133,6 @@ message RedisProxy {
     // storm to busy redis server. This config is a protection to rate limit reconnection rate.
     // If not set, there will be no rate limiting on the reconnection.
     ConnectionRateLimit connection_rate_limit = 10;
-
-    // Optional configure redis custom commands for the proxy, eg -> ["my_custom_cmd1", "my_custom_cmd2"]
-    //
-    // .. note::
-    //   The is to support redis's feature wherein new commands can be added using redis' modules api:
-    //   https://redis.io/docs/latest/develop/reference/modules/
-    repeated string custom_commands = 11;
   }
 
   message PrefixRoutes {

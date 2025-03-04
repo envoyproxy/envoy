@@ -2,16 +2,11 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
-#include "source/extensions/filters/network/common/redis/supported_commands.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
-
-absl::flat_hash_set<std::string> SupportedCommands::simpleCmdHashSet;
-
 namespace Client {
 namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
@@ -61,10 +56,6 @@ ConfigImpl::ConfigImpl(
   } else {
     connection_rate_limit_enabled_ = false;
     connection_rate_limit_per_sec_ = 100;
-  }
-
-  for (auto cmd : config.custom_commands()) {
-    Extensions::NetworkFilters::Common::Redis::SupportedCommands::addCustomCommand(cmd);
   }
 }
 
