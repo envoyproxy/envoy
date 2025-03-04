@@ -365,7 +365,7 @@ message RedisProxy {
   RedisExternalAuthProvider external_auth_provider = 10;
 
   // A List of custom command names already defined on Redis other than the already supported commands,
-// the list of commands mentioned below will get passed on to Redis.
+  // the list of commands mentioned below will get passed on to Redis.
   repeated string redis_custom_command_names = 11;
 }
 
