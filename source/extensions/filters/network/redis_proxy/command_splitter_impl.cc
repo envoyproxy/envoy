@@ -751,8 +751,8 @@ InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks&
   std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
   // Compatible with redis behavior, if there is an unsupported command, return immediately,
   // this action must be performed before verifying auth, some redis clients rely on this behavior.
-  if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name) ||
-      redis_custom_command_names.contains(command_name)) {
+  if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name) &&
+      !redis_custom_command_names.contains(command_name)) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
         "ERR unknown command '{}', with args beginning with: {}", request->asArray()[0].asString(),
