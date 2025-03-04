@@ -619,7 +619,7 @@ TEST_F(RedisSingleServerRequestTest, Hello) {
   EXPECT_EQ(nullptr, handle_);
 };
 
-TEST_F(RedisSingleServerRequestTest, CustomCommands) {
+TEST_F(RedisSingleServerRequestTest, CustomCommand) {
   absl::flat_hash_set<std::string> cmds = {"example"};
   auto splitter = getSplitter(std::move(cmds));
 
