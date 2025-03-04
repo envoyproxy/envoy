@@ -377,7 +377,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                         "Wasm remote code fetch is unstable and may cause a crash");
     auto now = dispatcher.timeSource().monotonicTime() + cache_time_offset_for_testing;
     source = vm_config.code().remote().http_uri().uri();
-    if (absl::StartsWith(source, "oci://")) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.wasm_plugin_enable_fetching_from_oci_regisitry") &&
+        absl::StartsWith(source, "oci://")) {
       is_oci = true;
     }
     std::lock_guard<std::mutex> guard(code_cache_mutex);
