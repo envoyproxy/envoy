@@ -83,6 +83,17 @@ public:
     }
   }
 
+  /**
+   * Helper to get the upstream information of the stream.
+   */
+  StreamInfo::UpstreamInfo* upstreamInfo() {
+    auto stream_info = streamInfo();
+    if (stream_info) {
+      return stream_info->upstreamInfo().get();
+    }
+    return nullptr;
+  }
+
 private:
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the

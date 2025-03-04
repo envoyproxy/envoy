@@ -44,6 +44,10 @@ absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers
   return sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
 }
 
+bool SignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) {
+  return credentials_provider_chain_->addCallbackIfChainCredentialsPending(std::move(cb));
+}
+
 // Region support utilities for sigv4a
 void SignerBaseImpl::addRegionHeader(
     ABSL_ATTRIBUTE_UNUSED Http::RequestHeaderMap& headers,
@@ -61,8 +65,9 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
 
-  const auto& credentials = credentials_provider_->getCredentials();
-  if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
+  const auto credentials = credentials_provider_chain_->chainGetCredentials();
+
+  if (!credentials.hasCredentials()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
     ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
