@@ -88,9 +88,6 @@ public:
    */
   virtual void remove(absl::string_view key) PURE;
 
-private:
-  friend class TraceContextHandler;
-
   /**
    * Optional HTTP request headers map. This is valid for HTTP protocol or any protocol that
    * that provides HTTP request headers.
