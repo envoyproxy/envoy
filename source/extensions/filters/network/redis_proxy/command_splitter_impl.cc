@@ -732,6 +732,11 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
   }
+
+  for (const std::string& command : custom_commands_) { 
+    //treating custom commads to be simple commands for now
+    addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_); 
+  }
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
