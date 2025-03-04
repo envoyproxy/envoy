@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.common.resp_cache.v3;
+
+message SimpleCacheConfig {
+  // Name of the header to be used as cache key
+  string cache_key_header = 1;
+
+  // The maximum number of items that can be stored in the cache.
+  uint32 max_cache_size = 2;
+
+  // The time-to-live (TTL) for cache entries, in seconds.
+  uint32 ttl_seconds = 3;
+
+  // The ratio of cache entries to consider for eviction when the cache is full.
+  double eviction_candidate_ratio = 4;
+
+  // The threshold ratio for evicting cache entries.
+  double eviction_threshold_ratio = 5;
+}
