@@ -202,6 +202,8 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
 
+  /// This is called when the stream is complete.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
   fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {}
 }
 
