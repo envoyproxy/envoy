@@ -237,9 +237,6 @@ private:
   uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
-  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
-    tracked_object_stack.add(*this);
-  }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
