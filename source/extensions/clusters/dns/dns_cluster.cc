@@ -35,7 +35,7 @@ DnsClusterFactory::createClusterWithConfig(
 REGISTER_FACTORY(DnsClusterFactory, ClusterFactory);
 
 /**
- * LogicalDNSFactory: making it backcompatible with ClusterFactoryImplBase
+ * LogicalDNSFactory: making it back compatible with ClusterFactoryImplBase
  */
 
 class LogicalDNSFactory : public ClusterFactoryImplBase {
@@ -65,7 +65,7 @@ public:
 REGISTER_FACTORY(LogicalDNSFactory, ClusterFactory);
 
 /**
- * StrictDNSFactory: making it backcompatible with ClusterFactoryImplBase
+ * StrictDNSFactory: making it back compatible with ClusterFactoryImplBase
  */
 
 class StrictDNSFactory : public Upstream::ConfigurableClusterFactoryBase<
