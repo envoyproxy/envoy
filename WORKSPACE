@@ -32,14 +32,18 @@ load("//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_extra")
 
 envoy_dependency_imports_extra()
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+# load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-http_archive(
-    name = "depend_on_what_you_use",
-    sha256 = "73a0140316118d56bf05d435b48525ea0fcdd27972f5df459eae98e92fd82cc0",
-    strip_prefix = "depend_on_what_you_use-0.7.0",
-    url = "https://github.com/martis42/depend_on_what_you_use/releases/download/0.7.0/depend_on_what_you_use-0.7.0.tar.gz",
-)
+# http_archive(
+#     name = "depend_on_what_you_use",
+#     sha256 = "73a0140316118d56bf05d435b48525ea0fcdd27972f5df459eae98e92fd82cc0",
+#     strip_prefix = "depend_on_what_you_use-0.7.0",
+#     url = "https://github.com/martis42/depend_on_what_you_use/releases/download/0.7.0/depend_on_what_you_use-0.7.0.tar.gz",
+# )
+
+load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+
+local_repository(name = "depend_on_what_you_use", path = "depend_on_what_you_use")
 
 load("@depend_on_what_you_use//:setup_step_1.bzl", dwyu_setup_step_1 = "setup_step_1")
 
@@ -48,3 +52,4 @@ dwyu_setup_step_1()
 load("@depend_on_what_you_use//:setup_step_2.bzl", dwyu_setup_step_2 = "setup_step_2")
 
 dwyu_setup_step_2()
+
