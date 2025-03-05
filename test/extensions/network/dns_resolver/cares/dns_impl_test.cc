@@ -800,6 +800,11 @@ public:
     return address;
   }
 
+  static bool isAddressLocal(const std::string& address) {
+      auto addr = Network::Utility::parseInternetAddressNoThrow(address);
+      return Network::Utility::isLoopbackAddress(*addr) || Network::Utility::isInternalAddress(*addr);
+  }
+
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
                                           const DnsResolver::ResolutionStatus expected_status,
@@ -817,9 +822,13 @@ public:
           // If the coverage job is moved from circle, this can be simplified to only the exact
           // list match.
           // https://github.com/envoyproxy/envoy/pull/10137#issuecomment-592525544
-          if (address == "localhost" && 
-              (lookup_family == DnsLookupFamily::V4Only || lookup_family == DnsLookupFamily::V6Only)) {
+          // For localhost, test inclusion of expected results as well as every returned address
+          // is link-local.
+          if (address == "localhost") {
             EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
+            for_each(address_as_string_list.begin(), address_as_string_list.end(), [&](std::string addr) {
+                EXPECT_TRUE(isAddressLocal(addr));
+            });
           } else {
             EXPECT_THAT(address_as_string_list, UnorderedElementsAreArray(expected_results));
           }
