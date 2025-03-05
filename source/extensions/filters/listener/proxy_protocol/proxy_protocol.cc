@@ -340,7 +340,7 @@ absl::optional<size_t> Filter::lenV2Address(const char* buf) {
   return len;
 }
 
-bool Filter::parseV2Header(const char* buf) {
+bool Parser::parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_protocol_header) {
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   uint8_t upper_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
   uint8_t lower_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
@@ -349,7 +349,7 @@ bool Filter::parseV2Header(const char* buf) {
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
     // This is locally-initiated, e.g. health-check, and should not override remote address.
     // According to the spec, this address length should be zero for local connection.
-    proxy_protocol_header_.emplace(WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, 0, 0});
+    proxy_protocol_header.emplace(WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, 0, 0});
     return true;
   }
 
@@ -395,7 +395,7 @@ bool Filter::parseV2Header(const char* buf) {
           return false;
         }
 
-        proxy_protocol_header_.emplace(
+        proxy_protocol_header.emplace(
             WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
                        hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
                        *remote_address_status, *local_address_status});
@@ -436,7 +436,7 @@ bool Filter::parseV2Header(const char* buf) {
           return false;
         }
 
-        proxy_protocol_header_.emplace(WireHeader{
+        proxy_protocol_header.emplace(WireHeader{
             PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
             *remote_address_status, *local_address_status});
@@ -692,7 +692,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     if (raw_slice.len_ >= static_cast<size_t>(PROXY_PROTO_V2_HEADER_LEN + addr_len)) {
       // The TLV remain, they are parsed in `parseTlvs()` which is called from the
       // parent (if needed).
-      if (parseV2Header(buf)) {
+      if (Parser::parseV2Header(buf, proxy_protocol_header_)) {
         return ReadOrParseState::Done;
       } else {
         return ReadOrParseState::Error;

@@ -151,6 +151,14 @@ private:
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
+ * Helper functions for parsing PROXY protocol headers.
+ */
+class Parser : public Logger::Loggable<Logger::Id::filter> {
+public:
+  static bool parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_protocol_header);
+};
+
+/**
  * Implementation the PROXY Protocol listener filter
  * (https://github.com/haproxy/haproxy/blob/master/doc/proxy-protocol.txt)
  *
@@ -192,7 +200,6 @@ private:
    * @return bool true if parsing succeeded, false if parsing failed.
    */
   bool parseV1Header(const char* buf, size_t len);
-  bool parseV2Header(const char* buf);
   absl::optional<size_t> lenV2Address(const char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
