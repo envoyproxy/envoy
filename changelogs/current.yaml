@@ -231,8 +231,9 @@ new_features:
     ``envoy.tcp_proxy.receive_before_connect``.
 - area: rate_limit
   change: |
-    Added the explict runtime switch :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.rate_limit.v3.RateLimit.filter_enabled>`
-    and :ref:`filter_enforced <envoy_v3_api_field_extensions.filters.http.rate_limit.v3.RateLimit.filter_enforced>` to control the
+    Added the explict runtime switch
+    :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enabled>` and
+    :ref:`filter_enforced <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enforced>` to control the
     filter behavior.
 
 deprecated:
