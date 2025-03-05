@@ -115,6 +115,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
 - area: dfp
   change: |
     The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
