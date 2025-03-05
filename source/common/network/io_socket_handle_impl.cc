@@ -401,7 +401,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (output.dropped_packets_ != nullptr) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ += *maybe_dropped;
+          *output.dropped_packets_ = *maybe_dropped;
           continue;
         }
       }
@@ -522,7 +522,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ += *maybe_dropped;
+          *output.dropped_packets_ = *maybe_dropped;
         }
       }
     }
