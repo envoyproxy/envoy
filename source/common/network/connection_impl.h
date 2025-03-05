@@ -62,6 +62,13 @@ public:
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
+  // New Method added to retrieve the connection socket.
+  // so that, new connection can be created with existing connection socket.
+  // This is required for reverse connections.
+  const ConnectionSocketPtr& getSocket() const override { return socket_; }
+  void setConnectionReused(bool value) override { reuse_connection_ = value; }
+  bool isConnectionReused() override { return reuse_connection_; }
+
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
@@ -142,6 +149,11 @@ public:
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
   TransportSocketPtr& transportSocket() { return transport_socket_; }
+
+  // Used on the responder envoy to mark an active connection accepted by a listener which will
+  // be used as a reverse connection. The socket for such a connection is closed upon draining
+  // of the owning listener.
+  bool reuse_connection_ = false;
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
@@ -285,9 +297,13 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+  // Method to create client connection from downstream connection
+  ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                       Network::TransportSocketPtr&& transport_socket,
+                       Network::ConnectionSocketPtr&& downstream_socket);
 
   // Network::ClientConnection
-  void connect() override;
+  virtual void connect() override;
 
 private:
   void onConnected() override;

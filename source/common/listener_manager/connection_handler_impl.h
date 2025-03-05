@@ -23,6 +23,7 @@ namespace Server {
 class ActiveUdpListenerBase;
 class ActiveTcpListener;
 class ActiveInternalListener;
+class ActiveReverseConnectionListener;
 
 /**
  * Server side connection handler. This is used both by workers as well as the
@@ -57,7 +58,11 @@ public:
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
-
+  void saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,
+                              uint64_t listener_tag) override;
+  Network::LocalRevConnRegistry& reverseConnRegistry() const override {
+    return *local_reverse_conn_registry_;
+  }
   // Network::TcpConnectionHandler
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Network::BalancedConnectionHandlerOptRef
@@ -91,17 +96,21 @@ private:
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
                   std::reference_wrapper<Network::UdpListenerCallbacks>,
-                  std::reference_wrapper<Network::InternalListener>>
+                  std::reference_wrapper<Network::InternalListener>,
+                  std::reference_wrapper<Network::ReverseConnectionListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
     Network::InternalListenerOptRef internalListener();
+    OptRef<Network::ReverseConnectionListener> reverseConnectionListener();
   };
 
   struct ActiveListenerDetails {
     std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_list_;
+
+    std::string name_;
 
     using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
 
@@ -113,6 +122,10 @@ private:
                     [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
                       fn(*details->listener_);
                     });
+    }
+
+    void setName(const std::string& name) {
+      name_ = name;
     }
 
     /**
@@ -153,6 +166,7 @@ private:
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
+  Network::LocalRevConnRegistry* local_reverse_conn_registry_;
   OptRef<OverloadManager> overload_manager_;
   OptRef<OverloadManager> null_overload_manager_;
   const std::string per_handler_stat_prefix_;
