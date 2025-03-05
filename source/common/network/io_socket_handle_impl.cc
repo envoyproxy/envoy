@@ -498,7 +498,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
             cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
             cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
           Buffer::OwnedImpl cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
-          output.msg_[0].saved_cmsg_ = std::move(cmsg_slice);
+          output.msg_[i].saved_cmsg_ = std::move(cmsg_slice);
         }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
