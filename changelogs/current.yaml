@@ -232,5 +232,8 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
-
+- area: dns
+  change: |
+    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
+    among several other new features, bug-fixes, etc.
 deprecated:
