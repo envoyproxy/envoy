@@ -46,6 +46,7 @@ impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
       on_response_headers_called: false,
       on_response_body_called: false,
       on_response_trailers_called: false,
+      on_stream_complete_called: false,
     })
   }
 }
@@ -66,6 +67,7 @@ struct NopHttpFilter {
   on_response_headers_called: bool,
   on_response_body_called: bool,
   on_response_trailers_called: bool,
+  on_stream_complete_called: bool,
 }
 
 impl Drop for NopHttpFilter {
@@ -76,6 +78,7 @@ impl Drop for NopHttpFilter {
     assert!(self.on_response_headers_called);
     assert!(self.on_response_body_called);
     assert!(self.on_response_trailers_called);
+    assert!(self.on_stream_complete_called);
   }
 }
 
@@ -130,5 +133,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     self.on_response_trailers_called = true;
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {
+    self.on_stream_complete_called = true;
   }
 }
