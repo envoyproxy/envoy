@@ -73,12 +73,12 @@ protected:
 
   NiceMock<MockClusterManager> cm_;
   Upstream::MockClusterMockPrioritySet mock_cluster_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Stats::MockIsolatedStatsStore> scope_;
   CdsApiPtr cds_;
   Config::SubscriptionCallbacks* cds_callbacks_{};
   ReadyWatcher initialized_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
 // Regression test against only updating versionInfo() if at least one cluster
