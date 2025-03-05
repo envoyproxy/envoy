@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
 
-#include <openssl/sha.h>
-
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/base64.h"

@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "basic_auth_lib",
     srcs = ["basic_auth_filter.cc"],
     hdrs = ["basic_auth_filter.h"],
-    external_deps = ["ssl"],
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
