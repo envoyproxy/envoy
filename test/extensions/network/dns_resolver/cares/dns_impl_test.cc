@@ -817,12 +817,10 @@ public:
           // If the coverage job is moved from circle, this can be simplified to only the exact
           // list match.
           // https://github.com/envoyproxy/envoy/pull/10137#issuecomment-592525544
-          if (address == "localhost" && lookup_family == DnsLookupFamily::V4Only) {
+          if (address == "localhost" && 
+              (lookup_family == DnsLookupFamily::V4Only || lookup_family == DnsLookupFamily::V6Only)) {
             EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
-          } else if (address == "::1" && lookup_family == DnsLookupFamily::V6Only) {
-            EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
-          }
-          else {
+          } else {
             EXPECT_THAT(address_as_string_list, UnorderedElementsAreArray(expected_results));
           }
 
