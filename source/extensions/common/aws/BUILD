@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["signer.h"],
     deps = [
         ":credentials_provider_interface",
+        "//envoy/common:pure_lib",
         "//envoy/http:message_interface",
     ],
 )
@@ -56,9 +57,10 @@ envoy_cc_library(
         "credentials_provider.h",
     ],
     deps = [
+        "//envoy/common:pure_lib",
         "//source/common/common:cleanup_lib",
-        "//source/common/common:thread_lib",
         "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
         "@com_google_absl//absl/types:optional",
     ],
 )
@@ -69,6 +71,9 @@ envoy_cc_library(
     hdrs = ["metadata_fetcher.h"],
     deps = [
         ":utility_lib",
+        "//envoy/common:pure_lib",
+        "//envoy/http:message_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -89,16 +94,6 @@ envoy_cc_library(
         ":aws_cluster_manager_lib",
         ":metadata_fetcher_lib",
         ":utility_lib",
-        "//envoy/api:api_interface",
-        "//source/common/common:logger_lib",
-        "//source/common/common:thread_lib",
-        "//source/common/config:datasource_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/init:target_lib",
-        "//source/common/json:json_loader_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "//source/common/tracing:http_tracer_lib",
-        "@com_google_absl//absl/time",
     ],
 )
 

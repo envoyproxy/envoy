@@ -114,6 +114,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:credentials_provider_interface",
+        "//source/extensions/common/aws:utility_lib",
+        "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
