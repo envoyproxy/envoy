@@ -18,7 +18,7 @@ public:
   std::string computeHash(absl::string_view input) override;
 
   /**
-   * Returns algorithm-specific lenght of the calculated hash.
+   * Returns algorithm-specific length of the calculated hash.
    */
   uint32_t digestLength() override;
 };
