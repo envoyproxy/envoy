@@ -185,9 +185,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
       abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
     }
 
-    fn on_stream_complete(
-      &mut self,
-      _envoy_filter: &mut EHF) {
+    fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {
       ON_STREAM_COMPLETE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
     }
   }

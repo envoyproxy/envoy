@@ -1080,7 +1080,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     // So, we iterate from 1 to counts - 1.
-    for i in 1 .. counts {
+    for i in 1..counts {
       let mut result_ptr: *const u8 = std::ptr::null();
       let mut result_size: usize = 0;
       unsafe {
