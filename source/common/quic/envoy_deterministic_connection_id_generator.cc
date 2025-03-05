@@ -93,7 +93,7 @@ EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOp
       absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_)));
 #else
   UNREFERENCED_PARAMETER(concurrency);
-  PANIC("BPF filter is not supported in this platform.");
+  return nullptr;
 #endif
 }
 

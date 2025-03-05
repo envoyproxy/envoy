@@ -950,6 +950,8 @@ lightstep
 linearization
 linearize
 linearized
+linkability
+linkable
 linux
 livelock
 llvm
