@@ -50,10 +50,6 @@ jobs:
       contents: read
       packages: read
     secrets:
-      dockerhub-username: >-
-        ${{ fromJSON(needs.load.outputs.trusted)
-            && secrets.DOCKERHUB_USERNAME
-            || '' }}
       dockerhub-password: >-
         ${{ fromJSON(needs.load.outputs.trusted)
             && secrets.DOCKERHUB_PASSWORD
