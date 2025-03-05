@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -363,6 +363,13 @@ message RedisProxy {
   // If this setting is set together with ``downstream_auth_username`` and ``downstream_auth_password``, the external auth service will be source of truth, but those fields will still be used for downstream authentication to the cluster.
   // The API is defined by :ref:`RedisProxyExternalAuthRequest <envoy_v3_api_msg_service.redis_auth.v3.RedisProxyExternalAuthRequest>`.
   RedisExternalAuthProvider external_auth_provider = 10;
+
+  // Optional configure redis custom commands for the proxy, eg -> ["my_custom_cmd1", "my_custom_cmd2"]
+  //
+  // .. note::
+  //   The is to support redis's feature wherein new commands can be added using redis' modules api:
+  //   https://redis.io/docs/latest/develop/reference/modules/
+  repeated string custom_commands = 11;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
