@@ -432,6 +432,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setDownstreamTransportFailureReason("error");
   s1.addBytesSent(1);
   s1.setIsShadow(true);
+  s1.addCustomFlag("test_flag");
+  s1.addCustomFlag("test_flag2");
 
 #ifdef __clang__
 #if defined(__linux__)
@@ -488,6 +490,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
   EXPECT_EQ(s1.bytesSent(), s2.bytesSent());
   EXPECT_EQ(s1.isShadow(), s2.isShadow());
+  EXPECT_EQ(s1.customFlags(), s2.customFlags());
+  EXPECT_EQ("test_flag,test_flag2", s1.customFlags());
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
