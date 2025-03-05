@@ -370,6 +370,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 
+# SHA-1
+/*/extensions/hash/sha1 @zhaohuabing @wbpcode
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
