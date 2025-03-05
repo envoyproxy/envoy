@@ -1,6 +1,13 @@
 #pragma once
 
+#include <string>
+
+#include "envoy/common/pure.h"
+
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
+namespace Extensions {
 namespace Hash {
 
 /**
@@ -14,10 +21,13 @@ public:
    * Calculates hash for a provided input.
    * @return std::string containing the hash.
    */
-  std::string computeHash(absl::string_view input) PURE;
+  virtual std::string computeHash(absl::string_view input) PURE;
+
+  virtual uint32_t digestLength() PURE;
 };
 
 using AlgorithmProviderSharedPtr = std::shared_ptr<AlgorithmProvider>;
 
 } // namespace Hash
+} // namespace Extensions
 } // namespace Envoy

@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/basic_auth:basic_auth_lib",
+        "//source/extensions/hash/sha1:config",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/filters/http/basic_auth/v3:pkg_cc_proto",
     ],
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/basic_auth:config",
+        "//source/extensions/hash/sha1:config",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/filters/http/basic_auth/v3:pkg_cc_proto",
     ],
@@ -43,6 +45,7 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/basic_auth:config",
+        "//source/extensions/hash/sha1:config",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

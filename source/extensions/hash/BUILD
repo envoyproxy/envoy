@@ -11,6 +11,10 @@ envoy_extension_package()
 envoy_cc_library(
     name = "algorithm_provider_interface",
     hdrs = ["algorithm_provider.h"],
+    deps = [
+        "//envoy/common:pure_lib",
+        "@com_google_absl//absl/strings",
+    ],
 )
 
 envoy_cc_library(

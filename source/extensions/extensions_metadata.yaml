@@ -875,6 +875,11 @@ envoy.grpc_credentials.file_based_metadata:
   - envoy.grpc_credentials
   security_posture: data_plane_agnostic
   status: alpha
+envoy.hash.sha1:
+  categories:
+  - envoy.hash
+  security_posture: unknown
+  status: wip
 envoy.health_checkers.http:
   categories:
   - envoy.health_checkers
