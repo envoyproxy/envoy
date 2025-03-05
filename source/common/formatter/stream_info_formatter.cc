@@ -1048,6 +1048,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                [](absl::string_view sub_command, absl::optional<size_t>) {
                                  return CommonDurationFormatter::create(sub_command);
                                }}},
+                             {"CUSTOM_FLAGS",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) {
+                                       return std::string(stream_info.customFlags());
+                                     });
+                               }}},
                              {"RESPONSE_FLAGS",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {
