@@ -14,7 +14,6 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
-        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_stream_complete",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_new",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_body",
@@ -23,6 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_body",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_headers",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_trailers",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_stream_complete",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # factory_context_mocks needs this.
