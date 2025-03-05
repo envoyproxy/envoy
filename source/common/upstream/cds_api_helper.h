@@ -27,9 +27,10 @@ public:
    * @param added_resources clusters newly added since the previous fetch.
    * @param removed_resources names of clusters that this fetch instructed to be removed.
    * @param system_version_info aggregate response data "version", for debugging.
-   * @return std::vector<std::string> a list of errors that occurred while updating the clusters.
+   * @return std::pair<uint32_t, std::vector<std::string>> the actual number of added or updated
+   * clusters and a list of errors that occurred while updating the clusters.
    */
-  std::vector<std::string>
+  std::pair<uint32_t, std::vector<std::string>>
   onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                  const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                  const std::string& system_version_info);
