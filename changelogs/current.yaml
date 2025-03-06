@@ -232,5 +232,9 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
+- area: sockets
+  change: |
+    Added :ref:`enable_io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.enable_io_uring>` to
+    support io_uring.
 
 deprecated:
