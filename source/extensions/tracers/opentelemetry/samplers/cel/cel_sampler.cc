@@ -28,8 +28,8 @@ SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_inf
 
   Protobuf::Arena arena;
   const ::Envoy::Http::RequestHeaderMap* request_headers = nullptr;
-  if (trace_context.has_value() && trace_context.value().get().requestHeaders().has_value()) {
-    request_headers = &trace_context.value().get().requestHeaders().value().get();
+  if (trace_context.has_value() && trace_context->requestHeaders().has_value()) {
+    request_headers = trace_context->requestHeaders().ptr();
   }
 
   auto eval_status = Expr::evaluate(
