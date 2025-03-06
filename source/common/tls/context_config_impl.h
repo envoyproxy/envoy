@@ -134,6 +134,10 @@ public:
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
+  const absl::optional<const Ssl::ClientContextConfig::PerHostSessionCacheConfig>
+  perHostSessionCacheConfig() const override {
+    return per_host_session_cache_config_;
+  }
 
 private:
   ClientContextConfigImpl(
@@ -149,6 +153,8 @@ private:
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
+  absl::optional<Ssl::ClientContextConfig::PerHostSessionCacheConfig>
+      per_host_session_cache_config_;
 };
 
 } // namespace Tls
