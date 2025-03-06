@@ -4,6 +4,8 @@
 
 set -e
 
+# ARB CHANGE
+
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
