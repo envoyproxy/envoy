@@ -23,6 +23,9 @@ public:
    */
   virtual std::string computeHash(absl::string_view input) PURE;
 
+  /**
+   * Returns algorithm-specific length of the calculated hash.
+   */
   virtual uint32_t digestLength() PURE;
 };
 

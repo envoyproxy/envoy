@@ -11,15 +11,8 @@ namespace Hash {
  */
 class SHA1AlgorithmImpl : public AlgorithmProvider {
 public:
-  /**
-   * Calculates hash for a provided input.
-   * @return std::string containing the hash.
-   */
   std::string computeHash(absl::string_view input) override;
 
-  /**
-   * Returns algorithm-specific length of the calculated hash.
-   */
   uint32_t digestLength() override;
 };
 
