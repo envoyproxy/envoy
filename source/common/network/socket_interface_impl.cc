@@ -45,7 +45,8 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
   // been registered in the TLS, initialized. There are cases that test may create threads before
   // IoUringWorkerFactory has been added to the TLS and got initialized.
   if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
-    return io_uring_worker_factory->createIoUringSocketHandle(socket_fd, socket_v6only, domain);
+    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_worker_factory, socket_fd,
+                                                     socket_v6only, domain);
   }
 #endif
   return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain,
