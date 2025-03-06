@@ -525,8 +525,12 @@ ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                     "when the reuse port isn't enabled",
                     new_listener.name()));
   }
-
-  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+  if (existing_listener.hasDuplicatedAddress(new_listener) && new_listener.reusePort() == false) {
+    return absl::InvalidArgumentError(fmt::format("Listener {}: doesn't support update addresses "
+                                                  "when the reuse port isn't enabled",
+                                                  new_listener.name()));
+  }
+  if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
@@ -642,6 +646,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
 bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
                                                            const ListenerImpl& listener) {
   for (const auto& existing_listener : list) {
+    // Skip if the listener is the same. It's because that the listener
+    // with same name was proven to be incompatible.
+    if (existing_listener->name() == listener.name()) {
+      continue;
+    }
     if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
