@@ -10,7 +10,6 @@
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
-// #include "test/mocks/upstream/cluster_manager.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {

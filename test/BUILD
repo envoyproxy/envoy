@@ -36,7 +36,7 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
         "//test/test_common:printers_lib",
-    ],
+    ]
 )
 
 envoy_cc_test_library(
