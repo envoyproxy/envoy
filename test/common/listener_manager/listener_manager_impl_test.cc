@@ -400,7 +400,7 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, AllowAddressesUpdateParitially) {
+TEST_P(ListenerManagerImplWithRealFiltersTest, AllowAddressesUpdatePartially) {
   const std::string yaml1 = R"EOF(
 name: foo
 address:
