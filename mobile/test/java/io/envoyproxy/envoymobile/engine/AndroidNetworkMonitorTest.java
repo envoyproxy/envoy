@@ -42,7 +42,7 @@ public class AndroidNetworkMonitorTest {
   @Before
   public void setUp() {
     Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-    AndroidNetworkMonitor.load(context, mockEnvoyEngine);
+    AndroidNetworkMonitor.load(context, mockEnvoyEngine, false);
     androidNetworkMonitor = AndroidNetworkMonitor.getInstance();
     connectivityManager = androidNetworkMonitor.getConnectivityManager();
     networkCapabilities =

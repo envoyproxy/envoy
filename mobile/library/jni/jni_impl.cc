@@ -1317,6 +1317,13 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChanged(JNIEnv*
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangeEvent(JNIEnv*, jclass,
+                                                                             jlong engine,
+                                                                             jint network_type) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChangeEvent(network_type);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkUnavailable(JNIEnv*, jclass,
                                                                              jlong engine) {
   reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkUnavailable();

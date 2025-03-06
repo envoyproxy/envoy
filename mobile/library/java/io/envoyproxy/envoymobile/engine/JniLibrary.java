@@ -235,6 +235,11 @@ public class JniLibrary {
   protected static native void onDefaultNetworkChanged(long engine, int networkType);
 
   /**
+   * A more modern callback into the Envoy Engine when the default network was changed.
+   */
+  protected static native void onDefaultNetworkChangeEvent(long engine, int networkType);
+
+  /**
    * A callback into the Envoy Engine when the default network is unavailable.
    */
   protected static native void onDefaultNetworkUnavailable(long engine);

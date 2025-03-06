@@ -72,6 +72,12 @@ public interface EnvoyEngine {
   void onDefaultNetworkChanged(int network);
 
   /**
+   * A more modern callback into the Envoy Engine when the default network type was changed.
+   * TODO(renjietang): Deprecate onDefaultNetworkChanged
+   */
+  void onDefaultNetworkChangeEvent(int network);
+
+  /**
    * A callback into the Envoy Engine when the default network is unavailable.
    */
   void onDefaultNetworkUnavailable();

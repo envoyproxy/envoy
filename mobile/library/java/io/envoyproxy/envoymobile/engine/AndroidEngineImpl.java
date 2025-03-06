@@ -23,13 +23,13 @@ public class AndroidEngineImpl implements EnvoyEngine {
    */
   public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback,
                            EnvoyLogger logger, EnvoyEventTracker eventTracker,
-                           Boolean enableProxying) {
+                           Boolean enableProxying, Boolean useNetworkChangeEvent) {
     this.context = context;
     this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker);
     if (ContextUtils.getApplicationContext() == null) {
       ContextUtils.initApplicationContext(context.getApplicationContext());
     }
-    AndroidNetworkMonitor.load(context, envoyEngine);
+    AndroidNetworkMonitor.load(context, envoyEngine, useNetworkChangeEvent);
     if (enableProxying) {
       AndroidProxyMonitor.load(context, envoyEngine);
     }
@@ -87,6 +87,11 @@ public class AndroidEngineImpl implements EnvoyEngine {
   @Override
   public void onDefaultNetworkChanged(int network) {
     envoyEngine.onDefaultNetworkChanged(network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangeEvent(int network) {
+    envoyEngine.onDefaultNetworkChangeEvent(network);
   }
 
   @Override
