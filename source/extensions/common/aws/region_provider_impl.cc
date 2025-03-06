@@ -22,7 +22,7 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegion() {
       return absl::nullopt;
     }
   }
-  ENVOY_LOG_MISC(debug, "EnvironmentRegionProvider: Region string retrieved: {}", region);
+  ENVOY_LOG(debug, "EnvironmentRegionProvider: Region string retrieved: {}", region);
   return region;
 }
 
@@ -34,7 +34,7 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegionSet() {
   if (regionSet.empty()) {
     return absl::nullopt;
   }
-  ENVOY_LOG_MISC(debug, "EnvironmentRegionProvider: RegionSet string retrieved: {}", regionSet);
+  ENVOY_LOG(debug, "EnvironmentRegionProvider: RegionSet string retrieved: {}", regionSet);
   return regionSet;
 }
 
@@ -68,7 +68,7 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG_MISC(debug, "AWSCredentialsFileRegionProvider: Region string retrieved: {}",
+  ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: Region string retrieved: {}",
                  it->second);
   return it->second;
 }
@@ -92,7 +92,7 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG_MISC(debug, "AWSCredentialsFileRegionProvider: RegionSet string retrieved: {}",
+  ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: RegionSet string retrieved: {}",
                  it->second);
   return it->second;
 }
@@ -113,7 +113,7 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG_MISC(debug, "AWSConfigFileRegionProvider: Region string retrieved: {}", it->second);
+  ENVOY_LOG(debug, "AWSConfigFileRegionProvider: Region string retrieved: {}", it->second);
   return it->second;
 }
 
@@ -133,7 +133,7 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG_MISC(debug, "AWSConfigFileRegionProvider: RegionSet string retrieved: {}", it->second);
+  ENVOY_LOG(debug, "AWSConfigFileRegionProvider: RegionSet string retrieved: {}", it->second);
   return it->second;
 }
 
