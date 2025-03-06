@@ -257,6 +257,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":io_socket_error_lib",
+        ":io_uring_socket_lib",
         ":socket_interface_lib",
         ":socket_lib",
         "//envoy/common/io:io_uring_interface",
@@ -292,6 +293,7 @@ envoy_cc_library(
     deps = [
         ":default_socket_interface_lib",
     ] + select({
+        "//bazel:android": [],
         "//bazel:linux": [
             "//source/common/io:io_uring_impl_lib",
             "//source/common/io:io_uring_worker_lib",
