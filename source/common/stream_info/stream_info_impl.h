@@ -195,14 +195,14 @@ struct StreamInfoImpl : public StreamInfo {
   void addCustomFlag(absl::string_view flag) override {
     ASSERT(!ResponseFlagUtils::responseFlagsMap().contains(flag));
     ASSERT(!StringUtil::hasEmptySpace(flag));
-    if (stream_flags_.empty()) {
-      stream_flags_.append(flag);
+    if (custom_flags_.empty()) {
+      custom_flags_.append(flag.data(), flag.size());
     } else {
-      stream_flags_.push_back(',');
-      stream_flags_.append(flag);
+      custom_flags_.push_back(',');
+      custom_flags_.append(flag.data(), flag.size());
     }
   }
-  absl::string_view customFlags() const override { return stream_flags_; }
+  absl::string_view customFlags() const override { return custom_flags_; }
 
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
@@ -401,7 +401,7 @@ struct StreamInfoImpl : public StreamInfo {
     setFromForRecreateStream(info);
     virtual_cluster_name_ = info.virtualClusterName();
     response_code_ = info.responseCode();
-    stream_flags_.assign(info.customFlags().data(), info.customFlags().size());
+    custom_flags_.assign(info.customFlags().data(), info.customFlags().size());
     response_code_details_ = info.responseCodeDetails();
     connection_termination_details_ = info.connectionTerminationDetails();
     upstream_info_ = info.upstreamInfo();
@@ -476,7 +476,7 @@ private:
 
 public:
   absl::InlinedVector<ResponseFlag, 4> response_flags_{};
-  std::string stream_flags_;
+  std::string custom_flags_;
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
