@@ -30,4 +30,7 @@ message Tap {
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+
+  // Indicates to whether output the connection information per event
+  bool output_connection_info_per_event = 3;
 }
