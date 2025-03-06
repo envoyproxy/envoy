@@ -22,7 +22,7 @@ createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::Filter
     formatter =
         THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                   fal_config.log_format(), context, std::move(command_parsers)),
-                              Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+                              Formatter::FormatterPtr);
   } else if (fal_config.access_log_format_case() ==
              T::AccessLogFormatCase::ACCESS_LOG_FORMAT_NOT_SET) {
     formatter = THROW_OR_RETURN_VALUE(

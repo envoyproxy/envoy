@@ -195,32 +195,6 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, NoDataAsSuccess) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.dns_nodata_noname_is_success", "true"}});
-  initialize();
-
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_NODATA, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
-                           EXPECT_TRUE(response.empty());
-                           std::vector<std::string> traces =
-                               absl::StrSplit(active_dns_query_->getTraces(), ',');
-                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
-                                                           HasTrace(GetAddrInfoTrace::Starting),
-                                                           HasTrace(GetAddrInfoTrace::NoResult),
-                                                           HasTrace(GetAddrInfoTrace::Callback)));
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
 TEST_F(GetAddrInfoDnsImplTest, NoDataAsFailure) {
   initialize();
 
