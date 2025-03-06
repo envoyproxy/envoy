@@ -44,9 +44,14 @@ message Config {
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-server-id-allocation.
   config.core.v3.DataSource server_id = 2 [(validate.rules).message = {required: true}];
 
+  // Optional validation of the expected server ID length. If this is non-zero and the value in ``server_id``
+  // does not have a matching length, a configuration error is generated. This can be useful for validating
+  // that the server ID is valid.
+  uint32 expected_server_id_length = 3 [(validate.rules).uint32 = {lte: 18}];
+
   // The nonce length must be at least 4 bytes.
   // The length of server_id and nonce_length_bytes must be 18 bytes or less.
-  uint32 nonce_length_bytes = 3 [(validate.rules).uint32 = {lte: 16 gte: 4}];
+  uint32 nonce_length_bytes = 4 [(validate.rules).uint32 = {lte: 16 gte: 4}];
 
   // Configuration to fetch the encryption key and configuration version.
   //
@@ -57,6 +62,6 @@ message Config {
   //
   // "configuration_version" must contain a 1 byte unsigned integer of value less than 7.
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
-  transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 4
+  transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 5
       [(validate.rules).message = {required: true}];
 }

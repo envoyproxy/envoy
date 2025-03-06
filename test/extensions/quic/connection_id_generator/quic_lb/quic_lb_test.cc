@@ -129,6 +129,17 @@ TEST(QuicLbTest, InvalidConfig) {
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_TRUE(factory_or_status.ok());
 
+  // Server ID length mismatch
+  cfg.set_expected_server_id_length(3);
+  factory_or_status = Factory::create(cfg, factory_context);
+  EXPECT_EQ(factory_or_status.status().message(),
+            "'expected_server_id_length' 3 does not match actual 'server_id' length 6");
+
+  // Valid config with expected length set.
+  cfg.set_expected_server_id_length(6);
+  factory_or_status = Factory::create(cfg, factory_context);
+  EXPECT_TRUE(factory_or_status.ok());
+
   // Invalid concurrency.
   EXPECT_CALL(factory_context.server_factory_context_.options_, concurrency())
       .WillOnce(testing::Return(257))
@@ -141,6 +152,7 @@ TEST(QuicLbTest, InvalidConfig) {
   // Invalid combined length.
   cfg.set_nonce_length_bytes(12);
   cfg.mutable_server_id()->set_inline_string("1234567");
+  cfg.set_expected_server_id_length(0);
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(
       factory_or_status.status().message(),

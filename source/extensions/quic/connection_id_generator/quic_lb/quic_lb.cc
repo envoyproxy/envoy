@@ -205,6 +205,13 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
 
   std::string server_id = server_id_or_result.value();
 
+  if (config.expected_server_id_length() > 0 &&
+      config.expected_server_id_length() != server_id.size()) {
+    return absl::InvalidArgumentError(
+        fmt::format("'expected_server_id_length' {} does not match actual 'server_id' length {}",
+                    config.expected_server_id_length(), server_id.size()));
+  }
+
   constexpr auto cid_length_and_version_prefix = sizeof(uint8_t);
   constexpr auto fixed_components_len =
       cid_length_and_version_prefix + sizeof(WorkerRoutingIdValue);
@@ -226,6 +233,9 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
     auto result = test_instance_or_result.value()->updateKeyAndVersion(test_key, 0);
     RETURN_IF_NOT_OK_REF(result);
   }
+
+  ENVOY_LOG_MISC(debug, "Configuring quic-lb with server_id length {} and nonce length {}",
+                 server_id.length(), config.nonce_length_bytes());
 
   ret->tls_slot_ = ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>::makeUnique(
       context.serverFactoryContext().threadLocal());
