@@ -17,6 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for default socket interface that relies on OS dependent syscall to create
 // sockets.
+// [#next-free-field: 6]
 message DefaultSocketInterface {
   // Enable io_uring for socket operations if the kernel supports. io_uring is only valid in
   // Linux with at least kernel version 5.6. Otherwise, Envoy will fall back to use the default
