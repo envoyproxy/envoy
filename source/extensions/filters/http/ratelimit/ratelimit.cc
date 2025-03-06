@@ -127,7 +127,7 @@ double Filter::getHitAddend() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
+  if (!config_->enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -257,8 +257,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     descriptor_statuses = nullptr;
   }
 
-  if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
-      config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
+  if (status == Filters::Common::RateLimit::LimitStatus::OverLimit && config_->enforced()) {
     state_ = State::Responded;
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
     callbacks_->sendLocalReply(
@@ -368,6 +367,20 @@ void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,
                                     const std::string&,
                                     Filters::Common::RateLimit::DynamicMetadataPtr&&) {
   delete this;
+}
+
+bool FilterConfig::enabled() const {
+  if (filter_enabled_.has_value()) {
+    return filter_enabled_->enabled();
+  }
+  return runtime_.snapshot().featureEnabled("ratelimit.http_filter_enabled", 100);
+}
+
+bool FilterConfig::enforced() const {
+  if (filter_enforced_.has_value()) {
+    return filter_enforced_->enabled();
+  }
+  return runtime_.snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100);
 }
 
 } // namespace RateLimitFilter

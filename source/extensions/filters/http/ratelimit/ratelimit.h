@@ -17,6 +17,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/header_parser.h"
+#include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/common/ratelimit/stat_names.h"
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
@@ -59,7 +60,17 @@ public:
                 : absl::nullopt),
         http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
-        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())) {
+        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
+        filter_enabled_(
+            config.has_filter_enabled()
+                ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                      Envoy::Runtime::FractionalPercent(config.filter_enabled(), runtime_))
+                : absl::nullopt),
+        filter_enforced_(
+            config.has_filter_enforced()
+                ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                      Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
+                : absl::nullopt) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
@@ -83,6 +94,8 @@ public:
   Http::Code rateLimitedStatus() { return rate_limited_status_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   Http::Code statusOnError() const { return status_on_error_; }
+  bool enabled() const;
+  bool enforced() const;
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -127,6 +140,8 @@ private:
   const Http::Code rate_limited_status_;
   Router::HeaderParserPtr response_headers_parser_;
   const Http::Code status_on_error_;
+  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
+  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
