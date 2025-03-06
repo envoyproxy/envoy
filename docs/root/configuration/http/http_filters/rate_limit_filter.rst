@@ -178,13 +178,6 @@ Runtime
 
 The HTTP rate limit filter supports the following runtime settings:
 
-ratelimit.http_filter_enabled
-  % of requests that will call the rate limit service. Defaults to 100.
-
-ratelimit.http_filter_enforcing
-  % of requests that that will have the rate limit service decision enforced. Defaults to 100.
-  This can be used to test what would happen before fully enforcing the outcome.
-
 ratelimit.<route_key>.http_filter_enabled
   % of requests that will call the rate limit service for a given *route_key* specified in the
   :ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>`. Defaults to 100.
