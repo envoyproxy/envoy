@@ -738,9 +738,8 @@ Network::FilterStatus UdpFilter::onData(Network::UdpRecvData& data) {
   auto raw_slice = data.buffer_->frontSlice();
   const char* buf = static_cast<const char*>(raw_slice.mem_);
 
-  if (memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
-             std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_)) != 0) {
-    // Only support PROXY protocol V2.
+  // Only support PROXY protocol V2.
+  if (!data.buffer_->startsWith(PROXY_PROTO_V2_SIGNATURE)) {
     return Network::FilterStatus::StopIteration;
   }
 
@@ -752,8 +751,11 @@ Network::FilterStatus UdpFilter::onData(Network::UdpRecvData& data) {
     return Network::FilterStatus::StopIteration;
   }
 
+  // Remove PROXY header from the payload.
+  data.buffer_->drain(header->wholeHeaderLength());
+
+  // For LOCAL command, preserve the original addresses and ignore the protocol block.
   if (header->local_command_) {
-    // For LOCAL command, preserve the original addresses and ignore the protocol block.
     return Network::FilterStatus::Continue;
   }
 
