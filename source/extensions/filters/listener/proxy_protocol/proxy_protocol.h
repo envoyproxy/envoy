@@ -218,6 +218,13 @@ private:
   Network::ProxyProtocolTLVVector parsed_tlvs_;
 };
 
+class UdpFilter : public Network::UdpListenerReadFilter, Logger::Loggable<Logger::Id::filter> {
+public:
+  // Network::UdpListenerReadFilter
+  Network::FilterStatus onData(Network::UdpRecvData& data) override;
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;
+};
+
 } // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions

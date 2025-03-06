@@ -734,6 +734,40 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   return ReadOrParseState::TryAgainLater;
 }
 
+Network::FilterStatus UdpFilter::onData(Network::UdpRecvData& data) {
+  auto raw_slice = data.buffer_->frontSlice();
+  const char* buf = static_cast<const char*>(raw_slice.mem_);
+
+  if (memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+             std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_)) != 0) {
+    // Only support PROXY protocol V2.
+    return Network::FilterStatus::StopIteration;
+  }
+
+  absl::optional<WireHeader> header;
+  if (!Parser::parseV2Header(buf, header)) {
+    return Network::FilterStatus::StopIteration;
+  }
+  if (!header.has_value()) {
+    return Network::FilterStatus::StopIteration;
+  }
+
+  if (header->local_command_) {
+    // For LOCAL command, preserve the original addresses and ignore the protocol block.
+    return Network::FilterStatus::Continue;
+  }
+
+  data.addresses_.local_ = header->local_address_;
+  data.addresses_.peer_ = header->remote_address_;
+
+  return Network::FilterStatus::Continue;
+}
+
+Network::FilterStatus UdpFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
+  UNREFERENCED_PARAMETER(error_code);
+  return Network::FilterStatus::StopIteration;
+}
+
 } // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions
