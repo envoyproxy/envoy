@@ -14,7 +14,6 @@ exports_files([
     "OWNERS.md",
     ".github/config.yml",
     "reviewers.yaml",
-    "ignore_includes.json",
 ])
 
 alias(

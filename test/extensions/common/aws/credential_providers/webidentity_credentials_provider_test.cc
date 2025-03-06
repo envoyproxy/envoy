@@ -1,27 +1,3 @@
-// #include <chrono>
-// #include <cstddef>
-// #include <filesystem>
-// #include <fstream>
-// #include <ios>
-// #include <string>
-
-// #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
-
-// #include "source/extensions/common/aws/credentials_provider_impl.h"
-// #include "source/extensions/common/aws/metadata_fetcher.h"
-// #include "source/extensions/common/aws/signer_base_impl.h"
-// #include "source/extensions/common/aws/sigv4_signer_impl.h"
-
-// #include "test/extensions/common/aws/mocks.h"
-// #include "test/mocks/api/mocks.h"
-// #include "test/mocks/event/mocks.h"
-// #include "test/mocks/runtime/mocks.h"
-// #include "test/mocks/server/factory_context.h"
-// #include "test/mocks/server/listener_factory_context.h"
-// #include "test/mocks/upstream/cluster_update_callbacks.h"
-// #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
-// #include "test/test_common/environment.h"
-// #include "test/test_common/simulated_time_system.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
 #include "source/extensions/common/aws/credential_providers/webidentity_credentials_provider.h"

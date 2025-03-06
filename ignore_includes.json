@@ -1,5 +1,0 @@
-{
-    "ignore_include_patterns": [
-      "^envoy/.*.pb.h"
-    ]
-}

@@ -65,7 +65,6 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
   return credential_provider;
 };
 
-
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,

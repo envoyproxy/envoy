@@ -16,15 +16,15 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/http:message_lib",
         "//envoy/http:message_interface",
+        "//source/common/http:message_lib",
         "//source/extensions/common/aws:aws_cluster_manager_lib",
+        "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
-        "//source/extensions/common/aws:credential_provider_chains_lib"
-  ],
+    ],
 )
 
 envoy_cc_test(
@@ -32,14 +32,14 @@ envoy_cc_test(
     srcs = ["credential_provider_chains_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/common/aws:credential_provider_chains_lib",
+        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//test/extensions/common/aws:aws_mocks",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",
-        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/mocks/api:api_mocks",
-        "//source/extensions/common/aws:credential_provider_chains_lib"
     ],
 )
 
@@ -86,6 +86,10 @@ envoy_cc_test(
     srcs = ["metadata_fetcher_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/http:headers_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/extensions/filters/http/common:mock_lib",
@@ -95,10 +99,6 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/common/http:headers_lib"
     ],
 )
 

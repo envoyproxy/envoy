@@ -19,12 +19,12 @@ envoy_cc_library(
     deps = [
         "//envoy/http:filter_interface",
         "//source/common/common:cancel_wrapper_lib",
+        "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws:region_provider_impl_lib",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "//source/extensions/common/aws/signers:sigv4a_signer_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
-        "//source/extensions/common/aws:credential_provider_chains_lib",
     ],
 )
 
@@ -36,10 +36,10 @@ envoy_cc_extension(
         ":aws_request_signing_filter_lib",
         "//envoy/registry",
         "//source/common/common:matchers_lib",
+        "//source/extensions/common/aws:credential_provider_chains_lib",
+        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
-        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
-        "//source/extensions/common/aws:credential_provider_chains_lib",
     ],
 )
