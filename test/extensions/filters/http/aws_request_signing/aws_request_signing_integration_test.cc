@@ -3,7 +3,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/common/aws/mocks.h"

@@ -27,8 +27,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
-#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -82,7 +82,7 @@ protected:
     return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
   }
 
-  absl::StatusOr<std::shared_ptr<StrictDnsClusterImpl>>
+  absl::StatusOr<std::shared_ptr<DnsClusterImpl>>
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
@@ -97,7 +97,7 @@ protected:
     if (!status_or_cluster.ok()) {
       return status_or_cluster.status();
     }
-    return (std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first));
+    return (std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
