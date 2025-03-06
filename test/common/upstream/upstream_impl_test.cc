@@ -4226,17 +4226,17 @@ class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {
 public:
   ClusterInfoImplTest() { ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_)); }
 
-  std::shared_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+  std::shared_ptr<DnsClusterImpl> makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV3Yaml(yaml);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, [&]() { return dns_resolver_; },
         ssl_context_manager_, nullptr, false);
 
-    StrictDnsClusterFactory factory{};
+    DnsClusterFactory factory{};
     auto status_or_cluster = factory.create(cluster_config_, factory_context);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
-    return std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first);
+    return std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
@@ -5139,7 +5139,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
-  std::vector<std::shared_ptr<StrictDnsClusterImpl>> clusters;
+  std::vector<std::shared_ptr<DnsClusterImpl>> clusters;
 
   {
     // Get the cluster with extension_protocol_options for a network filter factory.
