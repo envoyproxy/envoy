@@ -15,7 +15,9 @@ envoy_extension_package()
 envoy_cc_library(
     name = "ext_authz",
     srcs = ["ext_authz.cc"],
-    hdrs = ["ext_authz.h"],
+    hdrs = [
+        "ext_authz.h",
+    ],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/stats:stats_macros",
@@ -27,6 +29,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:utility_lib",
+        "//source/common/resp_cache",
         "//source/common/router:config_lib",
         "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
