@@ -29,6 +29,10 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//envoy/common:pure_lib",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/common:optref_lib"
     ],
 )
 
@@ -65,6 +69,26 @@ envoy_cc_library(
     ],
 )
 
+
+envoy_cc_library(
+    name = "credential_provider_chains_lib",
+    srcs = ["credential_provider_chains.cc"],
+    hdrs = ["credential_provider_chains.h"],
+    deps = [
+        "//source/extensions/common/aws:aws_cluster_manager_lib",
+        "//source/extensions/common/aws:credentials_provider_base_lib",
+        "//source/extensions/common/aws:metadata_fetcher_lib",
+        "//source/extensions/common/aws:utility_lib",
+        "//source/extensions/common/aws/credential_providers:container_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:webidentity_credentials_provider_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
 envoy_cc_library(
     name = "metadata_fetcher_lib",
     srcs = ["metadata_fetcher.cc"],
@@ -94,6 +118,7 @@ envoy_cc_library(
         ":aws_cluster_manager_lib",
         ":metadata_fetcher_lib",
         ":utility_lib",
+        "//envoy/common:time_interface"
     ],
 )
 
@@ -129,6 +154,7 @@ envoy_cc_library(
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+        "//source/common/common:lock_guard_lib",
     ],
 )
 

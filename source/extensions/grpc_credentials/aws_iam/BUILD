@@ -26,7 +26,7 @@ envoy_cc_extension(
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:region_provider_impl_lib",
         "//source/extensions/common/aws:utility_lib",
-        "//source/extensions/common/aws/credential_provider_chains:default_credentials_provider_chain_lib",
+        "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/grpc_credential/v3:pkg_cc_proto",

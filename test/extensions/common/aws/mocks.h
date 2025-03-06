@@ -8,7 +8,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws//credential_provider_chains/credentials_provider_chain_factories.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
 
 // #include "test/mocks/upstream/cluster_manager.h"
 #include "gmock/gmock.h"

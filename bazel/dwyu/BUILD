@@ -11,5 +11,8 @@ dwyu_make_cc_info_mapping(
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto": MAP_TRANSITIVE_DEPS,
         "@envoy_api//envoy/extensions/filters/http/aws_lambda/v3:pkg_cc_proto": MAP_TRANSITIVE_DEPS,
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto": MAP_TRANSITIVE_DEPS,
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto": MAP_TRANSITIVE_DEPS,
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto": MAP_TRANSITIVE_DEPS,
+        "//external:curl": MAP_TRANSITIVE_DEPS
     },
 )

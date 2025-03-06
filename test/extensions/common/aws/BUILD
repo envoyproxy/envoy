@@ -23,6 +23,20 @@ envoy_cc_mock(
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//source/extensions/common/aws:credential_provider_chains_lib"
+  ],
+)
+
+envoy_cc_test(
+    name = "credential_provider_chains_test",
+    srcs = ["credential_provider_chains_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
+        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib"
     ],
 )
 
