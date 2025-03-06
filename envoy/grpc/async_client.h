@@ -65,6 +65,12 @@ public:
    */
   virtual void resetStream() PURE;
 
+  /**
+   * Half-close client gRPC stream and wait for the server to half-close its stream.
+   * The server is expected to hafl-close within the interval specific in the StreamOptions.
+   */
+  virtual void waitForRemoteCloseAndDelete() PURE;
+
   /***
    * @returns if the stream has enough buffered outbound data to be over the configured buffer
    * limits
