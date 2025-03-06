@@ -25,7 +25,7 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
   if (provider_or_error_.ok()) {
     web_identity_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
-    ENVOY_LOG_MISC(info, "Invalid web identity data source");
+    ENVOY_LOG(info, "Invalid web identity data source");
     web_identity_data_source_provider_.reset();
   }
 }

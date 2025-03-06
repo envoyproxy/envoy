@@ -21,7 +21,7 @@ CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
         has_watched_directory_ = true;
       }
     } else {
-      ENVOY_LOG_MISC(info, "Invalid credential file data source");
+      ENVOY_LOG(info, "Invalid credential file data source");
       credential_file_data_source_provider_.reset();
     }
   }

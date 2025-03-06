@@ -51,7 +51,7 @@ void ContainerCredentialsProvider::refresh() {
     if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
       token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
       if (token_or_error.ok()) {
-        ENVOY_LOG_MISC(debug, "Container authorization token file contents loaded");
+        ENVOY_LOG(debug, "Container authorization token file contents loaded");
         authorization_header = token_or_error.value();
       }
     }
