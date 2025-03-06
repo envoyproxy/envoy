@@ -249,7 +249,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener, "
+      "to check if the listener has duplicated addresses with other listeners or "
+      "'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, DuplicateNonIPAddressNotAllowed) {
@@ -276,7 +278,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '/path' as existing listener");
+      "error adding listener: 'bar' has duplicate address '/path' as existing listener, to check "
+      "if the listener has duplicated addresses with other listeners or 'enable_reuse_port' is set "
+      "to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleAddressesDuplicatePortNotAllowed) {
@@ -316,7 +320,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
                             "error adding listener: 'bar' has duplicate address "
-                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener");
+                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener, to check if the "
+                            "listener has duplicated addresses with other listeners or "
+                            "'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -356,9 +362,11 @@ filter_chains:
   )EOF";
 
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-                            "error adding listener: 'bar' has duplicate address "
-                            "'127.0.0.1:0,127.0.0.3:0' as existing listener");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+      "error adding listener: 'bar' has duplicate address "
+      "'127.0.0.1:0,127.0.0.3:0' as existing listener, to check if the listener has duplicated "
+      "addresses with other listeners or 'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowCreateListenerWithMutipleZeroPorts) {
@@ -401,6 +409,7 @@ filter_chains:
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowAddressesUpdatePartially) {
+  // Update one of the addresses from '127.0.0.2:1000' to '127.0.0.3:2000'.
   const std::string yaml1 = R"EOF(
 name: foo
 address:
@@ -441,6 +450,8 @@ filter_chains:
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        AllowUpdateSocketOptionsIfNotDuplicatedEvenReusePortIsDisabled) {
+  // All addresses are different, so it should be allowed to update socket options even
+  // reuse port is disabled.
   const std::string yaml1 = R"EOF(
 name: foo
 address:
@@ -2384,7 +2395,9 @@ filter_chains:
   )EOF";
 
   const std::string expected_error_message =
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener, "
+      "to check if the listener has duplicated addresses with other listeners or "
+      "'enable_reuse_port' is set to 'false' for the listener";
   testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
                                                     expected_error_message);
 }
@@ -3422,7 +3435,9 @@ filter_chains:
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener, to "
+      "check if the listener has duplicated addresses with other listeners or 'enable_reuse_port' "
+      "is set to 'false' for the listener");
 
   // Move foo to active and then try to add again. This should still fail.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
@@ -3433,7 +3448,9 @@ filter_chains:
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener, to "
+      "check if the listener has duplicated addresses with other listeners or 'enable_reuse_port' "
+      "is set to 'false' for the listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }

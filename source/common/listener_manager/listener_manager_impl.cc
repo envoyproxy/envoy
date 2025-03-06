@@ -1143,11 +1143,11 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
   if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
       hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
-        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
+        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener, "
+                    "to check if the listener has duplicated addresses with other listeners or "
+                    "'enable_reuse_port' is set to 'false' for the listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
-    ENVOY_LOG(warn, "To check if the listener has duplicated addresses with other listeners or "
-                    "'enable_reuse_port' is set to 'false' for the listener");
     return absl::InvalidArgumentError(message);
   }
 
