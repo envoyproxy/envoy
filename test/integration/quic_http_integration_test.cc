@@ -50,6 +50,12 @@ using Extensions::TransportSockets::Tls::ContextImplPeer;
 
 namespace Quic {
 
+namespace {
+
+constexpr uint64_t WithTimeoutFactor(uint64_t duration) { return duration * TIMEOUT_FACTOR; }
+
+} // namespace
+
 class CodecClientCallbacksForTest : public Http::CodecClientCallbacks {
 public:
   void onStreamDestroy() override {}
@@ -324,6 +330,7 @@ public:
   }
 
   void initialize() override {
+    setListenersBoundTimeout(TestUtility::DefaultTimeout * 15);
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
@@ -446,8 +453,8 @@ public:
       // (Expected to save ~14s each across 6 tests on Windows)
       codec_clients.push_back(makeHttpConnection(lookupPort("http")));
     }
-    constexpr auto timeout_first = std::chrono::seconds(15);
-    constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
+    constexpr auto timeout_first = std::chrono::seconds(WithTimeoutFactor(15));
+    constexpr auto timeout_subsequent = std::chrono::milliseconds(WithTimeoutFactor(10));
     if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
@@ -544,8 +551,8 @@ public:
       designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
       codec_clients2.push_back(makeHttpConnection(lookupPort("address2")));
     }
-    constexpr auto timeout_first = std::chrono::seconds(15);
-    constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
+    constexpr auto timeout_first = std::chrono::seconds(WithTimeoutFactor(15));
+    constexpr auto timeout_subsequent = std::chrono::milliseconds(WithTimeoutFactor(10));
     if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 16u,
                                      timeout_first);
@@ -1069,7 +1076,8 @@ TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
   quic_connection_->OnPathDegradingDetected();
-  ASSERT_FALSE(quic_connection_->waitForPathResponse(std::chrono::milliseconds(2000)));
+  ASSERT_FALSE(
+      quic_connection_->waitForPathResponse(std::chrono::milliseconds(WithTimeoutFactor(2000))));
   auto self_addr = quic_connection_->self_address();
   EXPECT_EQ(old_self_addr, self_addr);
 
@@ -1186,11 +1194,12 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
 TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
   initialize();
 
-  constexpr uint64_t max_interval_sec = 5;
-  constexpr uint64_t initial_interval_sec = 1;
+  constexpr uint64_t max_interval_sec = WithTimeoutFactor(5);
+  constexpr uint64_t initial_interval_sec = WithTimeoutFactor(1);
   // Set connection idle network timeout to be a little larger than max interval.
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
-      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(max_interval_sec + 2));
+      .quic_config_.SetIdleNetworkTimeout(
+          quic::QuicTime::Delta::FromSeconds(max_interval_sec + WithTimeoutFactor(2)));
   client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
       max_interval_sec);
   client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
@@ -1199,10 +1208,10 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
-  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // Wait for 10s * TIMEOUT_FACTOR before sending back response. If keepalive is disabled, the
   // connection would have idle timed out.
   Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
-  timer->enableTimer(std::chrono::seconds(10));
+  timer->enableTimer(std::chrono::seconds(WithTimeoutFactor(10)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
@@ -1222,7 +1231,7 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
   constexpr uint64_t initial_interval_sec = 1;
   // Set connection idle network timeout to be a little larger than max interval.
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
-      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(5));
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(WithTimeoutFactor(5)));
   client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
       max_interval_sec);
   client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
@@ -1237,8 +1246,8 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
 }
 
 TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
-  constexpr uint64_t max_interval_sec = 5;
-  constexpr uint64_t initial_interval_sec = 1;
+  constexpr uint64_t max_interval_sec = WithTimeoutFactor(5);
+  constexpr uint64_t initial_interval_sec = WithTimeoutFactor(1);
   config_helper_.addConfigModifier(
       [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
@@ -1255,7 +1264,7 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
         ->mutable_udp_listener_config()
         ->mutable_quic_options()
         ->mutable_idle_timeout()
-        ->set_seconds(max_interval_sec + 2);
+        ->set_seconds(max_interval_sec + WithTimeoutFactor(2));
   });
   initialize();
 
@@ -1263,10 +1272,10 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 
-  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // Wait for 10s * TIMEOUT_FACTOR before sending back response. If keepalive is disabled, the
   // connection would have idle timed out.
   Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
-  timer->enableTimer(std::chrono::seconds(10));
+  timer->enableTimer(std::chrono::seconds(WithTimeoutFactor(10)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
@@ -1330,21 +1339,22 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
-  // Change the configured cert validation to defer 1s.
+  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
   auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(2500));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(WithTimeoutFactor(1000)));
   initialize();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setExpectedPeerAddress(fmt::format(
           "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
-  // Change the handshake timeout to be 2000ms to fail the handshake while the cert validation is
-  // pending.
-  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(2000);
+  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // validation is pending.
+  quic::QuicTime::Delta connect_timeout =
+      quic::QuicTime::Delta::FromMilliseconds(WithTimeoutFactor(500));
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1371,18 +1381,19 @@ typed_config:
   )EOF"),
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
-  // Change the configured cert validation to defer 1s.
+  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
   auto cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(2500));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(WithTimeoutFactor(1000)));
   initialize();
-  // Change the handshake timeout to be 2000ms to fail the handshake while the cert validation is
-  // pending.
-  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(2000);
+  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // validation is pending.
+  quic::QuicTime::Delta connect_timeout =
+      quic::QuicTime::Delta::FromMilliseconds(WithTimeoutFactor(500));
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1750,7 +1761,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
     socket_swap.write_matcher_->setDestinationPort(lookupPort("http"));
     socket_swap.write_matcher_->setWriteOverride(std::move(ebadf));
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    timeSystem().advanceTimeWait(std::chrono::seconds(TIMEOUT_FACTOR));
+    timeSystem().advanceTimeWait(std::chrono::seconds(WithTimeoutFactor(1)));
   }
 
   ASSERT_TRUE(response->waitForEndStream());
