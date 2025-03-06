@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
+#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.validate.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
@@ -9,6 +10,12 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
+
+#if defined(__linux__) && !defined(__ANDROID_API__)
+#include "source/common/io/io_uring_worker_factory_impl.h"
+#include "source/common/io/io_uring_impl.h"
+#include "source/common/network/io_uring_socket_handle_impl.h"
+#endif
 
 namespace Envoy {
 namespace Network {
@@ -20,6 +27,12 @@ namespace {
 }
 } // namespace
 
+void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
+  if (io_uring_worker_factory_ != nullptr) {
+    io_uring_worker_factory_->onWorkerThreadInitialized();
+  }
+}
+
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
     int socket_fd, bool socket_v6only, absl::optional<int> domain,
     const SocketCreationOptions& options,
@@ -27,20 +40,27 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
+#if defined(__linux__) && !defined(__ANDROID_API__)
   // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
   // been registered in the TLS, initialized. There are cases that test may create threads before
   // IoUringWorkerFactory has been added to the TLS and got initialized.
   if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
-    return io_uring_worker_factory->createIoUringSocketHandle(socket_fd, socket_v6only, domain);
+    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_worker_factory, socket_fd,
+                                                     socket_v6only, domain);
   }
+#endif
   return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain,
                                               options.max_addresses_cache_size_);
 }
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain,
+                                            Socket::Type socket_type, absl::optional<int> domain,
                                             const SocketCreationOptions& options) const {
-  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options);
+  if (socket_type == Socket::Type::Datagram) {
+    return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options, nullptr);
+  }
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options,
+                                    io_uring_worker_factory_.lock().get());
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
@@ -52,6 +72,13 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
+
+  // When io_uring is enabled, SOCK_NONBLOCK becomes redundant. io_uring can multiplex sockets on
+  // its own, and the EAGAIN caused by SOCK_NONBLOCK can lead to unnecessary event triggers.
+  if (hasIoUringWorkerFactory(io_uring_worker_factory_.lock().get()) &&
+      socket_type == Socket::Type::Stream) {
+    flags = 0;
+  }
 
   if (options.mptcp_enabled_) {
     ASSERT(socket_type == Socket::Type::Stream);
@@ -89,7 +116,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
     IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
     return nullptr;
   }
-  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain, options);
+  IoHandlePtr io_handle =
+      makeSocket(result.return_value_, socket_v6only, socket_type, domain, options);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
@@ -136,10 +164,30 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   return SOCKET_VALID(result.return_value_);
 }
 
-Server::BootstrapExtensionPtr
-SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
-                                              Server::Configuration::ServerFactoryContext&) {
-  return std::make_unique<SocketInterfaceExtension>(*this);
+Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
+    [[maybe_unused]] const Protobuf::Message& config,
+    [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
+#ifdef __linux__
+  const auto& message = MessageUtil::downcastAndValidate<
+      const envoy::extensions::network::socket_interface::v3::DefaultSocketInterface&>(
+      config, context.messageValidationVisitor());
+  if (message.enable_io_uring() && Io::isIoUringSupported()) {
+    std::shared_ptr<Io::IoUringWorkerFactoryImpl> io_uring_worker_factory =
+        std::make_shared<Io::IoUringWorkerFactoryImpl>(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_size, 1000),
+            message.enable_io_uring_submission_queue_polling(),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_read_buffer_size, 8192),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_write_timeout_ms, 1000),
+            context.threadLocal());
+    io_uring_worker_factory_ = io_uring_worker_factory;
+
+    return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_worker_factory);
+  } else {
+    return std::make_unique<DefaultSocketInterfaceExtension>(*this, nullptr);
+  }
+#else
+  return std::make_unique<DefaultSocketInterfaceExtension>(*this, nullptr);
+#endif
 }
 
 ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {

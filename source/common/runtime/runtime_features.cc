@@ -168,8 +168,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 
 // TODO(renjietang): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
-// TODO(fredyw): Remove after prod testing.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 // TODO(abeyad): Evaluate and either remove or make a config knob in
 // https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);

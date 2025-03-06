@@ -184,7 +184,6 @@ paths:
     - source/extensions/filters/http/lua
     - source/extensions/filters/http/proto_message_extraction
     - source/extensions/filters/http/rate_limit_quota
-    - source/extensions/filters/http/ratelimit
     - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/wasm
     - source/extensions/filters/network/dubbo_proxy
