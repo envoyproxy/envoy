@@ -158,20 +158,7 @@ protected:
     return per_priority_load_.degraded_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
-  uint64_t random(bool peeking) {
-    if (peeking) {
-      stashed_random_.push_back(random_.random());
-      return stashed_random_.back();
-    } else {
-      if (!stashed_random_.empty()) {
-        auto random = stashed_random_.front();
-        stashed_random_.pop_front();
-        return random;
-      } else {
-        return random_.random();
-      }
-    }
-  }
+  uint64_t random(bool peeking);
 
   ClusterLbStats& stats_;
   Runtime::Loader& runtime_;
