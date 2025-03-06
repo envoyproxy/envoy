@@ -6,6 +6,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/types/optional.h"
 
@@ -18,6 +19,14 @@ struct TcpKeepaliveConfig {
   absl::optional<uint32_t> keepalive_time_; // Connection idle time before probing will start, in ms
   absl::optional<uint32_t> keepalive_interval_; // Interval between probes, in ms
 };
+
+static inline Network::TcpKeepaliveConfig
+parseTcpKeepaliveConfig(const envoy::config::core::v3::TcpKeepalive& options) {
+  return Network::TcpKeepaliveConfig{
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_probes, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_time, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
+}
 
 class SocketOptionFactory : Logger::Loggable<Logger::Id::connection> {
 public:
