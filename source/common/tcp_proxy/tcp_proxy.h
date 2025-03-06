@@ -563,9 +563,6 @@ public:
       return absl::nullopt;
     }
     bool shouldLoadShed() const override { return false; }
-    void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
-      tracked_object_stack.add(*this);
-    }
     Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
     OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
     OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }

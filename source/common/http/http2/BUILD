@@ -46,6 +46,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:statusor_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_helper_lib",
