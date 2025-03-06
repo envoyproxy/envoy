@@ -70,6 +70,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
   private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
+  private boolean mUseNetworkChangeEvent = false;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
@@ -132,6 +133,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
     mEnableProxying = enable;
+    return this;
+  }
+
+  /**
+   * Use a more modern network change API.
+   *
+   * @param enable If true, use the new API; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseNetworkChangeEvent(boolean use) {
+    mUseNetworkChangeEvent = use;
     return this;
   }
 
@@ -279,7 +290,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
                            String logLevel) {
     AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
                                                      mEnvoyEventTracker, mEnableProxying);
-    AndroidNetworkMonitor.load(getContext(), engine);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }

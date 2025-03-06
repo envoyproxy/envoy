@@ -90,6 +90,11 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
+  public void onDefaultNetworkChangeEvent(int network) {
+    envoyEngine.onDefaultNetworkChangeEvent(network);
+  }
+
+  @Override
   public void onDefaultNetworkUnavailable() {
     envoyEngine.onDefaultNetworkUnavailable();
   }
