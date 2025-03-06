@@ -76,7 +76,7 @@ jobs:
           bazel-extra: >-
             --config=remote-cache-envoy-engflow
           rbe: false
-          runs-on: envoy-arm64-medium
+          runs-on: oracle-16cpu-64gb-arm64
 
   distribution:
     permissions:
