@@ -1,12 +1,14 @@
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
+
 #include <cstdint>
 
-#include "absl/container/flat_hash_set.h"
-#include "absl/types/optional.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -84,9 +86,9 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
       content_type_values_(contentTypeSet(proto_config.content_type())),
-      uncompressible_response_codes_(uncompressibleResponseCodesSet(proto_config.uncompressible_response_code())),
-      stats_{generateStats(stats_prefix, scope)} {
-}
+      uncompressible_response_codes_(
+          uncompressibleResponseCodesSet(proto_config.uncompressible_response_code())),
+      stats_{generateStats(stats_prefix, scope)} {}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
@@ -109,7 +111,8 @@ StringUtil::CaseUnorderedSet CompressorFilterConfig::DirectionConfig::contentTyp
                        : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
 }
 
-absl::flat_hash_set<uint32_t> CompressorFilterConfig::DirectionConfig::uncompressibleResponseCodesSet(
+absl::flat_hash_set<uint32_t>
+CompressorFilterConfig::DirectionConfig::uncompressibleResponseCodesSet(
     const Protobuf::RepeatedPtrField<google::protobuf::UInt32Value>& codes) {
   absl::flat_hash_set<uint32_t> result;
   for (const google::protobuf::UInt32Value& code : codes) {
@@ -584,17 +587,18 @@ bool CompressorFilterConfig::DirectionConfig::areAllResponseCodesCompressible() 
   return uncompressible_response_codes_.empty();
 }
 
-bool CompressorFilterConfig::DirectionConfig::isResponseCodeCompressible(uint32_t response_code) const {
+bool CompressorFilterConfig::DirectionConfig::isResponseCodeCompressible(
+    uint32_t response_code) const {
   return !uncompressible_response_codes_.contains(response_code);
 }
 
-bool CompressorFilter::isResponseCodeCompressible(const CompressorFilterConfig::ResponseDirectionConfig& config) const {
+bool CompressorFilter::isResponseCodeCompressible(
+    const CompressorFilterConfig::ResponseDirectionConfig& config) const {
   if (config.areAllResponseCodesCompressible()) {
     return true;
   }
 
-  absl::optional<uint32_t> response_code =
-      decoder_callbacks_->streamInfo().responseCode();
+  absl::optional<uint32_t> response_code = decoder_callbacks_->streamInfo().responseCode();
   if (!response_code.has_value()) {
     return true;
   }

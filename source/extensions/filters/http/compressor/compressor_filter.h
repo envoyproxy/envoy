@@ -96,8 +96,8 @@ public:
     static StringUtil::CaseUnorderedSet
     contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
-    static absl::flat_hash_set<uint32_t>
-    uncompressibleResponseCodesSet(const Protobuf::RepeatedPtrField<google::protobuf::UInt32Value>& codes);
+    static absl::flat_hash_set<uint32_t> uncompressibleResponseCodesSet(
+        const Protobuf::RepeatedPtrField<google::protobuf::UInt32Value>& codes);
 
     const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;
@@ -212,7 +212,8 @@ private:
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
-  bool isResponseCodeCompressible(const CompressorFilterConfig::ResponseDirectionConfig& config) const;
+  bool
+  isResponseCodeCompressible(const CompressorFilterConfig::ResponseDirectionConfig& config) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
   void insertVaryHeader(Http::ResponseHeaderMap& headers);
