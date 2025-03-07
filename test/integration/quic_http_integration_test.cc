@@ -329,7 +329,7 @@ public:
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
           hcm.mutable_drain_timeout()->clear_seconds();
-          hcm.mutable_drain_timeout()->set_nanos(500 * 1000 * 1000);
+          hcm.mutable_drain_timeout()->set_nanos(500 * 1000 * 1000 * TIMEOUT_FACTOR);
           EXPECT_EQ(hcm.codec_type(), envoy::extensions::filters::network::http_connection_manager::
                                           v3::HttpConnectionManager::HTTP3);
         });
