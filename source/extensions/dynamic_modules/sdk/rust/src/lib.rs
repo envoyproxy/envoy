@@ -204,6 +204,8 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 
   /// This is called when the stream is complete.
   /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  ///
+  /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
   fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {}
 }
 
