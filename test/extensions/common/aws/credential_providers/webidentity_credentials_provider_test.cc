@@ -614,6 +614,7 @@ TEST_F(WebIdentityCredentialsProviderTest, Coverage) {
 
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   EXPECT_TRUE(provider_friend.needsRefresh());
+  delete(raw_metadata_fetcher_);
 }
 
 } // namespace Aws
