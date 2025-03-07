@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // sockets.
 message DefaultSocketInterface {
   // io_uring options. io_uring is only valid in Linux with at least kernel version 5.11.
-  IoUringOptions io_uring = 1;
+  IoUringOptions io_uring_options = 1;
 }
 
 // [#next-free-field: 6]
