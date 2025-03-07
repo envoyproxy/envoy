@@ -83,11 +83,6 @@ void WebIdentityCredentialsProvider::refresh() {
 
 void WebIdentityCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
-  if (credential_document_value.empty()) {
-    ENVOY_LOG(error, "Could not load AWS credentials document from STS");
-    credentialsRetrievalError();
-    return;
-  }
 
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
   document_json_or_error = Json::Factory::loadFromString(credential_document_value);

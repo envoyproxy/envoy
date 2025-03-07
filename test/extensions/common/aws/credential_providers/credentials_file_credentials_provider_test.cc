@@ -8,6 +8,10 @@
 #include "gtest/gtest.h"
 
 using testing::InSequence;
+using testing::InvokeWithoutArgs;
+using testing::Return;
+using testing::ReturnRef;
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -62,6 +66,7 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Event::MockDispatcher dispatcher_;
 
   Api::ApiPtr api_;
   CredentialsFileCredentialsProvider provider_;
@@ -78,6 +83,30 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigShouldBeHo
   EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("profile4_token", credentials.sessionToken().value());
+}
+
+TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigWithWatched) {
+  auto file_path =
+      TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, CREDENTIALS_FILE_CONTENTS);
+
+  envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider config = {};
+  config.mutable_credentials_data_source()->set_filename(file_path);
+  config.mutable_credentials_data_source()->mutable_watched_directory()->set_path(
+      TestEnvironment::temporaryPath("test"));
+  EXPECT_CALL(context_, api()).WillRepeatedly(ReturnRef(*api_));
+  EXPECT_CALL(context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
+    Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+    EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+        .WillRepeatedly(Return(absl::OkStatus()));
+    return mock_watcher;
+  }));
+
+  auto provider = CredentialsFileCredentialsProvider(context_, config);
+  const auto credentials = provider.getCredentials();
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, CustomFilePathFromConfig) {

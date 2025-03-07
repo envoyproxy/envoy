@@ -244,6 +244,32 @@ not json
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(WebIdentityCredentialsProviderTest, EmptyJsonResponse) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectDocument(200, std::move(R"EOF(
+{
+}
+)EOF"));
+
+  setupProvider();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(
+                                       MetadataCredentialsProviderBase::getCacheDuration()),
+                                   nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
 TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponse) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
@@ -609,12 +635,28 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
 
 TEST_F(WebIdentityCredentialsProviderTest, Coverage) {
 
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectDocument(200, std::move(R"EOF(
+{
+  "AssumeRoleWithWebIdentityResponse": {
+    "UnexpectedResponse": ""
+  }
+}
+)EOF"));
+
   setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
                 std::chrono::seconds(2));
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
   EXPECT_TRUE(provider_friend.needsRefresh());
-  delete(raw_metadata_fetcher_);
 }
 
 } // namespace Aws
