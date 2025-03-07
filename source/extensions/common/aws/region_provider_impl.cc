@@ -68,8 +68,7 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: Region string retrieved: {}",
-                 it->second);
+  ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: Region string retrieved: {}", it->second);
   return it->second;
 }
 
@@ -92,8 +91,7 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
     return absl::nullopt;
   }
 
-  ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: RegionSet string retrieved: {}",
-                 it->second);
+  ENVOY_LOG(debug, "AWSCredentialsFileRegionProvider: RegionSet string retrieved: {}", it->second);
   return it->second;
 }
 
