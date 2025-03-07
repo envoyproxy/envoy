@@ -167,7 +167,7 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
 Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
     [[maybe_unused]] const Protobuf::Message& config,
     [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID_API__)
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::v3::DefaultSocketInterface&>(
       config, context.messageValidationVisitor());
