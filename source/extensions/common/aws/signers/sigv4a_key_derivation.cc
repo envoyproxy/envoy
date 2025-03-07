@@ -67,12 +67,7 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
       ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
 
       // And set the private key we calculated above
-      if (!EC_KEY_set_private_key(ec_key, priv_key_num)) {
-        ENVOY_LOG(debug, "Failed to set openssl private key");
-        BN_free(priv_key_num);
-        OPENSSL_free(ec_key);
-        return nullptr;
-      }
+      EC_KEY_set_private_key(ec_key, priv_key_num);
       BN_free(priv_key_num);
     }
   }
