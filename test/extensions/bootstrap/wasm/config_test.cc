@@ -49,6 +49,8 @@ protected:
     EXPECT_CALL(context_, initManager()).WillRepeatedly(testing::ReturnRef(init_manager_));
     EXPECT_CALL(context_, lifecycleNotifier())
         .WillRepeatedly(testing::ReturnRef(lifecycle_notifier_));
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(transport_socket_factory_context_));
     extension_ = factory->createBootstrapExtension(config, context_);
     extension_->onServerInitialized();
     static_cast<Bootstrap::Wasm::WasmServiceExtension*>(extension_.get())->wasmService();
@@ -59,6 +61,8 @@ protected:
   envoy::extensions::wasm::v3::WasmService config_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   testing::NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
