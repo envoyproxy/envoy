@@ -547,6 +547,7 @@ envoy_dynamic_module_on_http_filter_response_trailers(
 /**
  * envoy_dynamic_module_on_http_filter_stream_complete is called when the HTTP stream is complete.
  * This is called before envoy_dynamic_module_on_http_filter_destroy and access logs are flushed.
+ *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
