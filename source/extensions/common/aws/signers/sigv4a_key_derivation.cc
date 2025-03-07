@@ -67,17 +67,18 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
       ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
 
       // And set the private key we calculated above
-      EC_KEY_set_private_key(ec_key, priv_key_num);
+      auto ret = EC_KEY_set_private_key(ec_key, priv_key_num);
+      // Safe to ignore return code here, ECDSA_Sign will succeed regardless of key being set, but
+      // signature will be invalid
+      ASSERT(ret != 0, "Unable to set SigV4a private key, signature will be invalid");
       BN_free(priv_key_num);
     }
   }
 
-  if (result == SigV4AKeyDerivationResult::AkdrNextCounter) {
-    ENVOY_LOG(debug, "Key derivation exceeded retries, returning no signature");
-    return nullptr;
-  }
+  ASSERT(result != SigV4AKeyDerivationResult::AkdrNextCounter,
+         "SigV4a exceeded number of key generation cycles");
 
-  return ec_key;
+  return (result == SigV4AKeyDerivationResult::AkdrNextCounter) ? nullptr : ec_key;
 }
 
 bool SigV4AKeyDerivation::derivePublicKey(EC_KEY* ec_key) {

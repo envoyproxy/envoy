@@ -95,6 +95,7 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigWithWatche
       TestEnvironment::temporaryPath("test"));
   EXPECT_CALL(context_, api()).WillRepeatedly(ReturnRef(*api_));
   EXPECT_CALL(context_, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+  EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
     Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
     EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
