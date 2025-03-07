@@ -42,8 +42,8 @@ static_resources:
                 port_value: 8080
 
 bootstrap_extensions:
-  - name: envoy.extensions.network.socket_interface.default_socket_interface
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.DefaultSocketInterface
-      io_uring_options: {}
+- name: envoy.extensions.network.socket_interface.default_socket_interface
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.DefaultSocketInterface
+    io_uring_options: {}
 default_socket_interface: "envoy.extensions.network.socket_interface.default_socket_interface"
