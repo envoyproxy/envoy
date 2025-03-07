@@ -24,7 +24,7 @@ const char CREDENTIALS_FILE_CONTENTS[] =
   aws_access_key_id=default_access_key
   aws_secret_access_key=default_secret
   aws_session_token=default_token
-  
+
   # This profile has leading spaces that should get trimmed.
     [profile1]
   # The "=" in the value should not interfere with how this line is parsed.
@@ -32,14 +32,14 @@ const char CREDENTIALS_FILE_CONTENTS[] =
   aws_secret_access_key=profile1_secret
   foo=bar
   aws_session_token=profile1_token
-  
+
   [profile2]
   aws_access_key_id=profile2_access_key
-  
+
   [profile3]
   aws_access_key_id=profile3_access_key
   aws_secret_access_key=
-  
+
   [profile4]
   aws_access_key_id = profile4_access_key
   aws_secret_access_key = profile4_secret
