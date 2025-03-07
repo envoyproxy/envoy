@@ -16,7 +16,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for default socket interface that relies on OS dependent syscall to create
 // sockets.
-// [#next-free-field: 2]
 message DefaultSocketInterface {
   // io_uring options. io_uring is only valid in Linux with at least kernel version 5.11.
   IoUringOptions io_uring = 1;
