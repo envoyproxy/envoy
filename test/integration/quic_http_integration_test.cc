@@ -324,6 +324,7 @@ public:
   }
 
   void initialize() override {
+    setListenersBoundTimeout(TestUtility::DefaultTimeout * 15);
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
