@@ -13,49 +13,49 @@ namespace HttpFilters {
 namespace Cache {
 
 // Example cache backend that never evicts. Not suitable for production use.
-class SimpleHttpCache : public HttpCache, public Singleton::Instance {
-private:
-  struct Entry {
-    Http::ResponseHeaderMapPtr response_headers_;
-    ResponseMetadata metadata_;
-    std::string body_;
+class SimpleHttpCache : public HttpCache {
+public:
+  class Entry {
+  public:
+    Entry(Http::ResponseHeaderMapPtr response_headers, ResponseMetadata metadata)
+        : response_headers_(std::move(response_headers)), metadata_(std::move(metadata)) {}
+    Buffer::InstancePtr body(AdjustedByteRange range) const;
+    void appendBody(Buffer::InstancePtr buf);
+    uint64_t bodySize() const;
+    Http::ResponseHeaderMapPtr copyHeaders() const;
+    Http::ResponseTrailerMapPtr copyTrailers() const;
+    ResponseMetadata metadata() const;
+    void updateHeadersAndMetadata(Http::ResponseHeaderMapPtr response_headers,
+                                  ResponseMetadata metadata);
+    void setTrailers(Http::ResponseTrailerMapPtr trailers);
+    void setEndStreamAfterBody();
+
+  private:
+    mutable absl::Mutex mu_;
+    // Body can be being written to while being read from, so mutex guarded.
+    std::string body_ ABSL_GUARDED_BY(mu_);
+    Http::ResponseHeaderMapPtr response_headers_ ABSL_GUARDED_BY(mu_);
+    ResponseMetadata metadata_ ABSL_GUARDED_BY(mu_);
+    bool end_stream_after_body_{false};
     Http::ResponseTrailerMapPtr trailers_;
   };
 
-  // Looks for a response that has been varied. Only called from lookup.
-  Entry varyLookup(const LookupRequest& request,
-                   const Http::ResponseHeaderMapPtr& response_headers);
-
-  // A list of headers that we do not want to update upon validation
-  // We skip these headers because either it's updated by other application logic
-  // or they are fall into categories defined in the IETF doc below
-  // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
-  static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate();
-
-public:
   // HttpCache
-  LookupContextPtr makeLookupContext(LookupRequest&& request,
-                                     Http::StreamFilterCallbacks& callbacks) override;
-  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                     Http::StreamFilterCallbacks& callbacks) override;
-  void updateHeaders(const LookupContext& lookup_context,
-                     const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata, UpdateHeadersCallback on_complete) override;
   CacheInfo cacheInfo() const override;
+  void lookup(LookupRequest&& request, LookupCallback&& callback) override;
+  void evict(Event::Dispatcher& dispatcher, const Key& key) override;
+  // Touch is to influence expiry, this implementation has no expiry.
+  void touch(const Key&, SystemTime) override {}
+  void updateHeaders(Event::Dispatcher& dispatcher, const Key& key,
+                     const Http::ResponseHeaderMap& updated_headers,
+                     const ResponseMetadata& updated_metadata) override;
+  void insert(Event::Dispatcher& dispatcher, Key key, Http::ResponseHeaderMapPtr headers,
+              ResponseMetadata metadata, HttpSourcePtr source,
+              std::shared_ptr<CacheProgressReceiver> progress) override;
 
-  Entry lookup(const LookupRequest& request);
-  bool insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
-              ResponseMetadata&& metadata, std::string&& body,
-              Http::ResponseTrailerMapPtr&& trailers);
-
-  // Inserts a response that has been varied on certain headers.
-  bool varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
-                  ResponseMetadata&& metadata, std::string&& body,
-                  const Http::RequestHeaderMap& request_headers,
-                  const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
-
-  absl::Mutex mutex_;
-  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);
+  absl::Mutex mu_;
+  absl::flat_hash_map<Key, std::shared_ptr<Entry>, MessageUtil, MessageUtil>
+      entries_ ABSL_GUARDED_BY(mu_);
 };
 
 } // namespace Cache
