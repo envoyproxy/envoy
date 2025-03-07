@@ -25,7 +25,7 @@ Example Configuration
 .. literalinclude:: _include/io_uring.yaml
     :language: yaml
     :linenos:
-    :lines: 44-50
+    :lines: 44-49
     :caption: :download:`io_uring.yaml <_include/io_uring.yaml>`
 
 In this configuration, io_uring is enabled in the bootstrap extension, and the default socket
