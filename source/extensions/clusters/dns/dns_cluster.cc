@@ -68,21 +68,22 @@ REGISTER_FACTORY(LogicalDNSFactory, ClusterFactory);
  * StrictDNSFactory: making it back compatible with ClusterFactoryImplBase
  */
 
-class StrictDNSFactory : public Upstream::ConfigurableClusterFactoryBase<
-                             envoy::extensions::clusters::dns::v3::DnsCluster> {
+class StrictDNSFactory : public ClusterFactoryImplBase {
 public:
-  StrictDNSFactory() : ConfigurableClusterFactoryBase("envoy.cluster.strict_dns") {}
+  StrictDNSFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
-                          const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                           Upstream::ClusterFactoryContext& context) override {
     absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =
         selectDnsResolver(cluster, context);
     RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
+    envoy::extensions::clusters::dns::v3::DnsCluster typed_config;
+    createDnsClusterFromLegacyFields(cluster, typed_config);
+
     absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
     cluster_or_error =
-        DnsClusterImpl::create(cluster, proto_config, context, std::move(*dns_resolver_or_error));
+        DnsClusterImpl::create(cluster, typed_config, context, std::move(*dns_resolver_or_error));
 
     RETURN_IF_NOT_OK(cluster_or_error.status());
     return std::make_pair(ClusterImplBaseSharedPtr(std::move(*cluster_or_error)), nullptr);

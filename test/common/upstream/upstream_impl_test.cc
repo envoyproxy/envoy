@@ -1413,9 +1413,11 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
-      EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+  auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+  EXPECT_FALSE(cluster_or_error.ok());
+  EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(cluster_or_error.status().message(),
+            "DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
