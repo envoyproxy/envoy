@@ -18,7 +18,7 @@ public:
 
   Credentials getCredentials() override { return credentials_; }
   bool credentialsPending() override { return false; };
-  std::string providerName() override { return "InlineCredentialProvider"; };
+  std::string providerName() override { return "InlineCredentialsProvider"; };
 
 private:
   const Credentials credentials_;

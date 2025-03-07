@@ -37,9 +37,9 @@ TEST_F(ConfigCredentialsProviderTest, AssessKeyIdIsRequired) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST(ConfigCredentialsProviderTest, Coverage) {
+TEST_F(ConfigCredentialsProviderTest, Coverage) {
   auto provider = ConfigCredentialsProvider("akid", "secret", "");
-  EXPECT_EQ("ConfigCredentialProvider", provider.providerName());
+  EXPECT_EQ("ConfigCredentialsProvider", provider.providerName());
   EXPECT_FALSE(provider.credentialsPending());
 }
 
