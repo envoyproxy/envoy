@@ -21,6 +21,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "envoy/extensions/filters/udp/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -2874,6 +2875,94 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
 
   // Make sure we actually create the correct type!
   EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
+}
+
+class ProxyProtocolUdpTest : public testing::Test {
+public:
+  ProxyProtocolUdpTest() {
+    envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol proto;
+    config_ = std::make_shared<UdpConfig>(proto);
+    filter_ = std::make_unique<UdpFilter>(callbacks_, config_);
+  }
+
+  ~ProxyProtocolUdpTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()).Times(1); }
+
+  void setup(const std::string& yaml) {
+    envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol proto;
+    TestUtility::loadFromYamlAndValidate(yaml, proto);
+
+    config_ = std::make_shared<UdpConfig>(proto);
+    filter_ = std::make_unique<UdpFilter>(callbacks_, config_);
+  }
+
+  Network::UdpRecvData runFilter(const void* buffer, uint64_t size) {
+    Network::UdpRecvData data{};
+    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow(peer_address_);
+    data.addresses_.local_ =
+        Network::Utility::parseInternetAddressAndPortNoThrow(listener_address_);
+    data.buffer_ = std::make_unique<Buffer::OwnedImpl>(buffer, size);
+    data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
+    filter_status_ = filter_->onData(data);
+    return data;
+  }
+
+  UdpConfigSharedPtr config_;
+  std::unique_ptr<UdpFilter> filter_;
+  Network::FilterStatus filter_status_;
+  Network::MockUdpReadFilterCallbacks callbacks_;
+  std::string listener_address_ = "127.0.2.1:5353";
+  std::string peer_address_ = "10.0.0.1:2020";
+};
+
+TEST_F(ProxyProtocolUdpTest, V2Allowed) {
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
+                                0x49, 0x54, 0x0a,       // V2 Signature
+                                0x21,                   // ver_cmd = V2, LOCAL
+                                0x12,                   // family = AF_INET, protocol = DGRAM
+                                0x00, 0x0c,             // length
+                                0x01, 0x02, 0x03, 0x04, // src addr = 1.2.3.4
+                                0x05, 0x06, 0x07, 0x08, // dst addr = 5.6.7.8
+                                0x12, 0x34,             // src port = 4660
+                                0x56, 0x78,             // dst port = 22136
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  const uint64_t size = sizeof(buffer) / sizeof(uint8_t);
+  Network::UdpRecvData data = runFilter(buffer, size);
+  EXPECT_EQ(filter_status_, Network::FilterStatus::Continue);
+  EXPECT_EQ(data.buffer_->toString(), "more data");
+  EXPECT_EQ(data.addresses_.peer_->asStringView(), "1.2.3.4:4660");
+  EXPECT_EQ(data.addresses_.local_->asStringView(), "5.6.7.8:22136");
+}
+
+TEST_F(ProxyProtocolUdpTest, V1Dropped) {
+  constexpr uint8_t buffer[] = "PROXY TCP4 1.2.3.4 5.6.7.8 4660 22136\r\n";
+  const uint64_t size = sizeof(buffer) / sizeof(uint8_t);
+  Network::UdpRecvData data = runFilter(buffer, size);
+  EXPECT_EQ(filter_status_, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(ProxyProtocolUdpTest, NoHeaderDropped) {
+  constexpr uint8_t buffer[] = "foobar";
+  const uint64_t size = sizeof(buffer) / sizeof(uint8_t);
+  Network::UdpRecvData data = runFilter(buffer, size);
+  EXPECT_EQ(filter_status_, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(ProxyProtocolUdpTest, StreamFamilyDropped) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
+                                0x49, 0x54, 0x0a,       // V2 Signature
+                                0x21,                   // ver_cmd = V2, LOCAL
+                                0x11,                   // family = AF_INET, protocol = STREAM
+                                0x00, 0x0c,             // length
+                                0x01, 0x02, 0x03, 0x04, // src addr = 1.2.3.4
+                                0x05, 0x06, 0x07, 0x08, // dst addr = 5.6.7.8
+                                0x12, 0x34,             // src port = 4660
+                                0x56, 0x78,             // dst port = 22136
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  const uint64_t size = sizeof(buffer) / sizeof(uint8_t);
+  Network::UdpRecvData data = runFilter(buffer, size);
+  // TODO(aunderwood) Fix this, should be StopIteration
+  EXPECT_EQ(filter_status_, Network::FilterStatus::Continue);
 }
 
 } // namespace

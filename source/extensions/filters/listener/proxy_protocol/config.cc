@@ -2,6 +2,8 @@
 
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.validate.h"
+#include "envoy/extensions/filters/udp/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/filters/udp/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -43,12 +45,43 @@ public:
   std::string name() const override { return "envoy.filters.listener.proxy_protocol"; }
 };
 
+class UdpProxyProtocolConfigFactory
+    : public Server::Configuration::NamedUdpListenerFilterConfigFactory {
+public:
+  // NamedUdpListenerFilterConfigFactory
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol>();
+  }
+
+  Network::UdpListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& message,
+                               Server::Configuration::ListenerFactoryContext& context) override {
+    // downcast it to the proxy protocol config
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol&>(
+        message, context.messageValidationVisitor());
+    // UNREFERENCED_PARAMETER(proto_config);
+    UdpConfigSharedPtr config = std::make_shared<UdpConfig>(proto_config);
+    // UdpConfigSharedPtr config = std::make_shared<UdpConfig>();
+    return [config](Network::UdpListenerFilterManager& manager,
+                    Network::UdpReadFilterCallbacks& callbacks) -> void {
+      manager.addReadFilter(std::make_unique<UdpFilter>(callbacks, config));
+    };
+  }
+
+  std::string name() const override { return "envoy.filters.udp_listener.proxy_protocol"; }
+};
+
 /**
  * Static registration for the proxy protocol filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(ProxyProtocolConfigFactory,
                  Server::Configuration::NamedListenerFilterConfigFactory){
     "envoy.listener.proxy_protocol"};
+
+static Registry::RegisterFactory<UdpProxyProtocolConfigFactory,
+                                 Server::Configuration::NamedUdpListenerFilterConfigFactory>
+    register_udp_;
 
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

@@ -2,6 +2,7 @@
 
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/filters/udp/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
@@ -218,11 +219,27 @@ private:
   Network::ProxyProtocolTLVVector parsed_tlvs_;
 };
 
+class UdpConfig {
+public:
+  UdpConfig(
+      const envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol& proto_config) {
+    UNREFERENCED_PARAMETER(proto_config);
+  }
+};
+
+using UdpConfigSharedPtr = std::shared_ptr<UdpConfig>;
+
 class UdpFilter : public Network::UdpListenerReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
+  UdpFilter(Network::UdpReadFilterCallbacks& callbacks, const UdpConfigSharedPtr& config)
+      : Network::UdpListenerReadFilter(callbacks), config_(config) {}
+
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
   Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;
+
+private:
+  UdpConfigSharedPtr config_;
 };
 
 } // namespace ProxyProtocol
