@@ -73,7 +73,7 @@ public:
   StrictDNSFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                          Upstream::ClusterFactoryContext& context) override {
+                    Upstream::ClusterFactoryContext& context) override {
     absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =
         selectDnsResolver(cluster, context);
     RETURN_IF_NOT_OK(dns_resolver_or_error.status());
