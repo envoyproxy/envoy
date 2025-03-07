@@ -32,6 +32,19 @@ TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
   EXPECT_EQ("TestSessionToken", creds->sessionToken().value());
 }
 
+TEST(InlineCredentialsProviderTest, Coverage) {
+  envoy::extensions::common::aws::v3::InlineCredentialProvider inline_credential;
+  inline_credential.set_access_key_id("TestAccessKey");
+  inline_credential.set_secret_access_key("TestSecret");
+  inline_credential.set_session_token("TestSessionToken");
+
+  auto provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
+      inline_credential.access_key_id(), inline_credential.secret_access_key(),
+      inline_credential.session_token());
+  EXPECT_EQ("InlineCredentialProvider", provider->providerName());
+  EXPECT_FALSE(provider->credentialsPending());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

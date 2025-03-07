@@ -30,18 +30,6 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
   }
 }
 
-bool WebIdentityCredentialsProvider::needsRefresh() {
-
-  const auto now = api_.timeSource().systemTime();
-  auto expired = (now - last_updated_ > REFRESH_INTERVAL);
-
-  if (expiration_time_.has_value()) {
-    return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
-  } else {
-    return expired;
-  }
-}
-
 void WebIdentityCredentialsProvider::refresh() {
 
   absl::string_view web_identity_data;

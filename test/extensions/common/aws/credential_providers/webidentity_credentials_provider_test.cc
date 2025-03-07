@@ -28,6 +28,7 @@ public:
   MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
       : provider_(provider) {}
 
+  bool needsRefresh() { return provider_->needsRefresh(); }
   void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
@@ -104,33 +105,6 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
         context_, manager_optref_, cluster_name,
-        [this](Upstream::ClusterManager&, absl::string_view) {
-          metadata_fetcher_.reset(raw_metadata_fetcher_);
-          return std::move(metadata_fetcher_);
-        },
-        refresh_state, initialization_timer, cred_provider);
-  }
-
-  void
-  setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
-                               MetadataFetcher::MetadataReceiver::RefreshState::Ready,
-                           std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
-    std::string token_file_path;
-    envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
-        {};
-
-    if (token_.empty()) {
-      token_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
-      cred_provider.mutable_web_identity_token_data_source()->set_inline_string("web_token");
-    } else {
-      cred_provider.mutable_web_identity_token_data_source()->set_inline_string(token_);
-    }
-    cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
-    cred_provider.set_role_session_name("role-session-name");
-
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-        context_, absl::nullopt, "no_cluster",
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -631,6 +605,15 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(WebIdentityCredentialsProviderTest, Coverage) {
+
+  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
+                std::chrono::seconds(2));
+
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  EXPECT_TRUE(provider_friend.needsRefresh());
 }
 
 } // namespace Aws

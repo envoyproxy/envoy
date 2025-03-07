@@ -37,6 +37,12 @@ TEST_F(ConfigCredentialsProviderTest, AssessKeyIdIsRequired) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST(ConfigCredentialsProviderTest, Coverage) {
+  auto provider = ConfigCredentialsProvider("akid", "secret", "");
+  EXPECT_EQ("ConfigCredentialProvider", provider.providerName());
+  EXPECT_FALSE(provider.credentialsPending());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions
