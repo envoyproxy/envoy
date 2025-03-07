@@ -80,6 +80,8 @@ public:
     uint32_t minimumLength() const { return min_content_length_; }
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
+    bool areAllResponseCodesCompressible() const;
+    bool isResponseCodeCompressible(uint32_t response_code) const;
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;
@@ -94,8 +96,12 @@ public:
     static StringUtil::CaseUnorderedSet
     contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
+    static absl::flat_hash_set<uint32_t>
+    uncompressibleResponseCodesSet(const Protobuf::RepeatedPtrField<google::protobuf::UInt32Value>& codes);
+
     const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;
+    const absl::flat_hash_set<uint32_t> uncompressible_response_codes_;
     const CompressorStats stats_;
   };
 
@@ -206,6 +212,7 @@ private:
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
+  bool isResponseCodeCompressible(const CompressorFilterConfig::ResponseDirectionConfig& config) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
   void insertVaryHeader(Http::ResponseHeaderMap& headers);
