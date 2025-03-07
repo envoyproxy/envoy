@@ -142,14 +142,17 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
-                              Event::Dispatcher& dispatcher,
-                              const StreamInfo::StreamInfo& stream_info) override {
-    return SplitRequestPtr{makeRequest_(*request, callbacks, dispatcher, stream_info)};
+  SplitRequestPtr
+  makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+              Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info,
+              const absl::flat_hash_set<std::string>& redis_custom_command_names) override {
+    return SplitRequestPtr{
+        makeRequest_(*request, callbacks, dispatcher, stream_info, redis_custom_command_names)};
   }
   MOCK_METHOD(SplitRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
-               Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info));
+               Event::Dispatcher& dispatcher, const StreamInfo::StreamInfo& stream_info,
+               const absl::flat_hash_set<std::string> redis_custom_command_names));
 };
 
 } // namespace CommandSplitter
