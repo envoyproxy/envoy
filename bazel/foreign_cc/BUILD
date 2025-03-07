@@ -54,6 +54,7 @@ configure_make(
     targets = [
         "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
     ],
+    alwayslink = True,
 )
 
 # Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
@@ -97,7 +98,7 @@ configure_make(
     ],
     tags = ["skip_on_windows"],
     targets = [
-        "ARFLAGS='' libs install-subdirs",
+        "ARFLAGS='' WITH_LDS='n' libs install-subdirs",
     ],
     deps = [":lz4"],
     alwayslink = True,
@@ -268,6 +269,7 @@ envoy_cmake(
     cache_entries = {
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
+        "BUILD_LIBCURL_DOCS": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",

@@ -569,6 +569,7 @@ HTTP only
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
   **DownstreamRemoteReset**, **DR**, The response details are ``http2.remote_reset`` or ``http2.remote_refuse``.
+  **UnconditionalDropOverload**, **UDO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>` is set to 100%.
 
 UDP
   Not implemented ("-").
@@ -1380,5 +1381,12 @@ UDP
 %TRACE_ID%
   HTTP
     The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
+  TCP/UDP
+    Not implemented ("-").
+
+%QUERY_PARAM(X):Z%
+  HTTP
+    The value of the query parameter X. If the query parameter X is not present, '-' symbol will be used.
+    Z is an optional parameter denoting string truncation up to Z characters long.
   TCP/UDP
     Not implemented ("-").

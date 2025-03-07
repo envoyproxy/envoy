@@ -26,12 +26,10 @@
 using testing::_;
 using testing::AtLeast;
 using testing::Eq;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrEq;
 
 namespace Envoy {
 namespace Extensions {
@@ -83,8 +81,9 @@ public:
     setupFilter();
   }
 
-  void setupConfig(envoy::extensions::filters::http::lua::v3::Lua& proto_config,
-                   envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
+  void setupConfig(
+      const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
+      const envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
                                              *stats_store_.rootScope(), "test.");
@@ -2735,6 +2734,25 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_FALSE(request_headers_2.has("hello"));
 }
 
+// Test whether the automatic route cache clearing could be disabled.
+TEST_F(LuaHttpFilterTest, DisableAutomaticRouteCacheClearing) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_clear_route_cache()->set_value(false);
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
+  setupConfig(proto_config, {});
+  setupFilter();
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
+  EXPECT_EQ("world", request_headers_1.get_("hello"));
+}
+
 // Test whether the route can directly reuse the Lua code in the global configuration.
 TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
@@ -3128,6 +3146,22 @@ TEST_F(LuaHttpFilterTest, StatsWithPerFilterPrefix) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   });
   EXPECT_EQ(2, stats_store_.counter("test.lua.my_script.errors").value());
+}
+
+// Test clear route cache.
+TEST_F(LuaHttpFilterTest, ClearRouteCache) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:clearRouteCache()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Test successful upstream host override

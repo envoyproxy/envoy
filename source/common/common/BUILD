@@ -343,7 +343,7 @@ envoy_cc_library(
         "//envoy/common:exception_lib",
         "//envoy/common:matchers_interface",
         "//envoy/common:pure_lib",
-        "//source/common/network:cidr_range_interface",
+        "//source/common/network:cidr_range_lib",
         "@com_google_absl//absl/status:statusor",
     ],
 )
@@ -522,10 +522,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "callback_impl_lib",
+    srcs = ["callback_impl.cc"],
     hdrs = ["callback_impl.h"],
     deps = [
         ":assert_lib",
+        ":lock_guard_lib",
+        ":thread_lib",
         "//envoy/common:callback",
+        "//source/common/event:dispatcher_lib",
     ],
 )
 

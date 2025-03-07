@@ -126,6 +126,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
@@ -594,8 +595,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  onUpstreamHostSelected(host, true);
-
   if (protocol) {
     stream_info_.protocol(protocol.value());
   } else {
@@ -625,6 +624,11 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
   upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
+
+  // Invoke the onUpstreamHostSelected after setting ssl_connection_info_ in upstream_info.
+  // This is because the onUpstreamHostSelected callback may need to access the ssl_connection_info
+  // to determine the scheme of the upstream connection.
+  onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
     upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());

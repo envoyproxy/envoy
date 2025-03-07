@@ -64,6 +64,12 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
+  // These are used to hold the current chunk of the request/response body during the decodeData and
+  // encodeData callbacks. It is only valid during the call and should not be used outside of the
+  // call.
+  Buffer::Instance* current_request_body_ = nullptr;
+  Buffer::Instance* current_response_body_ = nullptr;
+
   /**
    * Helper to get the downstream information of the stream.
    */
@@ -75,6 +81,17 @@ public:
     } else {
       return nullptr;
     }
+  }
+
+  /**
+   * Helper to get the upstream information of the stream.
+   */
+  StreamInfo::UpstreamInfo* upstreamInfo() {
+    auto stream_info = streamInfo();
+    if (stream_info) {
+      return stream_info->upstreamInfo().get();
+    }
+    return nullptr;
   }
 
 private:

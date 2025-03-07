@@ -8,25 +8,32 @@
 
 #include "gtest/gtest.h"
 
+#ifdef __linux__
+#include "source/common/io/io_uring_impl.h"
+#endif
+
 namespace Envoy {
 namespace {
 
 class SocketInterfaceIntegrationTest : public BaseIntegrationTest,
                                        public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  SocketInterfaceIntegrationTest() : BaseIntegrationTest(GetParam(), config()) {
+  SocketInterfaceIntegrationTest(bool enable_io_uring = false)
+      : BaseIntegrationTest(GetParam(), config(enable_io_uring)) {
     use_lds_ = false;
   };
 
-  static std::string config() {
+  static std::string config(bool enable_io_uring = false) {
     // At least one empty filter chain needs to be specified.
-    return absl::StrCat(echoConfig(), R"EOF(
+    return absl::StrCat(echoConfig(), absl::StrFormat(R"EOF(
 bootstrap_extensions:
   - name: envoy.extensions.network.socket_interface.default_socket_interface
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.DefaultSocketInterface
+      enable_io_uring: %s
 default_socket_interface: "envoy.extensions.network.socket_interface.default_socket_interface"
-    )EOF");
+    )EOF",
+                                                      enable_io_uring ? "true" : "false"));
   }
   static std::string echoConfig() {
     return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
@@ -152,5 +159,43 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
   ASSERT_FALSE(result.ok());
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
 }
+
+#ifdef __linux__
+class IoUringSocketInterfaceIntegrationTest : public SocketInterfaceIntegrationTest {
+public:
+  IoUringSocketInterfaceIntegrationTest()
+      : SocketInterfaceIntegrationTest(true), should_skip_(!Io::isIoUringSupported()) {}
+
+  void SetUp() override {
+    if (should_skip_) {
+      GTEST_SKIP();
+    }
+  }
+
+  bool should_skip_{false};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, IoUringSocketInterfaceIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(IoUringSocketInterfaceIntegrationTest, Basic) {
+  BaseIntegrationTest::initialize();
+  const Network::SocketInterface* factory = Network::socketInterface(
+      "envoy.extensions.network.socket_interface.default_socket_interface");
+  ASSERT_TRUE(Network::SocketInterfaceSingleton::getExisting() == factory);
+
+  std::string response;
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "hello",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  ASSERT_TRUE(connection->run());
+  EXPECT_EQ("hello", response);
+}
+#endif
+
 } // namespace
 } // namespace Envoy

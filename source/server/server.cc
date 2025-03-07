@@ -153,7 +153,7 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
-  drain_manager_->startDrainSequence([] {});
+  drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
 void InstanceBase::failHealthcheck(bool fail) {
@@ -751,21 +751,25 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
+  // Create the xDS-Manager that will be passed to the cluster manager when it
+  // is initialized below.
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, validation_context_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+
+  // Now that the worker thread are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onWorkerThreadInitialized();
+  }
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
-
-  // Create the xDS-Manager and pass the cluster manager that was created above.
-  ASSERT(config_.clusterManager());
-  xds_manager_ =
-      std::make_unique<Config::XdsManagerImpl>(*config_.clusterManager(), validation_context_);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.

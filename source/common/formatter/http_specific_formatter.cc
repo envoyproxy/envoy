@@ -271,19 +271,27 @@ GrpcStatusFormatter::formatValueWithContext(const HttpFormatterContext& context,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-StreamInfoRequestHeaderFormatter::StreamInfoRequestHeaderFormatter(
-    const std::string& main_header, const std::string& alternative_header,
-    absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
+QueryParameterFormatter::QueryParameterFormatter(absl::string_view parameter_key,
+                                                 absl::optional<size_t> max_length)
+    : parameter_key_(parameter_key), max_length_(max_length) {}
 
-absl::optional<std::string> StreamInfoRequestHeaderFormatter::formatWithContext(
-    const HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) const {
-  return HeaderFormatter::format(*stream_info.getRequestHeaders());
+// FormatterProvider
+absl::optional<std::string>
+QueryParameterFormatter::formatWithContext(const HttpFormatterContext& context,
+                                           const StreamInfo::StreamInfo&) const {
+  const auto query_params = Envoy::Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(
+      context.requestHeaders().getPathValue());
+  absl::optional<std::string> value = query_params.getFirstValue(parameter_key_);
+  if (value.has_value() && max_length_.has_value()) {
+    SubstitutionFormatUtils::truncate(value.value(), max_length_.value());
+  }
+  return value;
 }
 
-ProtobufWkt::Value StreamInfoRequestHeaderFormatter::formatValueWithContext(
-    const HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) const {
-  return HeaderFormatter::formatValue(*stream_info.getRequestHeaders());
+ProtobufWkt::Value
+QueryParameterFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                                const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
 }
 
 const BuiltInHttpCommandParser::FormatterProviderLookupTbl&
@@ -363,8 +371,14 @@ BuiltInHttpCommandParser::getKnownFormatters() {
                                                            result.value().second, max_length);
          }}},
        {"TRACE_ID",
-        {CommandSyntaxChecker::COMMAND_ONLY, [](absl::string_view, absl::optional<size_t>) {
+        {CommandSyntaxChecker::COMMAND_ONLY,
+         [](absl::string_view, absl::optional<size_t>) {
            return std::make_unique<TraceIDFormatter>();
+         }}},
+       {"QUERY_PARAM",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           return std::make_unique<QueryParameterFormatter>(std::string(format), max_length);
          }}}});
 }
 
@@ -396,7 +410,7 @@ CommandParserPtr DefaultBuiltInHttpCommandParserFactory::createCommandParser() c
   return std::make_unique<BuiltInHttpCommandParser>();
 }
 
-REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInHttpCommandParserFactory);
+REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy
