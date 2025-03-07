@@ -171,13 +171,14 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::v3::DefaultSocketInterface&>(
       config, context.messageValidationVisitor());
-  if (message.enable_io_uring() && Io::isIoUringSupported()) {
+  const auto& io_uring_options = message.io_uring();
+  if (io_uring_options.enable() && Io::isIoUringSupported()) {
     std::shared_ptr<Io::IoUringWorkerFactoryImpl> io_uring_worker_factory =
         std::make_shared<Io::IoUringWorkerFactoryImpl>(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_size, 1000),
-            message.enable_io_uring_submission_queue_polling(),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_read_buffer_size, 8192),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_write_timeout_ms, 1000),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(io_uring_options, io_uring_size, 1000),
+            io_uring_options.enable_submission_queue_polling(),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(io_uring_options, read_buffer_size, 8192),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(io_uring_options, write_timeout_ms, 1000),
             context.threadLocal());
     io_uring_worker_factory_ = io_uring_worker_factory;
 

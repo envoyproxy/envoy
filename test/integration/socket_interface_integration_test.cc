@@ -30,7 +30,8 @@ bootstrap_extensions:
   - name: envoy.extensions.network.socket_interface.default_socket_interface
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.DefaultSocketInterface
-      enable_io_uring: %s
+      io_uring:
+        enable: %s
 default_socket_interface: "envoy.extensions.network.socket_interface.default_socket_interface"
     )EOF",
                                                       enable_io_uring ? "true" : "false"));
