@@ -236,5 +236,9 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: cluster
+  change: |
+    Adds ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
+    :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`.
 
 deprecated:
