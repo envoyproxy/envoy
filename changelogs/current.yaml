@@ -234,7 +234,7 @@ new_features:
     ``envoy.tcp_proxy.receive_before_connect``.
 - area: sockets
   change: |
-    Added :ref:`enable_io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.enable_io_uring>` to
-    support io_uring.
+    Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
+    default socket interface to support io_uring.
 
 deprecated:
