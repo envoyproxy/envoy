@@ -30,6 +30,7 @@ class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                                    const std::string& secret, const std::string& cb_url,
+                                   const std::string& code_verifier,
                                    AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
   virtual void asyncRefreshAccessToken(const std::string& refresh_token,
@@ -63,7 +64,7 @@ public:
    */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                            const std::string& secret, const std::string& cb_url,
-                           AuthType auth_type) override;
+                           const std::string& code_verifier, AuthType auth_type) override;
 
   void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
                                const std::string& secret, AuthType auth_type) override;
