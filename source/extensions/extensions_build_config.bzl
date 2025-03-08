@@ -546,6 +546,11 @@ EXTENSIONS = {
 
     # Dynamic mocules
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
+
+    #
+    # Hash calculation
+    #
+    "envoy.hash.sha1": "//source/extensions/hash/sha1:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
