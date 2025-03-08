@@ -23,6 +23,8 @@ test_program(name = "no_http_config_destroy")
 
 test_program(name = "no_http_filter_new")
 
+test_program(name = "no_http_filter_stream_complete")
+
 test_program(name = "no_http_filter_destroy")
 
 test_program(name = "no_http_filter_request_headers")

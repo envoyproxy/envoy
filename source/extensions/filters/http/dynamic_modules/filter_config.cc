@@ -74,6 +74,13 @@ newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
     return on_response_trailers.status();
   }
 
+  auto on_filter_stream_complete =
+      dynamic_module->getFunctionPointer<OnHttpFilterStreamCompleteType>(
+          "envoy_dynamic_module_on_http_filter_stream_complete");
+  if (!on_filter_stream_complete.ok()) {
+    return on_filter_stream_complete.status();
+  }
+
   auto on_filter_destroy = dynamic_module->getFunctionPointer<OnHttpFilterDestroyType>(
       "envoy_dynamic_module_on_http_filter_destroy");
   if (!on_filter_destroy.ok()) {
@@ -99,6 +106,7 @@ newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
   config->on_http_filter_response_headers_ = on_response_headers.value();
   config->on_http_filter_response_body_ = on_response_body.value();
   config->on_http_filter_response_trailers_ = on_response_trailers.value();
+  config->on_http_filter_stream_complete_ = on_filter_stream_complete.value();
   config->on_http_filter_destroy_ = on_filter_destroy.value();
   return config;
 }
