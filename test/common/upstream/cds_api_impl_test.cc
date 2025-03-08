@@ -6,6 +6,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -13,6 +14,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/printers.h"
@@ -37,7 +39,8 @@ class CdsApiImplTest : public testing::Test {
 protected:
   void setup() {
     envoy::config::core::v3::ConfigSource cds_config;
-    cds_ = *CdsApiImpl::create(cds_config, nullptr, cm_, *store_.rootScope(), validation_visitor_);
+    cds_ = *CdsApiImpl::create(cds_config, nullptr, cm_, *scope_.rootScope(), validation_visitor_,
+                               server_factory_context_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
@@ -70,7 +73,8 @@ protected:
 
   NiceMock<MockClusterManager> cm_;
   Upstream::MockClusterMockPrioritySet mock_cluster_;
-  Stats::IsolatedStoreImpl store_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Stats::MockIsolatedStatsStore> scope_;
   CdsApiPtr cds_;
   Config::SubscriptionCallbacks* cds_callbacks_{};
   ReadyWatcher initialized_;
@@ -150,6 +154,10 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
   EXPECT_CALL(initialized_, ready());
 
   EXPECT_TRUE(cds_callbacks_->onConfigUpdate({}, "").ok());
+  EXPECT_EQ(0UL, scope_.counter("cluster_manager.cds.config_reload").value());
+  EXPECT_EQ(
+      0UL,
+      scope_.findGaugeByString("cluster_manager.cds.config_reload_time_ms").value().get().value());
 }
 
 TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
@@ -320,6 +328,10 @@ resources:
       cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
 
   EXPECT_EQ("1", cds_->versionInfo());
+  EXPECT_EQ(2UL, scope_.counter("cluster_manager.cds.config_reload").value());
+  EXPECT_TRUE(
+      scope_.findGaugeByString("cluster_manager.cds.config_reload_time_ms").value().get().value() >
+      0UL);
 }
 
 // Validate behavior when the config is delivered but it fails PGV validation.
