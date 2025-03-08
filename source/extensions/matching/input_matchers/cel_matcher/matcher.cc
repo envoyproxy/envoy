@@ -13,6 +13,13 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
                                  Filters::Common::Expr::BuilderInstanceSharedPtr builder)
     : builder_(builder), cel_matcher_(std::move(cel_matcher)) {
   const CelExpression& input_expr = cel_matcher_->expr_match();
+
+  auto expr = Filters::Common::Expr::getExpr(input_expr);
+  if (expr.has_value()) {
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), expr.value());
+    return;
+  }
+
   switch (input_expr.expr_specifier_case()) {
   case CelExpression::ExprSpecifierCase::kParsedExpr:
     compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
