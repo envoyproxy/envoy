@@ -1390,3 +1390,7 @@ UDP
     Z is an optional parameter denoting string truncation up to Z characters long.
   TCP/UDP
     Not implemented ("-").
+
+%CUSTOM_FLAGS%
+  Custom flags set into the stream info. This could be used to log any custom event from the filters.
+  Multiple flags are separated by comma.

@@ -495,7 +495,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   Http::TestRequestHeaderMapImpl header_map{};
-  stream_info_.health_check_request_ = true;
+  stream_info_.healthCheck(true);
   EXPECT_CALL(*file_, write(_)).Times(0);
 
   log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
@@ -615,7 +615,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
 }
@@ -694,7 +694,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
 
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }

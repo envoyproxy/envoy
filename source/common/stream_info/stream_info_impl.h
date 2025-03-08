@@ -192,6 +192,18 @@ struct StreamInfoImpl : public StreamInfo {
     return {*downstream_timing_};
   }
 
+  void addCustomFlag(absl::string_view flag) override {
+    ASSERT(!ResponseFlagUtils::responseFlagsMap().contains(flag));
+    ASSERT(!StringUtil::hasEmptySpace(flag));
+    if (custom_flags_.empty()) {
+      custom_flags_.append(flag.data(), flag.size());
+    } else {
+      custom_flags_.push_back(',');
+      custom_flags_.append(flag.data(), flag.size());
+    }
+  }
+  absl::string_view customFlags() const override { return custom_flags_; }
+
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
@@ -389,6 +401,7 @@ struct StreamInfoImpl : public StreamInfo {
     setFromForRecreateStream(info);
     virtual_cluster_name_ = info.virtualClusterName();
     response_code_ = info.responseCode();
+    custom_flags_.assign(info.customFlags().data(), info.customFlags().size());
     response_code_details_ = info.responseCodeDetails();
     connection_termination_details_ = info.connectionTerminationDetails();
     upstream_info_ = info.upstreamInfo();
@@ -463,7 +476,7 @@ private:
 
 public:
   absl::InlinedVector<ResponseFlag, 4> response_flags_{};
-  bool health_check_request_{};
+  std::string custom_flags_;
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
@@ -481,24 +494,25 @@ private:
   }
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
-  uint64_t bytes_received_{};
-  uint64_t bytes_retransmitted_{};
-  uint64_t packets_retransmitted_{};
-  uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};
   StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
-  Tracing::Reason trace_reason_;
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
-  bool is_shadow_{false};
   std::string downstream_transport_failure_reason_;
+  OptRef<const StreamInfo> parent_stream_info_;
+  uint64_t bytes_received_{};
+  uint64_t bytes_retransmitted_{};
+  uint64_t packets_retransmitted_{};
+  uint64_t bytes_sent_{};
+  Tracing::Reason trace_reason_;
+  bool health_check_request_{};
   bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
-  OptRef<const StreamInfo> parent_stream_info_;
+  bool is_shadow_{false};
 };
 
 } // namespace StreamInfo
