@@ -118,13 +118,58 @@ TEST_F(CELSamplerTest, TestEval) {
       "envoy.tracers.opentelemetry.samplers.cel");
   sampler_ = factory->createSampler(typed_config.typed_config(), context_);
 
-  Tracing::TestTraceContextImpl request_headers{
-      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":authority", "test.com"}, {":path", "/test-path"}, {":method", "GET"}};
+  Tracing::TestRequestHeaderTraceContextImpl trace_context{request_headers};
 
   SpanContext span_context("0", "12345", "45678", false, "some_tracestate");
   auto sampling_result = sampler_->shouldSample(
       stream_info_, span_context, "operation_name", "12345",
-      ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, request_headers, {});
+      ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context, {});
+  EXPECT_EQ(sampling_result.decision, Decision::Drop);
+  EXPECT_EQ(sampling_result.attributes, nullptr);
+  EXPECT_STREQ(sampling_result.tracestate.c_str(), "");
+  EXPECT_FALSE(sampling_result.isRecording());
+  EXPECT_FALSE(sampling_result.isSampled());
+}
+
+TEST_F(CELSamplerTest, TestEvalFail) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  const std::string yaml = R"EOF(
+    name: envoy.tracers.opentelemetry.samplers.cel
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
+      expression:
+        cel_expr_parsed:
+          expr:
+            id: 3
+            call_expr:
+              function: _==_
+              args:
+              - id: 2
+                select_expr:
+                  operand:
+                    id: 1
+                    ident_expr:
+                      name: req
+                  field: path
+              - id: 4
+                const_expr:
+                  string_value: "/test-1234-deny"
+  )EOF";
+  TestUtility::loadFromYaml(yaml, typed_config);
+  auto* factory = Registry::FactoryRegistry<SamplerFactory>::getFactory(
+      "envoy.tracers.opentelemetry.samplers.cel");
+  sampler_ = factory->createSampler(typed_config.typed_config(), context_);
+
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":authority", "test.com"}, {":path", "/test-path"}, {":method", "GET"}};
+  Tracing::TestRequestHeaderTraceContextImpl trace_context{request_headers};
+
+  SpanContext span_context("0", "12345", "45678", false, "some_tracestate");
+  auto sampling_result = sampler_->shouldSample(
+      stream_info_, span_context, "operation_name", "12345",
+      ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context, {});
   EXPECT_EQ(sampling_result.decision, Decision::Drop);
   EXPECT_EQ(sampling_result.attributes, nullptr);
   EXPECT_STREQ(sampling_result.tracestate.c_str(), "");
@@ -177,6 +222,50 @@ TEST_F(CELSamplerTest, TestDecisionDrop) {
   EXPECT_STREQ(sampling_result.tracestate.c_str(), "");
   EXPECT_FALSE(sampling_result.isRecording());
   EXPECT_FALSE(sampling_result.isSampled());
+}
+
+TEST_F(CELSamplerTest, TestHeader) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  const std::string yaml = R"EOF(
+    name: envoy.tracers.opentelemetry.samplers.cel
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
+      expression:
+        cel_expr_parsed:
+          expr:
+            id: 3
+            call_expr:
+              function: _==_
+              args:
+              - id: 2
+                select_expr:
+                  operand:
+                    id: 1
+                    ident_expr:
+                      name: request
+                  field: path
+              - id: 4
+                const_expr:
+                  string_value: "/test-path"
+  )EOF";
+  TestUtility::loadFromYaml(yaml, typed_config);
+  auto* factory = Registry::FactoryRegistry<SamplerFactory>::getFactory(
+      "envoy.tracers.opentelemetry.samplers.cel");
+  sampler_ = factory->createSampler(typed_config.typed_config(), context_);
+
+  Http::TestRequestHeaderMapImpl request_headers = {
+      {":authority", "test.com"}, {":path", "/test-path"}, {":method", "GET"}};
+  Tracing::TestRequestHeaderTraceContextImpl trace_context{request_headers};
+
+  SpanContext span_context("0", "12345", "45678", false, "some_tracestate");
+  auto sampling_result = sampler_->shouldSample(
+      stream_info_, span_context, "operation_name", "12345",
+      ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context, {});
+  EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
+  EXPECT_EQ(sampling_result.attributes, nullptr);
+  EXPECT_STREQ(sampling_result.tracestate.c_str(), "some_tracestate");
+  EXPECT_TRUE(sampling_result.isRecording());
+  EXPECT_TRUE(sampling_result.isSampled());
 }
 
 } // namespace OpenTelemetry
