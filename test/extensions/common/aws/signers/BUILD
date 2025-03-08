@@ -66,7 +66,6 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
         "//source/extensions/common/aws:credentials_provider_base_lib",
-        # "//source/extensions/common/aws/signers:sigv4a_key_derivation_lib",
         "//source/extensions/common/aws/signers:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
