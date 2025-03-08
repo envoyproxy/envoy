@@ -9,21 +9,23 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
 
+enum class SocketProtocol { Unknown, Tcp, Udp };
+
 struct WireHeader {
   WireHeader(size_t header_length, size_t header_addr_length, size_t addr_lengh,
              size_t extensions_length)
       : header_length_(header_length), header_addr_length_(header_addr_length),
         addr_lengh_(addr_lengh), extensions_length_(extensions_length),
         protocol_version_(Network::Address::IpVersion::v4), remote_address_(nullptr),
-        local_address_(nullptr), local_command_(true) {}
+        local_address_(nullptr), local_command_(true), socket_protocol_(SocketProtocol::Unknown) {}
   WireHeader(size_t header_length, size_t header_addr_length, size_t addr_lengh,
              size_t extensions_length, Network::Address::IpVersion protocol_version,
              Network::Address::InstanceConstSharedPtr remote_address,
-             Network::Address::InstanceConstSharedPtr local_address)
+             Network::Address::InstanceConstSharedPtr local_address, SocketProtocol socket_protocol)
       : header_length_(header_length), header_addr_length_(header_addr_length),
         addr_lengh_(addr_lengh), extensions_length_(extensions_length),
         protocol_version_(protocol_version), remote_address_(remote_address),
-        local_address_(local_address), local_command_(false) {
+        local_address_(local_address), local_command_(false), socket_protocol_(socket_protocol) {
 
     ASSERT(extensions_length_ <= 65535);
   }
@@ -45,6 +47,7 @@ struct WireHeader {
   const Network::Address::InstanceConstSharedPtr remote_address_;
   const Network::Address::InstanceConstSharedPtr local_address_;
   const bool local_command_;
+  SocketProtocol socket_protocol_;
 };
 
 } // namespace ProxyProtocol

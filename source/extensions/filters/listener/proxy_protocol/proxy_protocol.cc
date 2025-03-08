@@ -340,6 +340,18 @@ absl::optional<size_t> Filter::lenV2Address(const char* buf) {
   return len;
 }
 
+namespace {
+SocketProtocol getSocketProtocol(uint8_t proto_family) {
+  if ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) {
+    return SocketProtocol::Tcp;
+  }
+  if ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM) {
+    return SocketProtocol::Udp;
+  }
+  return SocketProtocol::Unknown;
+}
+} // namespace
+
 bool Parser::parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_protocol_header) {
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   uint8_t upper_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
@@ -358,8 +370,8 @@ bool Parser::parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_pr
   // use the real-remote info
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_ONBEHALF_OF) {
     uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
-    if (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
-        ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM)) {
+    auto protocol = getSocketProtocol(proto_family);
+    if (protocol != SocketProtocol::Unknown) {
       if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET) {
         PACKED_STRUCT(struct pp_ipv4_addr {
           uint32_t src_addr;
@@ -398,7 +410,7 @@ bool Parser::parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_pr
         proxy_protocol_header.emplace(
             WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
                        hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
-                       *remote_address_status, *local_address_status});
+                       *remote_address_status, *local_address_status, protocol});
 
         return true;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
@@ -439,7 +451,7 @@ bool Parser::parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_pr
         proxy_protocol_header.emplace(WireHeader{
             PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
-            *remote_address_status, *local_address_status});
+            *remote_address_status, *local_address_status, protocol});
         return true;
       }
     }
@@ -484,8 +496,9 @@ bool Filter::parseV1Header(const char* buf, size_t len) {
       if (remote_address == nullptr || local_address == nullptr) {
         return false;
       }
-      proxy_protocol_header_.emplace(
-          WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v4, remote_address, local_address});
+      proxy_protocol_header_.emplace(WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v4,
+                                                remote_address, local_address,
+                                                SocketProtocol::Tcp});
       return true;
     } else if (line_parts[1] == "TCP6") {
       const Network::Address::InstanceConstSharedPtr remote_address =
@@ -498,8 +511,9 @@ bool Filter::parseV1Header(const char* buf, size_t len) {
       if (remote_address == nullptr || local_address == nullptr) {
         return false;
       }
-      proxy_protocol_header_.emplace(
-          WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v6, remote_address, local_address});
+      proxy_protocol_header_.emplace(WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v6,
+                                                remote_address, local_address,
+                                                SocketProtocol::Tcp});
       return true;
     } else {
       ENVOY_LOG(debug, "failed to read proxy protocol");
@@ -748,6 +762,9 @@ Network::FilterStatus UdpFilter::onData(Network::UdpRecvData& data) {
     return Network::FilterStatus::StopIteration;
   }
   if (!header.has_value()) {
+    return Network::FilterStatus::StopIteration;
+  }
+  if (header->socket_protocol_ != SocketProtocol::Udp) {
     return Network::FilterStatus::StopIteration;
   }
 

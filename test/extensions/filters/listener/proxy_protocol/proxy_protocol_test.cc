@@ -2961,8 +2961,7 @@ TEST_F(ProxyProtocolUdpTest, StreamFamilyDropped) {
                                 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   const uint64_t size = sizeof(buffer) / sizeof(uint8_t);
   Network::UdpRecvData data = runFilter(buffer, size);
-  // TODO(aunderwood) Fix this, should be StopIteration
-  EXPECT_EQ(filter_status_, Network::FilterStatus::Continue);
+  EXPECT_EQ(filter_status_, Network::FilterStatus::StopIteration);
 }
 
 } // namespace
