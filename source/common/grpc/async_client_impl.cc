@@ -133,6 +133,12 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   }
 }
 
+AsyncStreamImpl::~AsyncStreamImpl() {
+  if (options_.on_delete_callback_for_test_only) {
+    options_.on_delete_callback_for_test_only();
+  }
+}
+
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   const auto thread_local_cluster = parent_.cm_.getThreadLocalCluster(parent_.remote_cluster_name_);
   if (thread_local_cluster == nullptr) {
@@ -184,8 +190,10 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
-  callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
-                                                 : std::move(headers));
+  if (!waiting_to_delete_on_remote_close_) {
+    callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
+                                                   : std::move(headers));
+  }
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
@@ -234,7 +242,8 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
       streamError(Status::WellKnownGrpcStatus::Internal);
       return;
     }
-    if (!callbacks_.onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
+    if (!waiting_to_delete_on_remote_close_ &&
+        !callbacks_.onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
                                                     : std::make_unique<Buffer::OwnedImpl>())) {
       streamError(Status::WellKnownGrpcStatus::Internal);
       return;
@@ -251,7 +260,9 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
 void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
-  callbacks_.onReceiveTrailingMetadata(std::move(trailers));
+  if (!waiting_to_delete_on_remote_close_) {
+    callbacks_.onReceiveTrailingMetadata(std::move(trailers));
+  }
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
@@ -260,7 +271,9 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::streamError(Status::GrpcStatus grpc_status, const std::string& message) {
-  callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
+  if (!waiting_to_delete_on_remote_close_) {
+    callbacks_.onReceiveTrailingMetadata(Http::ResponseTrailerMapImpl::create());
+  }
   notifyRemoteClose(grpc_status, message);
   resetStream();
 }
@@ -272,7 +285,9 @@ void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
   current_span_->finishSpan();
-  callbacks_.onRemoteClose(status, message);
+  if (!waiting_to_delete_on_remote_close_) {
+    callbacks_.onRemoteClose(status, message);
+  }
 }
 
 void AsyncStreamImpl::onComplete() {
@@ -309,7 +324,8 @@ void AsyncStreamImpl::cleanup() {
     options_.sidestream_watermark_callbacks = nullptr;
   }
 
-  if (!http_reset_) {
+  // Do not reset if the stream is being cleaning up after server has half-closed.
+  if (!http_reset_ && !waiting_to_delete_on_remote_close_) {
     http_reset_ = true;
     stream_->reset();
   }
@@ -320,6 +336,23 @@ void AsyncStreamImpl::cleanup() {
     ASSERT(dispatcher_->isThreadSafe());
     dispatcher_->deferredDelete(
         LinkedObject<AsyncStreamImpl>::removeFromList(parent_.active_streams_));
+  }
+  remote_close_timer_ = nullptr;
+}
+
+void AsyncStreamImpl::waitForRemoteCloseAndDelete() {
+  if (!waiting_to_delete_on_remote_close_) {
+    waiting_to_delete_on_remote_close_ = true;
+
+    if (options_.sidestream_watermark_callbacks != nullptr) {
+      stream_->removeWatermarkCallbacks();
+      options_.sidestream_watermark_callbacks = nullptr;
+    }
+    remote_close_timer_ = dispatcher_->createTimer([this] {
+      waiting_to_delete_on_remote_close_ = false;
+      cleanup();
+    });
+    remote_close_timer_->enableTimer(options_.remote_close_timeout);
   }
 }
 
