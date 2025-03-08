@@ -164,14 +164,14 @@ x-forwarded-client-cert
 or all of the clients or proxies that a request has flowed through, on its way from the client to the
 server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.
 
-The XFCC header value is a comma (",") separated string. Each substring is an XFCC element, which
+The XFCC header value is a comma (``,``) separated string. Each substring is an XFCC element, which
 holds information added by a single proxy. A proxy can append the current client certificate
 information as an XFCC element, to the end of the request's XFCC header after a comma.
 
-Each XFCC element is a semicolon ";" separated string. Each substring is a key-value pair, grouped
-together by an equals ("=") sign. The keys are case-insensitive, the values are case-sensitive. If
-",", ";" or "=" appear in a value, the value should be double-quoted. Double-quotes in the value
-should be replaced by backslash-double-quote (\").
+Each XFCC element is a semicolon ``;`` separated string. Each substring is a key-value pair, grouped
+together by an equals (``=``) sign. The keys are case-insensitive, the values are case-sensitive. If
+``,``, ``;`` or ``=`` appear in a value, the value should be double-quoted. Double-quotes in the
+value should be replaced by backslash-double-quote (``\"``).
 
 The following keys are supported:
 
