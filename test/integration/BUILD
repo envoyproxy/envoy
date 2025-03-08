@@ -2566,6 +2566,40 @@ envoy_cc_test(
     }),
 )
 
+envoy_cc_test_library(
+    name = "quic_http_integration_test_lib",
+    hdrs = [
+        "quic_http_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":socket_interface_swap_lib",
+        "//source/common/quic:client_connection_factory_lib",
+        "//source/common/quic:envoy_quic_client_connection_lib",
+        "//source/common/quic:envoy_quic_client_session_lib",
+        "//source/common/quic:envoy_quic_connection_helper_lib",
+        "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/common/quic:quic_server_factory_lib",
+        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/common/quic:test_utils_lib",
+        "//test/common/tls/cert_validator:timed_cert_validator",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/integration/filters:test_listener_filter_lib",
+        "//test/integration/filters:test_network_filter_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
 # TODO(mattklein123): Use target_compatible_with when we switch to Bazel 4.0 instead of multiple
 # selects.
 envoy_cc_test(
@@ -2592,31 +2626,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
-        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
-        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
-        "//test/common/config:dummy_config_proto_cc_proto",
-        "//test/common/tls/cert_validator:timed_cert_validator",
-        ":http_integration_lib",
-        ":socket_interface_swap_lib",
-        "//source/common/quic:client_connection_factory_lib",
-        "//source/common/quic:envoy_quic_client_connection_lib",
-        "//source/common/quic:envoy_quic_client_session_lib",
-        "//source/common/quic:envoy_quic_connection_helper_lib",
-        "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/common/quic:quic_client_factory_lib",
-        "//source/common/quic:quic_server_factory_lib",
-        "//test/common/quic:test_utils_lib",
-        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
-        "//test/integration/filters:stream_info_to_headers_filter_lib",
-        "//test/integration/filters:test_network_filter_lib",
-        "//test/integration/filters:test_listener_filter_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
-        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        ":quic_http_integration_test_lib",
     ]),
 )
 

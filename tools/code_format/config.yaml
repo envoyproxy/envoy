@@ -218,6 +218,7 @@ paths:
     - source/extensions/matching
     - source/extensions/network/dns_resolver/cares/
     - source/extensions/quic/server_preferred_address
+    - source/extensions/quic/connection_id_generator
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc

@@ -8,23 +8,22 @@ namespace Envoy {
 namespace Quic {
 namespace Extensions {
 namespace ConnectionIdGenerator {
-namespace Deterministic {
+namespace QuicLb {
 
-class EnvoyDeterministicConnectionIdGeneratorConfigFactory
-    : public Quic::EnvoyQuicConnectionIdGeneratorConfigFactory {
+class ConfigFactory : public Quic::EnvoyQuicConnectionIdGeneratorConfigFactory {
 public:
   // EnvoyQuicConnectionIdGeneratorConfigFactory.
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr
   createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                                         Server::Configuration::FactoryContext&) override;
-  std::string name() const override { return "envoy.quic.deterministic_connection_id_generator"; }
+                                         Server::Configuration::FactoryContext& context) override;
+  std::string name() const override { return "envoy.quic.connection_id_generator.quic_lb"; }
 };
 
-DECLARE_FACTORY(EnvoyDeterministicConnectionIdGeneratorConfigFactory);
+DECLARE_FACTORY(ConfigFactory);
 
-} // namespace Deterministic
+} // namespace QuicLb
 } // namespace ConnectionIdGenerator
 } // namespace Extensions
 } // namespace Quic
