@@ -1,6 +1,7 @@
 #pragma once
 
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/aws/signers/sigv4a_signer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
