@@ -14,16 +14,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-// Friend class for testing callbacks
-class MetadataCredentialsProviderBaseFriend {
-public:
-  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
-      : provider_(provider) {}
-
-  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
-  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-};
-
 TEST(Credentials, Default) {
   const auto c = Credentials();
   EXPECT_FALSE(c.accessKeyId().has_value());

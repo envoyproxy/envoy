@@ -9,7 +9,7 @@
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
-#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
 #include "test/extensions/common/aws/mocks.h"
@@ -23,6 +23,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
+
+#include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::Eq;

@@ -1,22 +1,4 @@
-#include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
-
-#include <openssl/ssl.h>
-
-#include <cstddef>
-#include <cstdint>
-#include <regex>
-
-#include "envoy/common/exception.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
-#include "source/common/crypto/utility.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/str_join.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_signer_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +30,8 @@ IAMRolesAnywhereSignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& head
               override_region);
 }
 
-bool IAMRolesAnywhereSignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) {
+bool IAMRolesAnywhereSignerBaseImpl::addCallbackIfCredentialsPending(
+    CredentialsPendingCallback&& cb) {
   return credentials_provider_chain_->addCallbackIfChainCredentialsPending(std::move(cb));
 }
 

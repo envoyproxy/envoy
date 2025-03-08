@@ -91,16 +91,6 @@ MATCHER_P(WithAttribute, expectedCluster, "") {
                             result_listener);
 }
 
-// Friend class for testing callbacks
-class MetadataCredentialsProviderBaseFriend {
-public:
-  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
-      : provider_(provider) {}
-
-  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
-  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-};
-
 class ConfigCredentialsProviderTest : public testing::Test {
 public:
   ~ConfigCredentialsProviderTest() override = default;

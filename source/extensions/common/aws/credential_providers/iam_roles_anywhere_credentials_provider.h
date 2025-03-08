@@ -5,12 +5,13 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
+#include "source/extensions/common/aws/aws_cluster_manager.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,9 +30,9 @@ namespace Aws {
  * MetadataCredentialsProviderBase, which handles the async credential fetch and cluster creation
  * for the IAM Roles Anywhere endpoint.
  *
- * The X509 SigV4 signing process is performed via IAMRolesAnywhereSigV4SignerImpl, which is a
+ * The X509 SigV4 signing process is performed via IAMRolesAnywhereSigV4Signer, which is a
  * modification of standard SigV4 signing to use X509 credentials as the signing input.
- * IAMRolesAnywhereCredentialsProvider is the only consumer of IAMRolesAnywhereSigV4SignerImpl.
+ * IAMRolesAnywhereCredentialsProvider is the only consumer of IAMRolesAnywhereSigV4Signer.
  *
  * The logic is as follows:
  *   1. IAMRolesAnywhereX509CredentialsProvider retrieves X509 credentials and converts them to
@@ -39,7 +40,7 @@ namespace Aws {
  *
  *   2. IAMRolesAnywhereCredentialsProvider uses credentials from
  * IAMRolesAnywhereX509CredentialsProvider, and uses them as input to
- * IAMRolesAnywhereSigV4SignerImpl
+ * IAMRolesAnywhereSigV4Signer
  *
  *   3. Once signing has completed, IAMRolesAnywhereCredentialsProvider requests temporary
  * credentials from IAM Roles Anywhere endpoint using the signed payload
@@ -64,6 +65,7 @@ public:
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "IAMRolesAnywhereCredentialsProvider"; };
 
 private:
   bool needsRefresh() override;
@@ -79,7 +81,7 @@ private:
   const std::string region_;
   absl::optional<uint16_t> session_duration_;
   ServerFactoryContextOptRef server_factory_context_;
-  std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4SignerImpl> roles_anywhere_signer_;
+  std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer_;
 };
 
 using IAMRolesAnywhereCredentialsProviderPtr = std::shared_ptr<IAMRolesAnywhereCredentialsProvider>;

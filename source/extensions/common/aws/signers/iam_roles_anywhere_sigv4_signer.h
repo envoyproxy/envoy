@@ -3,13 +3,14 @@
 #include <cstdint>
 #include <utility>
 
+#include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_signer_base.h"
 #include "source/extensions/common/aws/signer.h"
 
 namespace Envoy {
@@ -34,17 +35,17 @@ public:
  * See https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html
  *
  */
-class IAMRolesAnywhereSigV4SignerImpl : public IAMRolesAnywhereSignerBaseImpl {
+class IAMRolesAnywhereSigV4Signer : public IAMRolesAnywhereSignerBaseImpl {
 
 public:
-  IAMRolesAnywhereSigV4SignerImpl(absl::string_view service_name, absl::string_view region,
-                                  const CredentialsProviderSharedPtr& credentials_provider,
-                                  Server::Configuration::CommonFactoryContext& context)
-      : IAMRolesAnywhereSignerBaseImpl(service_name, region, credentials_provider, context) {}
+  // IAMRolesAnywhereSigV4Signer(absl::string_view service_name, absl::string_view region,
+  //                                 const CredentialsProviderChainSharedPtr& credentials_provider,
+  //                                 Server::Configuration::CommonFactoryContext& context)
+  //     : IAMRolesAnywhereSignerBaseImpl(service_name, region, credentials_provider, context) {}
 
-  IAMRolesAnywhereSigV4SignerImpl(absl::string_view service_name, absl::string_view region,
-                                  const X509CredentialsProviderSharedPtr& credentials_provider,
-                                  TimeSource& timesource)
+  IAMRolesAnywhereSigV4Signer(absl::string_view service_name, absl::string_view region,
+                              const X509CredentialsProviderSharedPtr& credentials_provider,
+                              TimeSource& timesource)
       : IAMRolesAnywhereSignerBaseImpl(service_name, region, credentials_provider, timesource) {}
 
 private:

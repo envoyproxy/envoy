@@ -1,4 +1,4 @@
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
 
 #include <chrono>
 #include <memory>
@@ -12,11 +12,11 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider_impl.h"
+#include "source/extensions/common/aws/cached_credentials_provider_base.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -68,10 +68,9 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
           context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
           iam_roles_anywhere_config.certificate_chain());
   // Create our own x509 signer just for IAM Roles Anywhere
-  roles_anywhere_signer_ =
-      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4SignerImpl>(
-          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region_),
-          roles_anywhere_certificate_provider, context_->mainThreadDispatcher().timeSource());
+  roles_anywhere_signer_ = std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+      absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region_),
+      roles_anywhere_certificate_provider, context_->mainThreadDispatcher().timeSource());
 }
 
 void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
@@ -83,7 +82,7 @@ void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
   stats_->credential_refreshes_failed_.inc();
   ENVOY_LOG(error, "AWS IAM Roles Anywhere  fetch failure: {}",
             metadata_fetcher_->failureToString(reason));
-  handleFetchDone();
+  credentialsRetrievalError();
 }
 
 // TODO: @nbaws Unused and will be removed when curl is deprecated
@@ -136,6 +135,10 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   on_async_fetch_cb_ = [this](const std::string&& arg) {
     return this->extractCredentials(std::move(arg));
   };
+
+  // mark credentials as pending while async completes
+  credentials_pending_.store(true);
+
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }
 
@@ -147,7 +150,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               document_json_or_error.status().message());
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 
@@ -156,7 +159,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   if (!credentialset_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credentialset_object_or_error.status().message());
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 
@@ -166,7 +169,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   if (!credential_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credential_object_or_error.status().message());
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 

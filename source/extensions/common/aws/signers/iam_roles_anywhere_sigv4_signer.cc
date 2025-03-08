@@ -1,19 +1,4 @@
-#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
-
-#include <openssl/ssl.h>
-
-#include <cstddef>
-
-#include "envoy/common/exception.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
-#include "source/common/crypto/utility.h"
-#include "source/common/http/headers.h"
-#include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/str_join.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,14 +6,14 @@ namespace Common {
 namespace Aws {
 
 std::string
-IAMRolesAnywhereSigV4SignerImpl::createCredentialScope(absl::string_view short_date,
-                                                       absl::string_view override_region) const {
+IAMRolesAnywhereSigV4Signer::createCredentialScope(absl::string_view short_date,
+                                                   absl::string_view override_region) const {
   return fmt::format(IAMRolesAnywhereSigV4SignatureConstants::SigV4CredentialScopeFormat,
                      short_date, override_region.empty() ? region_ : override_region,
                      service_name_);
 }
 
-std::string IAMRolesAnywhereSigV4SignerImpl::createStringToSign(
+std::string IAMRolesAnywhereSigV4Signer::createStringToSign(
     const X509Credentials x509_credentials, const absl::string_view canonical_request,
     const absl::string_view long_date, const absl::string_view credential_scope) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -47,8 +32,8 @@ std::string IAMRolesAnywhereSigV4SignerImpl::createStringToSign(
 }
 
 std::string
-IAMRolesAnywhereSigV4SignerImpl::createSignature(const X509Credentials x509_credentials,
-                                                 const absl::string_view string_to_sign) const {
+IAMRolesAnywhereSigV4Signer::createSignature(const X509Credentials x509_credentials,
+                                             const absl::string_view string_to_sign) const {
 
   std::string key = x509_credentials.certificatePrivateKey().value();
   auto keysize = x509_credentials.certificatePrivateKey().value().size();
@@ -72,7 +57,7 @@ IAMRolesAnywhereSigV4SignerImpl::createSignature(const X509Credentials x509_cred
   return Hex::encode(output);
 }
 
-std::string IAMRolesAnywhereSigV4SignerImpl::createAuthorizationHeader(
+std::string IAMRolesAnywhereSigV4Signer::createAuthorizationHeader(
     const X509Credentials x509_credentials, const absl::string_view credential_scope,
     const std::map<std::string, std::string>& canonical_headers,
     const absl::string_view signature) const {

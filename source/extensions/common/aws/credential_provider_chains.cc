@@ -20,7 +20,8 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
           },
           true);
 
-  // Custom chain currently only supports iam roles anywhere, credentials file and web identity credentials
+  // Custom chain currently only supports iam roles anywhere, credentials file and web identity
+  // credentials
   if (credential_provider_config.has_iam_roles_anywhere()) {
     ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
     add(factories.createIAMRolesAnywhereCredentialsProvider(
@@ -102,14 +103,13 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     add(factories.createCredentialsFileCredentialsProvider(
         context.value(), credential_provider_config.credentials_file_provider()));
 
-
     if (credential_provider_config.has_iam_roles_anywhere() && context) {
       ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
       add(factories.createIAMRolesAnywhereCredentialsProvider(
           context.value(), aws_cluster_manager_, region,
           credential_provider_config.iam_roles_anywhere()));
     }
-    
+
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
 
     // Configure defaults if nothing is set in the config
@@ -306,7 +306,6 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
 
   return credential_provider;
 };
-
 
 CredentialsProviderSharedPtr
 DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(

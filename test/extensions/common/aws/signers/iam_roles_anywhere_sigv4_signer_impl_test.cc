@@ -2,8 +2,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
@@ -427,7 +426,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
-  IAMRolesAnywhereSigV4SignerImpl signer_;
+  IAMRolesAnywhereSigV4Signer signer_;
   X509Credentials credentials_;
   absl::optional<std::string> region_;
 };
@@ -613,7 +612,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
-  IAMRolesAnywhereSigV4SignerImpl signer_;
+  IAMRolesAnywhereSigV4Signer signer_;
   X509Credentials credentials_;
   absl::optional<std::string> region_;
 };
