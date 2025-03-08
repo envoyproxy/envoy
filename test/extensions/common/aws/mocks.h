@@ -6,12 +6,11 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider_impl.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
-
-#include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -125,10 +124,83 @@ public:
 };
 
 class MockCredentialsProviderChain : public CredentialsProviderChain {
+public:
+  MOCK_METHOD(Credentials, chainGetCredentials, ());
+  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(void, onCredentialUpdate, ());
+};
+
+
+class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
   public:
-    MOCK_METHOD(Credentials, chainGetCredentials, ());
-    MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
-    MOCK_METHOD(void, onCredentialUpdate, ());
+    MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
+    MOCK_METHOD(
+        CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
+        (Server::Configuration::ServerFactoryContext&,
+         (const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)),
+        (const));
+  
+    CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+        Server::Configuration::ServerFactoryContext& context,
+        const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)
+        const override {
+      return mockCreateCredentialsFileCredentialsProvider(context, config);
+    }
+  
+    MOCK_METHOD(
+        CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
+        (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+         const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
+  
+    MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
+                (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
+                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
+                 absl::string_view, absl::string_view,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+                 absl::string_view));
+  
+    MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
+                (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
+                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+                 absl::string_view),
+                (const));
+  
+    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+                (Server::Configuration::ServerFactoryContext & context,
+                 AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+                 const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                     iam_roles_anywhere_config),
+                (const));
+  };
+  
+  class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
+  public:
+    MOCK_METHOD(
+        CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
+        (Server::Configuration::ServerFactoryContext&,
+         (const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)),
+        (const));
+  
+    CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+        Server::Configuration::ServerFactoryContext& context,
+        const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)
+        const override {
+      return mockCreateCredentialsFileCredentialsProvider(context, config);
+    }
+  
+    MOCK_METHOD(
+        CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
+        (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+         const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
+        (const));
+  
+    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+                (Server::Configuration::ServerFactoryContext & context,
+                 AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+                 const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                     iam_roles_anywhere_config),
+                (const));
   };
   
 } // namespace Aws

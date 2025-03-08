@@ -7,10 +7,9 @@
 #include "envoy/common/time.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/common/logger.h"
+#include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 
-#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "openssl/evp.h"
 
@@ -18,6 +17,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
+constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
+constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
+constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
 
 /**
  * AWS credentials containers
@@ -193,16 +196,17 @@ public:
     providers_.emplace_back(credentials_provider);
   }
 
-  Credentials chainGetCredentials();
-
   bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
+
+  Credentials chainGetCredentials();
 
   // Store the RAII handle for a subscription to credential provider notification
   void storeSubscription(CredentialSubscriberCallbacksHandlePtr);
+
+private:
   // Callback to notify on credential updates occurring from a chain member
   void onCredentialUpdate() override;
 
-private:
   bool chainProvidersPending();
 
 protected:
@@ -211,21 +215,6 @@ protected:
   std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_) = {};
   std::list<CredentialSubscriberCallbacksHandlePtr> subscriber_handles_;
 };
-
-// /**
-//  * AWS credentials provider chain, able to fallback between multiple credential providers.
-//  */
-// class CredentialsProviderChain : public Logger::Loggable<Logger::Id::aws> {
-// public:
-//   void add(const CredentialsProviderSharedPtr& credentials_provider) {
-//     providers_.emplace_back(credentials_provider);
-//   }
-
-//   Credentials getCredentials();
-
-// protected:
-//   std::list<CredentialsProviderSharedPtr> providers_;
-// };
 
 using CredentialsProviderChainSharedPtr = std::shared_ptr<CredentialsProviderChain>;
 
