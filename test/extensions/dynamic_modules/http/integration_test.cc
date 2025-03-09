@@ -3,34 +3,11 @@
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
-using HttpFilterProto =
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 class DynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
   DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()){};
 
-  const HttpFilterProto getCodecFilterConfig() {
-    HttpFilterProto filter_config;
-    filter_config.set_name("envoy.filters.http.upstream_codec");
-    auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
-    filter_config.mutable_typed_config()->PackFrom(configuration);
-    return filter_config;
-  }
-
-  void addHttpUpstreamFilterToCluster(const HttpFilterProto& config) {
-    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      ConfigHelper::HttpProtocolOptions protocol_options =
-          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-              (*cluster->mutable_typed_extension_protocol_options())
-                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-      *protocol_options.add_http_filters() = config;
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
-    });
-  }
   void
   initializeFilter(const std::string& filter_name, const std::string& config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
