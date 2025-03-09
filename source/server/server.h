@@ -174,10 +174,7 @@ class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
                                  public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
-      : server_(server), server_scope_(server_.stats().createScope("")) {
-    Configuration::ServerFactoryContextInstance::initialize(this);
-  }
-  ~ServerFactoryContextImpl() override { Configuration::ServerFactoryContextInstance::clear(); }
+      : server_(server), server_scope_(server_.stats().createScope("")) {}
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
