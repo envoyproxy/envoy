@@ -87,6 +87,17 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
 
+    let downstrean_port =
+      envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
+    assert_eq!(downstrean_port, Some(1234));
+    let downstream_addr =
+      envoy_filter.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress);
+    assert!(downstream_addr.is_some());
+    assert_eq!(
+      std::str::from_utf8(&downstream_addr.unwrap().as_slice()).unwrap(),
+      "1.1.1.1:1234"
+    );
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 

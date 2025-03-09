@@ -671,25 +671,26 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
-  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
-    draining_it->listener_->debugLog("removing draining listener");
-    for (const auto& worker : workers_) {
-      // Once the drain time has completed via the drain manager's timer, we tell the workers
-      // to remove the listener.
-      worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-        // The remove listener completion is called on the worker thread. We post back to the
-        // main thread to avoid locking. This makes sure that we don't destroy the listener
-        // while filters might still be using its context (stats, etc.).
-        server_.dispatcher().post([this, draining_it]() -> void {
-          if (--draining_it->workers_pending_removal_ == 0) {
-            draining_it->listener_->debugLog("draining listener removal complete");
-            draining_listeners_.erase(draining_it);
-            stats_.total_listeners_draining_.set(draining_listeners_.size());
-          }
-        });
+  draining_it->listener_->localDrainManager().startDrainSequence(
+      Network::DrainDirection::All, [this, draining_it]() -> void {
+        draining_it->listener_->debugLog("removing draining listener");
+        for (const auto& worker : workers_) {
+          // Once the drain time has completed via the drain manager's timer, we tell the workers
+          // to remove the listener.
+          worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
+            // The remove listener completion is called on the worker thread. We post back to the
+            // main thread to avoid locking. This makes sure that we don't destroy the listener
+            // while filters might still be using its context (stats, etc.).
+            server_.dispatcher().post([this, draining_it]() -> void {
+              if (--draining_it->workers_pending_removal_ == 0) {
+                draining_it->listener_->debugLog("draining listener removal complete");
+                draining_listeners_.erase(draining_it);
+                stats_.total_listeners_draining_.set(draining_listeners_.size());
+              }
+            });
+          });
+        }
       });
-    }
-  });
 
   updateWarmingActiveGauges();
 }
@@ -1029,10 +1030,17 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
       stopListener(listener, options, [this, listener_tag]() {
-        stats_.listener_stopped_.inc();
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            maybeCloseSocketsForListener(*listener);
+        // Only stop the listener if we don't have a record of its tag.
+        // This prevents us from double incrementing if listeners are stopped twice.
+        // This can happen if the admin endpoint is triggered for inbound_only and then
+        // all. We perform the check in the callback to ensure it's done on the main thread
+        if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
+          stats_.listener_stopped_.inc();
+          stopped_listener_tags_.insert(listener_tag);
+          for (auto& listener : active_listeners_) {
+            if (listener->listenerTag() == listener_tag) {
+              maybeCloseSocketsForListener(*listener);
+            }
           }
         }
       });

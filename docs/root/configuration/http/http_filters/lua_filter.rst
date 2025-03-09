@@ -117,6 +117,12 @@ Lua script as follows:
     :linenos:
     :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
+Upstream Filter
+---------------
+
+The lua filter can be used as an upstream filter. Upstream filters cannot clear the route cache (as
+routing decision has already been made). Clearing the route cache will be a no-op in this case.
+
 Statistics
 ----------
 .. _config_http_filters_lua_stats:
