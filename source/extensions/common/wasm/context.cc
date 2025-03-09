@@ -1648,7 +1648,7 @@ Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers
   return result;
 }
 
-Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus Context::(::Envoy::Buffer::Instance& data, bool end_stream) {
   if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
