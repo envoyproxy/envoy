@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/backoff_strategy.h"
 #include "envoy/event/dispatcher.h"
@@ -33,9 +35,12 @@ public:
   Entry& operator=(const Entry&) = delete;
   Entry(uint64_t time, std::map<std::string, std::string>&& record)
       : time_(time), record_(std::move(record)) {}
+  Entry(uint64_t time, std::vector<uint8_t>&& vector_record)
+      : time_(time), vector_record_(std::move(vector_record)) {}
 
   const uint64_t time_;
   const std::map<std::string, std::string> record_;
+  const std::vector<uint8_t> vector_record_;
 };
 
 using EntryPtr = std::unique_ptr<Entry>;
