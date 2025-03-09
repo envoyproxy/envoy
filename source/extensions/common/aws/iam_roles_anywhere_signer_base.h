@@ -46,15 +46,6 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  */
 class IAMRolesAnywhereSignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
-  IAMRolesAnywhereSignerBaseImpl(
-      absl::string_view service_name, absl::string_view region,
-      const CredentialsProviderChainSharedPtr& credentials_provider_chain,
-      Server::Configuration::CommonFactoryContext& context)
-      : service_name_(service_name), region_(region),
-        credentials_provider_chain_(credentials_provider_chain), time_source_(context.timeSource()),
-        long_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::LongDateFormat)),
-        short_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::ShortDateFormat)) {}
-
   IAMRolesAnywhereSignerBaseImpl(absl::string_view service_name, absl::string_view region,
                                  const X509CredentialsProviderSharedPtr& credentials_provider,
                                  TimeSource& timesource)
