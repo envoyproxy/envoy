@@ -121,55 +121,6 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
   runHeaderCallbacksTest(true);
 }
 
-TEST_P(DynamicModulesIntegrationTest, UpstreamFilter) {
-  initializeFilter("header_callbacks", "dog:cat");
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
-                                                 {":method", "POST"},
-                                                 {":path", "/test/long/url"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"}};
-  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
-  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
-
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(encoder_decoder.first, 10, false);
-  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(10, false);
-  upstream_request_->encodeTrailers(response_trailers);
-
-  ASSERT_TRUE(response->waitForEndStream());
-
-  // Verify the proxied request was received upstream, as expected.
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(10U, upstream_request_->bodyLength());
-  // Verify that the headers/trailers are added as expected.
-  EXPECT_EQ(
-      "cat",
-      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
-  EXPECT_EQ("cat", upstream_request_->trailers()
-                       .get()
-                       ->get(Http::LowerCaseString("dog"))[0]
-                       ->value()
-                       .getStringView());
-  // Verify the proxied response was received downstream, as expected.
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ(10U, response->body().size());
-  // Verify that the headers/trailers are added as expected.
-  EXPECT_EQ("cat",
-            response->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
-  EXPECT_EQ(
-      "cat",
-      response->trailers().get()->get(Http::LowerCaseString("dog"))[0]->value().getStringView());
-}
-
 TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
   initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */,
                    "type.googleapis.com/google.protobuf.BytesValue");
