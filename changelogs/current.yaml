@@ -164,6 +164,11 @@ new_features:
     Added alpha support for asynchronous load balancing. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details. Support can
     be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
+- area: quic
+  change: |
+    Added an :ref:`extension
+    <envoy_v3_api_msg_extensions.quic.connection_id_generator.quic_lb.v3.Config>` to support QUIC-LB draft standard for
+    connection ID generation.
 - area: ext_proc
   change: |
     Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
