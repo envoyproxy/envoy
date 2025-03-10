@@ -67,10 +67,12 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
       ec_key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
 
       // And set the private key we calculated above
-      auto ret = EC_KEY_set_private_key(ec_key, priv_key_num);
-      // Safe to ignore return code here, ECDSA_Sign will succeed regardless of key being set, but
-      // signature will be invalid
-      ASSERT(ret != 0, "Unable to set SigV4a private key, signature will be invalid");
+      if (!EC_KEY_set_private_key(ec_key, priv_key_num)) {
+        ENVOY_LOG(debug, "Failed to set openssl private key");
+        BN_free(priv_key_num);
+        OPENSSL_free(ec_key);
+        return nullptr;
+      }
       BN_free(priv_key_num);
     }
   }

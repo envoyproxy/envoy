@@ -73,6 +73,8 @@ void CredentialsFileCredentialsProvider::extractCredentials(absl::string_view cr
 
   std::string access_key_id, secret_access_key, session_token;
 
+  // TODO: nbaws@ optimise out this flat hash map creation
+  
   absl::flat_hash_map<std::string, std::string> elements = {
       {AWS_ACCESS_KEY_ID, ""}, {AWS_SECRET_ACCESS_KEY, ""}, {AWS_SESSION_TOKEN, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
