@@ -364,17 +364,21 @@ DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
   int len = 0, plaintext_len = 0;
 
   // Initialize decryption operation
-  int result = EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
-  RELEASE_ASSERT(result == 1, "Decryption initialization failed");
+  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
+    return {"", "Decryption failed"};
+  }
 
   // Decrypt the ciphertext
-  result = EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size());
-  RELEASE_ASSERT(result == 1, "Decryption update failed");
+  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+    return {"", "Decryption failed"};
+  }
   plaintext_len += len;
 
   // Finalize decryption
-  result = EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len);
-  RELEASE_ASSERT(result == 1, "Decryption finalization failed");
+  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+    return {"", "Decryption failed"};
+  }
+
   plaintext_len += len;
 
   EVP_CIPHER_CTX_free(ctx);
