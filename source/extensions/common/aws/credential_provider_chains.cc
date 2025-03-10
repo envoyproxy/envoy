@@ -22,10 +22,10 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
 
   // Custom chain currently only supports iam roles anywhere, credentials file and web identity
   // credentials
-  if (credential_provider_config.has_iam_roles_anywhere()) {
+  if (credential_provider_config.has_iam_roles_anywhere_provider()) {
     ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
     add(factories.createIAMRolesAnywhereCredentialsProvider(
-        context, aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere()));
+        context, aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere_provider()));
   }
 
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
@@ -103,11 +103,11 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     add(factories.createCredentialsFileCredentialsProvider(
         context.value(), credential_provider_config.credentials_file_provider()));
 
-    if (credential_provider_config.has_iam_roles_anywhere() && context) {
+    if (credential_provider_config.has_iam_roles_anywhere_provider() && context) {
       ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
       add(factories.createIAMRolesAnywhereCredentialsProvider(
           context.value(), aws_cluster_manager_, region,
-          credential_provider_config.iam_roles_anywhere()));
+          credential_provider_config.iam_roles_anywhere_provider()));
     }
 
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
@@ -322,15 +322,6 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
   auto status = aws_cluster_manager.ref()->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
-
-  //         Api::Api& api, ServerFactoryContextOptRef context,
-  // AwsClusterManagerOptRef aws_cluster_manager,
-  // absl::string_view cluster_name,
-  //   CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
-  //   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-  //   std::chrono::seconds initialization_timer,
-  //   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
-  //   iam_roles_anywhere_config);
 
   auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,

@@ -289,6 +289,29 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
   EXPECT_EQ(inline_string, "custom_inline_string");
 }
 
+TEST_F(DefaultCredentialsProviderChainTest, IAMRolesAnywhere) {
+  std::string role_arn;
+
+  EXPECT_CALL(factories_, createIAMRolesAnywhereCredentialsProvider(_, _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&role_arn](
+              const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider& provider)
+              -> IAMRolesAnywhereCredentialsProviderPtr {
+            role_arn = provider.role_arn();
+            return nullptr;
+          })));
+
+  EXPECT_CALL(factories_,
+              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.mutable_iam_roles_anywhere_provider()->set_role_arn("role-arn");
+
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
+  EXPECT_EQ(role_arn, "role-arn");
+}
+
 class CustomCredentialsProviderChainTest : public testing::Test {};
 
 TEST_F(CustomCredentialsProviderChainTest, CreateFileCredentialProviderOnly) {
@@ -352,6 +375,30 @@ TEST_F(CustomCredentialsProviderChainTest, CreateFileAndWebProviders) {
       server_context, region, cred_provider, factories);
 }
 
+TEST_F(CustomCredentialsProviderChainTest, IAMRolesAnywhere) {
+  std::string role_arn;
+  NiceMock<MockCustomCredentialsProviderChainFactories> factories;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Api::ApiPtr api;
+  auto region = "ap-southeast-2";
+
+  EXPECT_CALL(factories, createIAMRolesAnywhereCredentialsProvider(_, _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&role_arn](
+              const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider& provider)
+              -> IAMRolesAnywhereCredentialsProviderPtr {
+            role_arn = provider.role_arn();
+            return nullptr;
+          })));
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.mutable_iam_roles_anywhere_provider()->set_role_arn("role-arn");
+
+  auto chain = std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
+    server_context, region, credential_provider_config, factories);
+  EXPECT_EQ(role_arn, "role-arn");
+}
+
 TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::common::aws::v3::InlineCredentialProvider inline_credential;
@@ -370,6 +417,7 @@ TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
   EXPECT_EQ("TestSecret", creds->secretAccessKey().value());
   EXPECT_EQ("TestSessionToken", creds->sessionToken().value());
 }
+
 
 } // namespace Aws
 } // namespace Common
