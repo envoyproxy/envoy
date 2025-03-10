@@ -1014,16 +1014,49 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfToken) {
 
 /**
  * Scenario: The OAuth filter receives a callback request from the OAuth server that has an invalid
- * CSRF token. This scenario simulates a CSRF attack where the original OAuth request was inserted
- * to the user's browser by a malicious actor, and the user was tricked into clicking on the link.
+ * CSRF token (without Dot). This scenario simulates a CSRF attack where the original OAuth request
+ * was inserted to the user's browser by a malicious actor, and the user was tricked into clicking
+ * on the link.
  *
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */
-TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTkoen) {
+TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenWithoutDot) {
   // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"0"}
   static const std::string state_with_invalid_csrf_token =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3Ny"
       "Zl90b2tlbiI6IjAifQ";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
+      {Http::Headers::get().Cookie.get(),
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  // Deliberately fail the HMAC Validation check.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a callback request from the OAuth server that has an invalid
+ * CSRF token (hmac doesn't match). This scenario simulates a CSRF attack where the original OAuth
+ * request was inserted to the user's browser by a malicious actor, and the user was tricked into
+ * clicking on the link.
+ *
+ * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
+ */
+TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenInvalidHmac) {
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"00000000075bcd15.invalidhmac"}
+  static const std::string state_with_invalid_csrf_token =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3Ny"
+      "Zl90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUuaW52YWxpZGhtYWMifQ==";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
       {Http::Headers::get().Cookie.get(),
