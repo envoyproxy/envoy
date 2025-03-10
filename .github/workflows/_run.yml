@@ -8,7 +8,6 @@ on:
     secrets:
       app-id:
       app-key:
-      dockerhub-username:
       dockerhub-password:
       gcp-key:
       gcs-cache-key:
@@ -57,6 +56,9 @@ on:
       docker-ipv6:
         default: true
         type: boolean
+      dockerhub-username:
+        default: envoyproxy
+        type: string
       downloads:
         type: string
       entrypoint:
@@ -390,7 +392,7 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
-        DOCKERHUB_USERNAME: ${{ secrets.dockerhub-username }}
+        DOCKERHUB_USERNAME: ${{ inputs.dockerhub-username }}
         DOCKERHUB_PASSWORD: ${{ secrets.dockerhub-password }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
         ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
