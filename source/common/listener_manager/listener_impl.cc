@@ -1241,26 +1241,54 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
+  if (lhs.has_tcp_keepalive() != rhs.has_tcp_keepalive()) {
+    return false;
+  }
+
+  if (lhs.has_tcp_keepalive() &&
+      !Protobuf::util::MessageDifferencer::Equals(lhs.tcp_keepalive(), rhs.tcp_keepalive())) {
+    return false;
+  }
+
   if (lhs.additional_addresses_size() != rhs.additional_addresses_size()) {
     return false;
   }
   // Assume people won't change the order of additional addresses.
   for (auto i = 0; i < lhs.additional_addresses_size(); i++) {
-    if (lhs.additional_addresses(i).has_socket_options() !=
-        rhs.additional_addresses(i).has_socket_options()) {
+    auto& lhs_addr = lhs.additional_addresses(i);
+    auto& rhs_addr = rhs.additional_addresses(i);
+    if (lhs_addr.has_socket_options() != rhs_addr.has_socket_options()) {
       return false;
     }
-    if (lhs.additional_addresses(i).has_socket_options()) {
+    if (lhs_addr.has_tcp_keepalive_override() != rhs_addr.has_tcp_keepalive_override()) {
+      return false;
+    }
+
+    if (lhs_addr.has_socket_options()) {
       is_equal =
-          std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     lhs.additional_addresses(i).socket_options().socket_options().end(),
-                     rhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     rhs.additional_addresses(i).socket_options().socket_options().end(),
+          std::equal(lhs_addr.socket_options().socket_options().begin(),
+                     lhs_addr.socket_options().socket_options().end(),
+                     rhs_addr.socket_options().socket_options().begin(),
+                     rhs_addr.socket_options().socket_options().end(),
                      [](const ::envoy::config::core::v3::SocketOption& option,
                         const ::envoy::config::core::v3::SocketOption& other_option) {
                        return Protobuf::util::MessageDifferencer::Equals(option, other_option);
                      });
       if (!is_equal) {
+        return false;
+      }
+    }
+
+    if (lhs_addr.has_tcp_keepalive_override()) {
+      if (lhs_addr.tcp_keepalive_override().has_tcp_keepalive() !=
+          rhs_addr.tcp_keepalive_override().has_tcp_keepalive()) {
+        return false;
+      }
+
+      if (lhs_addr.tcp_keepalive_override().has_tcp_keepalive() &&
+          !Protobuf::util::MessageDifferencer::Equals(
+              lhs_addr.tcp_keepalive_override().tcp_keepalive(),
+              rhs_addr.tcp_keepalive_override().tcp_keepalive())) {
         return false;
       }
     }

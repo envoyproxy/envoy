@@ -568,97 +568,6 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
 #endif
 
 #ifdef __linux__
-TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive) {
-  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
-    return; // Keepalive is not supported on this platform.
-  }
-
-  on_server_init_function_ = [&]() {
-    createLdsStream();
-    listener_config_.mutable_tcp_keepalive();
-    listener_config_.mutable_additional_addresses(0)
-        ->mutable_tcp_keepalive_override()
-        ->mutable_tcp_keepalive()
-        ->mutable_keepalive_probes()
-        ->set_value(3);
-    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
-    createRdsStream(route_table_name_);
-  };
-  initialize();
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
-  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
-  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
-  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
-  registerTestServerPorts({"address1", "address2"});
-
-  constexpr absl::string_view route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-)EOF";
-  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
-  test_server_->waitForCounterGe(
-      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
-  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
-  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
-
-  test_server_->waitUntilListenersReady();
-  // NOTE: The line above doesn't tell you if listener is up and listening.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
-  // Request is sent to cluster_0.
-
-  int response_size = 800;
-  int request_size = 10;
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                   {"server_id", "cluster_0, backend_0"}};
-
-  codec_client_ = makeHttpConnection(lookupPort("address1"));
-  auto response = sendRequestAndWaitForResponse(
-      Http::TestResponseHeaderMapImpl{
-          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
-      request_size, response_headers, response_size, /*cluster_0*/ 0);
-  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  codec_client_->close();
-  // Wait for the client to be disconnected.
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-
-  codec_client_ = makeHttpConnection(lookupPort("address2"));
-  auto response2 = sendRequestAndWaitForResponse(
-      Http::TestResponseHeaderMapImpl{
-          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
-      request_size, response_headers, response_size, /*cluster_0*/ 0);
-  verifyResponse(std::move(response2), "200", response_headers, std::string(response_size, 'a'));
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(request_size, upstream_request_->bodyLength());
-
-  int opt_value = 0;
-  socklen_t opt_len = sizeof(opt_value);
-  // Verify first address.
-  EXPECT_TRUE(getSocketOption("testing-listener-0", ENVOY_SOCKET_SO_KEEPALIVE.level(),
-                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 0));
-  EXPECT_EQ(opt_len, sizeof(opt_value));
-  EXPECT_EQ(1, opt_value);
-  // Verify second address.
-  EXPECT_TRUE(getSocketOption("testing-listener-0", ENVOY_SOCKET_SO_KEEPALIVE.level(),
-                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
-  EXPECT_EQ(opt_len, sizeof(opt_value));
-  EXPECT_EQ(1, opt_value);
-
-  EXPECT_TRUE(getSocketOption("testing-listener-0", ENVOY_SOCKET_TCP_KEEPCNT.level(),
-                              ENVOY_SOCKET_TCP_KEEPCNT.option(), &opt_value, &opt_len, 1));
-  EXPECT_EQ(opt_len, sizeof(opt_value));
-  EXPECT_EQ(3, opt_value);
-}
-#endif
-
-#ifdef __linux__
 TEST_P(ListenerMultiAddressesIntegrationTest,
        BasicSuccessWithSocketOptionsOnlySetOnAdditionalAddress) {
   on_server_init_function_ = [&]() {
@@ -1787,6 +1696,120 @@ TEST_P(ListenerFilterIntegrationTest,
         ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
       });
 }
+
+#ifdef __linux__
+TEST_P(ListenerFilterIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    return; // Keepalive is not supported on this platform.
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    listener_config_.mutable_tcp_keepalive();
+
+    auto* additional_addr = listener_config_.mutable_additional_addresses()->Add();
+    additional_addr->mutable_tcp_keepalive_override()
+        ->mutable_tcp_keepalive()
+        ->mutable_keepalive_probes()
+        ->set_value(3);
+
+    auto* address = additional_addr->mutable_address()->mutable_socket_address();
+    address->set_address("127.0.0.1");
+    address->set_port_value(0);
+
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener_1"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener_1"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  // Verify first address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  // Verify second address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                              ENVOY_SOCKET_TCP_KEEPCNT.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(3, opt_value);
+
+  // Update the listener with different keepalive settings.
+  listener_config_.mutable_tcp_keepalive()->mutable_keepalive_time()->set_value(74);
+  // Disable keepalive on the second address.
+  listener_config_.mutable_additional_addresses(0)->mutable_tcp_keepalive_override()->Clear();
+
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // We want to test update listener with different keepalive time and disable keepalive on additional address.
+  registerTestServerPorts({"test_listener_1"});
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener_1"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+
+  // Verify first address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                              ENVOY_SOCKET_TCP_KEEPIDLE.option(), &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(74, opt_value);
+
+  // Verify keepalive is disabled on the second address.
+  EXPECT_TRUE(getSocketOption("listener_foo", ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(0, opt_value);
+}
+#endif
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
