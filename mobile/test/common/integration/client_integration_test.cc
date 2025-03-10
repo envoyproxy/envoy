@@ -277,7 +277,6 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
     }
   };
   builder_.setLogger(std::move(logger));
-  builder_.addRuntimeGuard("dns_nodata_noname_is_success", false);
   builder_.setDisableDnsRefreshOnFailure(true);
   initialize();
 

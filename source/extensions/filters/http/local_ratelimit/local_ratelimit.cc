@@ -46,7 +46,7 @@ FilterConfig::FilterConfig(
                     Envoy::Runtime::FractionalPercent(config.filter_enabled(), runtime_))
               : absl::nullopt),
       filter_enforced_(
-          config.has_filter_enabled()
+          config.has_filter_enforced()
               ? absl::optional<Envoy::Runtime::FractionalPercent>(
                     Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
               : absl::nullopt),

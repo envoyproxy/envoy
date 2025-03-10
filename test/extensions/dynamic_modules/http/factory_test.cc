@@ -44,8 +44,7 @@ filter_config:
   auto factory_cb = result.value();
   Http::MockFilterChainFactoryCallbacks callbacks;
 
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
-  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
 }
 
@@ -74,8 +73,7 @@ filter_name: foo
   auto factory_cb = result.value();
   Http::MockFilterChainFactoryCallbacks callbacks;
 
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
-  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
 }
 
@@ -107,8 +105,7 @@ filter_config:
   auto factory_cb = result.value();
   Http::MockFilterChainFactoryCallbacks callbacks;
 
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
-  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
 }
 
