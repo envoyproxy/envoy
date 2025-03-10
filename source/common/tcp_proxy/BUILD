@@ -84,7 +84,6 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/proxy_protocol:proxy_protocol_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_id_provider_lib",
         "//source/common/stream_info:stream_info_lib",

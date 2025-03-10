@@ -261,6 +261,9 @@ public:
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
 
+    static Network::ProxyProtocolTLVVector
+    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
+
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
     const Stats::ScopeSharedPtr stats_scope_;

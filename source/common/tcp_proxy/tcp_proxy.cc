@@ -32,7 +32,6 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
-#include "source/common/proxy_protocol/proxy_protocol.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
@@ -183,7 +182,7 @@ Config::SharedConfig::SharedConfig(
   }
 
   if (!config.proxy_protocol_tlvs().empty()) {
-    proxy_protocol_tlvs_ = Common::ProxyProtocol::parseTLVs(config.proxy_protocol_tlvs());
+    proxy_protocol_tlvs_ = parseTLVs(config.proxy_protocol_tlvs());
   }
 }
 
@@ -288,6 +287,16 @@ Filter::~Filter() {
 
 TcpProxyStats Config::SharedConfig::generateStats(Stats::Scope& scope) {
   return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+}
+
+Network::ProxyProtocolTLVVector
+Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs) {
+  Network::ProxyProtocolTLVVector tlv_vector;
+  for (const auto& tlv : tlvs) {
+    tlv_vector.push_back({static_cast<uint8_t>(tlv->type()),
+                          std::vector<unsigned char>(tlv->value().begin(), tlv->value().end())});
+  }
+  return tlv_vector;
 }
 
 void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
