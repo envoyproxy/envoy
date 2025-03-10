@@ -332,7 +332,7 @@ std::string encrypt(const std::string& plaintext, const std::string& secret,
 
 struct DecryptResult {
   std::string plaintext;
-  std::optional<std::string> error;
+  absl::optional<std::string> error;
 };
 
 /**

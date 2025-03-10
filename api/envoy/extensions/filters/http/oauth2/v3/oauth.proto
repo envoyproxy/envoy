@@ -39,7 +39,7 @@ message CookieConfig {
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CookieConfigs {
   // Configuration for the bearer token cookie.
   CookieConfig bearer_token_cookie_config = 1;
