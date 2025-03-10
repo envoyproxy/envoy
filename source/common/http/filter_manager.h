@@ -911,9 +911,7 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
-  void setReverseConnForceLocalReply(bool value) {
-    reverse_conn_force_local_reply_ = value;
-  }
+  void setReverseConnForceLocalReply(bool value) { reverse_conn_force_local_reply_ = value; }
 
   void sendGoAwayAndClose() {
     // Stop filter chain iteration by checking encoder or decoder chain.

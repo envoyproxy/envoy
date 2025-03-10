@@ -157,7 +157,8 @@ public:
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   void setReverseConnForceLocalReply(bool value) override {
-    ENVOY_LOG_MISC(error, "Cannot set value {}. AsyncStreamImpl does not support reverse connection.", value);
+    ENVOY_LOG_MISC(
+        error, "Cannot set value {}. AsyncStreamImpl does not support reverse connection.", value);
   }
 
 protected:

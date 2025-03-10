@@ -379,9 +379,8 @@ ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
 
 OptRef<Network::ReverseConnectionListener>
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::reverseConnectionListener() {
-  auto* val = absl::get_if<
-      std::reference_wrapper<Network::ReverseConnectionListener>>(
-      &typed_listener_);
+  auto* val =
+      absl::get_if<std::reference_wrapper<Network::ReverseConnectionListener>>(&typed_listener_);
   return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
 

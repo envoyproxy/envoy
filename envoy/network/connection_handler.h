@@ -324,14 +324,15 @@ using InternalListenerOptRef = OptRef<InternalListener>;
  */
 class ReverseConnectionListener : public virtual ConnectionHandler::ActiveListener {
 public:
-
   /**
    * Helper method that triggers the reverse connection workflow.
    * @param dispatcher the thread local dispatcher.
    * @param conn_handler the thread local connection handler.
    * @param config the listener config that triggers the reverse connection.
    */
-  virtual void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler, Network::ListenerConfig& config) PURE;
+  virtual void startRCWorkflow(Event::Dispatcher& dispatcher,
+                               Network::ConnectionHandler& conn_handler,
+                               Network::ListenerConfig& config) PURE;
 
   /**
    * Called when a new connection is accepted.

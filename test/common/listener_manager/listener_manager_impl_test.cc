@@ -800,11 +800,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, RejectReverseConnListenerWithInva
 
   // Set up the expectation that fromAnyConfig will return an InvalidArgumentError
   EXPECT_CALL(*rev_conn_registry_, fromAnyConfig(_))
-      .WillOnce(Return(ByMove(absl::InvalidArgumentError("Source node ID is missing in reverse connection listener config"))));
+      .WillOnce(Return(ByMove(absl::InvalidArgumentError(
+          "Source node ID is missing in reverse connection listener config"))));
 
-  EXPECT_THROW_WITH_REGEX(
-      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-      "failed to unpack reverse connection config");
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                          "failed to unpack reverse connection config");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AcceptReverseConnListenerWithValidConfig) {

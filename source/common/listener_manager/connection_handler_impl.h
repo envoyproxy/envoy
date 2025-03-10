@@ -124,9 +124,7 @@ private:
                     });
     }
 
-    void setName(const std::string& name) {
-      name_ = name;
-    }
+    void setName(const std::string& name) { name_ = name; }
 
     /**
      * Add an ActiveListener into the list.

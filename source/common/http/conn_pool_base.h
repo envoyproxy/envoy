@@ -111,21 +111,25 @@ public:
       HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
       uint64_t effective_concurrent_stream_limit, uint64_t configured_concurrent_stream_limit,
       OptRef<Upstream::Host::CreateConnectionData> opt_data,
-      CreateConnectionDataFn connection_fn =
-          [](HttpConnPoolImplBase& parent) {
-            return static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)
-                ->host()
-                ->createConnection(parent.dispatcher(), parent.socketOptions(),
-                                   parent.transportSocketOptions());
-          })
+      CreateConnectionDataFn connection_fn = nullptr)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
                                             configured_concurrent_stream_limit) {
     if (opt_data.has_value()) {
+      ENVOY_LOG(debug, "Using provided CreateConnectionData");
       initialize(opt_data.value(), parent);
       return;
     }
     ENVOY_LOG(debug, "Creating CreateConnectionData");
+    if (connection_fn == nullptr) {
+      ENVOY_LOG(debug, "Using default CreateConnectionData");
+      connection_fn = [](HttpConnPoolImplBase& parent) {
+        return static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)
+            ->host()
+            ->createConnection(parent.dispatcher(), parent.socketOptions(),
+                                parent.transportSocketOptions());
+      };
+    }
     Upstream::Host::CreateConnectionData data = connection_fn(parent);
     initialize(data, parent);
   }

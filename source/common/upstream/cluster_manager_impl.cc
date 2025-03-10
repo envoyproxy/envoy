@@ -2425,7 +2425,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
-    if (host->cluster().clusterType().has_value() && host->cluster().clusterType()->name() == "envoy.clusters.reverse_connection") {
+    if (host->cluster().clusterType().has_value() &&
+        host->cluster().clusterType()->name() == "envoy.clusters.reverse_connection") {
       ENVOY_LOG_MISC(debug, "Allocating reverse connection conn pool");
       auto* factory = Config::Utility::getFactoryByName<Http::Http2::ReverseConnPoolFactory>(
           "envoy.http.reverse_conn.default");
@@ -2433,8 +2434,9 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         return factory->allocateConnPool(
             dispatcher, context_.api().randomGenerator(), server_.singletonManager(), host,
             priority, options, transport_socket_options, state, origin, alternate_protocols_cache);
-      }
-      else throw EnvoyException("Failed to create reverse connection conn pool. Cannot find a factory implementation for reverse connection conn pool.");
+      } else
+        throw EnvoyException("Failed to create reverse connection conn pool. Cannot find a factory "
+                             "implementation for reverse connection conn pool.");
     }
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, origin,

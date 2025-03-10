@@ -521,22 +521,25 @@ public:
   ListenerInfoConstSharedPtr listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
+  std::string version_info_;
   const AccessLog::InstanceSharedPtrVector empty_access_logs_;
 };
 
 class MockReverseConnectionListener : public ReverseConnectionListener {
 public:
-  MOCK_METHOD(void, startRCWorkflow, (Event::Dispatcher& dispatcher,
-                                      Network::ConnectionHandler& conn_handler,
-                                      Network::ListenerConfig& config), ());
-  MOCK_METHOD(void, onAccept, (ConnectionSocketPtr&& socket), ());
+  MOCK_METHOD(void, startRCWorkflow,
+              (Event::Dispatcher & dispatcher, Network::ConnectionHandler& conn_handler,
+               Network::ListenerConfig& config),
+              ());
+  MOCK_METHOD(void, onAccept, (ConnectionSocketPtr && socket), ());
 };
 
 class MockLocalRevConnRegistry : public LocalRevConnRegistry {
 public:
   MOCK_METHOD(Network::ReverseConnectionListenerPtr, createActiveReverseConnectionListener,
-              (Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
-               Network::ListenerConfig& config), ());
+              (Network::ConnectionHandler & conn_handler, Event::Dispatcher& dispatcher,
+               Network::ListenerConfig& config),
+              ());
 };
 
 class MockRevConnRegistry : public RevConnRegistry {
@@ -589,7 +592,7 @@ public:
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
   MOCK_METHOD(Network::LocalRevConnRegistry&, reverseConnRegistry, (), (const));
   MOCK_METHOD(void, saveUpstreamConnection,
-              (Network::ConnectionSocketPtr&& upstream_socket, uint64_t listener_tag));
+              (Network::ConnectionSocketPtr && upstream_socket, uint64_t listener_tag));
 
   uint64_t num_handler_connections_{};
 };

@@ -822,7 +822,7 @@ public:
   virtual bool shouldLoadShed() const PURE;
 
   /**
-   * @return set a flag to send a local reply immediately for reverse connections. 
+   * @return set a flag to send a local reply immediately for reverse connections.
    */
   virtual void setReverseConnForceLocalReply(bool value) PURE;
 };

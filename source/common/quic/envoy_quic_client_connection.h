@@ -43,7 +43,9 @@ public:
 
     Network::ConnectionSocket& probingSocket();
 
-    Network::ConnectionSocketPtr releaseSocket();
+    Network::ConnectionSocketPtr releaseSharedSocket();
+
+    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
 
   private:
     std::unique_ptr<EnvoyQuicPacketWriter> writer_;

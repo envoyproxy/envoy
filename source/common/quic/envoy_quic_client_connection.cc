@@ -203,7 +203,7 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
   auto envoy_context =
       static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
 
-  auto probing_socket = envoy_context->releaseSocket();
+  auto probing_socket = envoy_context->releaseSharedSocket();
   if (envoy_context->peer_address() != peer_address()) {
     OnServerPreferredAddressValidated(*envoy_context, true);
     envoy_context->releaseWriter();
@@ -303,8 +303,15 @@ EnvoyQuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContext
 }
 
 Network::ConnectionSocketPtr
-EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSocket() {
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSharedSocket() {
   return std::move(socket_);
+}
+
+std::unique_ptr<Network::ConnectionSocket>
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSocket() {
+  Network::ConnectionSocket* raw_socket_ptr = socket_.get();
+  socket_.reset();
+  return std::unique_ptr<Network::ConnectionSocket>(raw_socket_ptr);
 }
 
 Network::ConnectionSocket&

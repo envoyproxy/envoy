@@ -248,7 +248,7 @@ void DlbBalancedConnectionHandlerImpl::post(
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
   // The pointer will be casted to unique_ptr in onDlbEvents(), no need to consider free.
-  auto s = socket.release();
+  auto s = socket.get();
   dlb_event_t events[1];
   events[0].send.queue_id = DlbConnectionBalanceFactorySingleton::get().tx_queue_id;
   events[0].send.sched_type = SCHED_UNORDERED;

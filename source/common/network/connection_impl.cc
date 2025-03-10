@@ -89,7 +89,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       transport_wants_read_(false), reuse_connection_(false) {
 
-  if (socket_== nullptr || !socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     IS_ENVOY_BUG("Client socket failure");
     return;
   }
@@ -143,8 +143,9 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (socket_== nullptr || !socket_->isOpen()) {
-    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket object is null or socket is not open", *this);
+  if (socket_ == nullptr || !socket_->isOpen()) {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing",
+                         "Not closing conn, socket object is null or socket is not open", *this);
     return;
   }
 
@@ -236,7 +237,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (socket_== nullptr || !socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -969,7 +970,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr(),
                    StreamInfo::FilterState::LifeSpan::Connection) {
-  if (socket_== nullptr || !socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     setFailureReason("socket creation failure");
     // Set up the dispatcher to "close" the connection on the next loop after
     // the owner has a chance to add callbacks.
