@@ -49,6 +49,11 @@ uint8_t QuicLbConnectionIdGenerator::ConnectionIdLength(uint8_t first_byte) cons
 
 absl::optional<quic::QuicConnectionId>
 QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connection_id) {
+  // TODO(ggreenway): the thread ID should be encoded and protected in such a way that the value
+  // does not require decrypting the CID, but that a passive observer can not easily link
+  // thread IDs for different CIDs on the same connection. See
+  // https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-server-process-demultiplexi.
+
   uint8_t buffer[quic::kQuicMaxConnectionIdWithLengthPrefixLength];
 
   const uint16_t new_length = new_connection_id.length() + sizeof(WorkerRoutingIdValue);
