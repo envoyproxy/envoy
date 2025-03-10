@@ -60,9 +60,7 @@ public:
     const auto& proto_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol&>(
         message, context.messageValidationVisitor());
-    // UNREFERENCED_PARAMETER(proto_config);
     UdpConfigSharedPtr config = std::make_shared<UdpConfig>(proto_config);
-    // UdpConfigSharedPtr config = std::make_shared<UdpConfig>();
     return [config](Network::UdpListenerFilterManager& manager,
                     Network::UdpReadFilterCallbacks& callbacks) -> void {
       manager.addReadFilter(std::make_unique<UdpFilter>(callbacks, config));
