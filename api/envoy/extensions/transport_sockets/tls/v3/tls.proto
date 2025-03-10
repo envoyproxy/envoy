@@ -33,12 +33,12 @@ message TlsPerHostSessionCacheConfig {
   // configurations, meaning a session key from one host isn't reusable with another.
   //
   // If not explicitly set, the default is to cache session keys for 10 upstream hosts.
-  google.protobuf.UInt32Value max_hosts = 1;
+  uint32 max_hosts = 1;
 
   // Specifies the maximum number of session keys to cache per upstream host.
   //
   // If not explicitly set, the default is to cache 2 session keys per upstream host.
-  google.protobuf.UInt32Value max_session_keys_per_host = 2;
+  uint32 max_session_keys_per_host = 2;
 }
 
 // [#next-free-field: 9]

@@ -361,11 +361,18 @@ ClientContextConfigImpl::ClientContextConfigImpl(
   }
 
   if (config.has_per_host_session_cache_config()) {
+    auto max_hosts = config.per_host_session_cache_config().max_hosts();
+    auto max_session_keys_per_host =
+        config.per_host_session_cache_config().max_session_keys_per_host();
+    if (max_hosts == 0) {
+      max_hosts = 10; // Default value
+    }
+    if (max_session_keys_per_host == 0) {
+      max_session_keys_per_host = 2; // Default value
+    }
     per_host_session_cache_config_ = Ssl::ClientContextConfig::PerHostSessionCacheConfig{
-        .max_hosts_ =
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.per_host_session_cache_config(), max_hosts, 10),
-        .max_session_keys_per_host_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            config.per_host_session_cache_config(), max_session_keys_per_host, 2),
+        .max_hosts_ = max_hosts,
+        .max_session_keys_per_host_ = max_session_keys_per_host,
     };
   }
 }
