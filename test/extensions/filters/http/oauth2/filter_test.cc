@@ -1392,7 +1392,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
   // {"url":"https://traffic.example.com/_oauth","csrf_token":"${extracted}"}
   static const std::string state_with_callback_url =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwiY3NyZl90b2tlbiI6IjAwMDAwMDAwMDc1"
-      "YmNkMTUifQ";
+      "YmNkMTUubmE2a3J1NHgxcEhnb2NTSWVVL21kdEhZbjU4R2gxYnF3ZVM0WFhvaXFWZz0ifSA";
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
