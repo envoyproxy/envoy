@@ -87,9 +87,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
-      transport_wants_read_(false) {
+      transport_wants_read_(false), reuse_connection_(false) {
 
-  if (!socket_->isOpen()) {
+  if (socket_== nullptr || !socket_->isOpen()) {
     IS_ENVOY_BUG("Client socket failure");
     return;
   }
@@ -236,7 +236,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (!socket_->isOpen()) {
+  if (socket_== nullptr || !socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -334,7 +334,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return;
   }
 
@@ -372,7 +372,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
-  ASSERT(socket_->isOpen());
+  ASSERT(socket_ != nullptr && socket_->isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -969,7 +969,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr(),
                    StreamInfo::FilterState::LifeSpan::Connection) {
-  if (!socket_->isOpen()) {
+  if (socket_== nullptr || !socket_->isOpen()) {
     setFailureReason("socket creation failure");
     // Set up the dispatcher to "close" the connection on the next loop after
     // the owner has a chance to add callbacks.

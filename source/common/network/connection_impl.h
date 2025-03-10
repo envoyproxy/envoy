@@ -150,11 +150,6 @@ public:
   void flushWriteBuffer() override;
   TransportSocketPtr& transportSocket() { return transport_socket_; }
 
-  // Used on the responder envoy to mark an active connection accepted by a listener which will
-  // be used as a reverse connection. The socket for such a connection is closed upon draining
-  // of the owning listener.
-  bool reuse_connection_ = false;
-
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
@@ -257,6 +252,11 @@ private:
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
   bool transport_wants_read_ : 1;
+
+  // Used on the responder envoy to mark an active connection accepted by a listener which will
+  // be used as a reverse connection. The socket for such a connection is closed upon draining
+  // of the owning listener.
+  bool reuse_connection_ : 1;
 };
 
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
