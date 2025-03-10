@@ -110,8 +110,14 @@ removed_config_or_runtime:
 - area: local_ratelimit
   change: |
     Removed runtime guard ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
 - area: dfp
   change: |
     The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
@@ -146,6 +152,10 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: admin
+  change: |
+    Add support for the inbound_only and graceful query params of /drain_listeners to be used together by
+    implementing directional draining in DrainManager.
 - area: http
   change: |
     Added alpha support for asynchronous load balancing. See
@@ -226,7 +236,11 @@ new_features:
   change: |
     Added support for configuring TCP keepalive settings on both primary and additional listener addresses
     by setting :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>` on the primary
-    address and :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`
+    address and :ref:`tcp_keepalive_override <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive_override>`
     on additional addresses.
+- area: sockets
+  change: |
+    Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
+    default socket interface to support io_uring.
 
 deprecated:

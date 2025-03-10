@@ -183,9 +183,9 @@ The following keys are supported:
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
 
-A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 2459`_.
+A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 5280`_.
 
-.. _RFC 2459: https://tools.ietf.org/html/rfc2459#section-4.2.1.7
+.. _RFC 5280: https://tools.ietf.org/html/rfc5280#section-4.2.1.6
 
 Some examples of the XFCC header are:
 

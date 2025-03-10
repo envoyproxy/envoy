@@ -16,8 +16,6 @@ public:
 
   void onWorkerThreadInitialized() override;
   bool currentThreadRegistered() override;
-  Network::IoHandlePtr createIoUringSocketHandle(int socket_fd, bool socket_v6only,
-                                                 absl::optional<int> domain) override;
 
 private:
   const uint32_t io_uring_size_;

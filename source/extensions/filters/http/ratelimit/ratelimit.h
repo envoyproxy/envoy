@@ -43,7 +43,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ratelimit::v3::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context)
+               Runtime::Loader& runtime, Http::Context& http_context, absl::Status& creation_status)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
@@ -59,10 +59,13 @@ public:
                 : absl::nullopt),
         http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
-        response_headers_parser_(THROW_OR_RETURN_VALUE(
-            Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
-            Router::HeaderParserPtr)),
-        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())) {}
+        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())) {
+    absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
+        Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
+    SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
+    response_headers_parser_ = std::move(response_headers_parser_or_.value());
+  }
+
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
