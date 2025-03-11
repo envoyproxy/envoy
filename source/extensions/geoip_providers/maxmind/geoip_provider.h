@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/common/platform.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
@@ -35,6 +37,8 @@ public:
   const absl::optional<std::string>& anonHostingHeader() const { return anon_hosting_header_; }
   const absl::optional<std::string>& anonTorHeader() const { return anon_tor_header_; }
   const absl::optional<std::string>& anonProxyHeader() const { return anon_proxy_header_; }
+
+  const absl::optional<std::string>& ispHeader() const { return isp_header_; }
 
   void incLookupError(absl::string_view maxmind_db_type) {
     incCounter(
@@ -78,6 +82,8 @@ private:
   absl::optional<std::string> anon_hosting_header_;
   absl::optional<std::string> anon_tor_header_;
   absl::optional<std::string> anon_proxy_header_;
+
+  absl::optional<std::string> isp_header_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;

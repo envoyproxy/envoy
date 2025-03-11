@@ -58,7 +58,7 @@ const std::string default_city_config_yaml = R"EOF(
 
 const std::string default_isp_db_path =
     "{{ test_rundir "
-    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb";
+    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test";
 
 const std::string default_updated_isp_db_path =
     "{{ test_rundir "
@@ -68,7 +68,7 @@ const std::string default_isp_config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
         asn: "x-geo-asn"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test"
   )EOF";
 
 const std::string default_anon_db_path =
@@ -176,8 +176,9 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
         region: "x-geo-region"
         city: "x-geo-city"
         asn: "x-geo-asn"
+        isp: "x-geo-isp"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -195,6 +196,8 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   const auto& country_it = captured_lookup_response_.find("x-geo-country");
   EXPECT_EQ("GB", country_it->second);
   const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("15169", asn_it->second);
+  const auto& asn_it = captured_lookup_response_.find("x-geo-isp");
   EXPECT_EQ("15169", asn_it->second);
   expectStats("city_db");
   expectStats("isp_db");

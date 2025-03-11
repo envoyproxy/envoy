@@ -13,7 +13,7 @@ namespace {
 static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
 static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
 static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
-static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
+static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number", "isp"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
                                                         "is_public_proxy"};
@@ -60,6 +60,8 @@ GeoipProviderConfig::GeoipProviderConfig(
   anon_proxy_header_ = !geo_headers_to_add.anon_proxy().empty()
                            ? absl::make_optional(geo_headers_to_add.anon_proxy())
                            : absl::nullopt;
+  isp_header_ = !geo_headers_to_add.isp().empty() ? absl::make_optional(geo_headers_to_add.isp())
+                                                  : absl::nullopt;
   if (!city_db_path_ && !isp_db_path_ && !anon_db_path_) {
     throw EnvoyException("At least one geolocation database path needs to be configured: "
                          "city_db_path, isp_db_path or anon_db_path");
@@ -209,7 +211,8 @@ void GeoipProvider::lookupInCityDb(
 void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+  if (config_->isLookupEnabledForHeader(config_->asnHeader()) ||
+      config_->isLookupEnabledForHeader(config_->ispHeader())) {
     int mmdb_error;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
@@ -225,9 +228,15 @@ void GeoipProvider::lookupInAsnDb(
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
-      if (status == MMDB_SUCCESS && entry_data_list) {
-        populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
-                                MMDB_ASN_LOOKUP_ARGS[0]);
+      if (status == MMDB_SUCCESS) {
+        if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
+                                  MMDB_ASN_LOOKUP_ARGS[0]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->ispHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->ispHeader().value(),
+                                  MMDB_ASN_LOOKUP_ARGS[1]);
+        }
         MMDB_free_entry_data_list(entry_data_list);
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(ISP_DB_TYPE);
