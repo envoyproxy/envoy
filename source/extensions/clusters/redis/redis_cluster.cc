@@ -387,11 +387,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
               return;
             }
+            // A successful query can return an empty response.
             if (Runtime::runtimeFeatureEnabled(
                     "envoy.reloadable_features.redis_empty_dns_response") &&
                 response.empty()) {
-              // A successful query can return an empty response, and we need to
-              // guard against that before attempting to dereference the response.
               ENVOY_LOG(error, "DNS resolution for primary slot address {} returned no results",
                         slot.primary_hostname_);
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
@@ -450,8 +449,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
           } else if (Runtime::runtimeFeatureEnabled(
                          "envoy.reloadable_features.redis_empty_dns_response") &&
                      response.empty()) {
-            // A successful query can return an empty response, and we need to
-            // guard against that before attempting to dereference the response.
+            // A successful query can return an empty response.
             ENVOY_LOG(warn, "DNS resolution for cluster replica address {} returned no results",
                       replica.first);
           } else {
