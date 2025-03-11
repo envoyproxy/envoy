@@ -4703,9 +4703,9 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
   waitForNextUpstreamRequest();
 
   // Send the response headers.
-  upstream_request_->encodeHeaders(
-      default_response_headers_,
-      false); // Now send an overly large response body. At some point, too much data will
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Now send an overly large response body. At some point, too much data will
   // be buffered, the stream will be reset, and the connection will disconnect.
   upstream_request_->encodeData(512, false);
   upstream_request_->encodeData(1024 * 100, false);
@@ -5374,8 +5374,8 @@ TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
   tcp_client->waitForData("\r\n0\r\n\r\n", false);
   ASSERT_TRUE(tcp_client->connected());
 
-  // Now write data into downstream client after upstream has completed its response and verify
-  // that upstream receives it.
+  // Now write data into downstream client after upstream has completed its response and verify that
+  // upstream receives it.
   ASSERT_TRUE(tcp_client->write(absl::StrCat("80\r\n", std::string(0x80, 'A'), "\r\n0\r\n\r\n"),
                                 false, false));
 
