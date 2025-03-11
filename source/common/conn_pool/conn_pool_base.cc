@@ -31,12 +31,14 @@ ConnPoolImplBase::ConnPoolImplBase(
 ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(isIdleImpl());
   ASSERT(connecting_stream_capacity_ == 0);
+  ASSERT(connecting_and_connected_stream_capacity_ == 0);
 }
 
 void ConnPoolImplBase::deleteIsPendingImpl() {
   deferred_deleting_ = true;
   ASSERT(isIdleImpl());
   ASSERT(connecting_stream_capacity_ == 0);
+  ASSERT(connecting_and_connected_stream_capacity_ == 0);
 }
 
 void ConnPoolImplBase::destructAllConnections() {
@@ -89,16 +91,30 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
     // prefetching for the next upcoming stream, which will likely be assigned to this pool.
     // We may eventually want to track preconnect_attempts to allow more preconnecting for
     // heavily weighted upstreams or sticky picks.
-    return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
-                         global_preconnect_ratio, true);
+    bool result =
+        shouldConnect(pending_streams_.size(), num_active_streams_,
+                      connecting_and_connected_stream_capacity_, global_preconnect_ratio, true);
+    ENVOY_LOG(trace,
+              "predictive shouldCreateNewConnection returns {} for pending {} active {} "
+              "current_capacity {} ratio {}",
+              result, pending_streams_.size(), num_active_streams_,
+              connecting_and_connected_stream_capacity_, global_preconnect_ratio);
+    return result;
   } else {
     // Ensure this local pool has adequate connections for the given load.
     //
     // Local preconnect does not need to anticipate a stream. It is called as
     // new streams are established or torn down and simply attempts to maintain
     // the correct ratio of streams and anticipated capacity.
-    return shouldConnect(pending_streams_.size(), num_active_streams_, connecting_stream_capacity_,
-                         perUpstreamPreconnectRatio());
+    bool result =
+        shouldConnect(pending_streams_.size(), num_active_streams_,
+                      connecting_and_connected_stream_capacity_, perUpstreamPreconnectRatio());
+    ENVOY_LOG(trace,
+              "per-upstream shouldCreateNewConnection returns {} for pending {} active {} "
+              "connecting_capacity {} ratio {}",
+              result, pending_streams_.size(), num_active_streams_,
+              connecting_and_connected_stream_capacity_, perUpstreamPreconnectRatio());
+    return result;
   }
 }
 
@@ -131,6 +147,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     ENVOY_LOG(trace, "not creating a new connection, shouldCreateNewConnection returned false.");
     return ConnectionResult::ShouldNotConnect;
   }
+  ENVOY_LOG(trace, "creating new preconnect connection");
 
   const bool can_create_connection = host_->canCreateConnection(priority_);
 
@@ -212,7 +229,9 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
 
 void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& client,
                                       bool delay_attaching_stream) {
-  ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", client, client.numActiveStreams());
+  ENVOY_CONN_LOG(
+      debug, "destroying stream: {} active remaining, readyForStream {}, currentUnusedCapacity {}",
+      client, client.numActiveStreams(), client.readyForStream(), client.currentUnusedCapacity());
   ASSERT(num_active_streams_ > 0);
   state_.decrActiveStreams(1);
   num_active_streams_--;
@@ -704,7 +723,8 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
 
 void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
-  state_.decrConnectingAndConnectedStreamCapacity(delta);
+  decrClusterStreamCapacity(delta);
+
   if (!client.hasHandshakeCompleted()) {
     // If still doing handshake, it is contributing to the local connecting stream capacity. Update
     // the capacity as well.
@@ -715,7 +735,8 @@ void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
 
 void ConnPoolImplBase::incrConnectingAndConnectedStreamCapacity(uint32_t delta,
                                                                 ActiveClient& client) {
-  state_.incrConnectingAndConnectedStreamCapacity(delta);
+  incrClusterStreamCapacity(delta);
+
   if (!client.hasHandshakeCompleted()) {
     connecting_stream_capacity_ += delta;
   }
