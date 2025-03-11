@@ -11,16 +11,16 @@ namespace Aws {
 class SigV4AKeyDerivationBase {
 public:
   virtual ~SigV4AKeyDerivationBase() = default;
-  virtual EC_KEY* derivePrivateKey(absl::string_view access_key_id,
-                                   absl::string_view secret_access_key) PURE;
+  virtual absl::StatusOr<EC_KEY*> derivePrivateKey(absl::string_view access_key_id,
+                                                   absl::string_view secret_access_key) PURE;
   virtual bool derivePublicKey(EC_KEY* ec_key) PURE;
 };
 
 class SigV4AKeyDerivation : public SigV4AKeyDerivationBase,
                             public Logger::Loggable<Logger::Id::aws> {
 public:
-  EC_KEY* derivePrivateKey(absl::string_view access_key_id,
-                           absl::string_view secret_access_key) override;
+  absl::StatusOr<EC_KEY*> derivePrivateKey(absl::string_view access_key_id,
+                                           absl::string_view secret_access_key) override;
   bool derivePublicKey(EC_KEY* ec_key) override;
 
 private:
