@@ -1,41 +1,19 @@
 #pragma once
 
+#include <memory>
+
 #include "source/common/common/logger.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/extensions/common/aws/signers/sigv4a_common.h"
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
-
-class SigV4ASignatureHeaderValues : public SignatureHeaderValues {
-public:
-  const Http::LowerCaseString RegionSet{"x-amz-region-set"};
-};
-
-using SigV4ASignatureHeaders = ConstSingleton<SigV4ASignatureHeaderValues>;
-
-class SigV4ASignatureConstants : public SignatureConstants {
-public:
-  static constexpr absl::string_view SigV4AAuthorizationHeaderFormat =
-      "AWS4-ECDSA-P256-SHA256 Credential={}, SignedHeaders={}, Signature={}";
-  static constexpr absl::string_view SigV4ACredentialScopeFormat = "{}/{}/aws4_request";
-  static constexpr absl::string_view SigV4ASignatureVersion = "AWS4A";
-  static constexpr absl::string_view SigV4AStringToSignFormat = "{}\n{}\n{}\n{}";
-  static constexpr absl::string_view SigV4AAlgorithm = "AWS4-ECDSA-P256-SHA256";
-};
-
-enum SigV4AKeyDerivationResult {
-  AkdrSuccess,
-  AkdrNextCounter,
-  AkdrFailure,
-};
-
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4A signing process.
@@ -56,9 +34,12 @@ public:
       const CredentialsProviderChainSharedPtr& credentials_provider,
       Server::Configuration::CommonFactoryContext& context,
       const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
-      const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
+      const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration,
+      std::unique_ptr<SigV4AKeyDerivation> key_derivation_ptr =
+          std::make_unique<SigV4AKeyDerivation>())
       : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
-                       query_string, expiration_time) {}
+                       query_string, expiration_time),
+        key_derivation_ptr_(std::move(key_derivation_ptr)) {}
 
 private:
   void addRegionHeader(Http::RequestHeaderMap& headers,
@@ -86,6 +67,7 @@ private:
                                         const absl::string_view signature) const override;
 
   absl::string_view getAlgorithmString() const override;
+  std::unique_ptr<SigV4AKeyDerivation> key_derivation_ptr_;
 };
 
 } // namespace Aws

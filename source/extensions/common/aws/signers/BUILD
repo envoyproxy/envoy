@@ -26,11 +26,12 @@ envoy_cc_library(
     name = "sigv4a_signer_impl_lib",
     srcs = [
         "sigv4a_key_derivation.cc",
-        "sigv4a_key_derivation.h",
         "sigv4a_signer_impl.cc",
     ],
     hdrs = [
         "sigv4a_signer_impl.h",
+        "sigv4a_key_derivation.h",
+        "sigv4a_common.h",
     ],
     deps = [
         "//source/extensions/common/aws:credentials_provider_interface",

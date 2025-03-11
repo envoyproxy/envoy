@@ -9,6 +9,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 #include "gmock/gmock.h"
 
@@ -148,6 +149,13 @@ public:
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
+};
+
+class MockSigV4AKeyDerivation : public SigV4AKeyDerivation {
+public:
+  MOCK_METHOD(EC_KEY*, derivePrivateKey,
+              (absl::string_view access_key_id, absl::string_view secret_access_key));
+  MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
 };
 
 // Friend class for testing callbacks
