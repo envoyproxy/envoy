@@ -52,11 +52,10 @@ std::string SigV4ASignerImpl::createSignature(
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-
-  EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(access_key_id, secret_access_key);
+  EC_KEY* ec_key = key_derivation_ptr_->derivePrivateKey(access_key_id, secret_access_key);
   if (!ec_key) {
     ENVOY_LOG(debug, "SigV4A key derivation failed");
-    return blank_str_;
+    return invalid_signature_;
   }
 
   std::vector<uint8_t> signature(ECDSA_size(ec_key));

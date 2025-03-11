@@ -35,7 +35,7 @@ public:
       Server::Configuration::CommonFactoryContext& context,
       const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
       const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration,
-      std::unique_ptr<SigV4AKeyDerivation> key_derivation_ptr =
+      std::unique_ptr<SigV4AKeyDerivationBase> key_derivation_ptr =
           std::make_unique<SigV4AKeyDerivation>())
       : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
                        query_string, expiration_time),
@@ -67,7 +67,7 @@ private:
                                         const absl::string_view signature) const override;
 
   absl::string_view getAlgorithmString() const override;
-  std::unique_ptr<SigV4AKeyDerivation> key_derivation_ptr_;
+  std::unique_ptr<SigV4AKeyDerivationBase> key_derivation_ptr_;
 };
 
 } // namespace Aws

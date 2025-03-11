@@ -8,16 +8,25 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class SigV4AKeyDerivation : public Logger::Loggable<Logger::Id::aws> {
+class SigV4AKeyDerivationBase {
 public:
-  static EC_KEY* derivePrivateKey(absl::string_view access_key_id,
-                                  absl::string_view secret_access_key);
-  static bool derivePublicKey(EC_KEY* ec_key);
+  virtual ~SigV4AKeyDerivationBase() = default;
+  virtual EC_KEY* derivePrivateKey(absl::string_view access_key_id,
+                                   absl::string_view secret_access_key) PURE;
+  virtual bool derivePublicKey(EC_KEY* ec_key) PURE;
+};
+
+class SigV4AKeyDerivation : public SigV4AKeyDerivationBase,
+                            public Logger::Loggable<Logger::Id::aws> {
+public:
+  EC_KEY* derivePrivateKey(absl::string_view access_key_id,
+                           absl::string_view secret_access_key) override;
+  bool derivePublicKey(EC_KEY* ec_key) override;
 
 private:
-  static bool constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
-                                            std::vector<uint8_t> rhs_raw_be_bigint);
-  static void constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint);
+  bool constantTimeLessThanOrEqualTo(std::vector<uint8_t> lhs_raw_be_bigint,
+                                     std::vector<uint8_t> rhs_raw_be_bigint);
+  void constantTimeAddOne(std::vector<uint8_t>* raw_be_bigint);
 };
 
 } // namespace Aws

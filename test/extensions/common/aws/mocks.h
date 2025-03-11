@@ -151,7 +151,7 @@ public:
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 };
 
-class MockSigV4AKeyDerivation : public SigV4AKeyDerivation {
+class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
 public:
   MOCK_METHOD(EC_KEY*, derivePrivateKey,
               (absl::string_view access_key_id, absl::string_view secret_access_key));
