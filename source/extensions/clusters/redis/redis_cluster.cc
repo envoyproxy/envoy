@@ -390,7 +390,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
               // A successful query can return an empty response, and we need to
               // guard against that before attempting to dereference the response.
               ENVOY_LOG(error, "DNS resolution for primary slot address {} returned no results",
-                slot.primary_hostname_);
+                        slot.primary_hostname_);
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
               return;
             }
@@ -447,7 +447,8 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
           } else if (response.empty()) {
             // A successful query can return an empty response, and we need to
             // guard against that before attempting to dereference the response.
-            ENVOY_LOG(warn, "DNS resolution for cluster replica address {} returned no results", replica.first);
+            ENVOY_LOG(warn, "DNS resolution for cluster replica address {} returned no results",
+                      replica.first);
           } else {
             // Replica resolved
             slot.addReplica(Network::Utility::getAddressWithPort(
