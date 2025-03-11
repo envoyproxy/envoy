@@ -32,9 +32,6 @@ public:
     chain_ = std::make_shared<CredentialsProviderChain>();
     credentials_provider_ = std::make_shared<NiceMock<MockCredentialsProvider>>();
     chain_->add(credentials_provider_);
-    // signer_ = std::make_shared<SigV4ASignerImpl>(
-    //     "service", "region", chain_, context_,
-    //     Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
   }
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
