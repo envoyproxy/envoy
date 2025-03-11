@@ -98,7 +98,7 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 }
 
 void GradientController::enterMinRTTSamplingWindow() {
-  // precondition: isMinRTTSamplingEnabled() == true
+  ASSERT(isMinRTTSamplingEnabled());
 
   // There a potential race condition where setting the minimum concurrency multiple times in a row
   // resets the minRTT sampling timer and triggers the calculation immediately. This could occur
