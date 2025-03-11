@@ -569,6 +569,15 @@ void testUtil(const TestUtilOptions& options) {
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
 
+      for (const auto& san : options.expectedClientCertUri()) {
+        StringSanMatcher matcher(GEN_URI, TestUtility::createExactMatcher(san),
+                                 server_factory_context);
+        EXPECT_TRUE(server_connection->ssl()->peerCertificateSanMatches(matcher));
+      }
+
+      DnsExactStringSanMatcher never_match("this string will never match a SAN");
+      EXPECT_FALSE(server_connection->ssl()->peerCertificateSanMatches(never_match));
+
       if (!options.expectedLocalUri().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
@@ -625,6 +634,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedPeerSubject(),
                   server_connection->ssl()->subjectPeerCertificate());
       }
+
       if (options.expectedParsedPeerSubject()) {
         const auto& subject = server_connection->ssl()->parsedSubjectPeerCertificate();
         EXPECT_EQ(options.expectedParsedPeerSubject()->commonName_, subject->commonName_);
