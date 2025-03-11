@@ -306,6 +306,12 @@ type FilterState interface {
 	GetString(key string) string
 }
 
+type SecretManager interface {
+	// Get generic secret from secret manager.
+	// bool is false on missing secret
+	GetGenericSecret(name string) (string, bool)
+}
+
 type MetricType uint32
 
 const (
@@ -320,6 +326,10 @@ type ConfigCallbacks interface {
 	DefineCounterMetric(name string) CounterMetric
 	DefineGaugeMetric(name string) GaugeMetric
 	// TODO Histogram
+
+	// Get secret manager.
+	// Secrets should be defined in the plugin configuration.
+	SecretManager() SecretManager
 }
 
 type ConfigCallbackHandler interface {

@@ -1476,6 +1476,57 @@ uint64_t Filter::getMergedConfigId() {
 
 /*** FilterConfig ***/
 
+namespace {
+Secret::GenericSecretConfigProviderSharedPtr
+secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
+                Secret::SecretManager& secret_manager,
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Init::Manager& init_manager) {
+  if (config.has_sds_config()) {
+    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
+                                                            transport_socket_factory, init_manager);
+  } else {
+    return secret_manager.findStaticGenericSecretProvider(config.name());
+  }
+}
+} // namespace
+
+SecretReader::SecretReader(
+    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+    Server::Configuration::FactoryContext& context) {
+  if (proto_config.generic_secrets_size() > 0) {
+    auto& secret_manager =
+        context.serverFactoryContext().clusterManager().clusterManagerFactory().secretManager();
+    auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+    auto& init_manager = context.initManager();
+    auto& tls = context.serverFactoryContext().threadLocal();
+    auto& api = context.serverFactoryContext().api();
+    for (auto& secret : proto_config.generic_secrets()) {
+      // Check here to avoid creating unecessary sds provider
+      if (secrets_.contains(secret.name())) {
+        throw EnvoyException(absl::StrCat("duplicate secret ", secret.name()));
+      }
+      auto secret_provider =
+          secretsProvider(secret, secret_manager, transport_socket_factory, init_manager);
+      if (secret_provider == nullptr) {
+        throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
+      }
+      auto tlsp = THROW_OR_RETURN_VALUE(
+          Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
+          std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>);
+      secrets_.emplace(secret.name(), std::move(tlsp));
+    }
+  }
+}
+
+absl::optional<const std::string> SecretReader::secret(const std::string&& name) {
+  auto secret = secrets_.find(name);
+  if (secret != secrets_.end()) {
+    return secret->second->secret();
+  }
+  return absl::nullopt;
+}
+
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
     Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
@@ -1484,7 +1535,9 @@ FilterConfig::FilterConfig(
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
+      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))) {
+  secret_reader_ = std::make_shared<SecretReader>(proto_config, context);
+};
 
 void FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");
@@ -1612,6 +1665,19 @@ CAPIStatus FilterConfig::recordMetric(uint32_t metric_id, uint64_t value) {
       it->second->recordValue(value);
     }
   }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus FilterConfig::getSecret(const absl::string_view name, uint64_t* value_data,
+                                   int* value_len) {
+  Thread::LockGuard lock(mutex_);
+  auto maybe_secret = secret_reader_->secret(std::string(name));
+  if (!maybe_secret.has_value()) {
+    return CAPIStatus::CAPIValueNotFound;
+  }
+  str_value_ = maybe_secret.value();
+  *value_data = reinterpret_cast<uint64_t>(str_value_.data());
+  *value_len = str_value_.length();
   return CAPIStatus::CAPIOK;
 }
 

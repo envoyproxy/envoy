@@ -393,6 +393,17 @@ CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t v
       });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringSecret(void* c, void* key_data, int key_len,
+                                            uint64_t* value_data, int* value_len) {
+  return envoyGoConfigHandlerWrapper(
+      c,
+      [key_data, key_len, value_data,
+       value_len](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
+        auto key_str = stringViewFromGoPointer(key_data, key_len);
+        return filter_config->getSecret(key_str, value_data, value_len);
+      });
+}
+
 #ifdef __cplusplus
 }
 #endif

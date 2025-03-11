@@ -236,5 +236,9 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: golang
+  change: |
+    Expose generic secrets to :ref:`lua <envoy_v3_api_msg_extensions.filters.http.golang.v3alpha.Config>`
+    Add SecretManager interface in the go envoy sdk.
 
 deprecated:
