@@ -24,7 +24,7 @@ envoy_cc_mock(
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
-        "//source/extensions/common/aws/signers:sigv4a_signer_impl_lib"
+        "//source/extensions/common/aws/signers:sigv4a_signer_impl_lib",
     ],
 )
 
