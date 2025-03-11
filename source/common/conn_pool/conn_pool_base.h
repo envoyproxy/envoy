@@ -398,6 +398,8 @@ private:
   // Prerequisite: the given clients shouldn't be idle.
   void drainClients(std::list<ActiveClientPtr>& clients);
 
+  void assertCapacityCountsAreCorrect();
+
   std::list<PendingStreamPtr> pending_streams_;
 
   // The number of streams currently attached to clients.

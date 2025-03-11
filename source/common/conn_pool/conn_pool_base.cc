@@ -10,14 +10,32 @@
 namespace Envoy {
 namespace ConnectionPool {
 namespace {
-[[maybe_unused]] ssize_t connectingCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
-  ssize_t ret = 0;
+int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clients) {
+  int64_t ret = 0;
   for (const auto& client : connecting_clients) {
     ret += client->currentUnusedCapacity();
   }
   return ret;
 }
 } // namespace
+
+void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
+  SLOW_ASSERT(static_cast<int64_t>(connecting_stream_capacity_) ==
+              currentUnusedCapacity(connecting_clients_) +
+                  currentUnusedCapacity(early_data_clients_));
+
+  // Note: must include `busy_clients_` because they can have negative current unused capacity,
+  // which is included in `connecting_and_connected_stream_capacity_`.
+  SLOW_ASSERT(
+      connecting_and_connected_stream_capacity_ ==
+          (static_cast<int64_t>(connecting_stream_capacity_) +
+           currentUnusedCapacity(ready_clients_) + currentUnusedCapacity(busy_clients_)),
+      fmt::format(
+          "connecting_and_connected_stream_capacity_ {}, connecting_stream_capacity_ {}, "
+          "currentUnusedCapacity(ready_clients_) {}, currentUnusedCapacity(busy_clients_) {}",
+          connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
+          currentUnusedCapacity(ready_clients_), currentUnusedCapacity(busy_clients_)));
+}
 
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
@@ -172,6 +190,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
     // Increase the connecting capacity to reflect the streams this connection can serve.
     incrConnectingAndConnectedStreamCapacity(client->currentUnusedCapacity(), *client);
     LinkedList::moveIntoList(std::move(client), owningList(client->state()));
+    assertCapacityCountsAreCorrect();
     return can_create_connection ? ConnectionResult::CreatedNewConnection
                                  : ConnectionResult::CreatedButRateLimited;
   } else {
@@ -275,10 +294,8 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
                                                              bool can_send_early_data) {
   ASSERT(!is_draining_for_deletion_);
   ASSERT(!deferred_deleting_);
+  assertCapacityCountsAreCorrect();
 
-  ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
-         connectingCapacity(connecting_clients_) +
-             connectingCapacity(early_data_clients_)); // O(n) debug check.
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing fully connected connection", client);
@@ -635,6 +652,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     break;
   }
   }
+  assertCapacityCountsAreCorrect();
 }
 
 PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
