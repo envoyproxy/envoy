@@ -386,7 +386,8 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
                         slot.primary_hostname_);
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
               return;
-            } else if (response.empty()) {
+            }
+            if (response.empty()) {
               // A successful query can return an empty response, and we need to
               // guard against that before attempting to dereference the response.
               ENVOY_LOG(error, "DNS resolution for primary slot address {} returned no results",
