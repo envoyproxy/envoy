@@ -315,6 +315,7 @@ public:
   }
 
   void initialize() override {
+    setListenersBoundTimeout(TestUtility::DefaultTimeout * 15);
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
@@ -437,8 +438,8 @@ public:
       // (Expected to save ~14s each across 6 tests on Windows)
       codec_clients.push_back(makeHttpConnection(lookupPort("http")));
     }
-    constexpr auto timeout_first = std::chrono::seconds(15);
-    constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
+    constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
+    constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 8u, timeout_first);
     } else {
@@ -539,8 +540,8 @@ public:
       designated_connection_ids_.push_back(gen_connection_id(i));
       codec_clients2.push_back(makeHttpConnection(lookupPort("address2")));
     }
-    constexpr auto timeout_first = std::chrono::seconds(15);
-    constexpr auto timeout_subsequent = std::chrono::milliseconds(10);
+    constexpr auto timeout_first = std::chrono::seconds(15 * TIMEOUT_FACTOR);
+    constexpr auto timeout_subsequent = std::chrono::milliseconds(10 * TIMEOUT_FACTOR);
     if (version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 16u,
                                      timeout_first);
