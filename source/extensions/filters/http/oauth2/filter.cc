@@ -365,17 +365,20 @@ DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
 
   // Initialize decryption operation
   if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to initialize decryption"};
   }
 
   // Decrypt the ciphertext
   if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to decrypt data"};
   }
   plaintext_len += len;
 
   // Finalize decryption
   if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
     return {"", "failed to finalize decryption"};
   }
 
