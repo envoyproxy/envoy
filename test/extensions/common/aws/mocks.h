@@ -11,6 +11,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 #include "gmock/gmock.h"
 
@@ -199,6 +200,24 @@ public:
                const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
                    iam_roles_anywhere_config),
               (const));
+};
+
+class MockSigV4AKeyDerivation : public SigV4AKeyDerivation {
+public:
+  MOCK_METHOD(EC_KEY*, derivePrivateKey,
+              (absl::string_view access_key_id, absl::string_view secret_access_key));
+  MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
+};
+
+// Friend class for testing callbacks
+class MetadataCredentialsProviderBaseFriend {
+public:
+  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
+      : provider_(provider) {}
+
+  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
+  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
+  bool needsRefresh() { return true; };
 };
 
 } // namespace Aws

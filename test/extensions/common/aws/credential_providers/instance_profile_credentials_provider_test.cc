@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
 public:
   explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)

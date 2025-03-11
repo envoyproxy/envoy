@@ -584,6 +584,31 @@ TEST(SigV4AKeyDerivationTest, TestKeyDerivations) {
   EC_KEY_free(ec_key);
 }
 
+// Force key derivation to fail, to test error handling
+TEST_F(SigV4ASignerImplTest, FailKeyDerivation) {
+
+  Http::TestRequestHeaderMapImpl headers{};
+
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+
+  headers.setMethod("GET");
+  // Simple path, 1 extra header
+  headers.setPath("/example/path");
+  headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
+  headers.addCopy("testheader", "value1");
+  std::unique_ptr<MockSigV4AKeyDerivation> mock_key_derivation =
+      std::make_unique<MockSigV4AKeyDerivation>();
+  SigV4ASignerImpl querysigner("service", "region", chain_, context_,
+                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
+                               SignatureQueryParameterValues::DefaultExpiration,
+                               std::move(mock_key_derivation));
+  EXPECT_CALL(*mock_key_derivation, derivePrivateKey(_, _)).WillOnce(Return(nullptr));
+
+  auto status = querysigner.signUnsignedPayload(headers);
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common
