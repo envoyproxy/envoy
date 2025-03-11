@@ -1,17 +1,3 @@
-diff --git a/shared/envoy/Dockerfile b/shared/envoy/Dockerfile
-index 459841c..3775d27 100644
---- a/shared/envoy/Dockerfile
-+++ b/shared/envoy/Dockerfile
-@@ -1,8 +1,7 @@
- ARG ENVOY_IMAGE="${ENVOY_IMAGE:-envoyproxy/envoy}"
- ARG ENVOY_VARIANT="${ENVOY_VARIANT:-dev}"
- 
--
--FROM ${ENVOY_IMAGE}:${ENVOY_VARIANT} AS envoy-base
-+FROM zhaohuabing/envoy:test AS envoy-base
- ARG ENVOY_CONFIG=envoy.yaml
- ENV ENVOY_CONFIG="$ENVOY_CONFIG"
- ENV DEBIAN_FRONTEND=noninteractive
 diff --git a/single-page-app/verify.sh b/single-page-app/verify.sh
 index 819661e..de0d297 100755
 --- a/single-page-app/verify.sh
