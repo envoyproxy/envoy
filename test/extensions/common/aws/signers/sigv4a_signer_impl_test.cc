@@ -241,7 +241,7 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
       message_->headers().get(SigV4ASignatureHeaders::get().Date)[0]->value().getStringView());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request,"
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
                           "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
                           "Signature="));
 }
@@ -281,7 +281,7 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
                 .getStringView());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request,"
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
                           "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
                           "Signature="));
 }
@@ -302,7 +302,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeader) {
                 .getStringView());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request,"
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
                           "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
                           "Signature="));
 }
@@ -323,7 +323,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
                 .getStringView());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request,"
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
                           "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-region-set, "
                           "Signature="));
 }
@@ -341,8 +341,8 @@ TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
   EXPECT_TRUE(status.ok());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request,"
-                          "SignedHeaders=a;b;c;x-amz-content-sha256;x-amz-date;x-amz-region-set,"
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
+                          "SignedHeaders=a;b;c;x-amz-content-sha256;x-amz-date;x-amz-region-set, "
                           "Signature="));
 }
 
@@ -357,7 +357,7 @@ TEST_F(SigV4ASignerImplTest, SignHostHeader) {
   EXPECT_TRUE(status.ok());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request,"
+      testing::StartsWith("AWS4-ECDSA-P256-SHA256 Credential=akid/20180102/service/aws4_request, "
                           "SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-region-set, "
                           "Signature="));
 }

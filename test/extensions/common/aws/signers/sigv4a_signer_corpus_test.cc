@@ -174,10 +174,11 @@ public:
     std::vector<uint8_t> signature;
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
     auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+    auto sigv4a_key_derivation = std::make_unique<SigV4AKeyDerivation>();
 
     EC_KEY* ec_key =
-        SigV4AKeyDerivation::derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
-    SigV4AKeyDerivation::derivePublicKey(ec_key);
+        sigv4a_key_derivation->derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
+    sigv4a_key_derivation->derivePublicKey(ec_key);
     signature = Hex::decode(calculated_signature);
 
     EXPECT_EQ(
