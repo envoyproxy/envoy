@@ -80,6 +80,9 @@ bug_fixes:
     Before the :scheme header was always 'http'.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
+- area: listener
+  change: |
+    Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -110,8 +113,14 @@ removed_config_or_runtime:
 - area: local_ratelimit
   change: |
     Removed runtime guard ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
 - area: dfp
   change: |
     The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
@@ -155,6 +164,11 @@ new_features:
     Added alpha support for asynchronous load balancing. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details. Support can
     be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
+- area: quic
+  change: |
+    Added an :ref:`extension
+    <envoy_v3_api_msg_extensions.quic.connection_id_generator.quic_lb.v3.Config>` to support QUIC-LB draft standard for
+    connection ID generation.
 - area: ext_proc
   change: |
     Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
@@ -169,6 +183,10 @@ new_features:
 - area: formatter
   change: |
     Added ``QUERY_PARAM`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
+    for more details.
+- area: formatter
+  change: |
+    Added ``CUSTOM_FLAGS`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
     for more details.
 - area: http
   change: |
@@ -226,5 +244,15 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying PROXY protocol TLVs to be added in the PROXY protocol state created by the TCP proxy filter.
+    TLVs added in the PROXY protocol state will be added to the PROXY protocol v2 header sent upstream.
+- area: sockets
+  change: |
+    Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
+    default socket interface to support io_uring.
 
 deprecated:
