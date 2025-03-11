@@ -128,10 +128,10 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
-      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
-                              captured_cb_(
-                                  Geolocation::LookupResult{{"x-geo-region", "dummy-region"}});
-                            })));
+      .WillRepeatedly(
+          DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                  captured_cb_(Geolocation::LookupResult{{"x-geo-region", "dummy-region"}});
+                })));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
@@ -189,11 +189,10 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
-  std::map<std::string, std::string> geo_headers = {{"x-geo-region", "dummy-region"},
-                                                    {"x-geo-city", "dummy-city"},
-                                                    {"x-geo-country", "dummy-country"},
-                                                    {"x-geo-asn", "dummy-asn"},
-                                                    {"x-geo-isp", "dummy-isp"}};
+  std::map<std::string, std::string> geo_headers = {
+      {"x-geo-region", "dummy-region"},   {"x-geo-city", "dummy-city"},
+      {"x-geo-country", "dummy-country"}, {"x-geo-asn", "dummy-asn"},
+      {"x-geo-isp", "dummy-isp"},         {"x-geo-apple-private-relay", "true"}};
   std::map<std::string, std::string> geo_anon_headers = {{"x-geo-anon", "true"},
                                                          {"x-geo-anon-vpn", "false"},
                                                          {"x-geo-anon-hosting", "true"},
@@ -212,6 +211,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
                                                             {"x-geo-country", "dummy-country"},
                                                             {"x-geo-asn", "dummy-asn"},
                                                             {"x-geo-isp", "dummy-isp"},
+                                                            {"x-geo-apple-private-relay", "true"},
                                                             {"x-geo-anon", "true"},
                                                             {"x-geo-anon-vpn", "false"},
                                                             {"x-geo-anon-hosting", "true"},
@@ -223,7 +223,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
-  EXPECT_EQ(9, request_headers.size());
+  EXPECT_EQ(11, request_headers.size());
   for (auto& geo_header : geo_headers) {
     auto& header = geo_header.first;
     auto& value = geo_header.second;

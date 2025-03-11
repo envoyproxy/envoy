@@ -39,6 +39,9 @@ public:
   const absl::optional<std::string>& anonProxyHeader() const { return anon_proxy_header_; }
 
   const absl::optional<std::string>& ispHeader() const { return isp_header_; }
+  const absl::optional<std::string>& applePrivateRelayHeader() const {
+    return apple_private_relay_header_;
+  }
 
   void incLookupError(absl::string_view maxmind_db_type) {
     incCounter(
@@ -84,6 +87,7 @@ private:
   absl::optional<std::string> anon_proxy_header_;
 
   absl::optional<std::string> isp_header_;
+  absl::optional<std::string> apple_private_relay_header_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
@@ -143,7 +147,9 @@ private:
   template <typename... Params>
   void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
                                absl::flat_hash_map<std::string, std::string>& lookup_result,
-                               const std::string& result_key, Params... lookup_params) const;
+                               const std::string& result_key,
+                               absl::optional<std::string> compare_with,
+                               Params... lookup_params) const;
   MaxmindDbSharedPtr getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);

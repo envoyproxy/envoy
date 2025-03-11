@@ -71,6 +71,7 @@ const std::string ConfigIsp = R"EOF(
             city: "x-geo-city"
             asn: "x-geo-asn"
             isp: "x-geo-isp"
+            is_apple_private_relay: "x-geo-apple-private-relay"
         city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
         isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Isp-Test.mmdb"
   )EOF";
@@ -154,6 +155,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIsp) {
   EXPECT_EQ("GB", headerValue("x-geo-country"));
   EXPECT_EQ("7018", headerValue("x-geo-asn"));
   EXPECT_EQ("AT&T Services", headerValue("x-geo-isp"));
+  EXPECT_EQ("false", headerValue("x-geo-apple-private-relay"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
