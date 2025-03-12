@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Network External Processing Service]
-//
+
 // The Network External Processing filter allows an external service to dynamically
 // interact with and modify L4 network traffic passing through Envoy. Unlike the
 // HTTP External Processing filter, this service operates at the TCP/UDP level,

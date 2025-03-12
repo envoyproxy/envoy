@@ -5,7 +5,6 @@ package envoy.extensions.filters.network.ext_proc.v3;
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 
 import "xds/annotations/v3/status.proto";
 
