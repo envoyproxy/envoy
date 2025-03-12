@@ -91,6 +91,12 @@ CacheFileHeader makeCacheFileHeaderProto(Buffer::Instance& buffer) {
   return ret;
 }
 
+CacheFileTrailer makeCacheFileTrailerProto(Buffer::Instance& buffer) {
+  CacheFileTrailer ret;
+  ret.ParseFromString(buffer.toString());
+  return ret;
+}
+
 } // namespace FileSystemHttpCache
 } // namespace Cache
 } // namespace HttpFilters

@@ -9,16 +9,26 @@ namespace Cache {
 
 absl::string_view cacheEntryStatusString(CacheEntryStatus s) {
   switch (s) {
-  case CacheEntryStatus::Ok:
-    return "Ok";
-  case CacheEntryStatus::Unusable:
-    return "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return "RequiresValidation";
+  case CacheEntryStatus::Hit:
+    return "Hit";
+  case CacheEntryStatus::Miss:
+    return "Miss";
+  case CacheEntryStatus::Streamed:
+    return "Streamed";
+  case CacheEntryStatus::Uncacheable:
+    return "Uncacheable";
+  case CacheEntryStatus::Validated:
+    return "Validated";
+  case CacheEntryStatus::ValidatedFree:
+    return "ValidatedFree";
+  case CacheEntryStatus::FailedValidation:
+    return "FailedValidation";
   case CacheEntryStatus::FoundNotModified:
     return "FoundNotModified";
   case CacheEntryStatus::LookupError:
     return "LookupError";
+  case CacheEntryStatus::UpstreamReset:
+    return "UpstreamReset";
   }
   IS_ENVOY_BUG(absl::StrCat("Unexpected CacheEntryStatus: ", s));
   return "UnexpectedCacheEntryStatus";
