@@ -73,7 +73,7 @@ const std::string ConfigIsp = R"EOF(
             isp: "x-geo-isp"
             is_apple_private_relay: "x-geo-apple-private-relay"
         city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-        isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Isp-Test.mmdb"
+        isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
   )EOF";
 
 class GeoipFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
