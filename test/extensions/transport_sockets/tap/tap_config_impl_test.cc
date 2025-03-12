@@ -73,7 +73,7 @@ public:
     EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
-    tap_config_.set_output_connection_info_per_event(output_conn_info_per_event_);
+    tap_config_.set_set_connection_per_event(output_conn_info_per_event_);
     tapper_ = std::make_unique<PerSocketTapperImpl>(config_, tap_config_, connection_);
   }
 

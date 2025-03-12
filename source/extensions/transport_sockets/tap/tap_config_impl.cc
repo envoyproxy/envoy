@@ -19,7 +19,7 @@ PerSocketTapperImpl::PerSocketTapperImpl(
     : config_(std::move(config)),
       sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),
       connection_(connection), statuses_(config_->createMatchStatusVector()),
-      should_output_conn_info_per_event_(tap_config.output_connection_info_per_event()) {
+      should_output_conn_info_per_event_(tap_config.set_connection_per_event()) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
     // TODO(mattklein123): For IP client connections, local address will not be populated until
