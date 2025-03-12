@@ -114,9 +114,10 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
                       connecting_and_connected_stream_capacity_, global_preconnect_ratio, true);
     ENVOY_LOG(trace,
               "predictive shouldCreateNewConnection returns {} for pending {} active {} "
-              "current_capacity {} ratio {}",
+              "connecting_and_connected_capacity {} connecting_capacity {} ratio {}",
               result, pending_streams_.size(), num_active_streams_,
-              connecting_and_connected_stream_capacity_, global_preconnect_ratio);
+              connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
+              global_preconnect_ratio);
     return result;
   } else {
     // Ensure this local pool has adequate connections for the given load.
@@ -129,9 +130,10 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
                       connecting_and_connected_stream_capacity_, perUpstreamPreconnectRatio());
     ENVOY_LOG(trace,
               "per-upstream shouldCreateNewConnection returns {} for pending {} active {} "
-              "connecting_capacity {} ratio {}",
+              "connecting_and_connected_capacity {} connecting_capacity {} ratio {}",
               result, pending_streams_.size(), num_active_streams_,
-              connecting_and_connected_stream_capacity_, perUpstreamPreconnectRatio());
+              connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
+              perUpstreamPreconnectRatio());
     return result;
   }
 }
@@ -162,7 +164,6 @@ ConnPoolImplBase::ConnectionResult
 ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // There are already enough Connecting connections for the number of queued streams.
   if (!shouldCreateNewConnection(global_preconnect_ratio)) {
-    ENVOY_LOG(trace, "not creating a new connection, shouldCreateNewConnection returned false.");
     return ConnectionResult::ShouldNotConnect;
   }
   ENVOY_LOG(trace, "creating new preconnect connection");

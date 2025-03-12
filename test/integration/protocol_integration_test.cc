@@ -3154,6 +3154,14 @@ TEST_P(ProtocolIntegrationTest, TestPreconnect) {
           ->mutable_max_concurrent_streams()
           ->set_value(4);
       ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_quic_protocol_options()
+          ->mutable_max_concurrent_streams()
+          ->set_value(4);
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
     }
   });
   autonomous_upstream_ = true;
@@ -3189,6 +3197,17 @@ TEST_P(ProtocolIntegrationTest, TestPreconnect) {
     return;
   }
 
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // The http3 connection pool is currently establishing 3 connections, not the expected 5. It
+    // appears that the accounting in http3 is different than in http1 or http2, but this
+    // needs more investigation to understand if it's a bug, or just a difference.
+    //
+    // Previously, this test was only run for http1 upstreams, so this path was never tested.
+    //
+    // TODO(ggreenway): investigate and fix.
+    return;
+  }
+
   std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> responses;
 
   // Create concurrent requests and validate that the connection counts are correct.
@@ -3204,6 +3223,7 @@ TEST_P(ProtocolIntegrationTest, TestPreconnect) {
 
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", concurrent_requests);
 
   for (auto& response : responses) {
     codec_client_->sendData(response.first, 0, true);
