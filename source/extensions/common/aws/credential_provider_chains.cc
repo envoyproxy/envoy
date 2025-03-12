@@ -25,7 +25,8 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
   if (credential_provider_config.has_iam_roles_anywhere_provider()) {
     ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
     add(factories.createIAMRolesAnywhereCredentialsProvider(
-        context, aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere_provider()));
+        context, aws_cluster_manager_, region,
+        credential_provider_config.iam_roles_anywhere_provider()));
   }
 
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {

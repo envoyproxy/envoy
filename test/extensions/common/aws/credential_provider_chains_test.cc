@@ -294,9 +294,8 @@ TEST_F(DefaultCredentialsProviderChainTest, IAMRolesAnywhere) {
 
   EXPECT_CALL(factories_, createIAMRolesAnywhereCredentialsProvider(_, _, _, _))
       .WillOnce(Invoke(WithArg<3>(
-          [&role_arn](
-              const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider& provider)
-              -> IAMRolesAnywhereCredentialsProviderPtr {
+          [&role_arn](const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                          provider) -> IAMRolesAnywhereCredentialsProviderPtr {
             role_arn = provider.role_arn();
             return nullptr;
           })));
@@ -353,6 +352,43 @@ TEST_F(CustomCredentialsProviderChainTest, CreateWebIdentityCredentialProviderOn
       server_context, region, cred_provider, factories);
 }
 
+TEST_F(CustomCredentialsProviderChainTest, WebIdentityNoEnvironmentSession) {
+  NiceMock<MockCustomCredentialsProviderChainFactories> factories;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Event::SimulatedTimeSystem time_system;
+
+  TestEnvironment::unsetEnvVar("AWS_ROLE_SESSION_NAME");
+  time_system.setSystemTime(std::chrono::milliseconds(1234567890));
+
+  auto region = "ap-southeast-2";
+  auto file_path = TestEnvironment::writeStringToFileForTest("credentials", "hello");
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider cred_provider = {};
+  cred_provider.mutable_assume_role_with_web_identity_provider()->set_role_arn("arn://1234");
+  cred_provider.mutable_assume_role_with_web_identity_provider()
+      ->mutable_web_identity_token_data_source()
+      ->set_filename(file_path);
+
+  EXPECT_CALL(factories, mockCreateCredentialsFileCredentialsProvider(Ref(server_context), _))
+      .Times(0);
+  std::string role_session_name;
+
+  EXPECT_CALL(factories, createWebIdentityCredentialsProvider(Ref(server_context), _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&role_session_name](
+              const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+                  provider) -> CredentialsProviderSharedPtr {
+            role_session_name = provider.role_session_name();
+            return nullptr;
+          })));
+
+  auto chain = std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
+      server_context, region, cred_provider, factories);
+  // Role session name is equal to nanoseconds from the set simulated system time when environment
+  // variable is unset
+  EXPECT_EQ(role_session_name, "1234567890000000");
+}
+
 TEST_F(CustomCredentialsProviderChainTest, CreateFileAndWebProviders) {
   NiceMock<MockCustomCredentialsProviderChainFactories> factories;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
@@ -384,9 +420,8 @@ TEST_F(CustomCredentialsProviderChainTest, IAMRolesAnywhere) {
 
   EXPECT_CALL(factories, createIAMRolesAnywhereCredentialsProvider(_, _, _, _))
       .WillOnce(Invoke(WithArg<3>(
-          [&role_arn](
-              const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider& provider)
-              -> IAMRolesAnywhereCredentialsProviderPtr {
+          [&role_arn](const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                          provider) -> IAMRolesAnywhereCredentialsProviderPtr {
             role_arn = provider.role_arn();
             return nullptr;
           })));
@@ -395,7 +430,7 @@ TEST_F(CustomCredentialsProviderChainTest, IAMRolesAnywhere) {
   credential_provider_config.mutable_iam_roles_anywhere_provider()->set_role_arn("role-arn");
 
   auto chain = std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
-    server_context, region, credential_provider_config, factories);
+      server_context, region, credential_provider_config, factories);
   EXPECT_EQ(role_arn, "role-arn");
 }
 
@@ -417,7 +452,6 @@ TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
   EXPECT_EQ("TestSecret", creds->secretAccessKey().value());
   EXPECT_EQ("TestSessionToken", creds->sessionToken().value());
 }
-
 
 } // namespace Aws
 } // namespace Common

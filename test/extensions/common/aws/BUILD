@@ -26,8 +26,8 @@ envoy_cc_mock(
         "//source/extensions/common/aws:signer_interface",
         "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
-        "//test/mocks/upstream:cluster_manager_mocks",
         "//source/extensions/common/aws/signers:sigv4a_signer_impl_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
