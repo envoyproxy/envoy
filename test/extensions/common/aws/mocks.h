@@ -114,17 +114,6 @@ public:
   MOCK_METHOD(void, onClusterAddOrUpdate, ());
 };
 
-// Friend class for testing callbacks
-class MetadataCredentialsProviderBaseFriend {
-public:
-  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
-      : provider_(provider) {}
-
-  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
-  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-  bool needsRefresh() { return true; }
-};
-
 class MockCredentialsProviderChain : public CredentialsProviderChain {
 public:
   MOCK_METHOD(Credentials, chainGetCredentials, ());
