@@ -27,7 +27,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
               credential_provider:
-                iam_roles_anywhere:
+                iam_roles_anywhere_provider:
                   role_arn: arn:aws:iam::012345678901:role/rolesanywhere
                   certificate: {filename: /certificates/certificate.pem}
                   private_key: {filename: /certificates/private-key.pem}
