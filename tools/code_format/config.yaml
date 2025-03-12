@@ -184,12 +184,10 @@ paths:
     - source/extensions/filters/http/lua
     - source/extensions/filters/http/proto_message_extraction
     - source/extensions/filters/http/rate_limit_quota
-    - source/extensions/filters/http/ratelimit
     - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/wasm
     - source/extensions/filters/network/dubbo_proxy
     - source/extensions/filters/network/rbac
-    - source/extensions/filters/network/sni_dynamic_forward_proxy
     - source/extensions/filters/network/common
     - source/extensions/filters/network/redis_proxy
     - source/extensions/filters/network/zookeeper_proxy
@@ -219,6 +217,7 @@ paths:
     - source/extensions/matching
     - source/extensions/network/dns_resolver/cares/
     - source/extensions/quic/server_preferred_address
+    - source/extensions/quic/connection_id_generator
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
