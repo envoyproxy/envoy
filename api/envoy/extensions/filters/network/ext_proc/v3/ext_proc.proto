@@ -20,6 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Filter]
+// [#not-implemented-hide:]
 // External Processing Filter: Process network traffic using an external service.
 // [#extension: envoy.filters.network.ext_proc]
 
@@ -34,7 +35,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // By using the filter's processing mode, you can selectively choose which data
 // directions to process (read, write or both), allowing for efficient processing.
-// [#not-implemented-hide:]
 message NetworkExternalProcessor {
   // The gRPC service that will process network traffic.
   // This service must implement the NetworkExternalProcessor service
