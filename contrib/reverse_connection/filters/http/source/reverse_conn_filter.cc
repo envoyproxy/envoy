@@ -304,9 +304,9 @@ void ReverseConnFilter::saveDownstreamConnection(Network::Connection& downstream
                                                  const std::string& cluster_id) {
   ENVOY_STREAM_LOG(debug, "Adding downstream connection socket to connection socket pool",
                    *decoder_callbacks_);
-  const Network::ConnectionSocketPtr& downstream_socket = downstream_connection.getSocket();
+  Network::ConnectionSocketPtr& downstream_socket = downstream_connection.getSocket();
   downstream_socket->ioHandle().resetFileEvents();
-  reverseConnectionHandler().addConnectionSocket(node_id, cluster_id, downstream_socket,
+  reverseConnectionHandler().addConnectionSocket(node_id, cluster_id, std::move(downstream_socket),
                                                  expects_proxy_protocol_, config_->pingInterval(),
                                                  false /* rebalanced */);
 }
