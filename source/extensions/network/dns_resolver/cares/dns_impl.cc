@@ -432,7 +432,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     // Resolution does not need asynchronous behavior or network events. For
     // example, localhost lookup.
     ENVOY_LOG_EVENT(debug, "cares_resolution_completed",
-                    "dns resolution for {} completed with no async or network events", dns_name_, status);
+                    "dns resolution for {} completed with no async or network events", dns_name);
     return nullptr;
   } else {
     // Enable timer to wake us up if the request times out.
