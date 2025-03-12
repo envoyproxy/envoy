@@ -96,8 +96,8 @@ public:
     static StringUtil::CaseUnorderedSet
     contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
-    static absl::flat_hash_set<uint32_t> uncompressibleResponseCodesSet(
-        const Protobuf::RepeatedPtrField<google::protobuf::UInt32Value>& codes);
+    static absl::flat_hash_set<uint32_t>
+    uncompressibleResponseCodesSet(const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes);
 
     const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;

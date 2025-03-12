@@ -113,9 +113,9 @@ StringUtil::CaseUnorderedSet CompressorFilterConfig::DirectionConfig::contentTyp
 
 absl::flat_hash_set<uint32_t>
 CompressorFilterConfig::DirectionConfig::uncompressibleResponseCodesSet(
-    const Protobuf::RepeatedPtrField<google::protobuf::UInt32Value>& codes) {
+    const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes) {
   absl::flat_hash_set<uint32_t> result;
-  for (const google::protobuf::UInt32Value& code : codes) {
+  for (const Protobuf::UInt32Value& code : codes) {
     result.insert(code.value());
   }
   return result;
