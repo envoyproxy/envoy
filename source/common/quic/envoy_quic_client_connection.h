@@ -33,7 +33,7 @@ public:
     EnvoyQuicPathValidationContext(const quic::QuicSocketAddress& self_address,
                                    const quic::QuicSocketAddress& peer_address,
                                    std::unique_ptr<EnvoyQuicPacketWriter> writer,
-                                   Network::ConnectionSocketPtr probing_socket);
+                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
 
     ~EnvoyQuicPathValidationContext() override;
 
@@ -42,8 +42,6 @@ public:
     EnvoyQuicPacketWriter* releaseWriter();
 
     Network::ConnectionSocket& probingSocket();
-
-    Network::ConnectionSocketPtr releaseSharedSocket();
 
     std::unique_ptr<Network::ConnectionSocket> releaseSocket();
 

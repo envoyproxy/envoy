@@ -65,7 +65,7 @@ public:
   // New Method added to retrieve the connection socket.
   // so that, new connection can be created with existing connection socket.
   // This is required for reverse connections.
-  const ConnectionSocketPtr& getSocket() const override { return socket_; }
+  ConnectionSocketPtr& getSocket() override { return socket_; }
   void setConnectionReused(bool value) override { reuse_connection_ = value; }
   bool isConnectionReused() override { return reuse_connection_; }
 

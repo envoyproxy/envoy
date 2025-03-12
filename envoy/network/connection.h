@@ -321,7 +321,7 @@ public:
   /**
    * @return ConnectionSocketPtr& To get socket from current connection.
    */
-  virtual const ConnectionSocketPtr& getSocket() const PURE;
+  virtual ConnectionSocketPtr& getSocket() PURE;
 
   /**
    *  Mark a connection as a reverse connection. The socket

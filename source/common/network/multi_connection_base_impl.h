@@ -133,7 +133,7 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
+  Network::ConnectionSocketPtr& getSocket() override { PANIC("not implemented"); }
   void setConnectionReused(bool) override { PANIC("not implemented"); }
   bool isConnectionReused() override { PANIC("not implemented"); }
 

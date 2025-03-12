@@ -203,7 +203,7 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
   auto envoy_context =
       static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
 
-  auto probing_socket = envoy_context->releaseSharedSocket();
+  auto probing_socket = envoy_context->releaseSocket();
   if (envoy_context->peer_address() != peer_address()) {
     OnServerPreferredAddressValidated(*envoy_context, true);
     envoy_context->releaseWriter();
@@ -230,7 +230,7 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
-  auto probing_socket =
+  std::unique_ptr<Network::ConnectionSocket> probing_socket =
       static_cast<EnvoyQuicPathValidationContext*>(context.get())->releaseSocket();
   // Extend the socket life time till the end of the current event loop.
   dispatcher_.deferredDelete(std::make_unique<DeferredDeletableSocket>(std::move(probing_socket)));
@@ -287,7 +287,8 @@ void EnvoyQuicClientConnection::setNumPtosForPortMigration(uint32_t num_ptos_for
 
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(
     const quic::QuicSocketAddress& self_address, const quic::QuicSocketAddress& peer_address,
-    std::unique_ptr<EnvoyQuicPacketWriter> writer, Network::ConnectionSocketPtr probing_socket)
+    std::unique_ptr<EnvoyQuicPacketWriter> writer,
+    std::unique_ptr<Network::ConnectionSocket> probing_socket)
     : QuicPathValidationContext(self_address, peer_address), writer_(std::move(writer)),
       socket_(std::move(probing_socket)) {}
 
@@ -302,16 +303,9 @@ EnvoyQuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContext
   return writer_.release();
 }
 
-Network::ConnectionSocketPtr
-EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSharedSocket() {
-  return std::move(socket_);
-}
-
 std::unique_ptr<Network::ConnectionSocket>
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSocket() {
-  Network::ConnectionSocket* raw_socket_ptr = socket_.get();
-  socket_.reset();
-  return std::unique_ptr<Network::ConnectionSocket>(raw_socket_ptr);
+  return std::move(socket_);
 }
 
 Network::ConnectionSocket&

@@ -95,7 +95,7 @@ public:
                                     dispatcher, address_list, upstream_local_address_selector,
                                     socket_factory, transport_socket_options, host, options,
                                     happy_eyeballs_config)) {}
-  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
+  Network::ConnectionSocketPtr& getSocket() override { PANIC("not implemented"); }
   void setConnectionReused(bool) override { PANIC("not implemented"); }
   bool isConnectionReused() override { PANIC("not implemented"); }
 };
