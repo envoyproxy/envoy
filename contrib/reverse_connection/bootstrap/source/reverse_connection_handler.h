@@ -50,7 +50,7 @@ public:
    * to pick the most appropriate thread.
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
-                           Network::ConnectionSocketPtr socket, bool expects_proxy_protocol,
+                           Network::ConnectionSocketPtr&& socket, bool expects_proxy_protocol,
                            const std::chrono::seconds& ping_interval, bool rebalanced);
 
   /** Add the accepted connection and remote cluster mapping to RCHandler maps
@@ -63,7 +63,7 @@ public:
    * @param ping_interval the interval at which ping keepalives are sent on accepted reverse conns.
    */
   void post(const std::string& node_id, const std::string& cluster_id,
-            Network::ConnectionSocketPtr socket, bool expects_proxy_protocol,
+            Network::ConnectionSocketPtr&& socket, bool expects_proxy_protocol,
             const std::chrono::seconds& ping_interval);
 
   /** Called by the responder envoy when a request is received, that could be sent through a reverse

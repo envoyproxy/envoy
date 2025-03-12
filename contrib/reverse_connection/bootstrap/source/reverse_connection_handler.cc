@@ -116,23 +116,23 @@ ReverseConnectionHandler::pickTargetHandler(const std::string& node_id,
 }
 
 void ReverseConnectionHandler::post(const std::string& node_id, const std::string& cluster_id,
-                                    Network::ConnectionSocketPtr socket,
-                                    const bool expects_proxy_protocol,
-                                    const std::chrono::seconds& ping_interval) {
+                                        Network::ConnectionSocketPtr&& socket,
+                                        const bool expects_proxy_protocol,
+                                        const std::chrono::seconds& ping_interval) {
   dispatcher_->post([&, node_id, cluster_id, expects_proxy_protocol, ping_interval,
-                     socket = std::move(socket)]() -> void {
-    this->addConnectionSocket(node_id, cluster_id, socket, expects_proxy_protocol, ping_interval,
+                     socket = std::move(socket)]() mutable -> void {
+    this->addConnectionSocket(node_id, cluster_id, std::move(socket), expects_proxy_protocol, ping_interval,
                               true /* rebalanced */);
   });
 }
 void ReverseConnectionHandler::addConnectionSocket(
-    const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
+    const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr&& socket,
     const bool expects_proxy_protocol, const std::chrono::seconds& ping_interval, bool rebalanced) {
   if (!rebalanced) {
     ReverseConnectionHandler& handler = pickMinHandler(node_id, cluster_id);
     if (&handler != this) {
       ENVOY_LOG(debug, "RC handler: Adding reverse connection to a different worker thread");
-      handler.post(node_id, cluster_id, socket, expects_proxy_protocol, ping_interval);
+      handler.post(node_id, cluster_id, std::move(socket), expects_proxy_protocol, ping_interval);
       return;
     } else {
       ENVOY_LOG(debug, "RC handler: Adding reverse connection to the same worker thread");
@@ -148,11 +148,6 @@ void ReverseConnectionHandler::addConnectionSocket(
   node_stats->reverse_conn_cx_idle_.inc();
   ENVOY_LOG(debug, "RC Handler: reverse conn count for node:{} idle: {} total:{}", node_id,
             node_stats->reverse_conn_cx_idle_.value(), node_stats->reverse_conn_cx_total_.value());
-
-  // If local envoy is responding to reverse connections, add the socket to
-  // accepted_reverse_connections_. Thereafter, initiate ping keepalives on the socket.
-  tryEnablePingTimer(ping_interval);
-  accepted_reverse_connections_[node_id].push_back(socket);
 
   if (!cluster_id.empty()) {
     if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
@@ -180,18 +175,24 @@ void ReverseConnectionHandler::addConnectionSocket(
       ENVOY_LOG(debug, "Removing stale entry for fd: {} from proxy protocol set", fd);
     }
   }
+
+  accepted_reverse_connections_[node_id].push_back(std::move(socket));
+  Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
   // onPingResponse() expects a ping reply on the socket.
   fd_to_event_map_[fd] = dispatcher_->createFileEvent(
       fd,
-      [this, socket](uint32_t events) {
+      [this, &socket_ref](uint32_t events) {
         ASSERT(events == Event::FileReadyType::Read);
-        onPingResponse(socket->ioHandle());
+        onPingResponse(socket_ref->ioHandle());
         return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   fd_to_timer_map_[fd] =
       dispatcher_->createTimer([this, fd]() { markSocketDead(fd, false /* used */); });
   fd_to_node_map_[fd] = node_id;
+  // If local envoy is responding to reverse connections, add the socket to
+  // accepted_reverse_connections_. Thereafter, initiate ping keepalives on the socket.
+  tryEnablePingTimer(ping_interval);
   ENVOY_LOG(info, "RC Handler: done adding socket to maps with node: {} connection key: {} fd: {}",
             node_id, connectionKey, fd);
 }
@@ -280,7 +281,7 @@ void ReverseConnectionHandler::rebalanceGetConnectionSocket(
     std::shared_ptr<std::promise<RCSocketPair>> socket_promise) {
   dispatcher_->post([&, key, rebalanced, socket_promise]() -> void {
     RCSocketPair socket_pair_value = this->getConnectionSocket(key, rebalanced);
-    socket_promise->set_value(socket_pair_value);
+    socket_promise->set_value(std::move(socket_pair_value));
   });
 }
 
@@ -358,7 +359,8 @@ ReverseConnectionHandler::getConnectionSocket(const std::string& key, bool rebal
       return std::make_pair(Network::ConnectionSocketPtr(), false);
     }
   }
-  Network::ConnectionSocketPtr socket(accepted_reverse_connections_[node_id].front());
+
+  Network::ConnectionSocketPtr socket = std::move(accepted_reverse_connections_[node_id].front());
   accepted_reverse_connections_[node_id].pop_front();
 
   const int fd = socket->ioHandle().fdDoNotUse();
@@ -397,7 +399,7 @@ ReverseConnectionHandler::getConnectionSocket(const std::string& key, bool rebal
     this->node_to_conn_count_map_[node_id]--;
     handler_lock.WriterUnlock();
   }
-  return std::make_pair(socket, expects_proxy_protocol);
+  return std::make_pair(std::move(socket), expects_proxy_protocol);
 }
 
 uint64_t ReverseConnectionHandler::getNumberOfSocketsByNode(const std::string& node_id) {
