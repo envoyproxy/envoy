@@ -136,8 +136,8 @@ message WriteData {
   // When true, the server has closed the writing side of the connection or
   // the write operation is about to complete.
   //
-  // [#comment: The external processor should still respond to this message even
-  // if there is no more data expected in this direction.]
+  // The external processor should still respond to this message even
+  // if there is no more data expected in this direction.
   bool end_of_stream = 2;
 }
 
