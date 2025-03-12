@@ -57,21 +57,30 @@ service NetworkExternalProcessor {
   }
 }
 
+// The payload data from network layer
+message Data {
+  // The raw payload data
+  bytes data = 1;
+
+  // Indicates whether this is the last data frame in the current direction.
+  // The external processor should still respond to this message even
+  // if there is no more data expected in this direction.
+  bool end_of_stream = 2;
+}
+
 // ProcessingRequest contains data sent from Envoy to the external processing server.
 // Each request contains either read data (from client) or write data (to client)
 // along with optional metadata.
 message ProcessingRequest {
-  oneof request {
-    option (validate.required) = true;
+  // ReadData contains the network data intercepted in the request path (client to server).
+  // This is sent to the external processor when data arrives from the downstream client.
+  // If this is set, write_data should not be set.
+  Data read_data = 1;
 
-    // ReadData contains the network data intercepted in the request path (client to server).
-    // This is sent to the external processor when data arrives from the downstream client.
-    ReadData read_data = 1;
-
-    // WriteData contains the network data intercepted in the response path (server to client).
-    // This is sent to the external processor when data arrives from the upstream server.
-    WriteData write_data = 2;
-  }
+  // WriteData contains the network data intercepted in the response path (server to client).
+  // This is sent to the external processor when data arrives from the upstream server.
+  // If this is set, read_data should not be set.
+  Data write_data = 2;
 
   // Optional metadata associated with the request.
   // This can include connection properties, filter configuration, and any other
@@ -85,64 +94,8 @@ message ProcessingRequest {
 // ProcessingResponse contains the response from the external processing server to Envoy.
 // Each response corresponds to a ProcessingRequest and indicates how the network
 // traffic should be handled.
+// [#next-free-field: 6]
 message ProcessingResponse {
-  oneof response {
-    option (validate.required) = true;
-
-    // The processed ReadData containing potentially modified data for the request path.
-    // This should be sent in response to a ProcessingRequest with read_data.
-    ReadData read_data = 1;
-
-    // The processed WriteData containing potentially modified data for the response path.
-    // This should be sent in response to a ProcessingRequest with write_data.
-    WriteData write_data = 2;
-  }
-
-  // Status of the processing operation.
-  // This field communicates to Envoy how the data was processed and
-  // what action should be taken with the connection.
-  ProcessingStatus processing_status = 3;
-
-  // Optional metadata associated with the request.
-  // This can include connection properties, filter configuration, and any other
-  // contextual information that might be useful for processing decisions.
-  //
-  // The metadata is not automatically propagated from request to response.
-  // The external processor must include any needed metadata in its response.
-  google.protobuf.Struct dynamic_metadata = 4;
-}
-
-// ReadData represents raw network data intercepted in the request path (client to server).
-message ReadData {
-  // The raw payload data from the request path.
-  bytes data = 1;
-
-  // Indicates whether this is the last data frame in the current direction.
-  // When true, the client has closed the writing side of the connection or
-  // the read operation has completed.
-  //
-  // The external processor should still respond to this message even
-  // if there is no more data expected in this direction.
-  bool end_of_stream = 2;
-}
-
-// WriteData represents raw network data intercepted in the response path (server to client).
-message WriteData {
-  // The raw payload data from the response path.
-  bytes data = 1;
-
-  // Indicates whether this is the last data frame in the current direction.
-  // When true, the server has closed the writing side of the connection or
-  // the write operation is about to complete.
-  //
-  // The external processor should still respond to this message even
-  // if there is no more data expected in this direction.
-  bool end_of_stream = 2;
-}
-
-// ProcessingStatus communicates the result of the external processing operation
-// and instructs Envoy on how to proceed with the connection.
-message ProcessingStatus {
   // DataProcessedStatus indicates whether the data was modified by the external processor.
   enum DataProcessedStatus {
     // The data remains unchanged. Envoy will use the original data.
@@ -172,12 +125,32 @@ message ProcessingStatus {
     CLOSE_RST = 2;
   }
 
+  // The processed ReadData containing potentially modified data for the request path.
+  // This should be sent in response to a ProcessingRequest with read_data, and the
+  // previous data in ProcessingRequest will be replaced by the new data in Envoy's data plane.
+  // If this is set, write_data should not be set.
+  Data read_data = 1;
+
+  // The processed WriteData containing potentially modified data for the response path.
+  // This should be sent in response to a ProcessingRequest with write_data, and the
+  // previous data in ProcessingRequest will be replaced by the new data in Envoy's data plane.
+  // If this is set, read_data should not be set.
+  Data write_data = 2;
+
   // Indicates whether the data was modified or not.
   // This is mandatory and tells Envoy whether to use the original or modified data.
-  DataProcessedStatus data_processing_status = 1;
+  DataProcessedStatus data_processing_status = 3;
 
   // Optional: Determines the connection behavior after processing.
   // If not specified, CONTINUE is assumed, and the connection proceeds normally.
   // Use CLOSE or CLOSE_RST to terminate the connection based on processing results.
-  ConnectionStatus connection_status = 2;
+  ConnectionStatus connection_status = 4;
+
+  // Optional metadata associated with the request.
+  // This can include connection properties, filter configuration, and any other
+  // contextual information that might be useful for processing decisions.
+  //
+  // The metadata is not automatically propagated from request to response.
+  // The external processor must include any needed metadata in its response.
+  google.protobuf.Struct dynamic_metadata = 5;
 }
