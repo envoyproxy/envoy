@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package envoy.service.ext_proc.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+
+import "annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.network_ext_proc.v3";
+option java_outer_classname = "NetworkExternalProcessorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/network_ext_proc/v3;network_ext_procv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// In other words, the process is a request/response conversation, but
+// using a gRPC stream to make it easier for the server to
+// maintain state.
+service NetworkExternalProcessor {
+  // This begins the bidirectional stream that Envoy will use to
+  // give the server control over what the filter does. The actual
+  // protocol is described by the ProcessingRequest and ProcessingResponse
+  // messages below.
+  rpc Process(stream ProcessingRequest) returns (stream ProcessingResponse) {
+  }
+}
+
+// The message Envoy sends to an external processing server.
+message ProcessingRequest {
+  oneof request {
+    // The read data from the network filter chain (request path).
+    ReadData read_data = 1;
+
+    // The write data from the network filter chain (response path).
+    WriteData write_data = 2;
+  }
+
+  // Optional metadata associated with the request.
+  envoy.config.core.v3.Metadata metadata = 3;
+}
+
+// The response from the external processing server.
+message ProcessingResponse {
+  oneof response {
+    // The processed read data (request path).
+    ReadData read_data = 1;
+
+    // The processed write data (response path).
+    WriteData write_data = 2;
+  }
+
+  // Status of the processing (mandatory).
+  ProcessingStatus processing_status = 3;
+}
+
+// Represents raw data intercepted in the L4 stream.
+message ReadData {
+  bytes data = 1;  // The payload from the request path.
+  bool end_of_stream = 2; // True if this is the last data frame.
+}
+
+// Represents raw data intercepted in the L4 response stream.
+message WriteData {
+  bytes data = 1;  // The payload from the response path.
+  bool end_of_stream = 2; // True if this is the last data frame.
+}
+
+// Processing status returned by the external processing server.
+message ProcessingStatus {
+  enum DataProcessedStatus {
+    UNMODIFIED = 0;  // Data remains unchanged.
+    MODIFIED = 1;    // Data has been modified.
+  }
+
+  enum ConnectionStatus {
+    CONTINUE = 0;   // Continue normal processing.
+    CLOSE = 1;      // Close connection gracefully.
+    CLOSE_RST = 2;  // Close connection with a reset.
+  }
+
+  // Whether the data was modified or not.
+  DataProcessedStatus data_processing_status = 1;
+
+  // Optional: Connection behavior after processing.
+  ConnectionStatus connection_status = 2;
+}
