@@ -60,7 +60,6 @@ service NetworkExternalProcessor {
 // ProcessingRequest contains data sent from Envoy to the external processing server.
 // Each request contains either read data (from client) or write data (to client)
 // along with optional metadata.
-// [#next-free-field: 4]
 message ProcessingRequest {
   oneof request {
     option (validate.required) = true;
@@ -86,7 +85,6 @@ message ProcessingRequest {
 // ProcessingResponse contains the response from the external processing server to Envoy.
 // Each response corresponds to a ProcessingRequest and indicates how the network
 // traffic should be handled.
-// [#next-free-field: 5]
 message ProcessingResponse {
   oneof response {
     option (validate.required) = true;
@@ -115,7 +113,6 @@ message ProcessingResponse {
 }
 
 // ReadData represents raw network data intercepted in the request path (client to server).
-// [#next-free-field: 3]
 message ReadData {
   // The raw payload data from the request path.
   bytes data = 1;
@@ -130,7 +127,6 @@ message ReadData {
 }
 
 // WriteData represents raw network data intercepted in the response path (server to client).
-// [#next-free-field: 3]
 message WriteData {
   // The raw payload data from the response path.
   bytes data = 1;
@@ -146,7 +142,6 @@ message WriteData {
 
 // ProcessingStatus communicates the result of the external processing operation
 // and instructs Envoy on how to proceed with the connection.
-// [#next-free-field: 3]
 message ProcessingStatus {
   // DataProcessedStatus indicates whether the data was modified by the external processor.
   enum DataProcessedStatus {
