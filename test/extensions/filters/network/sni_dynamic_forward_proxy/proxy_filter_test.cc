@@ -41,7 +41,9 @@ public:
     FilterConfig proto_config;
     proto_config.set_port_value(443);
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
+    absl::Status status = absl::OkStatus();
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
+    EXPECT_TRUE(status.ok());
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 
@@ -326,7 +328,9 @@ public:
     proto_config.set_save_upstream_address(true);
 
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
-    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
+    absl::Status status = absl::OkStatus();
+    filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
+    EXPECT_TRUE(status.ok());
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 

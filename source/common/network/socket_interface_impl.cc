@@ -167,17 +167,18 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
 Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
     [[maybe_unused]] const Protobuf::Message& config,
     [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID_API__)
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::v3::DefaultSocketInterface&>(
       config, context.messageValidationVisitor());
-  if (message.enable_io_uring() && Io::isIoUringSupported()) {
+  if (message.has_io_uring_options() && Io::isIoUringSupported()) {
+    const auto& options = message.io_uring_options();
     std::shared_ptr<Io::IoUringWorkerFactoryImpl> io_uring_worker_factory =
         std::make_shared<Io::IoUringWorkerFactoryImpl>(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_size, 1000),
-            message.enable_io_uring_submission_queue_polling(),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_read_buffer_size, 8192),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, io_uring_write_timeout_ms, 1000),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, io_uring_size, 1000),
+            options.enable_submission_queue_polling(),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000),
             context.threadLocal());
     io_uring_worker_factory_ = io_uring_worker_factory;
 
