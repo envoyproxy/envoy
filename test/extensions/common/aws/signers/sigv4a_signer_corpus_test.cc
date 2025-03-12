@@ -174,15 +174,17 @@ public:
     std::vector<uint8_t> signature;
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
     auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+    auto sigv4a_key_derivation = std::make_unique<SigV4AKeyDerivation>();
 
-    EC_KEY* ec_key =
-        SigV4AKeyDerivation::derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
-    SigV4AKeyDerivation::derivePublicKey(ec_key);
+    auto ec_key_or =
+        sigv4a_key_derivation->derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
+    EXPECT_TRUE(ec_key_or.ok());
+    sigv4a_key_derivation->derivePublicKey(ec_key_or.value());
     signature = Hex::decode(calculated_signature);
 
-    EXPECT_EQ(
-        1, ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(), ec_key));
-    EC_KEY_free(ec_key);
+    EXPECT_EQ(1, ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(),
+                              ec_key_or.value()));
+    EC_KEY_free(ec_key_or.value());
   }
 
   Http::RequestMessageImpl message_;

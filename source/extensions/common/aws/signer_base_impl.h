@@ -163,7 +163,7 @@ protected:
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
-  const std::string blank_str_;
+  const std::string invalid_signature_ = "invalidSignature";
 };
 
 } // namespace Aws

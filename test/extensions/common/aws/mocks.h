@@ -202,9 +202,9 @@ public:
               (const));
 };
 
-class MockSigV4AKeyDerivation : public SigV4AKeyDerivation {
+class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
 public:
-  MOCK_METHOD(EC_KEY*, derivePrivateKey,
+  MOCK_METHOD(absl::StatusOr<EC_KEY*>, derivePrivateKey,
               (absl::string_view access_key_id, absl::string_view secret_access_key));
   MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
 };
