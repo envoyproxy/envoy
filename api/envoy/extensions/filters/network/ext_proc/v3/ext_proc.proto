@@ -74,13 +74,21 @@ message NetworkExternalProcessor {
   }];
 }
 
-// ProcessingMode defines which traffic directions should be processed
-// by the external service.
-//
 message ProcessingMode {
-  // Whether to process inbound (read) data from the client.
-  bool process_read = 1;
+  // Defines how traffic should be handled by the external processor
+  enum ProcessingAction {
+    // Send the data to the external processor for processing
+    PROCESS = 0;
 
-  // Whether to process outbound (write) data to the client.
-  bool process_write = 2;
+    // Skip sending the data to the external processor
+    BYPASS = 1;
+  }
+
+  // Controls whether inbound (read) data from the client is sent to the external processor.
+  // Default: PROCESS
+  ProcessingAction process_read = 1;
+
+  // Controls whether outbound (write) data to the client is sent to the external processor.
+  // Default: PROCESS
+  ProcessingAction process_write = 2;
 }
