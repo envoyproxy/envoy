@@ -286,9 +286,11 @@ public:
 
   void decrClusterStreamCapacity(uint32_t delta) {
     state_.decrConnectingAndConnectedStreamCapacity(delta);
+    connecting_and_connected_stream_capacity_ -= delta;
   }
   void incrClusterStreamCapacity(uint32_t delta) {
     state_.incrConnectingAndConnectedStreamCapacity(delta);
+    connecting_and_connected_stream_capacity_ += delta;
   }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -396,7 +398,13 @@ private:
   // Prerequisite: the given clients shouldn't be idle.
   void drainClients(std::list<ActiveClientPtr>& clients);
 
+  void assertCapacityCountsAreCorrect();
+
   std::list<PendingStreamPtr> pending_streams_;
+
+  // The number of streams that can be immediately dispatched from the current
+  // `ready_clients_` plus `connecting_stream_capacity_`.
+  int64_t connecting_and_connected_stream_capacity_{0};
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
