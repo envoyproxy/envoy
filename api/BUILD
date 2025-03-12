@@ -367,6 +367,7 @@ proto_library(
         "//envoy/service/endpoint/v3:pkg",
         "//envoy/service/event_reporting/v3:pkg",
         "//envoy/service/ext_proc/v3:pkg",
+        "//envoy/service/network_ext_proc/v3:pkg",
         "//envoy/service/extension/v3:pkg",
         "//envoy/service/health/v3:pkg",
         "//envoy/service/listener/v3:pkg",
