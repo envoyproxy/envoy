@@ -2435,8 +2435,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
             dispatcher, context_.api().randomGenerator(), server_.singletonManager(), host,
             priority, options, transport_socket_options, state, origin, alternate_protocols_cache);
       } else
-        throw EnvoyException("Failed to create reverse connection conn pool. Cannot find a factory "
-                             "implementation for reverse connection conn pool.");
+        ENVOY_LOG_MISC(error, "Failed to create reverse connection conn pool. Cannot find a factory "
+                             "implementation for reverse connection conn pool. Using forward connecions.");
     }
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, origin,
