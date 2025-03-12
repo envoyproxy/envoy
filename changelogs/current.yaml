@@ -130,6 +130,15 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: geoip
+  change: |
+    Added option on the geoip filter :ref:`isp <common.v3.CommonGeoipProviderConfig.isp>` that has the isp name.
+    Performs a lookup on the IP address to get the ISP name from the Maxmind database provider.
+- area: geoip
+  change: |
+    Added option on the geoip filter :ref:`is_apple_private_relay <common.v3.CommonGeoipProviderConfig.is_apple_private_relay>`
+    that true if the isp name is iCloud Private Relay.
+    Performs a lookup on the IP address to get the ISP name from the Maxmind database provider and check if it is iCloud Private Relay.
 - area: http
   change: |
     Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
