@@ -1,7 +1,5 @@
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
-#include <__config>
-
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
