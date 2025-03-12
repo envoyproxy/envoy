@@ -19,11 +19,10 @@ namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
 
-Upstream::HostConstSharedPtr
-RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
+Upstream::HostSelectionResponse RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (!context) {
     ENVOY_LOG(debug, "Invalid downstream connection or invalid downstream request");
-    return nullptr;
+    return {nullptr};
   }
 
   // Check if host_id is already set for the upstream cluster. If it is, use
@@ -36,7 +35,7 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   if (context->downstreamHeaders() == nullptr) {
     ENVOY_LOG(error, "Found empty downstream headers for a request over connection with ID: {}",
               *(context->downstreamConnection()->connectionInfoProvider().connectionID()));
-    return nullptr;
+    return {nullptr};
   }
 
   // EnvoyDstClusterUUID is mandatory in each request. If this header is not
@@ -46,17 +45,17 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   if (header_result.empty()) {
     ENVOY_LOG(error, "{} header not found in request context",
               Http::Headers::get().EnvoyDstClusterUUID.get());
-    return nullptr;
+    return {nullptr};
   }
   const std::string host_id = std::string(parent_->getHostIdValue(context->downstreamHeaders()));
   if (host_id.empty()) {
     ENVOY_LOG(debug, "Found no header match for incoming request");
-    return nullptr;
+    return {nullptr};
   }
   return parent_->checkAndCreateHost(host_id);
 }
 
-Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const std::string host_id) {
+Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(const std::string host_id) {
   host_map_lock_.ReaderLock();
   // Check if host_id is already present in host_map_ or not. This ensures,
   // that envoy reuses a conn_pool_container for an endpoint.
@@ -65,7 +64,7 @@ Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const std::string host
     ENVOY_LOG(debug, "Found an existing host for {}.", host_id);
     Upstream::HostSharedPtr host = host_itr->second;
     host_map_lock_.ReaderUnlock();
-    return host;
+    return {host};
   }
   host_map_lock_.ReaderUnlock();
 
@@ -86,7 +85,7 @@ Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const std::string host
   ENVOY_LOG(trace, "Created a host {} for {}.", *host, host_id);
 
   host_map_[host_id] = host;
-  return host;
+  return {host};
 }
 
 void RevConCluster::cleanup() {

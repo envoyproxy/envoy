@@ -39,7 +39,7 @@ public:
   public:
     LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
 
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
 
     // Virtual functions that are not supported by our custom load-balancer.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
@@ -89,7 +89,7 @@ private:
 
   // Checks if a host exists for a given `host_id` and if not it creates and caches
   // that host to the map.
-  Upstream::HostSharedPtr checkAndCreateHost(const std::string host_id);
+  Upstream::HostSelectionResponse checkAndCreateHost(const std::string host_id);
 
   // Checks if the request headers contain any header that hold host_id value.
   // If such header is present, it return that header value.
