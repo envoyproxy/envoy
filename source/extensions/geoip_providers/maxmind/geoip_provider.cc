@@ -412,7 +412,7 @@ void GeoipProvider::populateGeoLookupResult(
       result_value = entry_data.boolean ? "true" : "false";
     }
     if (!result_value.empty()) {
-      // Check the result value against the comparation value and return "true" or "false"
+      // Check the result value against the comparison value and return "true" or "false"
       // accordingly.
       if (compare_with.has_value()) {
         result_value = (result_value == compare_with.value()) ? "true" : "false";
