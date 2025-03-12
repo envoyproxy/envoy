@@ -41,10 +41,7 @@ message NetworkExternalProcessor {
   config.core.v3.GrpcService grpc_service = 1;
 
   // By default, if the gRPC stream cannot be established, or if it is closed
-  // prematurely with an error, the filter will fail. Specifically, if the
-  // response headers have not yet been delivered, then it will return a 500
-  // error downstream. If they have been delivered, then instead the HTTP stream to the
-  // downstream client will be reset.
+  // prematurely with an error, the filter will fail, leading to the close of connection.
   // With this parameter set to true, however, then if the gRPC stream is prematurely closed
   // or could not be opened, processing continues without error.
   // [#not-implemented-hide:]
@@ -75,6 +72,8 @@ message ProcessingMode {
 
     // Skip sending the data to the external processor.
     SKIP = 1;
+
+    // Potental other send modes in future.
   }
 
   // Controls whether inbound (read) data from the client is sent to the external processor.
