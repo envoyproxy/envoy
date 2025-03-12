@@ -1,5 +1,3 @@
-#include "envoy/config/trace/v3/fluentd.pb.h"
-
 #include "source/extensions/tracers/fluentd/config.h"
 #include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
 

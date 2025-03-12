@@ -1,5 +1,3 @@
-#include "envoy/config/trace/v3/fluentd.pb.h"
-#include "envoy/config/trace/v3/fluentd.pb.validate.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/registry/registry.h"
 

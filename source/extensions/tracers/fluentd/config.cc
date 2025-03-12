@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include "envoy/config/trace/v3/fluentd.pb.h"
-#include "envoy/config/trace/v3/fluentd.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
