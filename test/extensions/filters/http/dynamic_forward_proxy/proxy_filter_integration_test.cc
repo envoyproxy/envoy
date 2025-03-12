@@ -1454,6 +1454,7 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
 
 // Verify that we expire sub clusters and not remove on CDS.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   const std::string cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
@@ -1482,16 +1483,9 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
       {":authority",
        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
 
-  //auto response =
-  //    sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  //checkSimpleRequestSuccess(1024, 1024, response.get());
-  ASSERT_TRUE(codec_client_->connected());
-  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
   // one more cluster
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
@@ -1504,14 +1498,8 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  //response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  //checkSimpleRequestSuccess(1024, 1024, response.get());
-  ASSERT_TRUE(codec_client_->connected());
-  response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
 
   // sub cluster added again
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
