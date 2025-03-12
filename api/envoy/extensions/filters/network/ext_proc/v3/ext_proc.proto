@@ -72,8 +72,6 @@ message ProcessingMode {
 
     // Skip sending the data to the external processor.
     SKIP = 1;
-
-    // Potental other send modes in future.
   }
 
   // Controls whether inbound (read) data from the client is sent to the external processor.
