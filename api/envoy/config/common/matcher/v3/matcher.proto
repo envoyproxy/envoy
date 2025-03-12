@@ -41,6 +41,11 @@ message Matcher {
       // Protocol-specific action to take.
       core.v3.TypedExtensionConfig action = 2;
     }
+
+    // If true and the Matcher matches, the action will be taken but the caller
+    // will behave as if the Matcher did not match. A subsequent matcher or
+    // on_no_match action will be used instead.
+    bool keep_matching = 3;
   }
 
   // A linear list of field matchers.
