@@ -4,7 +4,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
-#include "envoy/extensions/filters/http/credential_injector/v3/credential_injector.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
@@ -796,8 +795,6 @@ TEST_P(ProxyingConnectIntegrationTest, 2xxStatusCode) {
   cleanupUpstreamAndDownstream();
 }
 
-using HttpFilterProto =
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public BaseTcpTunnelingIntegrationTest {
 public:
@@ -830,20 +827,6 @@ public:
     BaseTcpTunnelingIntegrationTest::SetUp();
   }
 
-  void addHttpUpstreamFilterToCluster(const HttpFilterProto& config) {
-    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      ConfigHelper::HttpProtocolOptions protocol_options =
-          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-              (*cluster->mutable_typed_extension_protocol_options())
-                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-      *protocol_options.add_http_filters() = config;
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(protocol_options);
-    });
-  }
-
   const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
                                                  const std::string& value) {
     HttpFilterProto filter_config;
@@ -862,56 +845,6 @@ public:
     configuration.set_stop_and_buffer(true);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
-  }
-
-  const HttpFilterProto getCodecFilterConfig() {
-    HttpFilterProto filter_config;
-    filter_config.set_name("envoy.filters.http.upstream_codec");
-    auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
-    filter_config.mutable_typed_config()->PackFrom(configuration);
-    return filter_config;
-  }
-
-  void setUpConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
-    // Start a connection, and verify the upgrade headers are received upstream.
-    tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-    if (!fake_upstream_connection) {
-      ASSERT_TRUE(
-          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
-    }
-    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-    // Send upgrade headers downstream, fully establishing the connection.
-    upstream_request_->encodeHeaders(default_response_headers_, false);
-  }
-
-  void sendBidiData(FakeHttpConnectionPtr& fake_upstream_connection, bool send_goaway = false) {
-    // Send some data from downstream to upstream, and make sure it goes through.
-    ASSERT_TRUE(tcp_client_->write("hello", false));
-    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-
-    if (send_goaway) {
-      fake_upstream_connection->encodeGoAway();
-    }
-    // Send data from upstream to downstream.
-    upstream_request_->encodeData(12, false);
-    ASSERT_TRUE(tcp_client_->waitForData(12));
-  }
-
-  void closeConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
-    // Now send more data and close the TCP client. This should be treated as half close, so the
-    // data should go through.
-    ASSERT_TRUE(tcp_client_->write("hello", false));
-    tcp_client_->close();
-    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-    if (upstreamProtocol() == Http::CodecType::HTTP1) {
-      ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-    } else {
-      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-      // If the upstream now sends 'end stream' the connection is fully closed.
-      upstream_request_->encodeData(0, true);
-    }
   }
 
   void testGiantRequestAndResponse(uint64_t request_size, uint64_t response_size) {
@@ -939,7 +872,6 @@ public:
     }
   }
   int downstream_buffer_limit_{0};
-  IntegrationTcpClientPtr tcp_client_;
 };
 
 TEST_P(TcpTunnelingIntegrationTest, Basic) {
@@ -2363,65 +2295,6 @@ TEST_P(TcpTunnelingIntegrationTest,
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
-}
-
-TEST_P(TcpTunnelingIntegrationTest, InjectProxyAuthorizationHeader) {
-  if (!(GetParam().tunneling_with_upstream_filters)) {
-    return;
-  }
-
-  // add credential injector to cluster http_filters
-  envoy::extensions::filters::http::credential_injector::v3::CredentialInjector
-      credential_injector_config;
-  TestUtility::loadFromYaml(R"EOF(
-  credential:
-    name: envoy.http.injected_credentials.generic
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
-      credential:
-        name: proxy_authorization
-      header: Proxy-Authorization
-)EOF",
-                            credential_injector_config);
-  HttpFilterProto filter_config;
-  filter_config.set_name("envoy.filters.http.credential_injector");
-  filter_config.mutable_typed_config()->PackFrom(credential_injector_config);
-  addHttpUpstreamFilterToCluster(filter_config);
-  addHttpUpstreamFilterToCluster(getCodecFilterConfig());
-
-  // configure tunneling_config and create secret
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
-    proxy_config.set_stat_prefix("tcp_stats");
-    proxy_config.set_cluster("cluster_0");
-    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-
-    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
-    for (auto& listener : *listeners) {
-      if (listener.name() != "tcp_proxy") {
-        continue;
-      }
-      auto* filter_chain = listener.mutable_filter_chains(0);
-      auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
-      break;
-    }
-
-    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
-    secret->set_name("proxy_authorization");
-    auto* generic = secret->mutable_generic_secret();
-    generic->mutable_secret()->set_inline_string("Basic base64EncodedUsernamePassword");
-  });
-  initialize();
-
-  setUpConnection(fake_upstream_connection_);
-  sendBidiData(fake_upstream_connection_);
-  EXPECT_EQ("Basic base64EncodedUsernamePassword",
-            upstream_request_->headers()
-                .get(Http::LowerCaseString("Proxy-Authorization"))[0]
-                ->value()
-                .getStringView());
-  closeConnection(fake_upstream_connection_);
 }
 
 INSTANTIATE_TEST_SUITE_P(
