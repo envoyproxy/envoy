@@ -1,8 +1,7 @@
-#include "source/extensions/filters/http/compressor/compressor_filter.h"
-
 #include <sys/types.h>
 
-#include "absl/strings/str_join.h"
+#include "source/extensions/filters/http/compressor/compressor_filter.h"
+
 #include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -10,6 +9,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -747,20 +747,19 @@ TEST_P(IsContentTypeAllowedTest, Validate) {
 
 class IsResponseCodeAllowedTest
     : public CompressorFilterTest,
-      public testing::WithParamInterface<std::tuple<uint32_t, bool, bool, std::vector<uint32_t>>> {};
+      public testing::WithParamInterface<std::tuple<uint32_t, bool, bool, std::vector<uint32_t>>> {
+};
 
 INSTANTIATE_TEST_SUITE_P(
     IsResponseCodeAllowedTestSuite, IsResponseCodeAllowedTest,
-    testing::Values(
-        std::make_tuple(200, true, true, std::vector<uint32_t>{ 206 }),
-        std::make_tuple(206, false, true, std::vector<uint32_t>{ 206 }),
-        std::make_tuple(200, true, false, std::vector<uint32_t>{}),
-        std::make_tuple(200, true, true, std::vector<uint32_t>{}),
-        std::make_tuple(206, true, false, std::vector<uint32_t>{}),
-        std::make_tuple(206, true, true, std::vector<uint32_t>{}),
-        std::make_tuple(206, false, true, std::vector<uint32_t>{ 404, 206}),
-        std::make_tuple(200, true, true, std::vector<uint32_t>{ 404, 206})
-      ));
+    testing::Values(std::make_tuple(200, true, true, std::vector<uint32_t>{206}),
+                    std::make_tuple(206, false, true, std::vector<uint32_t>{206}),
+                    std::make_tuple(200, true, false, std::vector<uint32_t>{}),
+                    std::make_tuple(200, true, true, std::vector<uint32_t>{}),
+                    std::make_tuple(206, true, false, std::vector<uint32_t>{}),
+                    std::make_tuple(206, true, true, std::vector<uint32_t>{}),
+                    std::make_tuple(206, false, true, std::vector<uint32_t>{404, 206}),
+                    std::make_tuple(200, true, true, std::vector<uint32_t>{404, 206})));
 
 TEST_P(IsResponseCodeAllowedTest, Validate) {
   const uint32_t response_code = std::get<0>(GetParam());
@@ -787,21 +786,19 @@ TEST_P(IsResponseCodeAllowedTest, Validate) {
           "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
         }}
       }}
-    }})EOF", absl::StrJoin(uncompressible_response_codes, ", ")));
+    }})EOF",
+                            absl::StrJoin(uncompressible_response_codes, ", ")));
     response_stats_prefix_ = "response.";
   }
 
   auto filter_state = decoder_callbacks_.streamInfo().filterState();
-  ON_CALL(decoder_callbacks_, streamInfo())
-        .WillByDefault(ReturnRef(stream_info_));
-  ON_CALL(stream_info_, filterState())
-        .WillByDefault(testing::ReturnRef(filter_state));
+  ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  ON_CALL(stream_info_, filterState()).WillByDefault(testing::ReturnRef(filter_state));
   ON_CALL(stream_info_, responseCode())
-        .WillByDefault(Return(absl::optional<uint32_t>(response_code)));
+      .WillByDefault(Return(absl::optional<uint32_t>(response_code)));
 
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test, deflate"}});
-  Http::TestResponseHeaderMapImpl headers{
-      {":method", "get"}, {"content-length", "256"}};
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
   doResponse(headers, should_compress);
 
   EXPECT_EQ(should_compress, headers.has("vary"));
