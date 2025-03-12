@@ -8,6 +8,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: connection pool
+  change: |
+    Fixed a bug in :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>` where established connection
+    unused capacity was not considered in the logic to establish new connections, resulting in new connections anytime there was not
+    a connection currently in the process of being established. This resulted in far too many connections being established, with the only
+    bounds being cluster circuit breaker limits or upstream service limits.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
