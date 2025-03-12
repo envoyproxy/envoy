@@ -192,7 +192,7 @@ socket_streamed_trace_segment:
     read:
       data:
         as_bytes: aGVsbG8=
-    connection_info_per_event:
+    connection:
       local_address:
         socket_address:
           address: 127.0.0.1
@@ -214,7 +214,7 @@ socket_streamed_trace_segment:
       data:
         as_bytes: d29ybGQ=
       end_stream: true
-    connection_info_per_event:
+    connection:
       local_address:
         socket_address:
           address: 127.0.0.1
@@ -234,7 +234,7 @@ socket_streamed_trace_segment:
   event:
     timestamp: 1970-01-01T00:00:02Z
     closed: {}
-    connection_info_per_event:
+    connection:
       local_address:
         socket_address:
           address: 127.0.0.1

@@ -68,7 +68,7 @@ message SocketEvent {
   }
 
   // Connection information per event
-  Connection connection_info_per_event = 5;
+  Connection connection = 5;
 }
 
 // Sequence of read/write events that constitute a buffered trace on a socket.

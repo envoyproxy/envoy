@@ -75,7 +75,7 @@ void PerSocketTapperImpl::initEvent(envoy::data::tap::v3::SocketEvent& event) {
 void PerSocketTapperImpl::initStreamingEvent(envoy::data::tap::v3::SocketEvent& event) {
   initEvent(event);
   if (should_output_conn_info_per_event_) {
-    fillConnectionInfo(*event.mutable_connection_info_per_event());
+    fillConnectionInfo(*event.mutable_connection());
   }
 }
 
