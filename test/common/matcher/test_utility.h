@@ -267,14 +267,19 @@ std::unique_ptr<StringAction> stringValue(absl::string_view value) {
 }
 
 // Creates an OnMatch that evaluates to a StringValue with the provided value.
-template <class T> OnMatch<T> stringOnMatch(absl::string_view value) {
-  return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr};
+template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_matching = false) {
+  return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr, keep_matching};
 }
 
 // Verifies the match tree completes the matching with an not match result.
 void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
   EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
   EXPECT_FALSE(result.on_match_.has_value());
+}
+
+void verifyOnMatch(const OnMatch<TestData>& on_match, absl::string_view expected_value) {
+  EXPECT_NE(on_match.action_cb_, nullptr);
+  EXPECT_EQ(on_match.action_cb_().get()->getTyped<StringAction>(), *stringValue(expected_value));
 }
 
 // Verifies the match tree completes the matching with the expected value.
@@ -284,10 +289,7 @@ void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
   EXPECT_TRUE(result.on_match_.has_value());
 
   EXPECT_EQ(nullptr, result.on_match_->matcher_);
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
-
-  EXPECT_EQ(result.on_match_->action_cb_().get()->getTyped<StringAction>(),
-            *stringValue(expected_value));
+  verifyOnMatch(*result.on_match_, expected_value);
 }
 
 // Verifies the match tree fails to match since the data are not enough.

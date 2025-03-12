@@ -107,6 +107,7 @@ public:
 template <class DataType> struct OnMatch {
   const ActionFactoryCb action_cb_;
   const MatchTreeSharedPtr<DataType> matcher_;
+  bool keep_matching_;
 };
 template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
 
@@ -154,13 +155,57 @@ public:
   struct MatchResult {
     const MatchState match_state_;
     const absl::optional<OnMatch<DataType>> on_match_;
+    // Non-null if the match was completed and the match tree can be re-entered to check for
+    // additional matches from where the initial matching stopped.
+    std::unique_ptr<MatchTree<DataType>> matcher_reentrant_ = nullptr;
   };
 
   // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements). If the match couldn't be completed, {false, {}} will be returned.
   // If a match result was determined, {true, action} will be returned. If a match result was
   // determined to be no match, {true, {}} will be returned.
-  virtual MatchResult match(const DataType& matching_data) PURE;
+  MatchResult match(const DataType& data,
+                    std::vector<OnMatch<DataType>>* skipped_matches = nullptr) {
+    MatchResult result = doMatch(data);
+    // Special handling for matchers set to be skipped via the keep_matching flag.
+    if (shouldSkipMatch(result)) {
+      return skipAndReenter(result, data, skipped_matches);
+    }
+    return result;
+  }
+
+protected:
+  // Matching logic for MatchTree children to implement. The match() function handles universally
+  // applied logic, e.g. handling the keep_matching flag.
+  virtual MatchResult doMatch(const DataType& matching_data) PURE;
+
+  static inline MatchResult skipAndReenter(MatchResult& initial_result, const DataType& data,
+                                           std::vector<OnMatch<DataType>>* skipped_matches) {
+    // MatchResult is immutable so individual fields must be saved if needed between iterations.
+    std::unique_ptr<MatchTree<DataType>> matcher_reentrant =
+        std::move(initial_result.matcher_reentrant_);
+    if (skipped_matches)
+      skipped_matches->push_back(initial_result.on_match_.value());
+    // While continuing to hit skipped matches and while reentrants are still returned, continue
+    // matching.
+    while (matcher_reentrant) {
+      MatchResult result = matcher_reentrant->doMatch(data);
+      if (shouldSkipMatch(result)) {
+        if (skipped_matches)
+          skipped_matches->push_back(result.on_match_.value());
+        matcher_reentrant = std::move(result.matcher_reentrant_);
+        continue;
+      }
+      return result;
+    }
+    // Ran out of reentrants, return no-match.
+    return {MatchState::MatchComplete, {}};
+  }
+
+  static inline bool shouldSkipMatch(const MatchResult& result) {
+    return (result.match_state_ == MatchState::MatchComplete && result.on_match_.has_value() &&
+            result.on_match_->keep_matching_);
+  }
 };
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;

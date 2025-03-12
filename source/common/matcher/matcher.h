@@ -61,6 +61,98 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
   return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
 }
 
+// Re-entry helper class to track and match against nested reentrants for a MatchTree.
+template <class DataType> class ReenterableMatchEvaluator {
+public:
+  ReenterableMatchEvaluator(std::shared_ptr<MatchTree<DataType>> match_tree,
+                            bool ignore_multiple_skipped_results)
+      : match_tree_(match_tree), ignore_multiple_skipped_results_(ignore_multiple_skipped_results) {
+  }
+
+  // Match against the reentrant stack (bottom up), cleaning up any that no longer find a match.
+  MaybeMatchResult evaluateMatch(const DataType& data,
+                                 std::vector<ActionFactoryCb>& skipped_results_out) {
+    // First time matching, match against the parent match_tree.
+    if (!reentrant_stack_) {
+      reentrant_stack_ = std::make_unique<std::vector<std::unique_ptr<MatchTree<DataType>>>>(1);
+      return evaluateMatchForReentry(*match_tree_, data, reentrant_stack_->back(),
+                                     skipped_results_out);
+    }
+
+    // Iterate through the reentrant stack, clearing any that no longer match, until a match is
+    // found.
+    while (!reentrant_stack_->empty()) {
+      // If this level in the stack is already nulled out by a failed run, no-match, reentrant
+      // exhaustion, etc, delete it and continue up.
+      MatchTree<DataType>* reentrant = reentrant_stack_->back().get();
+      if (!reentrant) {
+        reentrant_stack_->pop_back();
+        continue;
+      }
+      auto result =
+          evaluateMatchForReentry(*reentrant, data, reentrant_stack_->back(), skipped_results_out);
+      if (result.match_state_ == MatchState::UnableToMatch || result.result_) {
+        return result;
+      }
+    }
+    // Out of reentrants to try, return no-match.
+    return {nullptr, MatchState::MatchComplete};
+  }
+
+private:
+  // Helper to evaluate a match and save a reentrant to the stack, if any.
+  MaybeMatchResult evaluateMatchForReentry(MatchTree<DataType>& match_tree, const DataType& data,
+                                           std::unique_ptr<MatchTree<DataType>>& reentrant_out,
+                                           std::vector<ActionFactoryCb>& skipped_results_out) {
+    std::vector<OnMatch<DataType>> skipped_results{};
+    auto result = match_tree.match(data, &skipped_results);
+
+    // Process skipped_results to find skipped actions, looking into nested matchers if necessary.
+    for (OnMatch<DataType>& skipped_result : skipped_results) {
+      ActionFactoryCb skipped_action =
+          evaluateSkippedOnMatch(skipped_result, data, skipped_results_out);
+      if (skipped_action) {
+        skipped_results_out.push_back(skipped_action);
+        if (ignore_multiple_skipped_results_)
+          break;
+      }
+    }
+
+    // Safety Note: expect reentrant_out to be nullptr when out of re-entries at this level of the
+    // stack.
+    reentrant_out = std::move(result.matcher_reentrant_);
+    if (result.match_state_ == MatchState::UnableToMatch || !result.on_match_) {
+      return {nullptr, result.match_state_};
+    }
+    // Recursive execution when hitting a nested matcher, adding to the reentrant stack.
+    if (result.on_match_->matcher_) {
+      return evaluateMatchForReentry(*result.on_match_->matcher_, data,
+                                     reentrant_stack_->emplace_back(), skipped_results_out);
+    }
+    return {result.on_match_->action_cb_, MatchState::MatchComplete};
+  }
+
+  // Helper to determine the skipped actions from skipped OnMatches, including recursively matching
+  // against skipped, nested Trees.
+  ActionFactoryCb evaluateSkippedOnMatch(OnMatch<DataType>& skipped_result, const DataType& data,
+                                         std::vector<ActionFactoryCb>& skipped_results_out) {
+    if (skipped_result.action_cb_ || !skipped_result.matcher_) {
+      return skipped_result.action_cb_;
+    }
+
+    // Find the action that would have been matched in the nested tree but is now getting skipped.
+    std::unique_ptr<MatchTree<DataType>> nested_reentrant = nullptr;
+    return evaluateMatchForReentry(*skipped_result.matcher_, data, nested_reentrant,
+                                   skipped_results_out)
+        .result_;
+  }
+
+  std::shared_ptr<MatchTree<DataType>> match_tree_;
+  std::unique_ptr<std::vector<std::unique_ptr<MatchTree<DataType>>>> reentrant_stack_ = nullptr;
+  // Only record the first skipped result.
+  bool ignore_multiple_skipped_results_ = false;
+};
+
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
 
 /**
@@ -73,7 +165,8 @@ public:
   explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
       : on_no_match_(std::move(on_no_match)) {}
 
-  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
+protected:
+  typename MatchTree<DataType>::MatchResult doMatch(const DataType&) override {
     return {MatchState::MatchComplete, on_no_match_};
   }
   const absl::optional<OnMatch<DataType>> on_no_match_;
@@ -326,7 +419,7 @@ private:
   absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     if (on_match.has_matcher()) {
       return [matcher_factory = std::move(create(on_match.matcher()))]() {
-        return OnMatch<DataType>{{}, matcher_factory()};
+        return OnMatch<DataType>{{}, matcher_factory(), false};
       };
     } else if (on_match.has_action()) {
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
@@ -337,7 +430,7 @@ private:
 
       auto action_factory = factory.createActionFactoryCb(
           *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
-      return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
+      return [action_factory] { return OnMatch<DataType>{action_factory, {}, false}; };
     }
 
     return absl::nullopt;

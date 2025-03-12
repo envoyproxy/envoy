@@ -19,7 +19,8 @@ public:
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
+protected:
+  typename MatchTree<DataType>::MatchResult doMatch(const DataType& data) override {
     const auto input = data_input_->get(data);
     ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
@@ -36,7 +37,7 @@ public:
       if (result->matcher_) {
         return result->matcher_->match(data);
       } else {
-        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
+        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr, {}}};
       }
     } else if (input.data_availability_ ==
                DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
@@ -48,7 +49,6 @@ public:
     return {MatchState::MatchComplete, on_no_match_};
   }
 
-protected:
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
   MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
              absl::Status& creation_status)
