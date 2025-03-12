@@ -166,7 +166,7 @@ public:
 
   void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-  bool needsRefresh() { return true; };
+  bool needsRefresh() { return provider_->needsRefresh(); };
 };
 
 } // namespace Aws
