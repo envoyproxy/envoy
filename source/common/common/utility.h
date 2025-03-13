@@ -47,8 +47,7 @@ const std::string errorDetails(int error_code);
 class DateFormatter {
 public:
   DateFormatter(absl::string_view format_string, bool local_time = false)
-      : raw_format_string_(format_string),
-        raw_format_hash_(CachedTimes::hasher{}(raw_format_string_)), local_time_(local_time) {
+      : raw_format_string_(format_string), local_time_(local_time) {
     parse(format_string);
   }
 
@@ -158,7 +157,6 @@ private:
 
   // This is the format string as supplied in configuration, e.g. "foo %3f bar".
   const std::string raw_format_string_;
-  const size_t raw_format_hash_{};
 
   // Use local time zone instead of UTC if this is set to true.
   const bool local_time_{};

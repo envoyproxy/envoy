@@ -235,6 +235,11 @@ public class JniLibrary {
   protected static native void onDefaultNetworkChanged(long engine, int networkType);
 
   /**
+   * A more modern callback into the Envoy Engine when the default network was changed.
+   */
+  protected static native void onDefaultNetworkChangeEvent(long engine, int networkType);
+
+  /**
    * A callback into the Envoy Engine when the default network is unavailable.
    */
   protected static native void onDefaultNetworkUnavailable(long engine);
@@ -300,7 +305,8 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure, long dnsRefreshSeconds,
+      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
+      boolean disableDnsRefreshOnNetworkChange, long dnsRefreshSeconds,
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,

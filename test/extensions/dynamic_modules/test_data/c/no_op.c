@@ -5,12 +5,12 @@
 
 static int some_variable = 0;
 
-int getSomeVariable() {
+int getSomeVariable(void) {
   some_variable++;
   return some_variable;
 }
 
-envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init() {
+envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init(void) {
   return kAbiVersion;
 }
 

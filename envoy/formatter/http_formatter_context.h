@@ -18,6 +18,16 @@ using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 class HttpFormatterContext {
 public:
   /**
+   * Interface for a context extension which can be used to provide non-HTTP specific data to
+   * formatters. This could be used for non-HTTP protocols to provide protocol specific data to
+   * formatters.
+   */
+  class Extension {
+  public:
+    virtual ~Extension() = default;
+  };
+
+  /**
    * Constructor that uses the provided request/response headers, response trailers, local reply
    * body, and access log type. Any of the parameters can be nullptr/empty.
    *
@@ -128,12 +138,26 @@ public:
   const Tracing::Span& activeSpan() const;
 
   /**
-   * @return short category name of the HttpFormatterContext. This may be used to create
-   * an actual fully qualified category name for other factory classes that use this context.
-   * For example the http specific built-in formatters will have a category of
-   * "envoy.built_in_formatters.http".
+   * Set the context extension.
+   * @param extension supplies the context extension.
    */
-  static constexpr absl::string_view category() { return "http"; }
+  HttpFormatterContext& setExtension(const Extension& extension) {
+    extension_ = extension;
+    return *this;
+  }
+
+  /**
+   * @return OptRef<const ContextExtension> the context extension.
+   */
+  OptRef<const Extension> extension() const { return extension_; }
+
+  /**
+   * @return OptRef<const ExtensionType> the context extension casted to the specified type.
+   */
+  template <class Type> OptRef<const Type> typedExtension() const {
+    const Type* typed_extension = dynamic_cast<const Type*>(extension_.ptr());
+    return makeOptRefFromPtr(typed_extension);
+  }
 
 private:
   const Http::RequestHeaderMap* request_headers_{};
@@ -142,7 +166,10 @@ private:
   absl::string_view local_reply_body_{};
   AccessLogType log_type_{AccessLogType::NotSet};
   const Tracing::Span* active_span_ = nullptr;
+  OptRef<const Extension> extension_;
 };
+
+using Context = HttpFormatterContext;
 
 } // namespace Formatter
 } // namespace Envoy

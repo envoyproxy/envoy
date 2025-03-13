@@ -41,7 +41,6 @@ UserAgentStats::UserAgentStats(Stats::StatName prefix, Stats::StatName device, S
           scope, {prefix, device, context.downstream_cx_length_ms_},
           Stats::Histogram::Unit::Milliseconds)) {
   downstream_cx_total_.inc();
-  downstream_rq_total_.inc();
 }
 
 void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::StatName prefix,
@@ -58,6 +57,9 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::St
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.android_, scope, context_);
       }
     }
+  }
+  if (stats_ != nullptr) {
+    stats_->downstream_rq_total_.inc();
   }
 }
 

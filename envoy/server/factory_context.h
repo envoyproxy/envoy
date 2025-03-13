@@ -36,6 +36,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 
@@ -184,6 +185,11 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
@@ -224,6 +230,11 @@ public:
    */
   virtual bool healthCheckFailed() const PURE;
 };
+
+// ServerFactoryContextInstance is a thread local singleton that provides access to the
+// ServerFactoryContext. This will be initialized once the server is created at the start of the
+// main thread and will be available at the main thread for the lifetime of the server.
+using ServerFactoryContextInstance = ThreadLocalInjectableSingleton<ServerFactoryContext>;
 
 /**
  * Generic factory context for multiple scenarios. This context provides a server factory context

@@ -1,16 +1,20 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <functional>
 #include <memory>
+#include <utility>
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
+#include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -225,6 +229,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
+      on_processing_response_factory_cb_(
+          createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
 
   if (config.disable_clear_route_cache()) {
@@ -1199,6 +1205,32 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
   setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
 }
 
+namespace {
+
+// DEFAULT header modes in a ProcessingResponse mode_override have no effect (they are considered
+// unset). Body modes are always explicit.
+ProcessingMode effectiveModeOverride(const ProcessingMode& target_override,
+                                     const ProcessingMode& existing_override) {
+  auto mode_override = existing_override;
+  if (target_override.request_header_mode() != ProcessingMode::DEFAULT) {
+    mode_override.set_request_header_mode(target_override.request_header_mode());
+  }
+  if (target_override.response_header_mode() != ProcessingMode::DEFAULT) {
+    mode_override.set_response_header_mode(target_override.response_header_mode());
+  }
+  if (target_override.request_trailer_mode() != ProcessingMode::DEFAULT) {
+    mode_override.set_request_trailer_mode(target_override.request_trailer_mode());
+  }
+  if (target_override.response_trailer_mode() != ProcessingMode::DEFAULT) {
+    mode_override.set_response_trailer_mode(target_override.response_trailer_mode());
+  }
+  mode_override.set_request_body_mode(target_override.request_body_mode());
+  mode_override.set_response_body_mode(target_override.response_body_mode());
+  return mode_override;
+}
+
+} // namespace
+
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   if (config_->observabilityMode()) {
@@ -1234,7 +1266,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
-    const auto& mode_override = response->mode_override();
+    const auto mode_override =
+        effectiveModeOverride(response->mode_override(), config_->processingMode());
+
     // First, check if mode override allow-list is configured
     if (!config_->allowedOverrideModes().empty()) {
       // Second, check if mode override from response is allowed.
@@ -1242,7 +1276,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
           config_->allowedOverrideModes(),
           [&mode_override](
               const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            return Protobuf::util::MessageDifferencer::Equals(mode_override, other);
+            // Ignore matching on request_header_mode as it's not applicable.
+            return mode_override.request_body_mode() == other.request_body_mode() &&
+                   mode_override.request_trailer_mode() == other.request_trailer_mode() &&
+                   mode_override.response_header_mode() == other.response_header_mode() &&
+                   mode_override.response_body_mode() == other.response_body_mode() &&
+                   mode_override.response_trailer_mode() == other.response_trailer_mode();
           });
     }
 
@@ -1264,26 +1303,50 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
+    if (on_processing_response_) {
+      on_processing_response_->afterProcessingRequestHeaders(*response, processing_status,
+                                                             decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
+    if (on_processing_response_) {
+      on_processing_response_->afterProcessingResponseHeaders(*response, processing_status,
+                                                              decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
+    if (on_processing_response_) {
+      on_processing_response_->afterProcessingRequestBody(*response, processing_status,
+                                                          decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
+    if (on_processing_response_) {
+      on_processing_response_->afterProcessingResponseBody(*response, processing_status,
+                                                           decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
+    if (on_processing_response_) {
+      on_processing_response_->afterProcessingRequestTrailers(*response, processing_status,
+                                                              decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
+    if (on_processing_response_) {
+      on_processing_response_->afterProcessingResponseTrailers(*response, processing_status,
+                                                               decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     if (config_->disableImmediateResponse()) {
@@ -1292,6 +1355,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
                        "Treat the immediate response message as spurious response.");
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
+
+      if (on_processing_response_) {
+        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
+                                                                 decoder_callbacks_->streamInfo());
+      }
     } else {
       setDecoderDynamicMetadata(*response);
       // We won't be sending anything more to the stream after we
@@ -1300,6 +1368,10 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
       closeStream();
+      if (on_processing_response_) {
+        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
+                                                                 decoder_callbacks_->streamInfo());
+      }
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
     }
@@ -1342,7 +1414,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 }
 
-void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
+void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_STREAM_LOG(debug, "Received gRPC error on stream: {}", *decoder_callbacks_, status);
   stats_.streams_failed_.inc();
 
@@ -1363,7 +1435,8 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
+    errorResponse.set_details(
+        absl::StrFormat("%s_gRPC_error_%i{%s}", ErrorPrefix, status, message));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -1588,6 +1661,35 @@ std::string responseCaseToString(const ProcessingResponse::ResponseCase response
   default:
     return "unknown";
   }
+}
+
+std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnProcessingResponseCb(
+    const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context,
+    const std::string& stats_prefix) {
+  if (!config.has_on_processing_response()) {
+    return nullptr;
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<OnProcessingResponseFactory>(
+      config.on_processing_response());
+  auto on_processing_response_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.on_processing_response().typed_config(), context.messageValidationVisitor(), factory);
+  if (on_processing_response_config == nullptr) {
+    return nullptr;
+  }
+  std::shared_ptr<const Protobuf::Message> shared_on_processing_response_config =
+      std::move(on_processing_response_config);
+  return [&factory, shared_on_processing_response_config, &context,
+          stats_prefix]() -> std::unique_ptr<OnProcessingResponse> {
+    return factory.createOnProcessingResponse(*shared_on_processing_response_config, context,
+                                              stats_prefix);
+  };
+}
+
+std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {
+  if (!on_processing_response_factory_cb_) {
+    return nullptr;
+  }
+  return on_processing_response_factory_cb_();
 }
 
 } // namespace ExternalProcessing
