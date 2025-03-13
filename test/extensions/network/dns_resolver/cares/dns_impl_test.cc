@@ -1972,7 +1972,7 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
              0 /*get_addr_failure*/, 3 /*timeouts*/);
 }
 
-// Validate that qcache is disabled by default.
+// Validate that c-ares query cache is disabled by default.
 TEST_P(DnsImplTest, DnsImplAresQCacheDisabled) {
   ares_options opts{};
   int optmask = 0;
