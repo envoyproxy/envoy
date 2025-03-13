@@ -650,14 +650,14 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
 }
 
 void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
-                            std::vector<Matchers::StringMatcherSharedPtr> matchers) {
+                            const std::vector<Matchers::StringMatcherPtr>& matchers) {
   if (headers.Upgrade()) {
     auto tokens = Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
 
     auto end = std::remove_if(tokens.begin(), tokens.end(), [&](absl::string_view token) {
       return std::any_of(
           matchers.begin(), matchers.end(),
-          [&token](Matchers::StringMatcherSharedPtr matcher) { return matcher->match(token); });
+          [&token](const Matchers::StringMatcherPtr& matcher) { return matcher->match(token); });
     });
 
     auto new_value = absl::StrJoin(tokens.begin(), end, ",");

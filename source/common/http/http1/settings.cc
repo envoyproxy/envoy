@@ -21,12 +21,12 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
   ret.enable_trailers_ = config.enable_trailers();
   ret.allow_chunked_length_ = config.allow_chunked_length();
 
+  std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : config.ignore_http_11_upgrade()) {
-    ret.ignore_upgrade_matchers_.emplace_back(
-        std::make_shared<
-            Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(matcher,
-                                                                                         context));
+    matchers.emplace_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
   }
+  ret.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
 
   if (config.header_key_format().has_proper_case_words()) {
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;

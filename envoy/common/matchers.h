@@ -23,7 +23,6 @@ public:
 };
 
 using StringMatcherPtr = std::unique_ptr<const StringMatcher>;
-using StringMatcherSharedPtr = std::shared_ptr<const StringMatcher>;
 
 } // namespace Matchers
 } // namespace Envoy

@@ -2144,9 +2144,10 @@ TEST_P(Http1ServerConnectionImplTest, IgnoreSpecificTLSVersionUpgradeRequest) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("TLS/1.2");
-  codec_settings_.ignore_upgrade_matchers_.emplace_back(
-      std::make_unique<Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
 
   initialize();
 
@@ -2161,9 +2162,10 @@ TEST_P(Http1ServerConnectionImplTest, IgnorePrefixUpgradeRequest) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix("TLS/");
-  codec_settings_.ignore_upgrade_matchers_.emplace_back(
-      std::make_unique<Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
 
   initialize();
 
@@ -2178,9 +2180,10 @@ TEST_P(Http1ServerConnectionImplTest, PartialIgnoreUpgradeRequest) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("TLS/1.2");
-  codec_settings_.ignore_upgrade_matchers_.emplace_back(
-      std::make_unique<Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
 
   initialize();
 

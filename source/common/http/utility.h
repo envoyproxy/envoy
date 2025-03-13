@@ -317,10 +317,10 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * Removes tokens from `Upgrade` header matching one of the matchers. Removes the `Upgrade`
- * header if result is empty
+ * header if result is empty.
  */
 void removeUpgrade(RequestOrResponseHeaderMap& headers,
-                   std::vector<Matchers::StringMatcherSharedPtr> matchers);
+                   const std::vector<Matchers::StringMatcherPtr>& matchers);
 
 /**
  * Removes `tokens_to_remove` from the `Connection` header, if present and part of a comma separated

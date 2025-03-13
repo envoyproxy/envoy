@@ -500,7 +500,7 @@ struct Http1Settings {
   bool allow_chunked_length_{false};
   // Remove HTTP/1.1 Upgrade header tokens matching any provided matcher. By default such
   // messages are rejected
-  std::vector<Matchers::StringMatcherSharedPtr> ignore_upgrade_matchers_{};
+  std::shared_ptr<const std::vector<Matchers::StringMatcherPtr>> ignore_upgrade_matchers_;
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy

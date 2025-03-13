@@ -864,10 +864,12 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
       Utility::removeConnectionUpgrade(request_or_response_headers,
                                        caseUnorderedSetContainingUpgradeAndHttp2Settings());
       request_or_response_headers.remove(header_values.Http2Settings);
-    } else if (!codec_settings_.ignore_upgrade_matchers_.empty()) {
+    } else if (codec_settings_.ignore_upgrade_matchers_ != nullptr &&
+               !codec_settings_.ignore_upgrade_matchers_->empty()) {
       ENVOY_CONN_LOG(trace, "removing ignored upgrade headers.", connection_);
 
-      Utility::removeUpgrade(request_or_response_headers, codec_settings_.ignore_upgrade_matchers_);
+      Utility::removeUpgrade(request_or_response_headers,
+                             *codec_settings_.ignore_upgrade_matchers_);
 
       if (!request_or_response_headers.Upgrade()) {
         Utility::removeConnectionUpgrade(request_or_response_headers,

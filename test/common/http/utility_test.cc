@@ -246,10 +246,8 @@ TEST(HttpUtility, removeUpgrade) {
 
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("foo2");
-    std::vector<Matchers::StringMatcherSharedPtr> matchers;
-    matchers.push_back(std::make_shared<
-                       Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-        matcher, context));
+    std::vector<Matchers::StringMatcherPtr> matchers;
+    matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
 
     Utility::removeUpgrade(converted_headers, matchers);
 
@@ -264,10 +262,8 @@ TEST(HttpUtility, removeUpgrade) {
 
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("foo");
-    std::vector<Matchers::StringMatcherSharedPtr> matchers;
-    matchers.push_back(std::make_shared<
-                       Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-        matcher, context));
+    std::vector<Matchers::StringMatcherPtr> matchers;
+    matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
 
     Utility::removeUpgrade(converted_headers, matchers);
 
@@ -282,10 +278,8 @@ TEST(HttpUtility, removeUpgrade) {
 
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("foo1");
-    std::vector<Matchers::StringMatcherSharedPtr> matchers;
-    matchers.push_back(std::make_shared<
-                       Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-        matcher, context));
+    std::vector<Matchers::StringMatcherPtr> matchers;
+    matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
 
     Utility::removeUpgrade(converted_headers, matchers);
 
