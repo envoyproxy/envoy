@@ -94,6 +94,10 @@ new_features:
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
+- area: redis_proxy
+  change: |
+    Added :ref:`custom_commands <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    configuring custom commands for redis proxy.
 - area: xds
   change: |
     Reporting a locality_stats to LRS server when rq_issued > 0, disable by setting runtime guard
