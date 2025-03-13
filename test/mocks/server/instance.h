@@ -2,6 +2,7 @@
 
 #include "envoy/server/instance.h"
 
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
@@ -22,6 +23,7 @@ public:
   MOCK_METHOD(void, run, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
   MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
@@ -63,7 +65,6 @@ public:
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
   MOCK_METHOD(bool, enableReusePortDefault, ());
   MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates> &&));
-  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -82,6 +83,7 @@ public:
   Event::GlobalTimeSystem time_system_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<Config::MockXdsManager> xds_manager_;
   testing::NiceMock<Http::MockHttpServerPropertiesCacheManager>
       http_server_properties_cache_manager_;
   Thread::MutexBasicLockable access_log_lock_;

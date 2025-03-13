@@ -33,11 +33,11 @@ public:
                   .earlyDataEnabled());
   }
 
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   QuicServerTransportSocketConfigFactory config_factory_;
   Stats::TestUtil::TestStore server_stats_store_;
   Api::ApiPtr server_api_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, EarlyDataEnabledByDefault) {
@@ -124,13 +124,13 @@ public:
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
   }
 
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{
       new NiceMock<Ssl::MockClientContextConfig>};
   std::function<void()> update_callback_;
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {

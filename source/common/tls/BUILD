@@ -245,7 +245,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "aws_lc_compat.h",
+        "utility.h",
+    ],
     external_deps = ["ssl"],
     deps = [
         "//source/common/common:assert_lib",

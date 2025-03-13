@@ -24,6 +24,7 @@ type HttpCAPI interface {
 	HttpContinue(s unsafe.Pointer, status uint64)
 	HttpSendLocalReply(s unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool)
+	HttpInjectData(s unsafe.Pointer, data []byte)
 
 	// Send a specialized reply that indicates that the filter has failed on the go side. Internally this is used for
 	// when unhandled panics are detected.
@@ -97,6 +98,22 @@ type NetworkCAPI interface {
 	UpstreamFinalize(f unsafe.Pointer, reason int)
 	// UpstreamInfo gets the upstream connection info of infoType
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
+}
+
+type TcpUpstreamCAPI interface {
+	// Header related
+	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	SetRespHeader(s unsafe.Pointer, key string, value string, add bool)
+	RemoveRespHeader(s unsafe.Pointer, key string)
+	// Buffer related
+	GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
+	SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	// Get the specified value by key
+	GetStringValue(r unsafe.Pointer, id int) (string, bool)
+
+	SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int)
 }
 
 type CommonCAPI interface {

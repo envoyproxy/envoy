@@ -62,7 +62,10 @@ protected:
     last_response_ = std::move(response);
   }
 
-  void onGrpcError(Grpc::Status::GrpcStatus status) override { grpc_status_ = status; }
+  void onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) override {
+    grpc_status_ = status;
+    grpc_error_message_ = message;
+  }
 
   void onGrpcClose() override { grpc_closed_ = true; }
   void logStreamInfo() override {}
@@ -71,6 +74,7 @@ protected:
 
   std::unique_ptr<ProcessingResponse> last_response_;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
+  std::string grpc_error_message_;
   bool grpc_closed_ = false;
 
   envoy::config::core::v3::GrpcService grpc_service_;
@@ -141,11 +145,12 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
+  EXPECT_EQ(grpc_error_message_, "");
   EXPECT_TRUE(stream_callbacks_->onReceiveMessageRaw(std::move(response_buf)));
   EXPECT_TRUE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
-
+  EXPECT_EQ(grpc_error_message_, "");
   auto empty_response_trailers = Http::ResponseTrailerMapImpl::create();
   stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
 
@@ -163,10 +168,12 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
+  EXPECT_EQ(grpc_error_message_, "");
   stream_callbacks_->onRemoteClose(0, "");
   EXPECT_FALSE(last_response_);
   EXPECT_TRUE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
+  EXPECT_EQ(grpc_error_message_, "");
   stream->close();
 }
 
@@ -179,10 +186,11 @@ TEST_F(ExtProcStreamTest, StreamError) {
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
-  stream_callbacks_->onRemoteClose(123, "Some sort of gRPC error");
+  stream_callbacks_->onRemoteClose(123, "gRPC error message");
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 123);
+  EXPECT_EQ(grpc_error_message_, "gRPC error message");
   stream->close();
 }
 

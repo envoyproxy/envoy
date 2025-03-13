@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Upstream {
 
-std::vector<std::string>
+std::pair<uint32_t, std::vector<std::string>>
 CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
@@ -83,7 +83,7 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
   if (any_applied) {
     system_version_info_ = system_version_info;
   }
-  return exception_msgs;
+  return std::pair{added_or_updated, exception_msgs};
 }
 
 } // namespace Upstream

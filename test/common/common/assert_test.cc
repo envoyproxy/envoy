@@ -3,9 +3,12 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/base/attributes.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+static ABSL_ATTRIBUTE_NOINLINE void releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }
 
 TEST(ReleaseAssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
@@ -13,6 +16,18 @@ TEST(ReleaseAssertDeathTest, VariousLogs) {
                ".*assert failure: 0. Details: With some logs.*");
   EXPECT_DEATH({ RELEASE_ASSERT(0 == EAGAIN, fmt::format("using {}", "fmt")); },
                ".*assert failure: 0 == EAGAIN. Details: using fmt.*");
+}
+
+TEST(ReleaseAssertDeathTest, AssertIncludesStackTrace) {
+#ifdef NDEBUG
+  GTEST_SKIP() << "optimized build inlines functions so the stack trace won't be reliable";
+#endif
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+  GTEST_SKIP() << "memory sanitizer build inlines functions so the stack trace won't be reliable";
+#endif
+#endif
+  EXPECT_DEATH({ releaseAssertInAFunction(); }, "releaseAssertInAFunction");
 }
 
 TEST(AssertDeathTest, VariousLogs) {

@@ -3142,24 +3142,92 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, TestPreconnect) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+TEST_P(ProtocolIntegrationTest, TestPreconnect) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_preconnect_policy()->mutable_per_upstream_preconnect_ratio()->set_value(1.5);
+    cluster->mutable_preconnect_policy()->mutable_per_upstream_preconnect_ratio()->set_value(2.0);
+
+    if (upstreamProtocol() == Http::CodecType::HTTP2) {
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->mutable_max_concurrent_streams()
+          ->set_value(4);
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_quic_protocol_options()
+          ->mutable_max_concurrent_streams()
+          ->set_value(4);
+      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    }
   });
+  autonomous_upstream_ = true;
   initialize();
+
+  // First request should cause initial connections to be setup, enough for no more connections when
+  // request concurrency doesn't exceed 1.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-  FakeHttpConnectionPtr fake_upstream_connection_two;
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    // For HTTP/1.1 there should be a preconnected connection.
-    ASSERT_TRUE(
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
-  } else {
-    // For HTTP/2, the original connection can accommodate two requests.
-    ASSERT_FALSE(fake_upstreams_[0]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection_two, std::chrono::milliseconds(5)));
+  {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+
+  // Preconnect is set to 2. Http 1 allows 1 request per connection so it requires 2 connections,
+  // and http is configured for 4 so it requires only 1 connection.
+  uint32_t expected_upstream_cx = (upstreamProtocol() == Http::CodecType::HTTP1) ? 2 : 1;
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
+
+  // Make several non-concurrent requests. The concurrency is only 1, so there should only be 1 or 2
+  // upstream connections, already established by the first request.
+  for (uint32_t i = 0; i < 10; i++) {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
+
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
+    // The rest of the test requires multiple concurrent requests and isn't written to use multiple
+    // downstream connections.
+    return;
+  }
+
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // The http3 connection pool is currently establishing 3 connections, not the expected 5. It
+    // appears that the accounting in http3 is different than in http1 or http2, but this
+    // needs more investigation to understand if it's a bug, or just a difference.
+    //
+    // Previously, this test was only run for http1 upstreams, so this path was never tested.
+    //
+    // TODO(ggreenway): investigate and fix.
+    return;
+  }
+
+  std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> responses;
+
+  // Create concurrent requests and validate that the connection counts are correct.
+  constexpr uint32_t concurrent_requests = 10;
+  for (uint32_t i = 0; i < concurrent_requests; i++) {
+    // Create an outstanding request that doesn't complete.
+    responses.push_back(codec_client_->startRequest(default_request_headers_));
+  }
+
+  expected_upstream_cx = (upstreamProtocol() == Http::CodecType::HTTP1)
+                             ? (concurrent_requests * 2)
+                             : (concurrent_requests * 2 / 4);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", expected_upstream_cx);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", expected_upstream_cx);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", concurrent_requests);
+
+  for (auto& response : responses) {
+    codec_client_->sendData(response.first, 0, true);
+    ASSERT_TRUE(response.second->waitForEndStream());
   }
 }
 

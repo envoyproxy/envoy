@@ -234,7 +234,7 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoding_state_.setDecoderFilterCallbacks(callbacks);
-    // We initilizes dispatcher as soon as it is available.
+    // We initializes dispatcher as soon as it is available.
     dispatcher_ = &callbacks.dispatcher();
   }
 
@@ -269,6 +269,7 @@ public:
   CAPIStatus sendPanicReply(ProcessorState& state, absl::string_view details);
 
   CAPIStatus addData(ProcessorState& state, absl::string_view data, bool is_streaming);
+  CAPIStatus injectData(ProcessorState& state, absl::string_view data);
 
   CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                        int* value_len);

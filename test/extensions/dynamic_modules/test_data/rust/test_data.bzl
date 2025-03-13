@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_test", "rustfmt_test")
 
 def test_program(name):
@@ -5,13 +6,16 @@ def test_program(name):
     if name + "_test.rs" in native.glob(["*.rs"]):
         srcs = srcs + [name + "_test.rs"]
 
+    _name = "_" + name
     rust_shared_library(
-        name = name,
+        name = _name,
         srcs = srcs,
         edition = "2021",
+        crate_root = name + ".rs",
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
         ],
+        rustc_flags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
     )
 
     # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
@@ -19,13 +23,13 @@ def test_program(name):
     rustfmt_test(
         name = "fmt_" + name,
         tags = ["nocoverage"],
-        targets = [":" + name],
+        targets = [":" + _name],
         testonly = True,
     )
     rust_clippy(
         name = "clippy_" + name,
         tags = ["nocoverage"],
-        deps = [":" + name],
+        deps = [":" + _name],
         testonly = True,
     )
 
@@ -49,4 +53,12 @@ def test_program(name):
             "no_tsan",
             "nocoverage",
         ],
+    )
+
+    # Copy the shared library to the expected name especially for MacOS which
+    # defaults to lib<name>.dylib.
+    copy_file(
+        name = name,
+        src = _name,
+        out = "lib{}.so".format(name),
     )

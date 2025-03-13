@@ -267,8 +267,10 @@ public:
    * Read a filter definition from proto and instantiate an Instance. This method is used
    * to create access log instances that need access to listener properties.
    */
-  static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                                     Server::Configuration::FactoryContext& context);
+  static InstanceSharedPtr
+  fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+            Server::Configuration::FactoryContext& context,
+            std::vector<Formatter::CommandParserPtr>&& command_parsers = {});
 };
 
 } // namespace AccessLog

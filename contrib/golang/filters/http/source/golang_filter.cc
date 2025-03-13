@@ -146,7 +146,7 @@ void Filter::onDestroy() {
   // initRequest haven't be called yet, which mean haven't called into Go.
   if (req_->configId == 0) {
     // should release the req object, since stream reset may happen before calling into Go side,
-    // which means no GC finializer will be invoked to release this C++ object.
+    // which means no GC finalizer will be invoked to release this C++ object.
     delete req_;
     return;
   }
@@ -567,6 +567,43 @@ CAPIStatus Filter::addData(ProcessorState& state, absl::string_view data, bool i
   return CAPIStatus::CAPIYield;
 }
 
+CAPIStatus Filter::injectData(ProcessorState& state, absl::string_view data) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (state.filterState() != FilterState::ProcessingData) {
+    ENVOY_LOG(error, "injectData is not supported when calling without processing data, use "
+                     "`addData` instead.");
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (state.isThreadSafe()) {
+    ENVOY_LOG(error, "injectData is not supported when calling inside the callback context");
+    return CAPIStatus::CAPIInvalidScene;
+  }
+
+  auto data_to_write = std::make_shared<Buffer::OwnedImpl>(data);
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, data_to_write] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      ENVOY_LOG(debug, "golang filter inject data to filter chain, length: {}",
+                data_to_write->length());
+      state.injectDataToFilterChain(*data_to_write.get(), false);
+    } else {
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in injectData event");
+    }
+  });
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                              int* value_len) {
   Thread::LockGuard lock(mutex_);
@@ -643,7 +680,7 @@ CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* g
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// It won't take affect immediately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {
@@ -677,7 +714,7 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
     auto value_str = std::string(value);
 
@@ -708,7 +745,7 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// It won't take affect immediately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
   Thread::LockGuard lock(mutex_);
@@ -729,7 +766,7 @@ CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
     // it's safe to write header in the safe thread.
     headers->remove(Http::LowerCaseString(key));
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();
@@ -867,7 +904,7 @@ CAPIStatus Filter::setTrailer(ProcessorState& state, absl::string_view key, absl
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
     auto value_str = std::string(value);
 
@@ -915,7 +952,7 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   if (state.isThreadSafe()) {
     trailers->remove(Http::LowerCaseString(key));
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();
