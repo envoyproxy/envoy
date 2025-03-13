@@ -418,7 +418,8 @@ private:
   template <class OnMatchType>
   absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     if (on_match.has_matcher()) {
-      return [matcher_factory = std::move(create(on_match.matcher())), keep_matching = on_match.keep_matching()]() {
+      return [matcher_factory = std::move(create(on_match.matcher())),
+              keep_matching = on_match.keep_matching()]() {
         return OnMatch<DataType>{{}, matcher_factory(), keep_matching};
       };
     } else if (on_match.has_action()) {
@@ -430,7 +431,9 @@ private:
 
       auto action_factory = factory.createActionFactoryCb(
           *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
-      return [action_factory, keep_matching = on_match.keep_matching()] { return OnMatch<DataType>{action_factory, {}, keep_matching}; };
+      return [action_factory, keep_matching = on_match.keep_matching()] {
+        return OnMatch<DataType>{action_factory, {}, keep_matching};
+      };
     }
 
     return absl::nullopt;

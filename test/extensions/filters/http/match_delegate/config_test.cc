@@ -317,7 +317,8 @@ Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createRequestAndRespo
       Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
           []() { return std::make_unique<SkipAction>(); },
           createMatchingTree<Envoy::Http::Matching::HttpRequestHeadersDataInput, SkipAction>(
-              "match-header", "match"), false});
+              "match-header", "match"),
+          false});
 
   return tree;
 }
@@ -373,8 +374,8 @@ createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) 
           []() { return std::make_unique<ActionType>(); }, nullptr, false});
 
   // No action is set on match. i.e., nullptr action factory cb.
-  tree->addChild(
-      value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; }, nullptr, false});
+  tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; },
+                                                                        nullptr, false});
   return tree;
 }
 
