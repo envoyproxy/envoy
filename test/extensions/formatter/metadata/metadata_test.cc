@@ -30,6 +30,19 @@ public:
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
     inline_string: "%{}({}:metadata.test:test_key)%"
+)EOF",
+                                         tag, type);
+    TestUtility::loadFromYaml(yaml, config_);
+    return THROW_OR_RETURN_VALUE(
+        Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+        Envoy::Formatter::FormatterPtr);
+  }
+
+  ::Envoy::Formatter::FormatterPtr getTestMetadataFormatterLegacy(std::string type,
+                                                                  std::string tag = "METADATA") {
+    const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%{}({}:metadata.test:test_key)%"
   formatters:
     - name: envoy.formatter.metadata
       typed_config:
@@ -77,6 +90,15 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
 
   EXPECT_EQ("test_value", getTestMetadataFormatter("DYNAMIC")->formatWithContext(formatter_context_,
                                                                                  stream_info_));
+}
+
+TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfiguration) {
+  // Make sure that formatter accesses dynamic metadata.
+  EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(*metadata_));
+
+  EXPECT_EQ("test_value", getTestMetadataFormatterLegacy("DYNAMIC")->formatWithContext(
+                              formatter_context_, stream_info_));
 }
 
 // Extensive testing of Cluster Metadata formatter is in
