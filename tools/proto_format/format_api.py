@@ -32,6 +32,7 @@ CONTRIB_V3_ALLOW_LIST = [
     'envoy.extensions.filters.network.client_ssl_auth.v3',
     'envoy.extensions.filters.network.generic_proxy.action.v3',
     'envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3',
+    'envoy.extensions.filters.network.generic_proxy.codecs.http1.v3',
     'envoy.extensions.filters.network.generic_proxy.codecs.kafka.v3',
     'envoy.extensions.filters.network.generic_proxy.matcher.v3',
     'envoy.extensions.filters.network.generic_proxy.router.v3',
@@ -75,9 +76,9 @@ $frozen_pkgs    ],
 )
 """)
 
-IMPORT_REGEX = re.compile('import "(.*)";')
-SERVICE_REGEX = re.compile('service \w+ {')
-PACKAGE_REGEX = re.compile('\npackage ([a-z0-9_\.]*);')
+IMPORT_REGEX = re.compile(r'import "(.*)";')
+SERVICE_REGEX = re.compile(r'service \w+ {')
+PACKAGE_REGEX = re.compile(r'\npackage ([a-z0-9_\.]*);')
 PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
 
@@ -182,6 +183,9 @@ def get_import_deps(proto_path):
                     continue
                 if import_path.startswith('xds/type/matcher/v3/'):
                     imports.append('@com_github_cncf_xds//xds/type/matcher/v3:pkg')
+                    continue
+                if import_path.startswith('xds/type/v3/'):
+                    imports.append('@com_github_cncf_xds//xds/type/v3:pkg')
                     continue
                 # Special case for handling XDS annotations.
                 if import_path.startswith('xds/annotations/v3/'):
@@ -309,7 +313,7 @@ def format_api(mode, outfile, xformed, printed, build_file):
         dst_src_paths = defaultdict(list)
 
         for label in data["proto_targets"]:
-            _label = label[len('@envoy_api//'):].replace(':', '/')
+            _label = label[len('@@envoy_api//'):].replace(':', '/')
             for suffix in ["active_or_frozen", "next_major_version_candidate"]:
                 xpath = xformed_dir.joinpath(f"pkg/{_label}.{suffix}.proto")
                 path = printed_dir.joinpath(f"{_label}.proto")

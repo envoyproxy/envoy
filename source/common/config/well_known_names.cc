@@ -23,16 +23,19 @@ std::string expandRegex(const std::string& regex) {
               {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
               // A generic name can contain any character except dots.
               {"<TAG_VALUE>", TAG_VALUE_REGEX},
-              // Route names may contain dots in addition to alphanumerics and
-              // dashes with underscores.
-              {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
+              // Route names may contain dots and slashes in addition to
+              // alphanumerics, underscores, and dashes.
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
+              // Scoped Route names are named similarly to route config names.
+              {"<SCOPED_ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
               // Match a prefix that is either a listener plus name or cluster plus name
-              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"}});
+              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"},
+              {"<PROXY_PROTOCOL_VERSION>", R"(\d)"}});
 }
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"),
-                         false);
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcherNoSafetyChecks,
+                         absl::StrCat("^", TAG_VALUE_REGEX, "$"));
 }
 
 } // namespace
@@ -162,9 +165,10 @@ TagNameValues::TagNameValues() {
   // listener.<address|stat_prefix>.(worker_<id>.)*
   // listener_manager.(worker_<id>.)*
   // server.(worker_<id>.)*
+  // thread_local_cluster_manager.(worker_<id>.)*
   addRe2(
       WORKER_ID,
-      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)|server|listener_manager|thread_local_cluster_manager)\.worker_((\d+)\.))",
       "");
 
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
@@ -180,6 +184,11 @@ TagNameValues::TagNameValues() {
   // Note: <route_config_name> can contain dots thus we have to maintain full
   // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
+
+  // http.[<stat_prefix>.]scoped_rds.(<scoped_route_config_name>.)<base_stat>
+  addRe2(SCOPED_RDS_CONFIG,
+         R"(^http\.<TAG_VALUE>\.scoped_rds\.((<SCOPED_ROUTE_CONFIG_NAME>)\.)\w+?$)",
+         ".scoped_rds.");
 
   // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
   addTokenized(ROUTE, "vhost.*.route.$.**");
@@ -205,8 +214,30 @@ TagNameValues::TagNameValues() {
   // connection_limit.(<stat_prefix>.)*
   addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
 
+  // http.[<stat_prefix>.]rbac.[<optional stat_prefix>]policy.(<policy
+  // name>.).(allowed|shadow_allowed|denied|shadow_denied)
+  addRe2(
+      RBAC_POLICY_NAME,
+      R"(^http\.<TAG_VALUE>\.rbac\.(?:<TAG_VALUE>\.)?policy\.((<TAG_VALUE>)\.)(allowed|shadow_allowed|denied|shadow_denied)$)");
+
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
+
+  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy
+  addRe2(RBAC_HTTP_PREFIX, R"(^http\.<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
+
+  // proxy_proto.(<stat_prefix>.)**
+  addRe2(PROXY_PROTOCOL_PREFIX, R"(^proxy_proto\.((<TAG_VALUE>)\.).+$)", "", "versions");
+
+  // proxy_proto.([<optional stat_prefix>.]versions.v(<version_number>).)(found|disallowed|error)
+  //
+  // Strips out:  [<optional stat_prefix>.]versions.v(<version_number>).
+  // Leaving: proxy_proto.(found|disallowed|error)
+  addRe2(PROXY_PROTOCOL_VERSION,
+         R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
+
+  // grpc.(<stat_prefix>).**
+  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

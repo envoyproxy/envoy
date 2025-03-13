@@ -1,7 +1,7 @@
 #include <string>
 
 #include "source/common/common/random_generator.h"
-#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/common/tls/private_key/private_key_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"

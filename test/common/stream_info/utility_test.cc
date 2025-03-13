@@ -116,8 +116,8 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
 TEST(UtilityTest, formatDownstreamAddressNoPort) {
   EXPECT_EQ("1.2.3.4",
             Utility::formatDownstreamAddressNoPort(Network::Address::Ipv4Instance("1.2.3.4")));
-  EXPECT_EQ("/hello",
-            Utility::formatDownstreamAddressNoPort(Network::Address::PipeInstance("/hello")));
+  EXPECT_EQ("/hello", Utility::formatDownstreamAddressNoPort(
+                          **Network::Address::PipeInstance::create("/hello")));
 }
 
 TEST(UtilityTest, formatDownstreamAddressJustPort) {
@@ -367,7 +367,7 @@ TEST(ProxyStatusErrorToString, TestAll) {
 TEST(ProxyStatusFromStreamInfo, TestAll) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "true"}});
+      {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "false"}});
   for (const auto& [response_flag, proxy_status_error] :
        std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
            {CoreResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
@@ -398,14 +398,46 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
   }
 }
 
-TEST(ProxyStatusFromStreamInfo, TestUpstreamRequestTimeout) {
+TEST(ProxyStatusFromStreamInfo, TestNewAll) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_upstream_request_timeout", "false"}});
-  NiceMock<MockStreamInfo> stream_info;
-  ON_CALL(stream_info, hasResponseFlag(ResponseFlag(CoreResponseFlag::UpstreamRequestTimeout)))
-      .WillByDefault(Return(true));
-  EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), ProxyStatusError::ConnectionTimeout);
+      {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "true"}});
+  for (const auto& [response_flag, proxy_status_error] :
+       std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
+           {CoreResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::UpstreamRequestTimeout, ProxyStatusError::HttpResponseTimeout},
+           {CoreResponseFlag::DurationTimeout, ProxyStatusError::ConnectionTimeout},
+           {CoreResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
+           {CoreResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
+           {CoreResponseFlag::UnauthorizedExternalService, ProxyStatusError::ConnectionRefused},
+           {CoreResponseFlag::UpstreamConnectionTermination,
+            ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::DownstreamConnectionTermination,
+            ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::DownstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
+           {CoreResponseFlag::OverloadManager, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::DropOverLoad, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::FaultInjected, ProxyStatusError::HttpRequestError},
+           {CoreResponseFlag::UpstreamOverflow, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::NoRouteFound, ProxyStatusError::DestinationNotFound},
+           {CoreResponseFlag::RateLimited, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::RateLimitServiceError, ProxyStatusError::ConnectionLimitReached},
+           {CoreResponseFlag::UpstreamRetryLimitExceeded, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::StreamIdleTimeout, ProxyStatusError::HttpResponseTimeout},
+           {CoreResponseFlag::InvalidEnvoyRequestHeaders, ProxyStatusError::HttpRequestError},
+           {CoreResponseFlag::DownstreamProtocolError, ProxyStatusError::HttpRequestError},
+           {CoreResponseFlag::UpstreamMaxStreamDurationReached,
+            ProxyStatusError::HttpResponseTimeout},
+           {CoreResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
+           {CoreResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
+           {CoreResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
+           {CoreResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}}) {
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
+    EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
+  }
 }
 
 } // namespace

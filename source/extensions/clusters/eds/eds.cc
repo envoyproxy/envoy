@@ -9,13 +9,25 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/grpc/common.h"
 
 namespace Envoy {
 namespace Upstream {
 
+absl::StatusOr<std::unique_ptr<EdsClusterImpl>>
+EdsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
+                       ClusterFactoryContext& cluster_context) {
+  absl::Status creation_status = absl::OkStatus();
+  std::unique_ptr<EdsClusterImpl> ret =
+      absl::WrapUnique(new EdsClusterImpl(cluster, cluster_context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                               ClusterFactoryContext& cluster_context)
-    : BaseDynamicClusterImpl(cluster, cluster_context),
+                               ClusterFactoryContext& cluster_context,
+                               absl::Status& creation_status)
+    : BaseDynamicClusterImpl(cluster, cluster_context, creation_status),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           cluster_context.messageValidationVisitor(), "cluster_name"),
       local_info_(cluster_context.serverFactoryContext().localInfo()),
@@ -33,10 +45,11 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  subscription_ =
+  subscription_ = THROW_OR_RETURN_VALUE(
       cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-          resource_decoder_, {});
+          resource_decoder_, {}),
+      Config::SubscriptionPtr);
 }
 
 EdsClusterImpl::~EdsClusterImpl() {
@@ -53,7 +66,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb,
                                               parent_.random_);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
-    parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+    THROW_IF_NOT_OK(parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
 
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
@@ -140,12 +153,22 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {
-  const auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
+  const auto address =
+      THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(lb_endpoint.endpoint().address()),
+                            const Network::Address::InstanceConstSharedPtr);
   std::vector<Network::Address::InstanceConstSharedPtr> address_list;
   if (!lb_endpoint.endpoint().additional_addresses().empty()) {
     address_list.push_back(address);
     for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-      address_list.emplace_back(parent_.resolveProtoAddress(additional_address.address()));
+      Network::Address::InstanceConstSharedPtr address =
+          returnOrThrow(parent_.resolveProtoAddress(additional_address.address()));
+      address_list.emplace_back(address);
+    }
+    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+      // All addresses must by IP addresses.
+      if (!address->ip()) {
+        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+      }
     }
   }
 
@@ -456,7 +479,10 @@ EdsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& 
     return absl::InvalidArgumentError("cannot create an EDS cluster without an EDS config");
   }
 
-  return std::make_pair(std::make_unique<EdsClusterImpl>(cluster, context), nullptr);
+  absl::StatusOr<std::unique_ptr<EdsClusterImpl>> cluster_or_error =
+      EdsClusterImpl::create(cluster, context);
+  RETURN_IF_NOT_OK(cluster_or_error.status());
+  return std::make_pair(std::move(*cluster_or_error), nullptr);
 }
 
 bool EdsClusterImpl::validateAllLedsUpdated() const {

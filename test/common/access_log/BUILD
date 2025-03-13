@@ -17,11 +17,12 @@ envoy_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
+    rbe_pool = "6gig",
     deps = [
         "//source/common/access_log:access_log_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/stream_info:utility_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/access_loggers/stream:config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
@@ -46,6 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "access_log_manager_impl_test",
     srcs = ["access_log_manager_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/stats:stats_lib",

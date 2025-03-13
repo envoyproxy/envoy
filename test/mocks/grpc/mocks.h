@@ -11,6 +11,7 @@
 
 #include "source/common/grpc/typed_async_client.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -24,6 +25,7 @@ public:
   ~MockAsyncRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
 };
 
 class MockAsyncStream : public RawAsyncStream {
@@ -39,6 +41,9 @@ public:
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), ());
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks&));
+  MOCK_METHOD(void, removeWatermarkCallbacks, ());
 };
 
 template <class ResponseType> using ResponseTypePtr = std::unique_ptr<ResponseType>;
@@ -103,7 +108,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory() override;
 
-  MOCK_METHOD(RawAsyncClientPtr, createUncachedRawAsyncClient, ());
+  MOCK_METHOD(absl::StatusOr<RawAsyncClientPtr>, createUncachedRawAsyncClient, ());
 };
 
 class MockAsyncClientManager : public AsyncClientManager {
@@ -111,15 +116,15 @@ public:
   MockAsyncClientManager();
   ~MockAsyncClientManager() override;
 
-  MOCK_METHOD(AsyncClientFactoryPtr, factoryForGrpcService,
+  MOCK_METHOD(absl::StatusOr<AsyncClientFactoryPtr>, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
 
-  MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
+  MOCK_METHOD(absl::StatusOr<RawAsyncClientSharedPtr>, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
 
-  MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClientWithHashKey,
+  MOCK_METHOD(absl::StatusOr<RawAsyncClientSharedPtr>, getOrCreateRawAsyncClientWithHashKey,
               (const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
                bool skip_cluster_check));
 };

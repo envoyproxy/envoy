@@ -1,46 +1,75 @@
 package test.kotlin.integration
 
+import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
+import io.envoyproxy.envoy.config.route.v3.HeaderMatcher
+import io.envoyproxy.envoy.type.matcher.v3.StringMatcher
 import io.envoyproxy.envoymobile.EngineBuilder
+import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.RequestTrailersBuilder
-import io.envoyproxy.envoymobile.Standard
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.junit.After
+import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
-private const val TEST_RESPONSE_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
-private const val ASSERTION_FILTER_TYPE =
-  "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 private const val MATCHER_TRAILER_NAME = "test-trailer"
 private const val MATCHER_TRAILER_VALUE = "test.code"
 
+@RunWith(RobolectricTestRunner::class)
 class SendTrailersTest {
-
   init {
     JniLibrary.loadTestLibrary()
   }
 
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
+
+  @Before
+  fun setUp() {
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP2_WITH_TLS)
+  }
+
+  @After
+  fun tearDown() {
+    httpTestServer.shutdown()
+  }
+
   @Test
   fun `successful sending of trailers`() {
-
     val expectation = CountDownLatch(1)
+    StringMatcher.newBuilder().setExact("test.code")
+    val match = StringMatcher.newBuilder().setExact("test.code")
+    val trailers = HeaderMatcher.newBuilder().setName("test-trailer").setStringMatch(match).build()
+    val headersMatch = HttpHeadersMatch.newBuilder().addHeaders(trailers).build()
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestTrailersMatch(headersMatch).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
+        .setValue(configProto.toByteString())
+        .build()
+
     val engine =
-      EngineBuilder(Standard())
+      EngineBuilder()
+        .setLogLevel(LogLevel.DEBUG)
+        .setLogger { _, msg -> print(msg) }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .addNativeFilter(
           "envoy.filters.http.assertion",
-          "{'@type': $ASSERTION_FILTER_TYPE, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}"
+          anyProto.toByteArray().toString(Charsets.UTF_8)
         )
-        .addNativeFilter(
-          "envoy.filters.http.buffer",
-          "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":65000}"
-        )
-        .addNativeFilter("test_remote_response", "{'@type': $TEST_RESPONSE_FILTER_TYPE}")
         .build()
 
     val client = engine.streamClient()
@@ -49,8 +78,8 @@ class SendTrailersTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "example.com",
-          path = "/test"
+          authority = httpTestServer.address,
+          path = "/simple.txt"
         )
         .build()
 

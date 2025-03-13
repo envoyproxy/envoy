@@ -24,23 +24,25 @@ namespace AsyncFiles {
 // performed the previous action in the chain immediately performs the newly chained
 // action.
 class AsyncFileManagerThreadPool : public AsyncFileManager,
+                                   public std::enable_shared_from_this<AsyncFileManagerThreadPool>,
                                    protected Logger::Loggable<Logger::Id::main> {
 public:
   explicit AsyncFileManagerThreadPool(
       const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
       Api::OsSysCalls& posix);
   ~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(queue_mutex_) override;
+  CancelFunction createAnonymousFile(
+      Event::Dispatcher* dispatcher, absl::string_view path,
+      absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
   CancelFunction
-  createAnonymousFile(absl::string_view path,
-                      std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
-  CancelFunction
-  openExistingFile(absl::string_view filename, Mode mode,
-                   std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
-  CancelFunction stat(absl::string_view filename,
-                      std::function<void(absl::StatusOr<struct stat>)> on_complete) override;
-  CancelFunction unlink(absl::string_view filename,
-                        std::function<void(absl::Status)> on_complete) override;
+  openExistingFile(Event::Dispatcher* dispatcher, absl::string_view filename, Mode mode,
+                   absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
+  CancelFunction stat(Event::Dispatcher* dispatcher, absl::string_view filename,
+                      absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete) override;
+  CancelFunction unlink(Event::Dispatcher* dispatcher, absl::string_view filename,
+                        absl::AnyInvocable<void(absl::Status)> on_complete) override;
   std::string describe() const override;
+  void waitForIdle() override;
   Api::OsSysCalls& posix() const { return posix_; }
 
 #ifdef O_TMPFILE
@@ -56,13 +58,18 @@ public:
 #endif // O_TMPFILE
 
 private:
-  std::function<void()> enqueue(std::shared_ptr<AsyncFileAction> action)
+  absl::AnyInvocable<void()> enqueue(Event::Dispatcher* dispatcher,
+                                     std::unique_ptr<AsyncFileAction> action)
+      ABSL_LOCKS_EXCLUDED(queue_mutex_) override;
+  void postCancelledActionForCleanup(std::unique_ptr<AsyncFileAction> action)
       ABSL_LOCKS_EXCLUDED(queue_mutex_) override;
   void worker() ABSL_LOCKS_EXCLUDED(queue_mutex_);
-  void resolveActions();
 
   absl::Mutex queue_mutex_;
-  std::queue<std::shared_ptr<AsyncFileAction>> queue_ ABSL_GUARDED_BY(queue_mutex_);
+  void executeAction(QueuedAction&& action);
+  std::queue<QueuedAction> queue_ ABSL_GUARDED_BY(queue_mutex_);
+  int active_workers_ ABSL_GUARDED_BY(queue_mutex_) = 0;
+  std::queue<std::unique_ptr<AsyncFileAction>> cleanup_queue_ ABSL_GUARDED_BY(queue_mutex_);
   bool terminate_ ABSL_GUARDED_BY(queue_mutex_) = false;
 
   std::vector<std::thread> thread_pool_;

@@ -30,28 +30,28 @@ protected:
 };
 
 TEST_F(SrcAddrSocketOptionImplTest, TestSetOptionPreBindSetsAddress) {
-  const auto address = Network::Utility::parseInternetAddress("127.0.0.2");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.2");
   auto option = makeOptionByAddress(address);
   EXPECT_TRUE(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_EQ(*socket_.connection_info_provider_->localAddress(), *address);
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestSetOptionPreBindSetsAddressSecond) {
-  const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_TRUE(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_EQ(*socket_.connection_info_provider_->localAddress(), *address);
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestSetOptionNotPrebindDoesNotSetAddress) {
-  const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_TRUE(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
   EXPECT_NE(*socket_.connection_info_provider_->localAddress(), *address);
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestSetOptionSafeWithNullAddress) {
-  const auto address = Network::Utility::parseInternetAddress("4.3.2.1");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("4.3.2.1");
   socket_.connection_info_provider_->setLocalAddress(address);
   auto option = std::make_unique<SrcAddrSocketOptionImpl>(nullptr);
   EXPECT_TRUE(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
@@ -59,7 +59,7 @@ TEST_F(SrcAddrSocketOptionImplTest, TestSetOptionSafeWithNullAddress) {
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestIpv4HashKey) {
-  const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -69,7 +69,7 @@ TEST_F(SrcAddrSocketOptionImplTest, TestIpv4HashKey) {
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestIpv4HashKeyOther) {
-  const auto address = Network::Utility::parseInternetAddress("255.254.253.0");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("255.254.253.0");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -79,7 +79,8 @@ TEST_F(SrcAddrSocketOptionImplTest, TestIpv4HashKeyOther) {
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestIpv6HashKey) {
-  const auto address = Network::Utility::parseInternetAddress("102:304:506:708:90a:b0c:d0e:f00");
+  const auto address =
+      Network::Utility::parseInternetAddressNoThrow("102:304:506:708:90a:b0c:d0e:f00");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -89,7 +90,8 @@ TEST_F(SrcAddrSocketOptionImplTest, TestIpv6HashKey) {
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestIpv6HashKeyOther) {
-  const auto address = Network::Utility::parseInternetAddress("F02:304:519:708:90a:b0e:FFFF:0000");
+  const auto address =
+      Network::Utility::parseInternetAddressNoThrow("F02:304:519:708:90a:b0e:FFFF:0000");
   auto option = makeOptionByAddress(address);
   option->hashKey(key_);
 
@@ -99,7 +101,7 @@ TEST_F(SrcAddrSocketOptionImplTest, TestIpv6HashKeyOther) {
 }
 
 TEST_F(SrcAddrSocketOptionImplTest, TestOptionDetailsNotSupported) {
-  const auto address = Network::Utility::parseInternetAddress("255.254.253.0");
+  const auto address = Network::Utility::parseInternetAddressNoThrow("255.254.253.0");
   auto option = makeOptionByAddress(address);
 
   auto details =

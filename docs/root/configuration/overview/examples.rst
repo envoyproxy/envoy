@@ -101,10 +101,8 @@ on 127.0.0.1:5678 is provided below:
       type: EDS
       eds_cluster_config:
         eds_config:
-          resource_api_version: V3
           api_config_source:
             api_type: GRPC
-            transport_api_version: V3
             grpc_services:
               - envoy_grpc:
                   cluster_name: xds_cluster
@@ -181,18 +179,14 @@ below:
 
   dynamic_resources:
     lds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
           - envoy_grpc:
               cluster_name: xds_cluster
     cds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
           - envoy_grpc:
               cluster_name: xds_cluster
@@ -245,10 +239,8 @@ The management server could respond to LDS requests with:
           rds:
             route_config_name: local_route
             config_source:
-              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
-                transport_api_version: V3
                 grpc_services:
                   - envoy_grpc:
                       cluster_name: xds_cluster
@@ -285,10 +277,8 @@ The management server could respond to CDS requests with:
     type: EDS
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             - envoy_grpc:
                 cluster_name: xds_cluster

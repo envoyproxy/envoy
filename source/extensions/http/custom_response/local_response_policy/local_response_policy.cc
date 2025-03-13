@@ -21,22 +21,27 @@ LocalResponsePolicy::LocalResponsePolicy(
     const envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy&
         config,
     Server::Configuration::ServerFactoryContext& context)
-    : local_body_{config.has_body() ? absl::optional<std::string>(Config::DataSource::read(
-                                          config.body(), true, context.api()))
-                                    : absl::optional<std::string>{}},
+    : local_body_{config.has_body()
+                      ? absl::optional<std::string>(THROW_OR_RETURN_VALUE(
+                            Config::DataSource::read(config.body(), true, context.api()),
+                            std::string))
+                      : absl::optional<std::string>{}},
       status_code_{config.has_status_code()
                        ? absl::optional<Envoy::Http::Code>(
                              static_cast<Envoy::Http::Code>(config.status_code().value()))
                        : absl::optional<Envoy::Http::Code>{}},
-      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {
+      header_parser_(THROW_OR_RETURN_VALUE(
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
+          Router::HeaderParserPtr)) {
 
   // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
   // of server context should not be used here directly. But this is bug is not introduced
   // by this PR and will be fixed in the future.
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
   if (config.has_body_format()) {
-    formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config.body_format(),
-                                                                           generic_context);
+    formatter_ = THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                           config.body_format(), generic_context),
+                                       Formatter::FormatterPtr);
   }
 }
 

@@ -30,7 +30,8 @@ class FakeAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::FactoryContext&) override {
+                          Server::Configuration::FactoryContext&,
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override {
     std::lock_guard<std::mutex> guard(log_callback_lock_);
     auto access_log_instance = std::make_shared<FakeAccessLog>(log_cb_);
     access_log_instances_.push_back(access_log_instance);
@@ -51,7 +52,7 @@ public:
 private:
   std::mutex log_callback_lock_;
   LogSignature log_cb_{nullptr};
-  std::vector<AccessLog::InstanceSharedPtr> access_log_instances_;
+  AccessLog::InstanceSharedPtrVector access_log_instances_;
 };
 
 } // namespace Envoy

@@ -1,5 +1,5 @@
-load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:deb.bzl", "pkg_deb")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 GLIBC_MIN_VERSION = "2.27"
 

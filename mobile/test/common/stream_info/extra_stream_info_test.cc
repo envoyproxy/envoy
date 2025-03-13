@@ -50,7 +50,8 @@ public:
 };
 
 TEST_F(FinalIntelTest, Unset) {
-  StreamInfoImpl stream_info{Http::Protocol::Http2, start_time_source_, nullptr};
+  StreamInfoImpl stream_info{Http::Protocol::Http2, start_time_source_, nullptr,
+                             FilterState::LifeSpan::FilterChain};
   // By convention the "StreamInfoImpl instantiation" is when the request starts.
   expected_intel_.stream_start_ms = SYSTEM_TIME_START_MS;
   // The SystemTime (11111) is irrelevant for the fake_current_time.
@@ -63,7 +64,8 @@ TEST_F(FinalIntelTest, Unset) {
 }
 
 TEST_F(FinalIntelTest, SetWithSsl) {
-  StreamInfoImpl stream_info{Http::Protocol::Http2, start_time_source_, nullptr};
+  StreamInfoImpl stream_info{Http::Protocol::Http2, start_time_source_, nullptr,
+                             FilterState::LifeSpan::FilterChain};
   stream_info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
   auto upstream_info = stream_info.upstreamInfo();
   auto& timing = upstream_info->upstreamTiming();
@@ -103,7 +105,8 @@ TEST_F(FinalIntelTest, SetWithSsl) {
 }
 
 TEST_F(FinalIntelTest, SetWithoutSsl) {
-  StreamInfoImpl stream_info{Http::Protocol::Http11, start_time_source_, nullptr};
+  StreamInfoImpl stream_info{Http::Protocol::Http11, start_time_source_, nullptr,
+                             FilterState::LifeSpan::FilterChain};
   stream_info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
   auto upstream_info = stream_info.upstreamInfo();
   auto& timing = upstream_info->upstreamTiming();

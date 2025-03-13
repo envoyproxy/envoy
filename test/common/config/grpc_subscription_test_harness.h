@@ -61,6 +61,7 @@ public:
 
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
         /*dispatcher_=*/dispatcher_,
         /*service_method_=*/*method_descriptor_,
         /*local_info_=*/local_info_,

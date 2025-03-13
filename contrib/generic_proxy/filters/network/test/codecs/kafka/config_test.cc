@@ -1,10 +1,10 @@
 #include <cstdint>
 #include <memory>
 
+#include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 #include "test/mocks/server/factory_context.h"
 
 #include "contrib/generic_proxy/filters/network/source/codecs/kafka/config.h"
-#include "contrib/generic_proxy/filters/network/test/mocks/codec.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
 #include "gtest/gtest.h"
@@ -29,13 +29,13 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
 
     KafkaRequestFrame frame(request);
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 3);
+    EXPECT_EQ(frame.frameFlags().streamId(), 3);
   }
 
   {
     KafkaResponseFrame frame(nullptr);
     EXPECT_EQ(frame.protocol(), "kafka");
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 0);
+    EXPECT_EQ(frame.frameFlags().streamId(), 0);
   }
 
   {
@@ -46,17 +46,20 @@ TEST(KafkaCodecTest, SimpleFrameTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
 
     KafkaResponseFrame frame(response);
-    EXPECT_EQ(frame.frameFlags().streamFlags().streamId(), 3);
+    EXPECT_EQ(frame.frameFlags().streamId(), 3);
   }
 }
 
 TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
   NiceMock<GenericProxy::MockServerCodecCallbacks> callbacks;
+  NiceMock<Network::MockServerConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaRequestCallbacks request_callbacks(callbacks);
 
   {
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -68,18 +71,21 @@ TEST(KafkaCodecTest, KafkaRequestCallbacksTest) {
   }
 
   {
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     request_callbacks.onFailedParse(nullptr);
   }
 }
 
 TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
   NiceMock<GenericProxy::MockClientCodecCallbacks> callbacks;
+  NiceMock<Network::MockClientConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaResponseCallbacks response_callbacks(callbacks);
 
   {
-    EXPECT_CALL(callbacks, onDecodingSuccess(_));
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _));
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -91,13 +97,16 @@ TEST(KafkaCodecTest, KafkaResponseCallbacksTest) {
   }
 
   {
-    EXPECT_CALL(callbacks, onDecodingFailure());
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     response_callbacks.onFailedParse(nullptr);
   }
 }
 
 TEST(KafkaCodecTest, KafkaServerCodecTest) {
   NiceMock<GenericProxy::MockServerCodecCallbacks> callbacks;
+  NiceMock<Network::MockServerConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaServerCodec server_codec;
   server_codec.setCodecCallbacks(callbacks);
@@ -120,8 +129,8 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
 
   {
     // Test decode() method.
-    EXPECT_CALL(callbacks, onDecodingSuccess(_))
-        .WillOnce(testing::Invoke([](StreamFramePtr request) {
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
+        .WillOnce(testing::Invoke([](RequestHeaderFramePtr request, absl::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaRequestFrame*>(request.get())
                         ->request_->request_header_.correlation_id_,
                     3);
@@ -144,7 +153,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
   {
     // Test encode() method with non-response frame.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -153,30 +162,27 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
             NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
     KafkaRequestFrame request_frame(request);
 
-    // Do nothiing.
-    server_codec.encode(request_frame, encoding_callbacks);
+    auto status_or = server_codec.encode(request_frame, encoding_context);
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_EQ(status_or.status().message(), "Invalid response frame type");
   }
 
   {
     // Test encode() method without actual response.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
-    NiceMock<Network::MockServerConnection> mock_connection;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     KafkaResponseFrame response_frame(nullptr);
 
-    // Expect close connection.
-    EXPECT_CALL(callbacks, connection())
-        .WillOnce(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
-    EXPECT_CALL(mock_connection, close(Network::ConnectionCloseType::FlushWrite));
-
-    server_codec.encode(response_frame, encoding_callbacks);
+    auto status_or = server_codec.encode(response_frame, encoding_context);
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_EQ(status_or.status().message(), "Invalid empty response frame");
   }
 
   {
     // Test encode() method with response.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -191,24 +197,28 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
     dst_buffer.add(&size, sizeof(size)); // Encode data length.
     response->encode(dst_buffer);
 
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
-        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer, bool) {
+    EXPECT_CALL(callbacks, writeToConnection(_))
+        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer) {
           EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+          buffer.drain(buffer.length());
         }));
-    server_codec.encode(response_frame, encoding_callbacks);
+    EXPECT_TRUE(server_codec.encode(response_frame, encoding_context).ok());
   }
 }
 
 TEST(KafkaCodecTest, KafkaClientCodecTest) {
   NiceMock<GenericProxy::MockClientCodecCallbacks> callbacks;
+  NiceMock<Network::MockClientConnection> mock_connection;
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection)));
 
   KafkaClientCodec client_codec;
   client_codec.setCodecCallbacks(callbacks);
 
   {
     // Test decode() method.
-    EXPECT_CALL(callbacks, onDecodingSuccess(_))
-        .WillOnce(testing::Invoke([](StreamFramePtr response) {
+    EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
+        .WillOnce(testing::Invoke([](ResponseHeaderFramePtr response, absl::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(response.get())
                         ->response_->metadata_.correlation_id_,
                     3);
@@ -233,7 +243,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
   {
     // Test encode() method with non-request frame.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto response =
         std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
@@ -242,14 +252,15 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
             NetworkFilters::Kafka::FetchResponse({}, {}));
     KafkaResponseFrame response_frame(response);
 
-    // Do nothiing.
-    client_codec.encode(response_frame, encoding_callbacks);
+    auto status_or = client_codec.encode(response_frame, encoding_context);
+    EXPECT_FALSE(status_or.ok());
+    EXPECT_EQ(status_or.status().message(), "Invalid request frame type");
   }
 
   {
     // Test encode() method with request.
 
-    NiceMock<GenericProxy::MockEncodingCallbacks> encoding_callbacks;
+    NiceMock<GenericProxy::MockEncodingContext> encoding_context;
 
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
@@ -264,12 +275,13 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     dst_buffer.add(&size, sizeof(size)); // Encode data length.
     request->encode(dst_buffer);
 
-    EXPECT_CALL(encoding_callbacks, onEncodingSuccess(_, true))
-        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer, bool) {
+    EXPECT_CALL(callbacks, writeToConnection(_))
+        .WillOnce(testing::Invoke([&](Buffer::Instance& buffer) {
           EXPECT_EQ(buffer.toString(), dst_buffer.toString());
+          buffer.drain(buffer.length());
         }));
 
-    client_codec.encode(request_frame, encoding_callbacks);
+    EXPECT_TRUE(client_codec.encode(request_frame, encoding_context).ok());
   }
 }
 

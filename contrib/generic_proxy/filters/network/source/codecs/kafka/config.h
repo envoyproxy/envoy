@@ -1,9 +1,9 @@
 #pragma once
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/generic_proxy/interface/codec.h"
 
 #include "contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3/kafka.pb.h"
-#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/kafka/filters/network/source/request_codec.h"
 #include "contrib/kafka/filters/network/source/response_codec.h"
 
@@ -28,8 +28,7 @@ public:
     if (request_ == nullptr) {
       return FrameFlags{};
     }
-    return FrameFlags{
-        StreamFlags{static_cast<uint64_t>(request_->request_header_.correlation_id_)}};
+    return FrameFlags{static_cast<uint64_t>(request_->request_header_.correlation_id_)};
   }
 
   absl::string_view protocol() const override { return "kafka"; }
@@ -46,7 +45,7 @@ public:
     if (response_ == nullptr) {
       return FrameFlags{};
     }
-    return FrameFlags{StreamFlags{static_cast<uint64_t>(response_->metadata_.correlation_id_)}};
+    return FrameFlags{static_cast<uint64_t>(response_->metadata_.correlation_id_)};
   }
 
   absl::string_view protocol() const override { return "kafka"; }
@@ -91,7 +90,6 @@ public:
     callbacks_.onDecodingFailure();
   }
 
-private:
   GenericProxy::ClientCodecCallbacks& callbacks_;
 };
 
@@ -102,8 +100,8 @@ public:
 
   void setCodecCallbacks(GenericProxy::ServerCodecCallbacks& callbacks) override;
   void decode(Envoy::Buffer::Instance& buffer, bool end_stream) override;
-  void encode(const GenericProxy::StreamFrame& frame,
-              GenericProxy::EncodingCallbacks& callbacks) override;
+  GenericProxy::EncodingResult encode(const GenericProxy::StreamFrame& frame,
+                                      GenericProxy::EncodingContext& ctx) override;
   GenericProxy::ResponsePtr respond(absl::Status, absl::string_view,
                                     const GenericProxy::Request&) override;
 
@@ -123,8 +121,8 @@ public:
 
   void setCodecCallbacks(GenericProxy::ClientCodecCallbacks& callbacks) override;
   void decode(Envoy::Buffer::Instance& buffer, bool end_stream) override;
-  void encode(const GenericProxy::StreamFrame& frame,
-              GenericProxy::EncodingCallbacks& callbacks) override;
+  GenericProxy::EncodingResult encode(const GenericProxy::StreamFrame& frame,
+                                      GenericProxy::EncodingContext& ctx) override;
 
   Envoy::Buffer::OwnedImpl request_buffer_;
   Envoy::Buffer::OwnedImpl response_buffer_;
@@ -151,7 +149,7 @@ public:
   // CodecFactoryConfig
   GenericProxy::CodecFactoryPtr
   createCodecFactory(const Envoy::Protobuf::Message& config,
-                     Envoy::Server::Configuration::FactoryContext& context) override;
+                     Envoy::Server::Configuration::ServerFactoryContext& context) override;
   std::string name() const override { return "envoy.generic_proxy.codecs.kafka"; }
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoConfig>();

@@ -1,10 +1,12 @@
 package io.envoyproxy.envoymobile.engine
 
-import org.assertj.core.api.Assertions.assertThat
+import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class JvmBridgeUtilityTest {
-
   @Test
   fun `retrieveHeaders produces a Map with all headers provided via passHeaders`() {
     val utility = JvmBridgeUtility()
@@ -18,9 +20,7 @@ class JvmBridgeUtilityTest {
       "test-1" to listOf("value-1", "value-2")
     )
 
-    assertThat(headers)
-      .hasSize(2) // Two keys / header name
-      .usingRecursiveComparison().isEqualTo(expectedHeaders)
+    assertThat(headers).isEqualTo(expectedHeaders)
   }
 
   @Test
@@ -58,9 +58,7 @@ class JvmBridgeUtilityTest {
       "test-2" to listOf("value-3")
     )
 
-    assertThat(nextHeaders)
-      .hasSize(1) // One key / header name
-      .usingRecursiveComparison().isEqualTo(expectedHeaders)
+    assertThat(nextHeaders).isEqualTo(expectedHeaders)
   }
 
   @Test(expected = AssertionError::class)

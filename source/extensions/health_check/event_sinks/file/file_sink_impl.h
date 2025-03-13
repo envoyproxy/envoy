@@ -13,9 +13,12 @@ public:
   explicit HealthCheckEventFileSink(
       const envoy::extensions::health_check::event_sinks::file::v3::HealthCheckEventFileSink&
           config,
-      AccessLog::AccessLogManager& log_manager)
-      : file_(log_manager.createAccessLog(Filesystem::FilePathAndType{
-            Filesystem::DestinationType::File, config.event_log_path()})) {}
+      AccessLog::AccessLogManager& log_manager) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.event_log_path()});
+    THROW_IF_NOT_OK_REF(file_or_error.status());
+    file_ = file_or_error.value();
+  }
 
   void log(envoy::data::core::v3::HealthCheckEvent event) override;
 

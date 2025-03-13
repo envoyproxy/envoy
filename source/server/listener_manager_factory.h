@@ -31,7 +31,8 @@ public:
                           absl::optional<uint32_t> worker_index) PURE;
   virtual std::unique_ptr<ConnectionHandler>
   createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                          OverloadManager& overload_manager) PURE;
+                          OverloadManager& overload_manager,
+                          OverloadManager& null_overload_manager) PURE;
 
   std::string category() const override { return "envoy.connection_handler"; }
 };

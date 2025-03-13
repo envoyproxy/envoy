@@ -86,7 +86,7 @@ ResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag
 
 const ResponseFlagUtils::ResponseFlagsVecType& ResponseFlagUtils::responseFlagsVec() {
   CONSTRUCT_ON_FIRST_USE(ResponseFlagsVecType, []() {
-    static_assert(CoreResponseFlag::LastFlag == 27,
+    static_assert(CoreResponseFlag::LastFlag == 29,
                   "A flag has been added. Add the new flag to CORE_RESPONSE_FLAGS.");
 
     responseFlagsVecInitialized() = true;
@@ -198,6 +198,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent
     return absl::nullopt;
   }
   return duration(timing.value().get().lastDownstreamTxByteSent(), stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamHeaderRxByteReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamHeaderRxByteReceived(), stream_info_);
 }
 
 absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
@@ -428,27 +436,53 @@ const absl::optional<ProxyStatusError>
 ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
   // NB: This mapping from Envoy-specific CoreResponseFlag enum to Proxy-Status
   // error enum is lossy, since CoreResponseFlag is really a bitset of many
-  // CoreResponseFlag enums. Here, we search the list of all known CoreResponseFlag values in
-  // enum order, returning the first matching ProxyStatusError.
+  // CoreResponseFlag enums.
   if (stream_info.hasResponseFlag(CoreResponseFlag::FailedLocalHealthCheck)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoHealthyUpstream)) {
     return ProxyStatusError::DestinationUnavailable;
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRequestTimeout)) {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.proxy_status_upstream_request_timeout")) {
-      return ProxyStatusError::ConnectionTimeout;
-    }
     return ProxyStatusError::HttpResponseTimeout;
-  } else if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
-    return ProxyStatusError::ConnectionTimeout;
-  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
-    return ProxyStatusError::ConnectionTerminated;
-  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
-    return ProxyStatusError::ConnectionRefused;
-  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
-    return ProxyStatusError::ConnectionTerminated;
-  } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamOverflow)) {
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.proxy_status_mapping_more_core_response_flags")) {
+    if (stream_info.hasResponseFlag(CoreResponseFlag::DurationTimeout)) {
+      return ProxyStatusError::ConnectionTimeout;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
+      return ProxyStatusError::ConnectionTimeout;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
+      return ProxyStatusError::ConnectionTerminated;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
+      return ProxyStatusError::ConnectionRefused;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UnauthorizedExternalService)) {
+      return ProxyStatusError::ConnectionRefused;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
+      return ProxyStatusError::ConnectionTerminated;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::OverloadManager)) {
+      return ProxyStatusError::ConnectionLimitReached;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DropOverLoad)) {
+      return ProxyStatusError::ConnectionLimitReached;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::FaultInjected)) {
+      return ProxyStatusError::HttpRequestError;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamConnectionTermination)) {
+      return ProxyStatusError::ConnectionTerminated;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::DownstreamRemoteReset)) {
+      return ProxyStatusError::ConnectionTerminated;
+    }
+  } else {
+    if (stream_info.hasResponseFlag(CoreResponseFlag::LocalReset)) {
+      return ProxyStatusError::ConnectionTimeout;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamRemoteReset)) {
+      return ProxyStatusError::ConnectionTerminated;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionFailure)) {
+      return ProxyStatusError::ConnectionRefused;
+    } else if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamConnectionTermination)) {
+      return ProxyStatusError::ConnectionTerminated;
+    }
+  }
+
+  if (stream_info.hasResponseFlag(CoreResponseFlag::UpstreamOverflow)) {
     return ProxyStatusError::ConnectionLimitReached;
   } else if (stream_info.hasResponseFlag(CoreResponseFlag::NoRouteFound)) {
     return ProxyStatusError::DestinationNotFound;

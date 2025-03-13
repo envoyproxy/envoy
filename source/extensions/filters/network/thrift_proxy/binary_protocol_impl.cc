@@ -80,22 +80,9 @@ bool BinaryProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& r
   }
 
   int16_t id = buffer.peekBEInt<int16_t>(1);
-  validateFieldId(id);
   // successful response struct in field id 0, error (IDL exception) in field id greater than 0
   reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
-}
-
-void BinaryProtocolImpl::validateFieldId(int16_t id) {
-  if (id >= 0) {
-    return;
-  }
-
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_allow_negative_field_ids")) {
-    return;
-  }
-
-  throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
 }
 
 bool BinaryProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
@@ -126,7 +113,6 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
       return false;
     }
     int16_t id = buffer.peekBEInt<int16_t>(1);
-    validateFieldId(id);
     field_id = id;
     buffer.drain(3);
   }

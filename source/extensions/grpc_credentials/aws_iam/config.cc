@@ -22,11 +22,12 @@ namespace GrpcCredentials {
 namespace AwsIam {
 
 std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config,
+    Server::Configuration::CommonFactoryContext& context) {
 
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
-      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, api);
+      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, context.api());
 
   std::shared_ptr<grpc::CallCredentials> call_creds;
   for (const auto& credential : google_grpc.call_credentials()) {
@@ -65,11 +66,12 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // libcurl to fetch the credentials. To fully get rid of curl, need to address the below
         // usage of AWS credentials common utils. Until then we are setting nullopt for server
         // factory context.
+
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, absl::nullopt /*Empty factory context*/, region,
-            Common::Aws::Utility::fetchMetadata);
+            context.api(), absl::nullopt /*Empty factory context*/, region,
+            Common::Aws::Utility::fetchMetadataWithCurl);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
-            config.service_name(), region, credentials_provider, api.timeSource(),
+            config.service_name(), region, credentials_provider, context,
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
             Common::Aws::AwsSigningHeaderExclusionVector{});
@@ -104,9 +106,9 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
   auto message = buildMessageToSign(absl::string_view(service_url.data(), service_url.length()),
                                     absl::string_view(method_name.data(), method_name.length()));
 
-  TRY_NEEDS_AUDIT { signer_->sign(message, false); }
-  END_TRY catch (const EnvoyException& e) {
-    return grpc::Status(grpc::StatusCode::INTERNAL, e.what());
+  auto status = signer_->sign(message, false);
+  if (!status.ok()) {
+    return {grpc::StatusCode::INTERNAL, std::string{status.message()}};
   }
 
   signedHeadersToMetadata(message.headers(), *metadata);

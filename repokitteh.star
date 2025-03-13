@@ -51,6 +51,7 @@ use(
   ],
 )
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/versionchange.star")
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/workflows.star")
 
 def _backport():
   github.issue_label('backport/review')
@@ -61,3 +62,8 @@ def _milestone():
   github.issue_label('milestone/review')
 
 handlers.command(name='milestone', func=_milestone)
+
+def _nostalebot():
+  github.issue_label('no stalebot')
+
+handlers.command(name='nostalebot', func=_nostalebot)

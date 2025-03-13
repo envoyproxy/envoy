@@ -31,12 +31,12 @@ namespace ExtAuthz {
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
   TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
-                             TimeSource& time_source, Api::Api& api,
+                             Server::Configuration::CommonFactoryContext& context,
                              const Grpc::StatNames& stat_names,
                              const Bootstrap::GrpcAsyncClientManagerConfig& config)
-      : Grpc::AsyncClientManagerImpl(cm, tls, time_source, api, stat_names, config) {}
-  Grpc::AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService&,
-                                                    Stats::Scope&, bool) override {
+      : Grpc::AsyncClientManagerImpl(cm, tls, context, stat_names, config) {}
+  absl::StatusOr<Grpc::AsyncClientFactoryPtr>
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
   }
 };
@@ -46,10 +46,13 @@ class ExtAuthzFilterTest : public Event::TestUsingSimulatedTime,
                            public testing::Test {
 public:
   ExtAuthzFilterTest() : RealThreadsTestHelper(5), stat_names_(symbol_table_) {
+    ON_CALL(context_.server_factory_context_, threadLocal())
+        .WillByDefault(testing::ReturnRef(tls()));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(testing::ReturnRef(api()));
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.server_factory_context_.cluster_manager_, tls(), api().timeSource(), api(),
-          stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
+          context_.server_factory_context_.cluster_manager_, tls(),
+          context_.server_factory_context_, stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
     });
   }
 
@@ -120,7 +123,6 @@ public:
 TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
   const std::string ext_authz_config_yaml = R"EOF(
   stat_prefix: "wall"
-  transport_api_version: V3
   allowed_headers:
       patterns:
       - exact: baz
@@ -159,6 +161,60 @@ TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
     pack_as_bytes: true
   )EOF";
   testFilterFactory(ext_authz_config_yaml);
+}
+
+TEST_F(ExtAuthzFilterHttpTest, FilterWithServerContext) {
+  const std::string ext_authz_config_yaml = R"EOF(
+  stat_prefix: "wall"
+  allowed_headers:
+      patterns:
+      - exact: baz
+      - prefix: x-
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    authorization_request:
+      headers_to_add:
+      - key: foo
+        value: bar
+      - key: bar
+        value: foo
+
+    authorization_response:
+      allowed_upstream_headers:
+        patterns:
+        - exact: baz
+        - prefix: x-success
+      allowed_client_headers:
+        patterns:
+        - exact: baz
+        - prefix: x-fail
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: baz-append
+        - prefix: x-append
+
+    path_prefix: /extauth
+
+  failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 100
+    pack_as_bytes: true
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(ext_authz_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
 }
 
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
@@ -211,8 +267,9 @@ private:
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
     Grpc::RawAsyncClientSharedPtr async_client =
-        async_client_manager_->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
-                                                                    context_.scope(), false);
+        async_client_manager_
+            ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)
+            .value();
     Grpc::MockAsyncClient* mock_async_client =
         dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());
     EXPECT_NE(mock_async_client, nullptr);
@@ -227,7 +284,6 @@ private:
 
 TEST_F(ExtAuthzFilterGrpcTest, EnvoyGrpc) {
   const std::string ext_authz_config_yaml = R"EOF(
-   transport_api_version: V3
    grpc_service:
      envoy_grpc:
        cluster_name: test_cluster
@@ -238,7 +294,6 @@ TEST_F(ExtAuthzFilterGrpcTest, EnvoyGrpc) {
 
 TEST_F(ExtAuthzFilterGrpcTest, GoogleGrpc) {
   const std::string ext_authz_config_yaml = R"EOF(
-  transport_api_version: V3
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server

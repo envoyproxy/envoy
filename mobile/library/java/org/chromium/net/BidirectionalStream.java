@@ -1,6 +1,5 @@
 package org.chromium.net;
 
-import android.annotation.SuppressLint;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executor;
 

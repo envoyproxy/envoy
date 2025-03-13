@@ -350,7 +350,7 @@ TEST_F(HttpConnManFinalizerImplTest, UnixDomainSocketPeerAddressTag) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
-  const auto remote_address = Network::Utility::resolveUrl("unix://" + path_);
+  const auto remote_address = *Network::Utility::resolveUrl("unix://" + path_);
 
   stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
 

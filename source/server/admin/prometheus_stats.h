@@ -38,6 +38,11 @@ public:
   static std::string formattedTags(const std::vector<Stats::Tag>& tags);
 
   /**
+   * Validate the given params, returning an error on invalid arguments
+   */
+  static absl::Status validateParams(const StatsParams& params);
+
+  /**
    * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
    * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
    * has a valid prometheus namespace, the trimmed name is returned.

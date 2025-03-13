@@ -8,6 +8,7 @@
 #include "envoy/server/process_context.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
@@ -39,7 +40,9 @@ public:
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
                      QuicConnectionIdGeneratorPtr&& cid_generator,
-                     QuicConnectionIdWorkerSelector worker_selector);
+                     QuicConnectionIdWorkerSelector worker_selector,
+                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+                     bool reject_new_connections = false);
 
   ~ActiveQuicListener() override;
 
@@ -58,6 +61,9 @@ public:
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
   size_t numPacketsExpectedPerEventLoop() const override;
+  const Network::IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const override {
+    return udp_save_cmsg_config_;
+  }
 
   // ActiveListenerImplBase
   void pauseListening() override;
@@ -95,6 +101,7 @@ private:
   bool reject_all_{false};
   // During hot restart, an optional handler for packets that weren't for existing connections.
   OptRef<Network::NonDispatchedUdpPacketHandler> non_dispatched_udp_packet_handler_;
+  Network::IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -106,7 +113,7 @@ public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                            ProcessContextOptRef context);
+                            Server::Configuration::ListenerFactoryContext& context);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -140,6 +147,7 @@ private:
       crypto_server_stream_factory_;
   absl::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>>
       proof_source_factory_;
+  EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;
@@ -150,7 +158,8 @@ private:
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
-  ProcessContextOptRef context_;
+  Server::Configuration::ListenerFactoryContext& context_;
+  bool reject_new_connections_{};
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };

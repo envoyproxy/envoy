@@ -7,8 +7,5 @@ MockHttpServerPropertiesCache::~MockHttpServerPropertiesCache() = default;
 
 MockHttpServerPropertiesCacheManager::~MockHttpServerPropertiesCacheManager() = default;
 
-MockHttpServerPropertiesCacheManagerFactory::~MockHttpServerPropertiesCacheManagerFactory() =
-    default;
-
 } // namespace Http
 } // namespace Envoy

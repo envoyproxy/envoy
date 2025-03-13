@@ -61,6 +61,7 @@ class UpstreamCodecFilter;
  * There is some required communication between the UpstreamRequest and
  * UpstreamCodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
  * interface, with the UpstreamFilterManager acting as intermediary.
+ *
  */
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public UpstreamToDownstream,
@@ -69,19 +70,19 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
-                  bool can_send_early_data, bool can_use_http3);
+                  bool can_send_early_data, bool can_use_http3, bool enable_half_close);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
 
   // To be called from the destructor, or prior to deferred delete.
   void cleanUp();
 
-  void acceptHeadersFromRouter(bool end_stream);
-  void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
+  virtual void acceptHeadersFromRouter(bool end_stream);
+  virtual void acceptDataFromRouter(Buffer::Instance& data, bool end_stream);
   void acceptTrailersFromRouter(Http::RequestTrailerMap& trailers);
   void acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr);
 
-  void resetStream();
+  virtual void resetStream();
   void setupPerTryTimeout();
   void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host, bool pool_success);
@@ -145,7 +146,9 @@ public:
   void encodeBodyAndTrailers();
 
   // Getters and setters
-  Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
+  Upstream::HostDescriptionOptConstRef upstreamHost() {
+    return makeOptRefFromPtr(upstream_host_.get());
+  }
   void outlierDetectionTimeoutRecorded(bool recorded) {
     outlier_detection_timeout_recorded_ = recorded;
   }
@@ -231,7 +234,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   // Tracks the number of times the flow of data from downstream has been disabled.
   uint32_t downstream_data_disabled_{};
-  bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool router_sent_end_stream_ : 1;
   bool encode_trailers_ : 1;
@@ -244,6 +246,7 @@ private:
   // True if the CONNECT headers have been sent but proxying payload is paused
   // waiting for response headers.
   bool paused_for_connect_ : 1;
+  bool paused_for_websocket_ : 1;
   bool reset_stream_ : 1;
 
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
@@ -254,7 +257,7 @@ private:
   bool had_upstream_ : 1;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   bool grpc_rq_success_deferred_ : 1;
-  bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
+  bool enable_half_close_ : 1;
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
@@ -337,15 +340,13 @@ public:
   void disarmRequestTimeout() override {}
   void resetIdleTimer() override {}
   void onLocalReply(Http::Code) override {}
+  void sendGoAwayAndClose() override {}
   // Upgrade filter chains not supported.
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
   // Unsupported functions.
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
     IS_ENVOY_BUG("recreateStream called from upstream HTTP filter");
-  }
-  void upgradeFilterChainCreated() override {
-    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream HTTP filter");
   }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
 
@@ -359,6 +360,14 @@ public:
   }
   bool pausedForConnect() const override { return upstream_request_.paused_for_connect_; }
   void setPausedForConnect(bool value) override { upstream_request_.paused_for_connect_ = value; }
+
+  bool pausedForWebsocketUpgrade() const override {
+    return upstream_request_.paused_for_websocket_;
+  }
+  void setPausedForWebsocketUpgrade(bool value) override {
+    upstream_request_.paused_for_websocket_ = value;
+  }
+
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return upstream_request_.upstreamStreamOptions();
   }
@@ -368,7 +377,7 @@ public:
   void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
     upstream_request_.upstream_interface_ = upstream_to_downstream_interface;
   }
-
+  bool isHalfCloseEnabled() override { return upstream_request_.enable_half_close_; }
   Http::RequestTrailerMapPtr trailers_;
   Http::ResponseHeaderMapPtr informational_headers_;
   Http::ResponseHeaderMapPtr response_headers_;

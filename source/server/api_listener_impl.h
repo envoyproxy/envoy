@@ -42,8 +42,9 @@ public:
 
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
-  bool drainClose() const override { return false; }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+  bool drainClose(Network::DrainDirection) const override { return false; }
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
     IS_ENVOY_BUG("Unexpected call to addOnDrainCloseCb");
     return nullptr;
   }
@@ -87,7 +88,7 @@ protected:
             connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
                 parent.parent_.address_, parent.parent_.address_)),
             stream_info_(parent_.parent_.factory_context_.serverFactoryContext().timeSource(),
-                         connection_info_provider_),
+                         connection_info_provider_, StreamInfo::FilterState::LifeSpan::Connection),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       void raiseConnectionEvent(Network::ConnectionEvent event);
@@ -232,7 +233,7 @@ public:
 private:
   HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
                   const envoy::config::listener::v3::Listener& config, Server::Instance& server,
-                  const std::string& name);
+                  const std::string& name, absl::Status& creation_status);
 
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.

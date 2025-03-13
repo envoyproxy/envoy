@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/secret/mocks.h"
@@ -21,7 +22,7 @@ public:
   Secret::MockSecretManager& secretManager() override { return secret_manager_; };
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
-  MOCK_METHOD(ClusterManagerPtr, clusterManagerFromProto,
+  MOCK_METHOD(absl::StatusOr<ClusterManagerPtr>, clusterManagerFromProto,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
 
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
@@ -32,7 +33,8 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                TimeSource& source, ClusterConnectivityState& state,
-               Http::PersistentQuicInfoPtr& quic_info));
+               Http::PersistentQuicInfoPtr& quic_info,
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
@@ -45,13 +47,13 @@ public:
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
-  MOCK_METHOD(CdsApiPtr, createCds,
+  MOCK_METHOD(absl::StatusOr<CdsApiPtr>, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config,
                const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  Singleton::ManagerImpl singleton_manager_;
 };
 } // namespace Upstream
 } // namespace Envoy

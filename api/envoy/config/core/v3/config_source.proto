@@ -28,12 +28,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // xDS API and non-xDS services version. This is used to describe both resource and transport
 // protocol versions (in distinct configuration fields).
 enum ApiVersion {
-  // When not specified, we assume v2, to ease migration to Envoy's stable API
-  // versioning. If a client does not support v2 (e.g. due to deprecation), this
-  // is an invalid value.
-  AUTO = 0 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
+  // When not specified, we assume v3; it is the only supported version.
+  AUTO = 0;
 
-  // Use xDS v2 API.
+  // Use xDS v2 API. This is no longer supported.
   V2 = 1 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
 
   // Use xDS v3 API.

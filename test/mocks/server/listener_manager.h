@@ -21,7 +21,8 @@ public:
               (ListenerState state));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(bool, removeListener, (const std::string& listener_name));
-  MOCK_METHOD(void, startWorkers, (OptRef<GuardDog> guard_dog, std::function<void()> callback));
+  MOCK_METHOD(absl::Status, startWorkers,
+              (OptRef<GuardDog> guard_dog, std::function<void()> callback));
   MOCK_METHOD(void, stopListeners,
               (StopListenersType listeners_type,
                const Network::ExtraShutdownListenerOptions& options));

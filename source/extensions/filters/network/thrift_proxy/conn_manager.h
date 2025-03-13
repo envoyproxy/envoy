@@ -42,9 +42,11 @@ public:
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
   virtual bool headerKeysPreserveCase() const PURE;
 };
+
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * ConnectionManager is a Network::Filter that will perform Thrift request handling on a connection.
@@ -54,7 +56,7 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+  ConnectionManager(const ConfigSharedPtr& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system, const Network::DrainDecision& drain_decision);
   ~ConnectionManager() override;
 
@@ -215,7 +217,8 @@ private:
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
-                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
+                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr(),
+                       StreamInfo::FilterState::LifeSpan::FilterChain),
           local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
           under_on_local_reply_{false} {
       parent_.stats_.request_active_.inc();
@@ -385,7 +388,7 @@ private:
                     const Http::ResponseHeaderMap* response_headers,
                     const StreamInfo::StreamInfo& stream_info);
 
-  Config& config_;
+  ConfigSharedPtr config_;
   ThriftFilterStats& stats_;
 
   Network::ReadFilterCallbacks* read_callbacks_{};

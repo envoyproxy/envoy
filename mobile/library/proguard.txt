@@ -35,10 +35,6 @@
    <methods>;
 }
 
--keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmCallbackContext {
-   <methods>;
-}
-
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmFilterContext {
    <methods>;
 }
@@ -56,5 +52,17 @@
 }
 
 -keep class io.envoyproxy.envoymobile.engine.types.EnvoyLogger {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel {
    <methods>;
 }

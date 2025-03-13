@@ -34,7 +34,7 @@ public:
     initial_metadata_entry.set_key("downstream-local-address");
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
 
-    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+    grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
     cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
@@ -90,7 +90,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
-  grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
@@ -144,7 +144,8 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   // Prepare the parent context of this call.
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider};
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;
@@ -171,7 +172,24 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
   EXPECT_CALL(http_stream, sendHeaders(_, _))
       .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
 
-  Http::AsyncClient::StreamOptions stream_options;
+  Tracing::MockSpan parent_span;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+
+  EXPECT_CALL(parent_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
+  EXPECT_CALL(*child_span, injectContext(_, _));
+  EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+
+  auto stream_options =
+      Http::AsyncClient::StreamOptions().setParentSpan(parent_span).setSampled(true);
+
   auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks, stream_options);
   EXPECT_EQ(grpc_stream, nullptr);
 }

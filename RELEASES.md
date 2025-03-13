@@ -61,10 +61,12 @@ actual mechanics of the release itself.
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |                                                                          |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |                                                                          |
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist))    |
-| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123)              |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123))             |
 | 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                   |
 | 2023 Q3 | Boteng Yao ([botengyao](https://github.com/botengyao))         | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))              |
 | 2023 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
+| 2024 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2024 Q3 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 
 ## Major release schedule
 
@@ -92,7 +94,11 @@ deadline of 3 weeks.
 | 1.27.0  | 2023/07/14 | 2023/07/27 |  +13 days  | 2024/07/27  |
 | 1.28.0  | 2023/10/16 | 2023/10/19 |   +3 days  | 2024/10/19  |
 | 1.29.0  | 2024/01/16 | 2024/01/16 |    0 days  | 2025/01/16  |
-| 1.30.0  | 2024/04/16 |            |            |             |
+| 1.30.0  | 2024/04/16 | 2024/04/16 |    0 days  | 2025/04/16  |
+| 1.31.0  | 2024/07/16 | 2024/07/19 |   +3 days  | 2025/07/19  |
+| 1.32.0  | 2024/10/15 | 2024/10/15 |    0 days  | 2025/10/15  |
+| 1.33.0  | 2025/01/14 | 2025/01/14 |    0 days  | 2026/01/14  |
+| 1.34.0  | 2025/04/15 |            |            |             |
 
 ### Cutting a major release
 
@@ -118,7 +124,7 @@ deadline of 3 weeks.
 * Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
   necessary changes to continue development.
 * Create a pull request with that commit.
-* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+* Run the deprecate_guards.py script (`bazel run //tools/deprecate_guards:deprecate_guards`)
 * If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
 * Craft a witty/uplifting email and send it to all the email aliases:
 envoy-announce@googlegroups.com
@@ -128,9 +134,15 @@ envoy-maintainers@googlegroups.com -
 include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
 * Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
 
-
 ## Security release schedule
 
-There is no fixed scheduled for security fixes. Zero-day vulnerabilities might necessitate
-an emergency release with little or no warning. However, historically security release have
-happened roughly once per quarter, midway between major releases.
+Security releases are published on a 3-monthly cycle, around the mid point between major releases.
+
+| Quarter |  Expected  |   Actual   | Difference |
+|:-------:|:----------:|:----------:|:----------:|
+| 2024 Q2 | 2024/06/04 | 2024/06/04 |   0 days   |
+| 2024 Q3 | 2024/09/03 | 2024/09/19 |  16 days   |
+| 2024 Q4 | 2024/12/03 | 2024/12/18 |  15 days   |
+| 2025 Q1 | 2025/03/04 |            |            |
+
+NOTE: Zero-day vulnerabilities, and upstream vulnerabilities disclosed to us under embargo, may necessitate an emergency release with little or no warning.

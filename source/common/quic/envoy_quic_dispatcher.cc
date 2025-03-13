@@ -8,6 +8,7 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -51,7 +52,8 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
     Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    quic::ConnectionIdGeneratorInterface& generator)
+    quic::ConnectionIdGeneratorInterface& generator,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length,
@@ -62,7 +64,8 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       crypto_server_stream_factory_(crypto_server_stream_factory),
       quic_stats_(generateStats(listener_config.listenerScope())),
       connection_stats_({QUIC_CONNECTION_STATS(
-          POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}) {}
+          POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}),
+      debug_visitor_factory_(debug_visitor_factory) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
@@ -92,7 +95,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
-      dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr());
+      dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr(),
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   auto listener_filter_manager = std::make_unique<QuicListenerFilterManagerImpl>(
       dispatcher_, *connection_socket, *stream_info);
@@ -127,7 +131,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
       listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
-      connection_stats_);
+      connection_stats_, debug_visitor_factory_);
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =
@@ -177,24 +181,17 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
     // Retain the number of connections in the list early because closing the connection will change
     // the size.
     const size_t num_connections = connections.size();
-    bool delete_sessions_immediately = false;
     for (size_t i = 0; i < num_connections; ++i) {
       Network::Connection& connection = connections.front().get();
       // This will remove the connection from the list. And the last removal will remove connections
       // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
-      if (!delete_sessions_immediately &&
-          dynamic_cast<QuicFilterManagerConnectionImpl&>(connection).fix_quic_lifetime_issues()) {
-        // If `envoy.reloadable_features.quic_fix_filter_manager_uaf` is true, the closed sessions
-        // need to be deleted right away to consistently handle quic lifetimes. Because upon
-        // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
-        // If any filters access those configs during destruction, it'll be use-after-free
-        delete_sessions_immediately = true;
-      }
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
-    if (delete_sessions_immediately) {
-      // Explicitly destroy closed sessions in the current call stack.
+    if (num_connections > 0) {
+      // Explicitly destroy closed sessions in the current call stack. Because upon
+      // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
+      // If any filters access those configs during destruction, it'll be use-after-free
       DeleteSessions();
     }
   }

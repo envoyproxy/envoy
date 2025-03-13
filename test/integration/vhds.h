@@ -87,10 +87,8 @@ static_resources:
           rds:
             route_config_name: my_route
             config_source:
-              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
-                transport_api_version: V3
                 grpc_services:
                   envoy_grpc:
                     cluster_name: xds_cluster
@@ -112,10 +110,8 @@ const char RdsConfig[] = R"EOF(
 name: my_route
 vhds:
   config_source:
-    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -131,10 +127,8 @@ virtual_hosts:
     route: { cluster: my_service }
 vhds:
   config_source:
-    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -216,12 +210,12 @@ public:
     RELEASE_ASSERT(result, result.message());
     vhds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(
-        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_);
-    EXPECT_TRUE(
-        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+        Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.

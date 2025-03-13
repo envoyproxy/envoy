@@ -163,7 +163,6 @@ routes:
 }
 
 TEST(DubboRouteMatcherTest, RouteByServiceNameWithAnyMethod) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   {
     const std::string yaml = R"EOF(
 name: local_route
@@ -428,7 +427,6 @@ routes:
 }
 
 TEST(DubboRouteMatcherTest, RouteByMethodWithRegexMatch) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string yaml = R"EOF(
 name: local_route
 interface: org.apache.dubbo.demo.DemoService

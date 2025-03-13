@@ -35,28 +35,6 @@ class FilterChainManager;
 
 namespace Upstream {
 
-class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
-public:
-  MockLoadBalancerSubsetInfo();
-  ~MockLoadBalancerSubsetInfo() override;
-
-  // Upstream::LoadBalancerSubsetInfo
-  MOCK_METHOD(bool, isEnabled, (), (const));
-  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
-              fallbackPolicy, (), (const));
-  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
-              metadataFallbackPolicy, (), (const));
-  MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
-  MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
-  MOCK_METHOD(bool, localityWeightAware, (), (const));
-  MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
-  MOCK_METHOD(bool, panicModeAny, (), (const));
-  MOCK_METHOD(bool, listAsAny, (), (const));
-  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
-
-  std::vector<SubsetSelectorPtr> subset_selectors_;
-};
-
 // While this mock class doesn't have any direct use in public Envoy tests, it's
 // useful for constructing tests of downstream private filters that use
 // ClusterTypedMetadata.
@@ -141,26 +119,16 @@ public:
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
   MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
-  MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
+  MOCK_METHOD(TypedLoadBalancerFactory&, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
-  MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
               (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>, lbRingHashConfig,
-              (), (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>, lbMaglevConfig, (),
-              (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>,
-              lbRoundRobinConfig, (), (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>,
-              lbLeastRequestConfig, (), (const));
-  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>,
-              lbOriginalDstConfig, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
               (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
+  MOCK_METHOD(absl::optional<uint16_t>, maxResponseHeadersKb, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
@@ -177,7 +145,6 @@ public:
   MOCK_METHOD(bool, perEndpointStatsEnabled, (), (const));
   MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
               (const));
-  MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
@@ -194,18 +161,18 @@ public:
               (const));
 
   MOCK_METHOD(bool, createFilterChain,
-              (Http::FilterChainManager & manager, bool only_create_if_configured,
-               const Http::FilterChainOptions& options),
+              (Http::FilterChainManager & manager, const Http::FilterChainOptions& options),
               (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
-               Http::FilterChainManager& manager),
+               Http::FilterChainManager& manager, const Http::FilterChainOptions&),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
-  MOCK_METHOD(const absl::optional<
-                  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
-              happyEyeballsConfig, (), (const));
+  MOCK_METHOD(
+      OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
+      happyEyeballsConfig, (), (const));
+  MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -246,21 +213,16 @@ public:
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;
-  LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
-  NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
-      lb_round_robin_config_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
-      lb_original_dst_config_;
+  Upstream::TypedLoadBalancerFactory* lb_factory_ =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+          "envoy.load_balancing_policies.round_robin");
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
@@ -274,6 +236,7 @@ public:
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
   absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
+  const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

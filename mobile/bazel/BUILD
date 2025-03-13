@@ -1,26 +1,8 @@
-load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
-
-config_setting(
-    name = "envoy_mobile_swift_cxx_interop",
-    values = {"define": "envoy_mobile_swift_cxx_interop=enabled"},
-)
-
-kt_jvm_library(
-    name = "envoy_mobile_test_suite",
-    srcs = [
-        "EnvoyMobileTestSuite.kt",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@maven//:io_github_classgraph_classgraph",
-        "@maven//:junit_junit",
-    ],
-)
 
 config_setting(
     name = "exclude_certificates",
@@ -37,11 +19,16 @@ alias(
     actual = "@bazel_tools//tools/zip:zipper",
 )
 
-# Don't depend on these directly, use //library/jni:jni_import_lib.
 alias(
     name = "jni",
-    actual = "@bazel_tools//tools/jdk:jni",
-    visibility = ["//library/jni/import:__pkg__"],
+    actual = "@rules_java//toolchains:jni",
+    visibility = ["//library/jni:__pkg__"],
+)
+
+alias(
+    name = "objc_dummy",
+    actual = "@bazel_tools//tools/objc:dummy.c",
+    visibility = ["//library/jni:__pkg__"],
 )
 
 # autoformat requires that there be no @bazel_tools references outside of //bazel,

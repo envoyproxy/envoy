@@ -111,6 +111,30 @@ TEST_F(ProviderVerifierTest, TestOkJWTWithExtractedHeaderAndPayload) {
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
 }
 
+// Test to set dynamic metadata with the status of a failed JWT verification.
+TEST_F(ProviderVerifierTest, TestExpiredJWTWithFailedStatusInMetadata) {
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_failed_status_in_metadata(
+      "my_payload");
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, setExtractedData(_))
+      .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
+        ProtobufWkt::Struct expected_payload;
+        MessageUtil::loadFromJson(ExpectedJWTExpiredStatusJSON, expected_payload);
+
+        EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
+      }));
+
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
+
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+}
+
 TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
@@ -168,7 +192,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://pubkey-server/pubkey-path
         cluster: pubkey_cluster
     forward_payload_header: example-auth-userinfo
     claim_to_headers:
@@ -247,7 +271,7 @@ INSTANTIATE_TEST_SUITE_P(ProviderVerifiersJwtCache, ProviderVerifiersJwtCacheTes
 // This test verifies that two JWT requirements with different audiences behave the same with
 // jwt_cache and without. The first requirement is checking audiences specified in the provider
 // which is "example_service". The second requirement is type "provider_and_audiences" and its
-// specified audiences is "other_service". The audience in the JWT token is "example_service". The
+// specified audiences is "other_service". The audience in the JWT is "example_service". The
 // first requirement should work and the second one should fail.
 TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);

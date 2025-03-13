@@ -1,5 +1,7 @@
 on:
   pull_request:
+    branches:
+    - main
   workflow_dispatch:
   schedule:
   - cron: '0 5 * * 1,2,3,4,5'
@@ -14,7 +16,7 @@ jobs:
       statuses: read  # for pr_notifier.py
       pull-requests: read  # for pr_notifier.py
     name: PR Notifier
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
@@ -22,14 +24,14 @@ jobs:
               || !contains(github.actor, '[bot]'))
       }}
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
     - name: Notify about PRs
       run: |
         ARGS=()
         if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
             ARGS+=(--dry_run)
         fi
-        bazel run //tools/repo:notify -- "${ARGS[@]}"
+        bazel run --config=ci //tools/repo:notify -- "${ARGS[@]}"
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

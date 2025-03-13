@@ -19,6 +19,8 @@ class DynamicMetadataKeys {
 public:
   const std::string ShadowEffectivePolicyIdField{"shadow_effective_policy_id"};
   const std::string ShadowEngineResultField{"shadow_engine_result"};
+  const std::string EnforcedEffectivePolicyIdField{"enforced_effective_policy_id"};
+  const std::string EnforcedEngineResultField{"enforced_engine_result"};
   const std::string EngineResultAllowed{"allowed"};
   const std::string EngineResultDenied{"denied"};
   const std::string AccessLogKey{"access_log_hint"};
@@ -65,6 +67,7 @@ class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, No
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules,
                                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Server::Configuration::CommonFactoryContext& context,
                                    const EnforcementMode mode = EnforcementMode::Enforced);
 
   bool handleAction(const Network::Connection& connection,

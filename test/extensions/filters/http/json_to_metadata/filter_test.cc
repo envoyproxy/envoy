@@ -4,6 +4,7 @@
 
 #include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/json_to_metadata/filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
@@ -87,7 +88,7 @@ response_rules:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope());
+    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope(), regex_engine_);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -131,6 +132,7 @@ response_rules:
     EXPECT_EQ(expected_result, filter_->encodeData(buffer_, end_stream));
   }
 
+  Regex::GoogleReEngine regex_engine_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -670,7 +672,7 @@ request_rules:
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_,
-              setDynamicMetadata("envoy.filters.http.json_to_metadata", MapEq(expected)));
+              setDynamicMetadata(HttpFilterNames::get().JsonToMetadata, MapEq(expected)));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -912,6 +914,9 @@ TEST_F(FilterTest, NoRequestContentType) {
   Http::TestRequestHeaderMapImpl mismatched_incoming_headers{{":path", "/ping"},
                                                              {":method", "GET"}};
 
+  const std::map<std::string, std::string> expected = {{"version", "error"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(mismatched_incoming_headers, false));
   testRequestWithBody("{}");
@@ -928,6 +933,9 @@ TEST_F(FilterTest, MismatchedRequestContentType) {
   Http::TestRequestHeaderMapImpl mismatched_incoming_headers{
       {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/not-a-json"}};
 
+  const std::map<std::string, std::string> expected = {{"version", "error"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(mismatched_incoming_headers, false));
   testRequestWithBody("Peter picked a peck of pickled peppers");
@@ -1449,9 +1457,17 @@ request_rules:
     on_present:
       metadata_namespace: envoy.lb
       key: version
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'error'
   allow_content_types:
   - "application/non-json"
 )EOF");
+  const std::map<std::string, std::string> expected = {{"version", "error"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers_, false));
 
   testRequestWithBody("{}");
@@ -1471,9 +1487,16 @@ response_rules:
     on_present:
       metadata_namespace: envoy.lb
       key: version
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'error'
   allow_content_types:
   - "application/non-json"
 )EOF");
+  const std::map<std::string, std::string> expected = {{"version", "error"}};
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   testResponseWithBody("{}");
@@ -1588,6 +1611,213 @@ request_rules:
 
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypeRegex) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypemultipleRegex) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "(?:text|application)/.*"
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypeandRegex) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+  allow_content_types:
+  - application/better-json
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::string request_body = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/better-json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, RequestAllowContentTypeRegexMatch) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'unknown'
+  allow_content_types:
+  - application/better-json
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::string request_body_json = R"delimiter({"version":"good version"})delimiter";
+  const std::map<std::string, std::string> expected_json = {{"version", "good version"}};
+
+  Http::TestRequestHeaderMapImpl matched_incoming_headers_json{
+      {":path", "/ping"}, {":method", "GET"}, {"Content-Type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(matched_incoming_headers_json, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_json)));
+  testRequestWithBody(request_body_json);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, CustomRequestAllowContentTypeNoMatch) {
+  initializeFilter(R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'error'
+  allow_content_types:
+  - "text/plain"
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::map<std::string, std::string> expected = {{"version", "error"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
+  Http::TestRequestHeaderMapImpl nomatch_incoming_headers{
+      {":path", "/ping"}, {":method", "POST"}, {"Content-Type", "image/png"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(nomatch_incoming_headers, false));
+
+  testRequestWithBody("{}");
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.mismatched_content_type"), 1);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.invalid_json_body"), 0);
+}
+
+TEST_F(FilterTest, CustomResponseAllowContentTypeNoMatch) {
+  initializeFilter(R"EOF(
+response_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+    on_error:
+      metadata_namespace: envoy.lb
+      key: version
+      value: 'error'
+  allow_content_types:
+  - "text/plain"
+  allow_content_types_regex:
+    google_re2: {}
+    regex: "application/.*"
+)EOF");
+  const std::map<std::string, std::string> expected = {{"version", "error"}};
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
+  Http::TestResponseHeaderMapImpl nomatch_incoming_headers{{":path", "/ping"}, {":method", "GET"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(nomatch_incoming_headers, false));
+
+  testResponseWithBody("{}");
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 0);
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 1);
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
 }

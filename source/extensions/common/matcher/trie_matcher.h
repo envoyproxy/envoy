@@ -144,7 +144,9 @@ public:
       for (const auto& range : range_matcher.ranges()) {
         TrieNode<DataType> node = {i, range.prefix_len().value(), range_matcher.exclusive(),
                                    on_match};
-        data.push_back({node, {Network::Address::CidrRange::create(range)}});
+        data.push_back({node,
+                        {THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(range),
+                                               Network::Address::CidrRange)}});
       }
     }
     auto lc_trie = std::make_shared<Network::LcTrie::LcTrie<TrieNode<DataType>>>(data);

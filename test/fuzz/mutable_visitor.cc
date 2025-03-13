@@ -28,18 +28,18 @@ void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
     absl::string_view target_type_url;
 
     if (message.GetDescriptor()->full_name() == "google.protobuf.Any") {
-      auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
+      auto* any_message = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
       if (inner_message) {
-        MessageUtil::unpackTo(*any_message, *inner_message);
+        THROW_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
       }
     } else if (message.GetDescriptor()->full_name() == "xds.type.v3.TypedStruct") {
       std::tie(inner_message, target_type_url) =
-          Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);
+          Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message).value();
     } else if (message.GetDescriptor()->full_name() == "udpa.type.v1.TypedStruct") {
       std::tie(inner_message, target_type_url) =
-          Helper::convertTypedStruct<udpa::type::v1::TypedStruct>(message);
+          (Helper::convertTypedStruct<udpa::type::v1::TypedStruct>(message)).value();
     }
 
     if (inner_message != nullptr) {

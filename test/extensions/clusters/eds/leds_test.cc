@@ -144,7 +144,6 @@ public:
         grpc_services:
           envoy_grpc:
             cluster_name: xds_cluster
-      resource_api_version: V3
     leds_collection_name: xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/*
   )EOF"};
 

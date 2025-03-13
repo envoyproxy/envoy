@@ -8,7 +8,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.chromium.net.NetworkException;
 
@@ -21,8 +21,10 @@ public class Errors {
   public static final int QUIC_INTERNAL_ERROR = 1;
   private static final Map<Long, NetError> ENVOYMOBILE_ERROR_TO_NET_ERROR = buildErrorMap();
 
-  /**Subset of errors defined in
-   * https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h */
+  /**
+   * Subset of errors defined in
+   * <a href="https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h"></a>
+   */
   @LongDef(flag = true,
            value = {EnvoyMobileError.DNS_RESOLUTION_FAILED, EnvoyMobileError.DURATION_TIMEOUT,
                     EnvoyMobileError.STREAM_IDLE_TIMEOUT,
@@ -31,12 +33,12 @@ public class Errors {
                     EnvoyMobileError.UPSTREAM_REMOTE_RESET})
   @Retention(RetentionPolicy.SOURCE)
   public @interface EnvoyMobileError {
-    long DNS_RESOLUTION_FAILED = 0x4000000;
-    long DURATION_TIMEOUT = 0x400000;
-    long STREAM_IDLE_TIMEOUT = 0x10000;
-    long UPSTREAM_CONNECTION_FAILURE = 0x20;
-    long UPSTREAM_CONNECTION_TERMINATION = 0x40;
-    long UPSTREAM_REMOTE_RESET = 0x10;
+    long DNS_RESOLUTION_FAILED = 1 << 26;          // 0x4000000;
+    long DURATION_TIMEOUT = 1 << 22;               // 0x400000;
+    long STREAM_IDLE_TIMEOUT = 1 << 16;            // 0x10000
+    long UPSTREAM_CONNECTION_FAILURE = 1 << 5;     // 0x20
+    long UPSTREAM_CONNECTION_TERMINATION = 1 << 6; // 0x40
+    long UPSTREAM_REMOTE_RESET = 1 << 4;           // 0x10
   }
 
   /** Subset of errors defined in chromium/src/net/base/net_error_list.h */
@@ -69,24 +71,27 @@ public class Errors {
 
   /**
    * Maps Envoymobile's errorcode to chromium's net errorcode
-   * @param responseFlag envoymobile's finalStreamIntel responseFlag
+   * @param finalStreamIntel envoymobile's finalStreamIntel
    * @return the NetError that the EnvoyMobileError maps to
    */
   public static NetError mapEnvoyMobileErrorToNetError(EnvoyFinalStreamIntel finalStreamIntel) {
-    // if connection fails to be established, check if user is offline
-    long responseFlag = finalStreamIntel.getResponseFlags();
-    if ((responseFlag == EnvoyMobileError.DNS_RESOLUTION_FAILED ||
-         responseFlag == EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE) &&
-        !AndroidNetworkMonitor.getInstance().isOnline()) {
+    if (!AndroidNetworkMonitor.getInstance().isOnline()) {
       return NetError.ERR_INTERNET_DISCONNECTED;
     }
 
-    // Check if negotiated_protocol is quic
+    long responseFlag = finalStreamIntel.getResponseFlags();
+    // This will only map the first matched error to a NetError code.
+    for (Map.Entry<Long, NetError> entry : ENVOYMOBILE_ERROR_TO_NET_ERROR.entrySet()) {
+      if ((responseFlag & entry.getKey()) != 0) {
+        return entry.getValue();
+      }
+    }
+
+    // Use the QUIC error code if the upstream negotiated protocol is HTTP/3.
     if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
       return NetError.ERR_QUIC_PROTOCOL_ERROR;
     }
-
-    return ENVOYMOBILE_ERROR_TO_NET_ERROR.getOrDefault(responseFlag, NetError.ERR_OTHER);
+    return NetError.ERR_OTHER;
   }
 
   /**
@@ -127,7 +132,10 @@ public class Errors {
   }
 
   private static Map<Long, NetError> buildErrorMap() {
-    Map<Long, NetError> errorMap = new HashMap<>();
+    // Mapping potentially multiple response flags to a NetError requires iterating over the map's
+    // entries in a deterministic order, so using a LinkedHashMap here, at the expense of a little
+    // extra memory overhead.
+    Map<Long, NetError> errorMap = new LinkedHashMap<>();
     errorMap.put(EnvoyMobileError.DNS_RESOLUTION_FAILED, NetError.ERR_NAME_NOT_RESOLVED);
     errorMap.put(EnvoyMobileError.DURATION_TIMEOUT, NetError.ERR_TIMED_OUT);
     errorMap.put(EnvoyMobileError.STREAM_IDLE_TIMEOUT, NetError.ERR_TIMED_OUT);

@@ -32,7 +32,7 @@ public:
   virtual bool isIssuerAllowed(const std::string& issuer) const PURE;
 
   // Remove the token from the headers
-  virtual void removeJwt(Http::HeaderMap& headers) const PURE;
+  virtual void removeJwt(Http::RequestHeaderMap& headers) const PURE;
 };
 
 using JwtLocationConstPtr = std::unique_ptr<const JwtLocation>;
@@ -67,7 +67,7 @@ public:
   virtual ~Extractor() = default;
 
   /**
-   * Extract all JWT tokens from the headers. If set of header_keys or param_keys
+   * Extract all JWTs from the headers. If set of header_keys or param_keys
    * is not empty only those in the matching locations will be returned.
    *
    * @param headers is the HTTP request headers.
@@ -81,7 +81,7 @@ public:
    *
    * @param headers is the HTTP request headers.
    */
-  virtual void sanitizeHeaders(Http::HeaderMap& headers) const PURE;
+  virtual void sanitizeHeaders(Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Create an instance of Extractor for a given config.

@@ -13,6 +13,8 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_utility.h"
@@ -146,6 +148,7 @@ public:
   MetaDataAction(const envoy::config::route::v3::RateLimit::Action::MetaData& action);
   // for maintaining backward compatibility with the deprecated DynamicMetaData action
   MetaDataAction(const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action);
+
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
@@ -161,12 +164,32 @@ private:
 };
 
 /**
+ * Action for query parameters rate limiting.
+ */
+class QueryParametersAction : public RateLimit::DescriptorProducer {
+public:
+  QueryParametersAction(const envoy::config::route::v3::RateLimit::Action::QueryParameters& action);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::string query_param_name_;
+  const std::string descriptor_key_;
+  const bool skip_if_absent_;
+};
+
+/**
  * Action for header value match rate limiting.
  */
 class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   HeaderValueMatchAction(
-      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -187,7 +210,8 @@ private:
 class QueryParameterValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   QueryParameterValueMatchAction(
-      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -196,7 +220,9 @@ public:
                           const StreamInfo::StreamInfo& info) const override;
 
   std::vector<ConfigUtility::QueryParameterMatcherPtr> buildQueryParameterMatcherVector(
-      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::QueryParameterMatcher>&
+          query_parameters,
+      Server::Configuration::CommonFactoryContext& context);
 
 private:
   const std::string descriptor_value_;
@@ -205,13 +231,39 @@ private:
   const std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
 };
 
+class RateLimitDescriptorValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
+                                          absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
+
+class MatchInputRateLimitDescriptor : public RateLimit::DescriptorProducer {
+public:
+  MatchInputRateLimitDescriptor(const std::string& descriptor_key,
+                                Matcher::DataInputPtr<Http::HttpMatchingData>&& data_input)
+      : descriptor_key_(descriptor_key), data_input_(std::move(data_input)) {}
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::string descriptor_key_;
+  Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
+};
+
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
   RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config,
-                           Server::Configuration::CommonFactoryContext& context);
+                           Server::Configuration::CommonFactoryContext& context,
+                           absl::Status& creation_status);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }
@@ -223,12 +275,14 @@ public:
                                 const std::string& local_service_cluster,
                                 const Http::RequestHeaderMap&,
                                 const StreamInfo::StreamInfo& info) const override;
+  bool applyOnStreamDone() const override { return apply_on_stream_done_; }
 
 private:
   const std::string disable_key_;
   uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  const bool apply_on_stream_done_ = false;
 };
 
 /**
@@ -239,7 +293,7 @@ public:
   RateLimitPolicyImpl();
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

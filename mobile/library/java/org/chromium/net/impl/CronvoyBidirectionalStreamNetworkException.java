@@ -8,7 +8,13 @@ import org.chromium.net.impl.Errors.NetError;
 public final class CronvoyBidirectionalStreamNetworkException extends CronvoyNetworkExceptionImpl {
   public CronvoyBidirectionalStreamNetworkException(String message, int errorCode,
                                                     int cronetInternalErrorCode) {
-    super(message, errorCode, cronetInternalErrorCode);
+    this(message, errorCode, cronetInternalErrorCode, "");
+  }
+
+  public CronvoyBidirectionalStreamNetworkException(String message, int errorCode,
+                                                    int cronetInternalErrorCode,
+                                                    String errorDetails) {
+    super(message, errorCode, cronetInternalErrorCode, errorDetails);
   }
 
   @Override

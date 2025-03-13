@@ -1,13 +1,15 @@
 package org.chromium.net.testing;
 
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 import static org.chromium.net.testing.CronetTestRule.SERVER_CERT_PEM;
 import static org.chromium.net.testing.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 
 import static org.junit.Assert.assertNotNull;
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
+
+import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
@@ -17,7 +19,6 @@ import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.ResponseHeaders;
 import io.envoyproxy.envoymobile.ResponseTrailers;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -46,8 +47,7 @@ public class Http2TestServerTest {
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
-    JniLibrary.load();
+    JniLibrary.loadTestLibrary();
   }
 
   @Before
@@ -62,6 +62,11 @@ public class Http2TestServerTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
+                 .setLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .enablePlatformCertificatesValidation(enablePlatformCertificatesValidation)
                  .setTrustChainVerification(trustChainVerification)
                  .setOnEngineRunning(() -> {
@@ -127,7 +132,7 @@ public class Http2TestServerTest {
         })
         .setOnCancel((ignored) -> { throw new AssertionError("Unexpected OnCancel called."); })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestScenario.getHeaders(), false);
+        .sendHeaders(requestScenario.getHeaders(), /* endStream= */ false, /* idempotent= */ false);
 
     latch.await();
     assertNotNull(response.get().getEnvoyError());
@@ -164,7 +169,7 @@ public class Http2TestServerTest {
         })
         .setOnCancel((ignored) -> { throw new AssertionError("Unexpected OnCancel called."); })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestScenario.getHeaders(), false);
+        .sendHeaders(requestScenario.getHeaders(), /* endStream= */ false, /* idempotent= */ false);
 
     latch.await();
     assertNotNull(response.get().getEnvoyError());
@@ -215,7 +220,8 @@ public class Http2TestServerTest {
           return null;
         })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestScenario.getHeaders(), /* hasRequestBody= */ false);
+        .sendHeaders(requestScenario.getHeaders(), /* hasRequestBody= */ false,
+                     /* idempotent= */ false);
 
     latch.await();
     response.get().throwAssertionErrorIfAny();

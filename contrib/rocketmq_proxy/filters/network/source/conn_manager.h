@@ -52,6 +52,8 @@ public:
   virtual std::chrono::milliseconds transientObjectLifeSpan() const PURE;
 };
 
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
 class ConnectionManager;
 
 /**
@@ -82,7 +84,7 @@ private:
 
 class ConnectionManager : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  ConnectionManager(Config& config, TimeSource& time_source);
+  ConnectionManager(const ConfigSharedPtr& config, TimeSource& time_source);
 
   ~ConnectionManager() override = default;
 
@@ -151,7 +153,7 @@ public:
 
   void resetAllActiveMessages(absl::string_view error_msg);
 
-  Config& config() { return config_; }
+  Config& config() { return *config_; }
 
   RocketmqFilterStats& stats() { return stats_; }
 
@@ -194,7 +196,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Buffer::OwnedImpl request_buffer_;
 
-  Config& config_;
+  ConfigSharedPtr config_;
   TimeSource& time_source_;
   RocketmqFilterStats& stats_;
 

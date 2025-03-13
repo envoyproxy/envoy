@@ -19,6 +19,7 @@ public:
   ~EnvoyQuicProofSource() override = default;
 
   // quic::ProofSource
+  void OnNewSslCtx(SSL_CTX* ssl_ctx) override;
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& server_address,
                const quic::QuicSocketAddress& client_address, const std::string& hostname,
@@ -34,15 +35,24 @@ protected:
                    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  struct CertConfigWithFilterChain {
-    absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;
+  struct TransportSocketFactoryWithFilterChain {
+    const QuicServerTransportSocketFactory& transport_socket_factory_;
+    const Network::FilterChain& filter_chain_;
+  };
+
+  struct CertWithFilterChain {
+    quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_;
+    std::shared_ptr<quic::CertificatePrivateKey> private_key_;
     absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
   };
 
-  CertConfigWithFilterChain
-  getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,
-                                 const quic::QuicSocketAddress& client_address,
-                                 const std::string& hostname);
+  CertWithFilterChain getTlsCertAndFilterChain(const TransportSocketFactoryWithFilterChain& data,
+                                               const std::string& hostname, bool* cert_matched_sni);
+
+  absl::optional<TransportSocketFactoryWithFilterChain>
+  getTransportSocketAndFilterChain(const quic::QuicSocketAddress& server_address,
+                                   const quic::QuicSocketAddress& client_address,
+                                   const std::string& hostname);
 
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_{nullptr};

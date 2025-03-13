@@ -33,7 +33,7 @@ def random_loopback_host():
 # This is a timeout that must be long enough that the hot restarted
 # instance can reliably be fully started up within this many seconds, or the
 # test will be flaky. 3 seconds is enough on a not-busy host with a non-tsan
-# non-coverage build; 10 seconds should be enough to be not flaky in most
+# non-coverage build; 6 seconds should be enough to be not flaky in most
 # configurations.
 #
 # Unfortunately, because the test is verifying the behavior of a connection
@@ -41,10 +41,13 @@ def random_loopback_host():
 # so increasing this value increases the duration of the test. For this
 # reason we want to keep it as low as possible without causing flaky failure.
 #
-# Ideally this would be adjusted (3x) for tsan and coverage runs, but making that
-# possible for python is outside the scope of this test, so we're stuck using the
-# 3x value for all tests.
-STARTUP_TOLERANCE_SECONDS = 10
+# If this goes longer than 10 seconds connections start timing out which
+# causes the test to get stuck and time out. Unfortunately for tsan or asan
+# runs the "long enough to start up" constraint fights with the "too long for
+# connections to be idle" constraint. Ideally this test would be disabled for
+# those slower test contexts, but we don't currently have infrastructure for
+# that.
+STARTUP_TOLERANCE_SECONDS = 6
 
 # We send multiple requests in parallel and require them all to function correctly
 # - this makes it so if something is flaky we're more likely to encounter it, and
@@ -304,7 +307,7 @@ async def _wait_for_envoy_epoch(i: int):
             pass
         await asyncio.sleep(0.2)
     # Envoy instance with expected restart_epoch should have started up
-    assert expected_substring in response, f"server_info={response}"
+    assert expected_substring in response, f"expected_substring={expected_substring}, server_info={response}"
 
 
 class IntegrationTest(unittest.IsolatedAsyncioTestCase):
@@ -340,6 +343,51 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
         await self.slow_upstream.stop()
         await self.fast_upstream.stop()
         return await super().asyncTearDown()
+
+    async def test_dead_parent_startup(self) -> None:
+        log.info("starting envoy")
+        envoy_process_1 = await asyncio.create_subprocess_exec(
+            *self.base_envoy_args,
+            "--restart-epoch",
+            "0",
+            "--use-dynamic-base-id",
+            "--base-id-path",
+            self.base_id_path,
+            "-c",
+            self.slow_config_path,
+        )
+        log.info(f"cert path = {IntegrationTest.server_cert}")
+        log.info("waiting for envoy ready")
+        await _wait_for_envoy_epoch(0)
+        base_id = int(self.base_id_path.read_text())
+        log.info("terminating first envoy process")
+        envoy_process_1.terminate()
+        await envoy_process_1.wait()
+
+        log.info("starting envoy with hot restart config but parent is dead")
+        envoy_process_2 = await asyncio.create_subprocess_exec(
+            *self.base_envoy_args,
+            "--restart-epoch",
+            "1",
+            "--base-id",
+            str(base_id),
+            "--skip-hot-restart-on-no-parent",
+            "-c",
+            self.fast_config_path,
+        )
+        log.info("waiting for envoy ready")
+        await _wait_for_envoy_epoch(1)
+        log.info("sending request to fast upstream")
+        request_url = f"http://{ENVOY_HOST}:{ENVOY_PORT}/"
+        response = _full_http_request(request_url)
+        self.assertEqual(
+            await response,
+            "fast instance",
+            "envoy server should be running despite failed hot restart",
+        )
+        log.info("shutting instance down")
+        envoy_process_2.terminate()
+        await envoy_process_2.wait()
 
     async def test_connection_handoffs(self) -> None:
         log.info("starting envoy")
@@ -403,7 +451,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior",
         )
         for response in slow_responses:
-            self.assertEquals(await response.join(), 0)
+            self.assertEqual(await response.join(), 0)
         log.info("waiting for parent instance to terminate")
         await envoy_process_1.wait()
         log.info("sending second request to fast upstream")

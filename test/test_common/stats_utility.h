@@ -43,7 +43,7 @@ public:
     MockHostSet* host_set = cluster.priority_set_.getMockHostSet(priority);
     auto host = std::make_shared<NiceMock<MockHost>>();
     ON_CALL(*host, address())
-        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPort(
+        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPortNoThrow(
             fmt::format("127.0.0.{}:80", host_count_))));
     ON_CALL(*host, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
     ON_CALL(*host, coarseHealth()).WillByDefault(Return(Host::Health::Healthy));
@@ -78,7 +78,7 @@ public:
     MockHostSet* host_set = cluster.priority_set_.getMockHostSet(priority);
     auto host = std::make_shared<NiceMock<MockHost>>();
     ON_CALL(*host, address())
-        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPort(
+        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPortNoThrow(
             fmt::format("127.0.0.{}:80", host_count_))));
     ON_CALL(*host, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
     ON_CALL(*host, coarseHealth()).WillByDefault(Return(Host::Health::Healthy));
@@ -103,7 +103,7 @@ public:
     MockHostSet* host_set = cluster.priority_set_.getMockHostSet(priority);
     auto host = std::make_shared<NiceMock<MockHost>>();
     ON_CALL(*host, address())
-        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPort(
+        .WillByDefault(Return(Network::Utility::parseInternetAddressAndPortNoThrow(
             fmt::format("127.0.0.{}:80", host_count_))));
     ON_CALL(*host, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
     ON_CALL(*host, coarseHealth()).WillByDefault(Return(Host::Health::Healthy));

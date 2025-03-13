@@ -166,6 +166,8 @@ Api::IoCallUint64Result VclIoHandle::close() {
 
 bool VclIoHandle::isOpen() const { return VCL_SH_VALID(sh_); }
 
+bool VclIoHandle::wasConnected() const { return false; }
+
 Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                            uint64_t num_slice) {
   if (!VCL_SH_VALID(sh_)) {
@@ -327,7 +329,8 @@ Api::IoCallUint64Result VclIoHandle::sendmsg(const Buffer::RawSlice* slices, uin
 }
 
 Api::IoCallUint64Result VclIoHandle::recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                             uint32_t self_port, RecvMsgOutput& output) {
+                                             uint32_t self_port, const UdpSaveCmsgConfig&,
+                                             RecvMsgOutput& output) {
   if (!VCL_SH_VALID(sh_)) {
     return vclCallResultToIoCallResult(VPPCOM_EBADFD);
   }
@@ -373,7 +376,8 @@ Api::IoCallUint64Result VclIoHandle::recvmsg(Buffer::RawSlice* slices, const uin
   return vclCallResultToIoCallResult(result);
 }
 
-Api::IoCallUint64Result VclIoHandle::recvmmsg(RawSliceArrays&, uint32_t, RecvMsgOutput&) {
+Api::IoCallUint64Result VclIoHandle::recvmmsg(RawSliceArrays&, uint32_t, const UdpSaveCmsgConfig&,
+                                              RecvMsgOutput&) {
   PANIC("not implemented");
 }
 
@@ -621,7 +625,7 @@ absl::optional<int> VclIoHandle::domain() {
   return {AF_INET};
 };
 
-Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::localAddress() {
+absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> VclIoHandle::localAddress() {
   vppcom_endpt_t ep;
   uint32_t eplen = sizeof(ep);
   uint8_t addr_buf[sizeof(struct sockaddr_in6)];
@@ -632,7 +636,7 @@ Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::localAddress() {
   return vclEndptToAddress(ep, sh_);
 }
 
-Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::peerAddress() {
+absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> VclIoHandle::peerAddress() {
   VCL_LOG("grabbing peer address sh {:x}", sh_);
   vppcom_endpt_t ep;
   uint32_t eplen = sizeof(ep);

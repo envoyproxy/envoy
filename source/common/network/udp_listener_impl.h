@@ -26,12 +26,15 @@ public:
                   TimeSource& time_source, const envoy::config::core::v3::UdpSocketConfig& config);
   ~UdpListenerImpl() override;
   uint32_t packetsDropped() { return packets_dropped_; }
+  bool paused() const { return parent_drained_callback_registrar_ != absl::nullopt; }
+  void unpause();
 
   // Network::Listener
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat) override {}
   void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
+  bool shouldBypassOverloadManager() const override { return false; }
 
   // Network::UdpListener
   Event::Dispatcher& dispatcher() override;
@@ -43,11 +46,15 @@ public:
   // Network::UdpPacketProcessor
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-                     MonotonicTime receive_time) override;
+                     MonotonicTime receive_time, uint8_t tos,
+                     Buffer::OwnedImpl saved_cmsg) override;
   uint64_t maxDatagramSize() const override { return config_.max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
   size_t numPacketsExpectedPerEventLoop() const override {
     return cb_.numPacketsExpectedPerEventLoop();
+  }
+  const IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const override {
+    return cb_.udpSaveCmsgConfig();
   }
 
 protected:
@@ -63,6 +70,10 @@ private:
 
   TimeSource& time_source_;
   const ResolvedUdpSocketConfig config_;
+  OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar_;
+  // Taking a weak_ptr to this lets us detect if the listener has been destroyed.
+  std::shared_ptr<bool> destruction_checker_ = std::make_shared<bool>(true);
+  uint32_t events_when_unpaused_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
 };
 
 class UdpListenerWorkerRouterImpl : public UdpListenerWorkerRouter {

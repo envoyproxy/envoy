@@ -8,10 +8,11 @@ namespace Envoy {
 namespace Upstream {
 
 StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                     ClusterFactoryContext& context)
-    : ClusterImplBase(cluster, context),
-      priority_state_manager_(new PriorityStateManager(
-          *this, context.serverFactoryContext().localInfo(), nullptr, random_)) {
+                                     ClusterFactoryContext& context, absl::Status& creation_status)
+    : ClusterImplBase(cluster, context, creation_status) {
+  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
+  priority_state_manager_ = std::make_unique<PriorityStateManager>(
+      *this, context.serverFactoryContext().localInfo(), nullptr, random_);
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -21,12 +22,31 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
   Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      std::vector<Network::Address::InstanceConstSharedPtr> address_list;
+      if (!lb_endpoint.endpoint().additional_addresses().empty()) {
+        address_list.emplace_back(
+            THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
+                                  const Network::Address::InstanceConstSharedPtr));
+        for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
+          Network::Address::InstanceConstSharedPtr address =
+              returnOrThrow(resolveProtoAddress(additional_address.address()));
+          address_list.emplace_back(address);
+        }
+        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+          // All addresses must by IP addresses.
+          if (!address->ip()) {
+            throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+          }
+        }
+      }
       priority_state_manager_->registerHostForPriority(
-          lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),
-          {}, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          lb_endpoint.endpoint().hostname(),
+          THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
+                                const Network::Address::InstanceConstSharedPtr),
+          address_list, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }
@@ -66,8 +86,12 @@ StaticClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
                       cluster.name()));
     }
   }
-  return std::make_pair(std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context)),
-                        nullptr);
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::make_pair(
+      std::shared_ptr<StaticClusterImpl>(new StaticClusterImpl(cluster, context, creation_status)),
+      nullptr);
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 /**

@@ -21,6 +21,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -751,11 +752,28 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
       ->runFatalActionsOnTrackedObject(actions);
   ASSERT_EQ(action->getNumTimesRan(), 0);
 
+  // Make sure the test_thread has called dispatcher_.run().
+  dispatcher_->post([this]() {
+    {
+      Thread::LockGuard lock(mu_);
+      ASSERT(!work_finished_);
+      work_finished_ = true;
+    }
+    cv_.notifyOne();
+  });
+
+  {
+    Thread::LockGuard lock(mu_);
+    while (!work_finished_) {
+      cv_.wait(mu_);
+    }
+  }
   // Should not run when not on same thread
   static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
   ASSERT_EQ(action->getNumTimesRan(), 0);
 
   // Should run since on same thread as dispatcher
+  work_finished_ = false;
   dispatcher_->post([this, &actions]() {
     {
       Thread::LockGuard lock(mu_);
@@ -789,31 +807,46 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
   EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
-class DispatcherMonotonicTimeTest : public testing::Test {
+class DispatcherMonotonicTimeTest : public testing::TestWithParam<bool> {
 protected:
-  DispatcherMonotonicTimeTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+  DispatcherMonotonicTimeTest() : api_(Api::createApiForTest()) {
+    runtime_.mergeValues({{"envoy.restart_features.fix_dispatcher_approximate_now",
+                           (GetParam() ? "true" : "false")}});
+    dispatcher_ = api_->allocateDispatcher("test_thread");
+    dispatcher_->initializeStats(scope_);
+  }
   ~DispatcherMonotonicTimeTest() override = default;
 
+  NiceMock<Stats::MockStore> store_; // Used in InitializeStats, must outlive dispatcher_->exit().
+  Stats::Scope& scope_{*store_.rootScope()};
+  TestScopedRuntime runtime_;
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
   MonotonicTime time_;
 };
 
-TEST_F(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
-  dispatcher_->post([this]() {
-    {
-      MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
-      dispatcher_->updateApproximateMonotonicTime();
-      MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
-      EXPECT_LT(time1, time2);
+INSTANTIATE_TEST_SUITE_P(DispatcherMonotonicTimeTests, DispatcherMonotonicTimeTest,
+                         ::testing::ValuesIn({false, true}));
+
+TEST_P(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
+  dispatcher_->updateApproximateMonotonicTime();
+  MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
+  Event::TimerPtr timer = dispatcher_->createTimer([&] {
+    // Approximate time should have been updated in this loop to 1s later.
+    MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
+    EXPECT_LT(time1, time2);
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.fix_dispatcher_approximate_now")) {
+      // Time2 should be updated roughly 2000ms later than time1.
+      EXPECT_NEAR(
+          2000, std::chrono::duration_cast<std::chrono::milliseconds>(time2 - time1).count(), 100);
     }
   });
+  timer->enableTimer(std::chrono::seconds(2));
 
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
-TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
+TEST_P(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
   // approximateMonotonicTime is constant within one event loop run.
   dispatcher_->post([this]() {
     {
@@ -1544,7 +1577,12 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
   Event::FileEventPtr file_event = dispatcher_->createFileEvent(
-      fd, [&](uint32_t) -> void { watcher.ready(); }, trigger, FileReadyType::Read);
+      fd,
+      [&](uint32_t) {
+        watcher.ready();
+        return absl::OkStatus();
+      },
+      trigger, FileReadyType::Read);
   file_event->activate(FileReadyType::Read);
 
   InSequence s;
@@ -1565,7 +1603,7 @@ protected:
 TEST_F(DispatcherConnectionTest, CreateTcpConnection) {
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     SCOPED_TRACE(Network::Test::addressVersionAsString(ip_version));
-    auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
+    auto client_addr_port = Network::Utility::parseInternetAddressAndPortNoThrow(
         fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), 10911));
     auto client_conn = dispatcher_->createClientConnection(
         client_addr_port, Network::Address::InstanceConstSharedPtr(),

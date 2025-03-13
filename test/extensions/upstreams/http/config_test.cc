@@ -85,11 +85,10 @@ TEST_F(ConfigTest, AutoHttp3) {
 TEST_F(ConfigTest, AutoHttp3NoCache) {
   options_.mutable_auto_config();
   options_.mutable_auto_config()->mutable_http3_protocol_options();
-  EXPECT_THROW_WITH_MESSAGE(
-      std::shared_ptr<ProtocolOptionsConfigImpl> config =
-          ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value(),
-      EnvoyException,
-      "alternate protocols cache must be configured when HTTP/3 is enabled with auto_config");
+  EXPECT_EQ(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                .status()
+                .message(),
+            "alternate protocols cache must be configured when HTTP/3 is enabled with auto_config");
 }
 
 TEST_F(ConfigTest, KvStoreConcurrencyFail) {
@@ -99,10 +98,10 @@ TEST_F(ConfigTest, KvStoreConcurrencyFail) {
       ->mutable_alternate_protocols_cache_options()
       ->mutable_key_value_store_config();
   server_context_.options_.concurrency_ = 2;
-  EXPECT_THROW_WITH_MESSAGE(
-      std::shared_ptr<ProtocolOptionsConfigImpl> config =
-          ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value(),
-      EnvoyException,
+  EXPECT_EQ(
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+          .status()
+          .message(),
       "options has key value store but Envoy has concurrency = 2 : key_value_store_config {\n}\n");
 }
 
@@ -196,13 +195,9 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
                          ::Envoy::Http::Protocol::Http2, stats));
 #else
   // If UHV is disabled, providing config should result in rejection
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 
@@ -227,13 +222,9 @@ TEST_F(ConfigTest, HeaderValidatorConfigWithRuntimeDisabled) {
   EXPECT_EQ(nullptr, config->header_validator_factory_);
 #else
   // If UHV is disabled, providing config should result in rejection
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 
@@ -256,13 +247,9 @@ TEST_F(ConfigTest, DefaultHeaderValidatorConfigWithRuntimeEnabled) {
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 
@@ -305,13 +292,9 @@ TEST_F(ConfigTest, TranslateDownstreamLegacyConfigToDefaultHeaderValidatorConfig
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 
@@ -341,13 +324,9 @@ TEST_F(ConfigTest, TranslateAutoLegacyConfigToDefaultHeaderValidatorConfig) {
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 
@@ -377,13 +356,9 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 
@@ -413,13 +388,9 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
 #else
   // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
   // config is rejected
-  EXPECT_THROW(
-      {
-        std::shared_ptr<ProtocolOptionsConfigImpl> config =
-            ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
-                .value();
-      },
-      EnvoyException);
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
 #endif
 }
 

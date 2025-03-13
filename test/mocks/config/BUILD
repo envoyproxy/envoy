@@ -45,3 +45,12 @@ envoy_cc_mock(
         "//source/common/common:logger_lib",
     ],
 )
+
+envoy_cc_mock(
+    name = "xds_manager_mocks",
+    srcs = ["xds_manager.cc"],
+    hdrs = ["xds_manager.h"],
+    deps = [
+        "//envoy/config:xds_manager_interface",
+    ],
+)

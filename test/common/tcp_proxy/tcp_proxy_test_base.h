@@ -57,9 +57,11 @@ inline Config constructConfigFromYaml(const std::string& yaml,
   return {tcp_proxy, context};
 }
 
-class TcpProxyTestBase : public testing::Test {
+class TcpProxyTestBase : public testing::TestWithParam<bool> {
 public:
   TcpProxyTestBase() {
+    scoped_runtime_.mergeValues({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
+                                  GetParam() ? "true" : "false"}});
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -103,25 +105,30 @@ public:
     return config;
   }
 
-  void setup(uint32_t connections) { setup(connections, false, defaultConfig()); }
+  void setup(uint32_t connections) {
+    setup(connections, /*set_redirect_records=*/false, /*receive_before_connect=*/false,
+          defaultConfig());
+  }
 
   void setup(uint32_t connections,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
-    setup(connections, false, config);
+    setup(connections, /*set_redirect_records=*/false, /*receive_before_connect=*/false, config);
   }
 
-  void setup(uint32_t connections, bool set_redirect_records) {
-    setup(connections, set_redirect_records, defaultConfig());
+  void setup(uint32_t connections, bool set_redirect_records, bool receive_before_connect) {
+    setup(connections, set_redirect_records, receive_before_connect, defaultConfig());
   }
 
   virtual void
-  setup(uint32_t connections, bool set_redirect_records,
+  setup(uint32_t connections, bool set_redirect_records, bool receive_before_connect,
         const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) PURE;
 
-  void raiseEventUpstreamConnected(uint32_t conn_index) {
-    EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+  void raiseEventUpstreamConnected(uint32_t conn_index, bool expect_read_enable = true) {
+    if (expect_read_enable) {
+      EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+    }
     EXPECT_CALL(*upstream_connection_data_.at(conn_index), addUpstreamCallbacks(_))
-        .WillOnce(Invoke([=](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
+        .WillOnce(Invoke([=, this](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
 
           // Simulate TCP conn pool upstream callbacks. This is safe because the TCP proxy never
@@ -175,6 +182,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
   std::string redirect_records_data_ = "some data";
+  TestScopedRuntime scoped_runtime_;
 };
 
 } // namespace TcpProxy

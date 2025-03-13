@@ -208,9 +208,9 @@ protected:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = *loader->getObject("entries");
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return *(*entries->getObject(key))->getString("final_value");
     }
     return "";
   }
@@ -227,7 +227,7 @@ protected:
     // Expect at least the "client_cert" dynamic secret.
     ASSERT_GE(config_dump.configs_size(), 1);
     envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
-    ASSERT_OK(MessageUtil::unpackToNoThrow(config_dump.configs(0), dynamic_secret));
+    ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(0), dynamic_secret));
     EXPECT_EQ(secret_name, dynamic_secret.name());
     EXPECT_EQ(version_info, dynamic_secret.version_info());
   }
@@ -494,10 +494,8 @@ public:
 
       auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
       const std::string cds_yaml = fmt::format(R"EOF(
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: {}

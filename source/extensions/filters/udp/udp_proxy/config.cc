@@ -1,5 +1,6 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 
 namespace Envoy {
@@ -7,20 +8,12 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+using ConfigTypeCase =
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig::SessionFilter::ConfigTypeCase;
+
 constexpr uint32_t DefaultMaxConnectAttempts = 1;
 constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
 constexpr uint64_t DefaultMaxBufferedBytes = 16384;
-
-ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailers::serializeAsProto() const {
-  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
-  value().iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
-    auto* new_header = proto_out->add_headers();
-    new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(std::string(e.value().getStringView()));
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return proto_out;
-}
 
 const std::string& TunnelResponseHeaders::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.udp_proxy.propagate_response_headers");
@@ -32,8 +25,10 @@ const std::string& TunnelResponseTrailers::key() {
 
 TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
                                          Server::Configuration::FactoryContext& context)
-    : header_parser_(Envoy::Router::HeaderParser::configure(config.headers_to_add())),
-      proxy_port_(), target_port_(config.default_target_port()), use_post_(config.use_post()),
+    : header_parser_(
+          THROW_OR_RETURN_VALUE(Envoy::Router::HeaderParser::configure(config.headers_to_add()),
+                                Envoy::Router::HeaderParserPtr)),
+      target_port_(config.default_target_port()), use_post_(config.use_post()),
       post_path_(config.post_path()),
       max_connect_attempts_(config.has_retry_options()
                                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(),
@@ -59,15 +54,17 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
 
   if (post_path_.empty()) {
     post_path_ = "/";
-  } else if (post_path_.rfind("/", 0) != 0) {
+  } else if (!absl::StartsWith(post_path_, "/")) {
     throw EnvoyException("Path must start with '/'");
   }
 
   envoy::config::core::v3::SubstitutionFormatString proxy_substitution_format_config;
   proxy_substitution_format_config.mutable_text_format_source()->set_inline_string(
       config.proxy_host());
-  proxy_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      proxy_substitution_format_config, context);
+  proxy_host_formatter_ =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                proxy_substitution_format_config, context),
+                            Formatter::FormatterPtr);
 
   if (config.has_proxy_port()) {
     uint32_t port = config.proxy_port().value();
@@ -81,8 +78,25 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   envoy::config::core::v3::SubstitutionFormatString target_substitution_format_config;
   target_substitution_format_config.mutable_text_format_source()->set_inline_string(
       config.target_host());
-  target_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      target_substitution_format_config, context);
+  target_host_formatter_ =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                target_substitution_format_config, context),
+                            Formatter::FormatterPtr);
+
+  if (config.has_retry_options() && config.retry_options().has_backoff_options()) {
+    const uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(config.retry_options().backoff_options(), base_interval);
+    const uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+        config.retry_options().backoff_options(), max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException(
+          "max_backoff_interval must be greater or equal to base_backoff_interval");
+    }
+
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        base_interval_ms, max_interval_ms, context.serverFactoryContext().api().randomGenerator());
+  }
 }
 
 UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
@@ -97,6 +111,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       stats_(generateStats(config.stat_prefix(), context.scope())),
       // Default prefer_gro to true for upstream client traffic.
       upstream_socket_config_(config.upstream_socket_config(), true),
+      udp_session_filter_config_provider_manager_(
+          createSingletonUdpSessionFilterConfigProviderManager(context.serverFactoryContext())),
       random_generator_(context.serverFactoryContext().api().randomGenerator()) {
   if (use_per_packet_load_balancing_ && config.has_tunneling_config()) {
     throw EnvoyException(
@@ -111,7 +127,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
   if (use_original_src_ip_ &&
       !Api::OsSysCallsSingleton::get().supportsIpTransparent(
           context.serverFactoryContext().options().localAddressIpVersion())) {
-    ExceptionUtil::throwEnvoyException(
+    throw EnvoyException(
         "The platform does not support either IP_TRANSPARENT or IPV6_TRANSPARENT. Or the envoy "
         "is not running with the CAP_NET_ADMIN capability.");
   }
@@ -149,17 +165,42 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
 
   for (const auto& filter : config.session_filters()) {
     ENVOY_LOG(debug, "    UDP session filter #{}", filter_factories_.size());
+
+    if (filter.config_type_case() == ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", filter.name());
+      filter_factories_.push_back(
+          udp_session_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              filter.config_discovery(), filter.name(), context.serverFactoryContext(), context,
+              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "      name: {}", filter.name());
     ENVOY_LOG(debug, "    config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
                   static_cast<const Protobuf::Message&>(filter.typed_config()), true));
 
-    auto& factory = Config::Utility::getAndCheckFactory<NamedUdpSessionFilterConfigFactory>(filter);
+    auto& factory = Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedUdpSessionFilterConfigFactory>(filter);
     ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
         filter, context.messageValidationVisitor(), factory);
-    FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
-    filter_factories_.push_back(callback);
+
+    Network::UdpSessionFilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, context);
+    filter_factories_.push_back(
+        udp_session_filter_config_provider_manager_->createStaticFilterConfigProvider(
+            callback, filter.name()));
   }
+}
+
+SINGLETON_MANAGER_REGISTRATION(udp_session_filter_config_provider_manager);
+
+std::shared_ptr<UdpSessionFilterConfigProviderManager>
+UdpProxyFilterConfigImpl::createSingletonUdpSessionFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<UdpSessionFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(udp_session_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UdpSessionFilterConfigProviderManagerImpl>(); });
 }
 
 static Registry::RegisterFactory<UdpProxyFilterConfigFactory,

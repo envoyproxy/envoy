@@ -94,7 +94,8 @@ delay: 0s
 
   // Third connection should be connection limited.
   ActiveFilter active_filter3(config_);
-  EXPECT_CALL(active_filter3.read_filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(active_filter3.read_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "over_connection_limit"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter3.filter_.onNewConnection());
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter3.filter_.onData(buffer, false));
   EXPECT_EQ(1, TestUtility::findCounter(
@@ -133,7 +134,8 @@ delay: 0.2s
   EXPECT_EQ(2, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")
                    ->value());
-  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "over_connection_limit"));
   delay_timer->invokeCallback();
   EXPECT_EQ(1, TestUtility::findGauge(stats_store_,
                                       "connection_limit.connection_limit_stats.active_connections")

@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
@@ -16,6 +16,15 @@
 
 namespace Envoy {
 namespace {
+
+MATCHER_P2(SingleHeaderValueIs, key, value,
+           absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
+  const auto hdr = arg.get(::Envoy::Http::LowerCaseString(std::string(key)));
+  if (hdr.size() != 1) {
+    return false;
+  }
+  return hdr[0]->value() == value;
+}
 
 void validateClusters(const Upstream::ClusterManager::ClusterInfoMap& active_cluster_map,
                       const std::string& cluster, size_t expected_active_clusters,
@@ -224,6 +233,10 @@ public:
         lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
     ASSERT_TRUE(response->complete());
     EXPECT_EQ(status, response->headers().getStatusValue());
+    if (numerator == 100) {
+      EXPECT_THAT(response->headers(),
+                  SingleHeaderValueIs("x-envoy-unconditional-drop-overload", "true"));
+    }
     cleanupUpstreamAndDownstream();
   }
 
@@ -658,6 +671,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
     // We should see both hosts present in the member update callback.
     EXPECT_EQ(2, hosts_added.size());
     member_update_count++;
+    return absl::OkStatus();
   });
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

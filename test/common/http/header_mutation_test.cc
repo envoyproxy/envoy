@@ -14,7 +14,7 @@ TEST(HeaderMutationsTest, BasicRemove) {
   proto_mutations.Add()->set_remove("flag-header");
   proto_mutations.Add()->set_remove("another-flag-header");
 
-  HeaderMutations mutations(proto_mutations);
+  auto mutations = HeaderMutations::create(proto_mutations).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
@@ -27,7 +27,7 @@ TEST(HeaderMutationsTest, BasicRemove) {
         {":authority", "host"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
     EXPECT_EQ("", headers.get_("flag-header"));
     EXPECT_EQ("", headers.get_("another-flag-header"));
     EXPECT_EQ("not-flag-header-value", headers.get_("not-flag-header"));
@@ -63,7 +63,7 @@ TEST(HeaderMutationsTest, AllOperations) {
   append4->mutable_header()->set_value("flag-header-4-value");
   append4->set_append_action(ProtoHeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
-  HeaderMutations mutations(proto_mutations);
+  auto mutations = HeaderMutations::create(proto_mutations).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   // Remove 'flag-header' and try to append 'flag-header' with value 'another-flag-header-value'.
@@ -74,7 +74,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     // Original 'flag-header' is removed and no new value is appended because there is no
     // 'another-flag-header'.
@@ -89,7 +89,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     // Original 'flag-header' is removed and the new value is appended.
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
@@ -102,7 +102,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(2, headers.get(Http::LowerCaseString("flag-header-2")).size());
   }
@@ -112,7 +112,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-2")).size());
   }
@@ -123,7 +123,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
   }
@@ -134,7 +134,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-3")).size());
     EXPECT_EQ("flag-header-3-value-old", headers.get_("flag-header-3"));
@@ -147,7 +147,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-4")).size());
     EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
@@ -158,7 +158,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     EXPECT_EQ(1, headers.get(Http::LowerCaseString("flag-header-4")).size());
     EXPECT_EQ("flag-header-4-value", headers.get_("flag-header-4"));
@@ -175,7 +175,7 @@ TEST(HeaderMutationsTest, AllOperations) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     // 'flag-header' is removed and new 'flag-header' is added.
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
@@ -202,7 +202,7 @@ TEST(HeaderMutationsTest, KeepEmptyValue) {
   append->set_append_action(ProtoHeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   append->set_keep_empty_value(true);
 
-  HeaderMutations mutations(proto_mutations);
+  auto mutations = HeaderMutations::create(proto_mutations).value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
@@ -211,7 +211,7 @@ TEST(HeaderMutationsTest, KeepEmptyValue) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
 
     // Original 'flag-header' is removed and empty value is appended.
     EXPECT_EQ(2, headers.size());
@@ -233,7 +233,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
     // Step 2: Remove the header.
     proto_mutations.Add()->set_remove("flag-header");
 
-    HeaderMutations mutations(proto_mutations);
+    auto mutations = HeaderMutations::create(proto_mutations).value();
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
     Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -242,7 +242,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
     EXPECT_EQ("", headers.get_("flag-header"));
     EXPECT_EQ(0, headers.get(Http::LowerCaseString("flag-header")).size());
   }
@@ -258,7 +258,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
     append->mutable_header()->set_value("%REQ(ANOTHER-FLAG-HEADER)%");
     append->set_append_action(ProtoHeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
-    HeaderMutations mutations(proto_mutations);
+    auto mutations = HeaderMutations::create(proto_mutations).value();
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
     Envoy::Http::TestRequestHeaderMapImpl headers = {
@@ -267,7 +267,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
         {":method", "GET"},
     };
 
-    mutations.evaluateHeaders(headers, {&headers}, stream_info);
+    mutations->evaluateHeaders(headers, {&headers}, stream_info);
     EXPECT_EQ("another-flag-header-value", headers.get_("flag-header"));
   }
 }
@@ -276,7 +276,7 @@ TEST(HeaderMutationTest, Death) {
   ProtoHeaderMutatons proto_mutations;
   proto_mutations.Add();
 
-  EXPECT_DEATH(HeaderMutations{proto_mutations}, "unset oneof");
+  EXPECT_DEATH(HeaderMutations::create(proto_mutations).IgnoreError(), "unset oneof");
 }
 
 } // namespace

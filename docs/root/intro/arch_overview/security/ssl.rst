@@ -41,7 +41,7 @@ FIPS 140-2
 ----------
 
 BoringSSL can be built in a
-`FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md>`_,
+`FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md>`_,
 following the build instructions from the `Security Policy for BoringCrypto module
 <https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf>`_,
 using ``--define boringssl=fips`` Bazel option. Currently, this option is only available on Linux-x86_64.
@@ -97,8 +97,6 @@ See the reference for :ref:`UpstreamTlsContexts <envoy_v3_api_msg_extensions.tra
   subject name, hash, etc. Other validation context configuration is typically required depending
   on the deployment.
 
-.. _arch_overview_ssl_cert_select:
-
 Custom Certificate Validator
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -110,11 +108,13 @@ For example, Envoy can be configured to verify peer certificates following the `
 with multiple trust bundles in a single listener or cluster.
 For more detail, please refer to :ref:`the documentation of custom_validator_config field<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.custom_validator_config>`.
 
+.. _arch_overview_ssl_cert_select:
+
 Certificate selection
 ---------------------
 
 :ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` support multiple TLS
-certificates. These may be a mix of RSA and P-256 ECDSA certificates for multiple server name patterns.
+certificates. These may be a mix of RSA and ECDSA certificates for multiple server name patterns.
 
 Certificate config/loading rules:
 
@@ -122,7 +122,7 @@ Certificate config/loading rules:
 * FQDN like "test.example.com" and wildcard like "\*.example.com" are valid at the same time, which will be loaded
   as two different server name patterns.
 * If multiple certificates of a particular type (RSA or ECDSA) are specified for the same name or name pattern, the first one loaded is used for that name.
-* Non-P-256 server ECDSA certificates are rejected.
+* Non-P-256, P-384 or P-521 server ECDSA certificates are rejected.
 * Static and SDS certificates may not be mixed in a given :ref:`DownstreamTlsContext
   <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
 
@@ -144,7 +144,7 @@ Certificate selection rules:
   is false or true.
 * Full scan execuates OCSP and key type checking on each cert which is the same as described above in exact SNI matching.
   It falls back to the first cert in the whole list if there is no cert selected.
-* Currently only two kinds of key type are supported, RSA or ECDSA. If the client supports P-256 ECDSA, the P-256 ECDSA certificate
+* Currently only two kinds of key type are supported, RSA or ECDSA. If the client supports P-256, P-384 or P-521 ECDSA, the P-256, P-384 or P-521 ECDSA certificate
   is preferred over RSA. The certificate that it falls back to might result in a failed handshake. For instance, a client only supports
   RSA certificates and the certificate only support ECDSA.
 * The final selected certificate must adhere to the OCSP policy. If no such certificate is found, the connection is refused.
@@ -154,9 +154,8 @@ Certificate selection rules:
   :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
   is introduced to determine if we continue full scan on SNI mismatch when the client provides SNI. SNI mismatch contains two cases in this context, one is there is no cert that matches to SNI,
   another one is there are certs matches to SNI while OCSP policy fails on those certs. The :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-  defaults to false, so full scan is disabled by default. The runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch``
-  can be used to override the default value of :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`.
-  If full scan is enabled, it will look for the cert from the whole cert list on SNI mismatch, this could be a problem for a potential DoS attack because of O(n) complexity.
+  defaults to false, so full scan is disabled by default. If full scan is enabled, it will look for the cert from the whole cert list on SNI mismatch,
+  this could be a problem for a potential DoS attack because of O(n) complexity.
 
 
 Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts
@@ -265,4 +264,4 @@ Common errors are:
 * ``TLSV1_ALERT_UNKNOWN_CA``: Peer certificate CA is not in trusted CA.
 
 More detailed list of error that can be raised by BoringSSL can be found
-`here <https://github.com/google/boringssl/blob/master/crypto/err/ssl.errordata>`_
+`here <https://github.com/google/boringssl/blob/main/crypto/err/ssl.errordata>`_

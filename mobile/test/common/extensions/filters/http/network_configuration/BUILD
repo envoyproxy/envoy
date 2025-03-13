@@ -15,9 +15,12 @@ envoy_extension_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "//library/common/extensions/filters/http/network_configuration:config",
         "//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
+        "//library/common/network:proxy_api_lib",
+        "//library/common/network:proxy_resolver_interface_lib",
+        "//library/common/network:proxy_settings_lib",
         "@envoy//test/extensions/common/dynamic_forward_proxy:mocks",
         "@envoy//test/mocks/event:event_mocks",
         "@envoy//test/mocks/http:http_mocks",

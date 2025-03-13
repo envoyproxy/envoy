@@ -148,6 +148,7 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
+
   DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
@@ -244,7 +245,6 @@ private:
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
   bool transport_wants_read_ : 1;
-  bool enable_rst_detect_send_ : 1;
 };
 
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {

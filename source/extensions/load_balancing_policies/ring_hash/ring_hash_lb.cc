@@ -8,7 +8,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
@@ -90,9 +89,9 @@ RingHashLoadBalancerStats RingHashLoadBalancer::generateStats(Stats::Scope& scop
   return {ALL_RING_HASH_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};
 }
 
-HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t attempt) const {
+HostSelectionResponse RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t attempt) const {
   if (ring_.empty()) {
-    return nullptr;
+    return {nullptr};
   }
 
   // Ported from https://github.com/RJ/ketama/blob/master/libketama/ketama.c (ketama_get_server)

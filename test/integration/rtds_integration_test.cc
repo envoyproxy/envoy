@@ -56,10 +56,8 @@ layered_runtime:
     rtds_layer:
       name: some_rtds_layer
       rtds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: {}
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
@@ -131,9 +129,9 @@ public:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = loader->getObject("entries").value();
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return entries->getObject(key).value()->getString("final_value").value();
     }
     return "";
   }

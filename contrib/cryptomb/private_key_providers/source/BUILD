@@ -18,6 +18,8 @@ envoy_cmake(
     name = "ipp-crypto",
     cache_entries = {
         "BORINGSSL": "on",
+        "DYNAMIC_LIB": "off",
+        "MB_STANDALONE": "on",
     },
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",

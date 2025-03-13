@@ -17,6 +17,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -30,6 +31,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche_platform_impl/quiche_flags_impl.h"
+#include "quiche/common/platform/api/quiche_flags.h"
 #endif
 
 namespace Envoy {
@@ -44,21 +46,29 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 }
 
 void refreshReloadableFlags(const Snapshot::EntryMap& flag_map) {
-  absl::flat_hash_map<std::string, bool> quiche_flags_override;
   for (const auto& it : flag_map) {
-#ifdef ENVOY_ENABLE_QUIC
-    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
-        it.second.bool_value_.has_value()) {
-      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
-          it.second.bool_value_.value();
-    }
-#endif
     if (it.second.bool_value_.has_value() && isRuntimeFeature(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     }
   }
 #ifdef ENVOY_ENABLE_QUIC
+  absl::flat_hash_map<std::string, bool> quiche_flags_override;
+  for (const auto& it : flag_map) {
+    if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
+        it.second.bool_value_.has_value()) {
+      quiche_flags_override[it.first.substr(quiche::EnvoyFeaturePrefix.length())] =
+          it.second.bool_value_.value();
+    }
+  }
+
   quiche::FlagRegistry::getInstance().updateReloadableFlags(quiche_flags_override);
+
+  // Because this is a QUICHE protocol flag, this behavior can't be flipped with the above
+  // code, so it needs its own runtime flag and code to set it.
+  SetQuicheFlag(quic_always_support_server_preferred_address,
+                Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.quic_send_server_preferred_address_to_all_clients"));
+
 #endif
   // Make sure ints are parsed after the flag allowing deprecated ints is parsed.
   for (const auto& it : flag_map) {
@@ -274,82 +284,13 @@ bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   return false;
 }
 
-// Handle an awful corner case where we explicitly shove a yaml percent in a proto string
-// value. Basically due to prior parsing logic we have to handle any combination
-// of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
-// E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
-bool parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
-    return false;
-  }
-
-  const re2::RE2 numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
-
-  std::string match_string;
-  if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
-    return false;
-  }
-
-  uint32_t numerator;
-  if (!absl::SimpleAtoi(match_string, &numerator)) {
-    return false;
-  }
-  envoy::type::v3::FractionalPercent converted_fractional_percent;
-  converted_fractional_percent.set_numerator(numerator);
-  entry.fractional_percent_value_ = converted_fractional_percent;
-
-  if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
-    return true;
-  }
-  if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
-    entry.fractional_percent_value_->set_denominator(
-        envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-  }
-  if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
-    entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
-  }
-  return true;
-}
-
-// Handle corner cases in non-yaml parsing: mixed case strings aren't parsed as booleans.
-bool parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  absl::string_view stripped = entry.raw_string_value_;
-  stripped = absl::StripAsciiWhitespace(stripped);
-
-  if (absl::EqualsIgnoreCase(stripped, "true")) {
-    entry.bool_value_ = true;
-    return true;
-  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
-    entry.bool_value_ = false;
-    return true;
-  }
-  return false;
-}
-
 void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
                             const ProtobufWkt::Value& value, absl::string_view raw_string) {
-  const char* error_message = nullptr;
-  values.emplace(key, SnapshotImpl::createEntry(value, raw_string, error_message));
-  if (error_message != nullptr) {
-    IS_ENVOY_BUG(
-        absl::StrCat(error_message, "\n[ key:", key, ", value: ", value.DebugString(), "]"));
-  }
+  values.emplace(key, SnapshotImpl::createEntry(value, raw_string));
 }
 
-static const char* kBoolError =
-    "Runtime YAML appears to be setting booleans as strings. Support for this is planned "
-    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
-    "working "
-    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
-static const char* kFractionError =
-    "Runtime YAML appears to be setting fractions as strings. Support for this is planned "
-    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
-    "working "
-    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
-
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
-                                              absl::string_view raw_string,
-                                              const char*& error_message) {
+                                              absl::string_view raw_string) {
   Entry entry;
   entry.raw_string_value_ = value.string_value();
   if (!raw_string.empty()) {
@@ -365,7 +306,13 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.boolean_to_string_fix")) {
+        // Convert boolean to "true"/"false"
+        entry.raw_string_value_ = value.bool_value() ? "true" : "false";
+      } else {
+        // Use absl::StrCat for backward compatibility, which converts to "1"/"0"
+        entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      }
     }
     break;
   case ProtobufWkt::Value::kStructValue:
@@ -376,12 +323,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
     break;
   case ProtobufWkt::Value::kStringValue:
     parseEntryDoubleValue(entry);
-    if (parseEntryBooleanValue(entry)) {
-      error_message = kBoolError;
-    }
-    if (parseEntryFractionalPercentValue(entry)) {
-      error_message = kFractionError;
-    }
+    break;
   default:
     break;
   }
@@ -389,7 +331,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   return entry;
 }
 
-void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
+absl::Status AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
 #ifdef ENVOY_ENABLE_YAML
   for (const auto& kv : values) {
     values_.erase(kv.first);
@@ -398,37 +340,38 @@ void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>
     }
   }
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
+  return absl::OkStatus();
 #else
-  IS_ENVOY_BUG("Runtime admin reload requires YAML support");
   UNREFERENCED_PARAMETER(values);
-  return;
+  return absl::InvalidArgumentError("Runtime admin reload requires YAML support");
 #endif
 }
 
-DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& api)
+DiskLayer::DiskLayer(absl::string_view name, const std::string& path, Api::Api& api,
+                     absl::Status& creation_status)
     : OverrideLayerImpl{name} {
-  walkDirectory(path, "", 1, api);
+  creation_status = walkDirectory(path, "", 1, api);
 }
 
-void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
-                              Api::Api& api) {
+absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string& prefix,
+                                      uint32_t depth, Api::Api& api) {
   // Maximum recursion depth for walkDirectory().
   static constexpr uint32_t MaxWalkDepth = 16;
 
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
+    return absl::InvalidArgumentError(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid path: ", path));
+    return absl::InvalidArgumentError(absl::StrCat("Invalid path: ", path));
   }
 
   Filesystem::Directory directory(path);
   Filesystem::DirectoryIteratorImpl it = directory.begin();
-  THROW_IF_NOT_OK_REF(it.status());
+  RETURN_IF_NOT_OK_REF(it.status());
   for (; it != directory.end(); ++it) {
-    THROW_IF_NOT_OK_REF(it.status());
+    RETURN_IF_NOT_OK_REF(it.status());
     Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
@@ -440,7 +383,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
     if (entry.type_ == Filesystem::FileType::Directory && entry.name_ != "." &&
         entry.name_ != "..") {
-      walkDirectory(full_path, full_prefix, depth + 1, api);
+      absl::Status status = walkDirectory(full_path, full_prefix, depth + 1, api);
+      RETURN_IF_NOT_OK(status);
     } else if (entry.type_ == Filesystem::FileType::Regular) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
@@ -451,7 +395,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
-      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      RETURN_IF_NOT_OK_REF(file_or_error.status());
       const std::string text_file{file_or_error.value()};
 
       const auto lines = StringUtil::splitToken(text_file, "\n");
@@ -474,26 +418,32 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 #else
       IS_ENVOY_BUG("Runtime admin reload requires YAML support");
       UNREFERENCED_PARAMETER(value);
-      return;
+      return absl::OkStatus();
 #endif
     }
   }
-  THROW_IF_NOT_OK_REF(it.status());
+  RETURN_IF_NOT_OK_REF(it.status());
+  return absl::OkStatus();
 }
 
-ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto)
+ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
+                       absl::Status& creation_status)
     : OverrideLayerImpl{name} {
+  creation_status = absl::OkStatus();
   for (const auto& f : proto.fields()) {
-    walkProtoValue(f.second, f.first);
+    creation_status = walkProtoValue(f.second, f.first);
+    if (!creation_status.ok()) {
+      return;
+    }
   }
 }
 
-void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
+absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
   switch (v.kind_case()) {
   case ProtobufWkt::Value::KIND_NOT_SET:
   case ProtobufWkt::Value::kListValue:
   case ProtobufWkt::Value::kNullValue:
-    throwEnvoyExceptionOrPanic(absl::StrCat("Invalid runtime entry value for ", prefix));
+    return absl::InvalidArgumentError(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
     SnapshotImpl::addEntry(values_, prefix, v, "");
@@ -515,26 +465,44 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
       break;
     }
     for (const auto& f : s.fields()) {
-      walkProtoValue(f.second, prefix + "." + f.first);
+      absl::Status status = walkProtoValue(f.second, prefix + "." + f.first);
+      RETURN_IF_NOT_OK(status);
     }
     break;
   }
   }
+  return absl::OkStatus();
 }
 
-LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+LoaderImpl::LoaderImpl(ThreadLocal::SlotAllocator& tls,
                        const envoy::config::bootstrap::v3::LayeredRuntime& config,
                        const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-                       Random::RandomGenerator& generator,
-                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+                       Random::RandomGenerator& generator, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {
+      init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {}
+
+absl::StatusOr<std::unique_ptr<LoaderImpl>>
+LoaderImpl::create(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+                   const envoy::config::bootstrap::v3::LayeredRuntime& config,
+                   const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+                   Random::RandomGenerator& generator,
+                   ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+  auto loader =
+      std::unique_ptr<LoaderImpl>(new LoaderImpl(tls, config, local_info, store, generator, api));
+  auto result = loader->initLayers(dispatcher, validation_visitor);
+  RETURN_IF_NOT_OK(result);
+  return loader;
+}
+
+absl::Status LoaderImpl::initLayers(Event::Dispatcher& dispatcher,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  absl::Status creation_status;
   absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
-      throwEnvoyExceptionOrPanic(absl::StrCat("Duplicate layer name: ", layer.name()));
+      return absl::InvalidArgumentError(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
@@ -542,7 +510,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       if (admin_layer_ != nullptr) {
-        throwEnvoyExceptionOrPanic(
+        return absl::InvalidArgumentError(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
       }
       admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
@@ -551,28 +519,31 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       if (watcher_ == nullptr) {
         watcher_ = dispatcher.createFilesystemWatcher();
       }
-      watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
-                         [this](uint32_t) -> void { loadNewSnapshot(); });
+      creation_status = watcher_->addWatch(layer.disk_layer().symlink_root(),
+                                           Filesystem::Watcher::Events::MovedTo,
+                                           [this](uint32_t) { return loadNewSnapshot(); });
+      RETURN_IF_NOT_OK(creation_status);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer:
-      subscriptions_.emplace_back(
-          std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
+      subscriptions_.emplace_back(std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(),
+                                                                     store_, validation_visitor));
       init_manager_.add(subscriptions_.back()->init_target_);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
-      throwEnvoyExceptionOrPanic("layer specifier not set");
+      return absl::InvalidArgumentError("layer specifier not set");
     }
   }
 
-  loadNewSnapshot();
+  return loadNewSnapshot();
 }
 
-void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
+absl::Status LoaderImpl::initialize(Upstream::ClusterManager& cm) {
   cm_ = &cm;
 
   for (const auto& s : subscriptions_) {
-    s->createSubscription();
+    RETURN_IF_NOT_OK(s->createSubscription());
   }
+  return absl::OkStatus();
 }
 
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
@@ -594,11 +565,14 @@ RtdsSubscription::RtdsSubscription(
       stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
-void RtdsSubscription::createSubscription() {
+absl::Status RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
-  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+  auto subscription_or_error = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_, Grpc::Common::typeUrl(resource_name), *stats_scope_, *this, resource_decoder_,
       {});
+  RETURN_IF_NOT_OK(subscription_or_error.status());
+  subscription_ = std::move(*subscription_or_error);
+  return absl::OkStatus();
 }
 
 absl::Status
@@ -616,7 +590,7 @@ RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& 
   }
   ENVOY_LOG(debug, "Reloading RTDS snapshot for onConfigUpdate");
   proto_.CopyFrom(runtime.layer());
-  parent_.loadNewSnapshot();
+  RETURN_IF_NOT_OK(parent_.loadNewSnapshot());
   init_target_.ready();
   return absl::OkStatus();
 }
@@ -654,8 +628,8 @@ absl::Status RtdsSubscription::validateUpdateSize(uint32_t added_resources_num,
   if (added_resources_num + removed_resources_num != 1) {
     init_target_.ready();
     return absl::InvalidArgumentError(
-        fmt::format("Unexpected RTDS resource length, number of added recources "
-                    "{}, number of removed recources {}",
+        fmt::format("Unexpected RTDS resource length, number of added resources "
+                    "{}, number of removed resources {}",
                     added_resources_num, removed_resources_num));
   }
   return absl::OkStatus();
@@ -670,13 +644,15 @@ absl::Status RtdsSubscription::onConfigRemoved(
   }
   ENVOY_LOG(debug, "Clear RTDS snapshot for onConfigUpdate");
   proto_.Clear();
-  parent_.loadNewSnapshot();
+  RETURN_IF_NOT_OK(parent_.loadNewSnapshot());
   init_target_.ready();
   return absl::OkStatus();
 }
 
-void LoaderImpl::loadNewSnapshot() {
-  std::shared_ptr<SnapshotImpl> ptr = createNewSnapshot();
+absl::Status LoaderImpl::loadNewSnapshot() {
+  auto snapshot_or_error = createNewSnapshot();
+  RETURN_IF_NOT_OK_REF(snapshot_or_error.status());
+  std::shared_ptr<SnapshotImpl> ptr = std::move(snapshot_or_error.value());
   tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
   });
@@ -687,6 +663,7 @@ void LoaderImpl::loadNewSnapshot() {
     absl::MutexLock lock(&snapshot_mutex_);
     thread_safe_snapshot_ = ptr;
   }
+  return absl::OkStatus();
 }
 
 const Snapshot& LoaderImpl::snapshot() {
@@ -706,12 +683,12 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   }
 }
 
-void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
+absl::Status LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
-    throwEnvoyExceptionOrPanic("No admin layer specified");
+    return absl::InvalidArgumentError("No admin layer specified");
   }
-  admin_layer_->mergeValues(values);
-  loadNewSnapshot();
+  RETURN_IF_NOT_OK(admin_layer_->mergeValues(values));
+  return loadNewSnapshot();
 }
 
 Stats::Scope& LoaderImpl::getRootScope() { return *store_.rootScope(); }
@@ -725,15 +702,18 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-SnapshotImplPtr LoaderImpl::createNewSnapshot() {
+absl::StatusOr<SnapshotImplPtr> LoaderImpl::createNewSnapshot() {
   std::vector<Snapshot::OverrideLayerConstPtr> layers;
   uint32_t disk_layers = 0;
   uint32_t error_layers = 0;
   uint32_t rtds_layer = 0;
+  absl::Status creation_status;
   for (const auto& layer : config_.layers()) {
     switch (layer.layer_specifier_case()) {
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
-      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer()));
+      layers.emplace_back(
+          std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer(), creation_status));
+      RETURN_IF_NOT_OK(creation_status);
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kDiskLayer: {
       std::string path =
@@ -742,18 +722,27 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
         absl::StrAppend(&path, "/", service_cluster_);
       }
       if (api_.fileSystem().directoryExists(path)) {
+        std::unique_ptr<DiskLayer> disk_layer;
+        std::string error;
         TRY_ASSERT_MAIN_THREAD {
-          layers.emplace_back(std::make_unique<DiskLayer>(layer.name(), path, api_));
-          ++disk_layers;
+          absl::Status creation_status;
+          disk_layer = std::make_unique<DiskLayer>(layer.name(), path, api_, creation_status);
+          if (!creation_status.ok()) {
+            error = creation_status.message();
+          }
+          END_TRY
         }
-        END_TRY
-        CATCH(EnvoyException & e, {
+        CATCH(EnvoyException & e, { error = e.what(); });
+        if (error.empty()) {
+          layers.emplace_back(std::move(disk_layer));
+          ++disk_layers;
+        } else {
           // TODO(htuch): Consider latching here, rather than ignoring the
           // layer. This would be consistent with filesystem RTDS.
           ++error_layers;
           ENVOY_LOG(debug, "error loading runtime values for layer {} from disk: {}",
-                    layer.DebugString(), e.what());
-        });
+                    layer.DebugString(), error);
+        }
       }
       break;
     }
@@ -762,7 +751,9 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
       break;
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::kRtdsLayer: {
       auto* subscription = subscriptions_[rtds_layer++].get();
-      layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
+      layers.emplace_back(
+          std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_, creation_status));
+      RETURN_IF_NOT_OK(creation_status);
       break;
     }
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:

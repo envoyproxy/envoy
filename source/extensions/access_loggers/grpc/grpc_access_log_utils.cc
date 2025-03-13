@@ -41,7 +41,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::CoreResponseFlag::LastFlag == 27,
+  static_assert(StreamInfo::CoreResponseFlag::LastFlag == 29,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck)) {
@@ -151,6 +151,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DnsResolutionFailed)) {
     common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamRemoteReset)) {
+    common_access_log.mutable_response_flags()->set_downstream_remote_reset(true);
   }
 }
 
@@ -329,6 +333,10 @@ void Utility::extractCommonAccessLogProperties(
   // Set stream unique id from the stream info.
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
     common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
+  }
+
+  if (const auto& reason = stream_info.downstreamTransportFailureReason(); !reason.empty()) {
+    common_access_log.set_downstream_transport_failure_reason(reason);
   }
 
   if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {

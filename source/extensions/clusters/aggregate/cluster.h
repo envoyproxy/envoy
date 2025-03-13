@@ -39,10 +39,6 @@ using ClusterSetConstSharedPtr = std::shared_ptr<const ClusterSet>;
 
 class Cluster : public Upstream::ClusterImplBase {
 public:
-  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
-          const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-          Upstream::ClusterFactoryContext& context);
-
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {
     return Upstream::Cluster::InitializePhase::Secondary;
@@ -53,7 +49,15 @@ public:
   Random::RandomGenerator& random_;
   const ClusterSetConstSharedPtr clusters_;
 
+protected:
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
+          Upstream::ClusterFactoryContext& context, absl::Status& creation_status);
+
 private:
+  friend class ClusterFactory;
+  friend class AggregateClusterTest;
+
   // Upstream::ClusterImplBase
   void startPreInit() override { onPreInitComplete(); }
 };
@@ -64,6 +68,7 @@ class AggregateClusterLoadBalancer : public Upstream::LoadBalancer,
                                      Upstream::ClusterUpdateCallbacks,
                                      Logger::Loggable<Logger::Id::upstream> {
 public:
+  friend class AggregateLoadBalancerFactory;
   AggregateClusterLoadBalancer(const Upstream::ClusterInfoConstSharedPtr& parent_info,
                                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                                Random::RandomGenerator& random,
@@ -75,7 +80,7 @@ public:
   void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer
-  Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+  Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
@@ -97,7 +102,7 @@ private:
           priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not yet implemented for extensions.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -137,7 +142,8 @@ private:
 
 // Load balancer factory created by the main thread and will be called in each worker thread to
 // create the thread local load balancer.
-struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
+class AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
+public:
   AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
@@ -156,7 +162,7 @@ struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override {}
+  absl::Status initialize() override { return absl::OkStatus(); }
 
   std::shared_ptr<AggregateLoadBalancerFactory> factory_;
 };

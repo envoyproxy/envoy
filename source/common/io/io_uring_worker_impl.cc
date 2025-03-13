@@ -45,17 +45,17 @@ void IoUringSocketEntry::onReadCompleted() {
             "calling event callback since pending read buf has {} size data, data = {}, "
             "fd = {}",
             getReadParam()->buf_.length(), getReadParam()->buf_.toString(), fd_);
-  cb_(Event::FileReadyType::Read);
+  THROW_IF_NOT_OK(cb_(Event::FileReadyType::Read));
 }
 
 void IoUringSocketEntry::onWriteCompleted() {
   ENVOY_LOG(trace, "call event callback for write since result = {}", getWriteParam()->result_);
-  cb_(Event::FileReadyType::Write);
+  THROW_IF_NOT_OK(cb_(Event::FileReadyType::Write));
 }
 
 void IoUringSocketEntry::onRemoteClose() {
   ENVOY_LOG(trace, "onRemoteClose fd = {}", fd_);
-  cb_(Event::FileReadyType::Closed);
+  THROW_IF_NOT_OK(cb_(Event::FileReadyType::Closed));
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
@@ -72,8 +72,12 @@ IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
   file_event_ = dispatcher_.createFileEvent(
-      event_fd, [this](uint32_t) { onFileEvent(); }, Event::PlatformDefaultTriggerType,
-      Event::FileReadyType::Read);
+      event_fd,
+      [this](uint32_t) {
+        onFileEvent();
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 }
 
 IoUringWorkerImpl::~IoUringWorkerImpl() {
@@ -323,7 +327,7 @@ IoUringServerSocket::~IoUringServerSocket() {
 }
 
 void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
-  ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, status_);
+  ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, static_cast<int>(status_));
 
   IoUringSocketEntry::close(keep_fd_open, cb);
   keep_fd_open_ = keep_fd_open;
@@ -451,7 +455,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
   ENVOY_LOG(trace,
             "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}",
-            result, fd_, injected, status_, enable_close_event_);
+            result, fd_, injected, static_cast<int>(status_), enable_close_event_);
   if (!injected) {
     read_req_ = nullptr;
     // If the socket is going to close, discard all results.
@@ -556,7 +560,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onWrite(req, result, injected);
 
   ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
-            injected, status_);
+            injected, static_cast<int>(status_));
   if (!injected) {
     write_or_shutdown_req_ = nullptr;
   }
@@ -653,7 +657,7 @@ void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected)
   IoUringSocketEntry::onConnect(req, result, injected);
   ASSERT(!injected);
   ENVOY_LOG(trace, "onConnect with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
-            injected, status_);
+            injected, static_cast<int>(status_));
 
   read_req_ = nullptr;
   // Socket may be closed on connecting like binding error. In this situation we may not callback

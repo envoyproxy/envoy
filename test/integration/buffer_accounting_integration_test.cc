@@ -37,8 +37,6 @@ namespace {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
-using testing::HasSubstr;
-
 std::string protocolTestParamsAndBoolToString(
     const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
   return fmt::format("{}_{}",
@@ -141,9 +139,6 @@ public:
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
     setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
     setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
-    config_helper_.addRuntimeOverride(
-        Runtime::defer_processing_backedup_streams,
-        protocol_test_params.defer_processing_backedup_streams ? "true" : "false");
 
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);
@@ -154,9 +149,6 @@ protected:
   std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_;
 
   bool streamBufferAccounting() { return std::get<1>(GetParam()); }
-  bool deferProcessingBackedUpStreams() {
-    return Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams);
-  }
 
   std::string printAccounts() {
     std::stringstream stream;
@@ -586,7 +578,10 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
       ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
     } else {
       ASSERT_TRUE(response1->waitForReset());
-      EXPECT_EQ(response1->resetReason(), Http::StreamResetReason::RemoteReset);
+      EXPECT_EQ(response1->resetReason(),
+                (std::get<0>(GetParam()).downstream_protocol == Http::CodecType::HTTP2
+                     ? Http::StreamResetReason::RemoteReset
+                     : Http::StreamResetReason::OverloadManager));
     }
 
     // Wait for the upstream request to receive the reset to avoid a race when
@@ -643,6 +638,24 @@ public:
         });
   }
 
+  void runTest() {
+    config_helper_.setBufferLimits(16384, 131072);
+    initialize();
+
+    write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+
+    tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+
+    write_matcher_->setWriteReturnsEgain();
+    ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
+    test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
+    tcp_client_->close();
+  }
+
 protected:
   IntegrationTcpClientPtr tcp_client_;
 };
@@ -656,20 +669,13 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(TcpTunnelingWatermarkIntegrationTest, MultipleReadDisableCallsIncrementsStatsOnce) {
   config_helper_.setBufferLimits(16384, 131072);
-  initialize();
+  runTest();
+}
 
-  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-
-  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  write_matcher_->setWriteReturnsEgain();
-  ASSERT_TRUE(tcp_client_->write(std::string(524288, 'a'), false));
-  test_server_->waitForCounterEq("tcp.tcp_stats.downstream_flow_control_paused_reading_total", 1);
-  tcp_client_->close();
+TEST_P(TcpTunnelingWatermarkIntegrationTest,
+       MultipleReadDisableCallsIncrementsStatsOnceWithUpstreamFilters) {
+  config_helper_.addRuntimeOverride(Runtime::upstream_http_filters_with_tcp_proxy, "true");
+  runTest();
 }
 
 class Http2OverloadManagerIntegrationTest : public Http2BufferWatermarksTest,
@@ -1026,9 +1032,6 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the upstream.
   write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -1071,9 +1074,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
 TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -1116,9 +1116,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
 TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -1161,9 +1158,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
        ShouldCloseDeferredUpstreamOnStreamCloseIfLocalReply) {
   config_helper_.setBufferLimits(9000, 9000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -1220,9 +1214,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
        ShouldCloseDeferredUpstreamOnStreamCloseIfResetByDownstream) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -1267,9 +1258,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
 TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
   config_helper_.setBufferLimits(10000, 10000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the upstream.
   write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -1367,9 +1355,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
 TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   config_helper_.setBufferLimits(10000, 10000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the downstream.
   write_matcher_->setSourcePort(lookupPort("http"));
@@ -1506,9 +1491,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
       });
 
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   // Stop writes to the upstream.
   write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
@@ -1619,9 +1601,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
 TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProcessingBufferedData) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
 
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
                "Crashing as request body over 1000!.*"
@@ -1633,9 +1612,6 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
        CanDumpCrashInformationWhenProcessingBufferedDataOfDeferredCloseStream) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  if (!deferProcessingBackedUpStreams()) {
-    return;
-  }
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
                "Crashing as response body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"

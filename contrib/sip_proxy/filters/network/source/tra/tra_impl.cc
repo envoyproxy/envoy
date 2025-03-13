@@ -200,12 +200,13 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
                     const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
+  auto client_or_error = context.serverFactoryContext()
+                             .clusterManager()
+                             .grpcAsyncClientManager()
+                             .getOrCreateRawAsyncClient(grpc_service, context.scope(), true);
+  THROW_IF_NOT_OK_REF(client_or_error.status());
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
-      context.serverFactoryContext()
-          .clusterManager()
-          .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClient(grpc_service, context.scope(), true),
-      dispatcher, timeout);
+      client_or_error.value(), dispatcher, timeout);
 }
 
 } // namespace TrafficRoutingAssistant

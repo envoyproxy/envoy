@@ -165,6 +165,16 @@ The following core load shed points are supported:
     - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
       level which will eventually drain the HTTP/2 connection.
 
+  * - envoy.load_shed_points.hcm_ondata_creating_codec
+    - Envoy will close the connections before creating codec if Envoy is under
+      pressure, typically memory. This happens once geting data from the
+      connection.
+
+  * - envoy.load_shed_points.http_downstream_filter_check
+    - Envoy will send local reply directly before creating an upstream request in
+      the router if Envoy is under resource pressure, typically memory. This change
+      makes load shed check availabe in HTTP decoder filters.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
@@ -343,6 +353,51 @@ It's expected that the first few gradations shouldn't trigger anything, unless
 there's something seriously wrong e.g. in this example streams using ``>=
 128MiB`` in buffers.
 
+CPU Intensive Workload Brownout Protection
+------------------------------------------
+
+The ``envoy.overload_actions.stop_accepting_requests`` overload action can be used
+to protect workloads from browning-out when an unexpected spike in the number of
+requests the workload receives that causes the CPU to become saturated. This overload
+action when used in conjunction with the ``envoy.resource_monitors.cpu_utilization``
+resource monitor can reduce the pressure on the CPU by cheaply rejecting new requests.
+While the real mitigation for such request spikes are horizantally scaling the workload,
+this overload action can be used to ensure the fleet does not get into a cascading failure
+mode.
+Some platform owners may choose to install this overload action by default to protect the fleet,
+since it is easier to configure a target CPU utilization percentage than to configure a request rate per
+workload. This supports monitoring both HOST CPU Utilization and K8s Container CPU Utilization.
+By default it's using ``mode: HOST``, to trigger overload actions on Container CPU usage,
+use ``mode: CONTAINER`` to set the calculation strategy to evaluate Container CPU stats.
+
+.. literalinclude:: _include/cpu_utilization_monitor_overload.yaml
+    :language: yaml
+    :lines: 43-55
+    :emphasize-lines: 3-13
+    :linenos:
+    :caption: :download:`cpu_utilization_monitor_overload.yaml <_include/cpu_utilization_monitor_overload.yaml>`
+
+Loadshedding in K8s environment
+-------------------------------
+
+In a Kubernetes environment, where Envoy workloads often share node resources with other applications, configuring this
+overload action with a target container CPU utilization percentage offers a more adaptable approach than defining a fixed
+request rate. This ensures that Envoy workloads can dynamically manage their CPU usage based on container-level metrics
+without impacting other co-located workloads.
+
+The ``envoy.overload_actions.stop_accepting_requests`` overload action can be utilized to safeguard Envoy workloads
+in a Kubernetes environment from experiencing degraded performance during unexpected spikes in incoming requests
+that saturate the container's allocated CPU resources. When combined with the ``envoy.resource_monitors.cpu_utilization``
+resource monitor, this overload action can effectively reduce Container CPU pressure by rejecting new requests at a minimal
+computational cost.
+
+.. literalinclude:: _include/container_cpu_utilization_monitor_overload.yaml
+    :language: yaml
+    :lines: 1-14
+    :emphasize-lines: 3-14
+    :linenos:
+    :caption: :download:`container_cpu_utilization_monitor_overload.yaml <_include/container_cpu_utilization_monitor_overload.yaml>`
+
 
 Statistics
 ----------
@@ -377,4 +432,4 @@ with the following statistics:
   :widths: 1, 1, 2
 
   scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
-
+  shed_load_count, Counter, "Total count the load is sheded"

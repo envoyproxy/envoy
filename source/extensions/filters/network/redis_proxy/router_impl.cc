@@ -98,9 +98,9 @@ RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key,
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy = absl::AsciiStrToLower(key);
-    value = prefix_lookup_table_.findLongestPrefix(copy.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(copy);
   } else {
-    value = prefix_lookup_table_.findLongestPrefix(key.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(key);
   }
 
   if (value == nullptr) {
@@ -136,7 +136,7 @@ void PrefixRoutes::formatKey(std::string& key, std::string redis_key_formatter,
     redis_key_formatter = absl::StrReplaceAll(
         redis_key_formatter, {{redis_key_formatter_command_, redis_key_to_be_replaced_}});
   }
-  auto providers = Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
+  auto providers = *Formatter::SubstitutionFormatParser::parse(redis_key_formatter);
   std::string formatted_key;
   for (Formatter::FormatterProviderPtr& provider : providers) {
     auto provider_formatted_key = provider->formatValueWithContext({}, stream_info);

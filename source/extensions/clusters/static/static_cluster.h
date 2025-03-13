@@ -19,12 +19,13 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
+protected:
+  StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context, absl::Status& creation_status);
+
 private:
   friend class StaticClusterFactory;
   friend class UpstreamImplTestBase;
-
-  StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context);
 
   // ClusterImplBase
   void startPreInit() override;

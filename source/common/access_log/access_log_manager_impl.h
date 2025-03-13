@@ -44,7 +44,8 @@ public:
 
   // AccessLog::AccessLogManager
   void reopen() override;
-  AccessLogFileSharedPtr createAccessLog(const Filesystem::FilePathAndType& file_info) override;
+  absl::StatusOr<AccessLogFileSharedPtr>
+  createAccessLog(const Filesystem::FilePathAndType& file_info) override;
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
@@ -84,11 +85,7 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  Api::IoCallBoolResult open();
   void createFlushStructures();
-
-  // return default flags set which used by open
-  static Filesystem::FlagSet defaultFlags();
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;

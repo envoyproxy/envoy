@@ -3,6 +3,7 @@
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/filters/repick_cluster_filter.h"
@@ -46,7 +47,11 @@ public:
                 (*cluster->mutable_typed_extension_protocol_options())
                     ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
         protocol_options.add_http_filters()->set_name(filter_name_);
-        protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+        auto* upstream_codec = protocol_options.add_http_filters();
+        upstream_codec->set_name("envoy.filters.http.upstream_codec");
+        upstream_codec->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
+                default_instance());
         (*cluster->mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
                 .PackFrom(protocol_options);
@@ -510,11 +515,9 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = true;
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // With deferred processing, a local reply is triggered so the upstream
-    // stream will be incomplete.
-    autonomous_allow_incomplete_streams_ = true;
-  }
+  // A local reply is triggered so the upstream stream will be incomplete.
+  autonomous_allow_incomplete_streams_ = true;
+
   cluster_with_custom_filter_ = 0;
   filter_name_ = "encoder-decoder-buffer-filter";
   initialConfigSetup("cluster_1", "");
@@ -542,13 +545,8 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // With deferred processing, the encoder-decoder-buffer-filter will
-    // buffer too much data triggering a local reply.
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
-  } else {
-    test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
-  }
+  // The encoder-decoder-buffer-filter will buffer too much data triggering a local reply.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -658,7 +656,6 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
             ->mutable_match()
             ->set_prefix("/main");
       });
-  config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams, "true");
   initialize();
 
   write_matcher_->setDestinationPort(fake_upstreams_[1]->localAddress()->ip()->port());
@@ -797,16 +794,18 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
 // Test request mirroring / shadowing with upstream HTTP filters in the router.
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters) {
   initialConfigSetup("cluster_1", "");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
-        envoy::extensions::filters::http::router::v3::Router router_filter;
-        router_filter_config->typed_config().UnpackTo(&router_filter);
-        router_filter.add_upstream_http_filters()->set_name("add-body-filter");
-        router_filter.add_upstream_http_filters()->set_name("envoy.filters.http.upstream_codec");
-        router_filter_config->mutable_typed_config()->PackFrom(router_filter);
-      });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
+    envoy::extensions::filters::http::router::v3::Router router_filter;
+    router_filter_config->typed_config().UnpackTo(&router_filter);
+    router_filter.add_upstream_http_filters()->set_name("add-body-filter");
+    auto* upstream_codec = router_filter.add_upstream_http_filters();
+    upstream_codec->set_name("envoy.filters.http.upstream_codec");
+    upstream_codec->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+  });
   filter_name_ = "add-body-filter";
   initialize();
   sendRequestAndValidateResponse();
@@ -925,6 +924,115 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.async-client.rq_total")->value());
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffix) {
+  initialConfigSetup("cluster_1", "");
+  // By default `disable_shadow_host_suffix_append` is "false".
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header has suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com-shadow");
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderAppendsSuffixAddresses) {
+  initialConfigSetup("cluster_1", "");
+  // By default `disable_shadow_host_suffix_append` is "false".
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header has suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->getHostValue(), fake_upstreams_[0]->localAddress()->asStringView());
+  EXPECT_EQ(mirror_headers_->getHostValue(),
+            absl::StrCat(version_ == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]",
+                         "-shadow:", fake_upstreams_[0]->localAddress()->ip()->port()))
+      << mirror_headers_->getHostValue();
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffix) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_disable_shadow_host_suffix_append(true);
+        mirror_policy->set_cluster("cluster_1");
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // Ensure shadowed host header does not have suffix "-shadow".
+  EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
+  EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* metadata_match = hcm.mutable_route_config()
+                                   ->mutable_virtual_hosts(0)
+                                   ->mutable_routes(0)
+                                   ->mutable_route()
+                                   ->mutable_metadata_match();
+        TestUtility::loadFromYaml(R"EOF(
+            filterMetadata:
+              envoy.lb:
+                stack: "default"
+        )EOF",
+                                  *metadata_match);
+      });
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto clusters = bootstrap.mutable_static_resources()->mutable_clusters();
+    for (auto& cluster : *clusters) {
+      TestUtility::loadFromYaml(R"EOF(
+            subsetSelectors:
+              - keys:
+                - "stack"
+          )EOF",
+                                *cluster.mutable_lb_subset_config());
+
+      auto lb_endpoint =
+          cluster.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+
+      TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    stack: "default"
+                )EOF",
+                                *lb_endpoint->mutable_metadata());
+    }
+  });
+  initialize();
+  sendRequestAndValidateResponse();
 }
 
 } // namespace

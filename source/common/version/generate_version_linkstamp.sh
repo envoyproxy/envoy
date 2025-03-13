@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script generates a header file that is used by version_lib whenever linkstamp is not allowed.
 # linkstamp is used to link in version_linkstamp.cc into the version_lib.

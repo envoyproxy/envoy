@@ -130,7 +130,7 @@ public:
   void triggerTimeout() { attachedRequestBuffered()->onTimeout(attachedRequest()); }
 
   std::string makeBufferedAdminYaml(uint64_t max_traces, std::string timeout_s = "0s") {
-    const std::string buffered_admin_request_yaml_ =
+    constexpr absl::string_view buffered_admin_request_yaml_ =
         R"EOF(
 config_id: test_config_id
 tap_config:
@@ -142,7 +142,7 @@ tap_config:
           max_traces: {}
           timeout: {}
 )EOF";
-    return fmt::format(fmt::runtime(buffered_admin_request_yaml_), max_traces, timeout_s);
+    return fmt::format(buffered_admin_request_yaml_, max_traces, timeout_s);
   }
 
   // Cannot be moved into individual test cases as expected calls are validated on object
@@ -156,7 +156,13 @@ public:
   MockTapSinkFactory() = default;
   ~MockTapSinkFactory() override = default;
 
-  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, SinkContext), (override));
+  MOCK_METHOD(SinkPtr, createHttpSinkPtr,
+              (const Protobuf::Message& config, Server::Configuration::FactoryContext&),
+              (override));
+  MOCK_METHOD(SinkPtr, createTransportSinkPtr,
+              (const Protobuf::Message& config,
+               Server::Configuration::TransportSocketFactoryContext&),
+              (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
@@ -168,9 +174,7 @@ public:
                  Extensions::Common::Tap::Sink* admin_streamer, SinkContext context)
       : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
 };
-
 TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
-
   const std::string tap_config_yaml =
       R"EOF(
   match:
@@ -192,11 +196,8 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
       }));
-  EXPECT_CALL(
-      factory_impl,
-      createSinkPtr(
-          _,
-          testing::VariantWith<std::reference_wrapper<Server::Configuration::FactoryContext>>(_)));
+  EXPECT_CALL(factory_impl, createHttpSinkPtr(_, _));
+
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -204,7 +205,6 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
 }
 
 TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
-
   const std::string tap_config_yaml =
       R"EOF(
   match:
@@ -226,15 +226,68 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
       }));
-  EXPECT_CALL(
-      factory_impl,
-      createSinkPtr(
-          _, testing::VariantWith<
-                 std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(_)));
+  EXPECT_CALL(factory_impl, createTransportSinkPtr(_, _));
+
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   TestConfigImpl(tap_config, nullptr, factory_context);
+}
+
+// Validates that a BufferedAdmin tap config that is passed without an admin
+// streamer is rejected.
+TEST(TypedExtensionConfigTest, BufferedAdminNoAdminStreamerRejected) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - buffered_admin: {}
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(tap_config, nullptr, factory_context), EnvoyException,
+      "Output sink type BufferedAdmin requires that the admin output will be configured via admin");
+}
+
+// Validates that a StreamingAdmin tap config that is passed without an admin
+// streamer is rejected.
+TEST(TypedExtensionConfigTest, StreamingAdminNoAdminStreamerRejected) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - streaming_admin: {}
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  MockTapSinkFactory factory_impl;
+  EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
+  EXPECT_CALL(factory_impl, createEmptyConfigProto)
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return std::make_unique<ProtobufWkt::StringValue>();
+      }));
+  Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(TestConfigImpl(tap_config, nullptr, factory_context), EnvoyException,
+                            "Output sink type StreamingAdmin requires that the admin output will "
+                            "be configured via admin");
 }
 
 // Make sure warn if using a pipe address for the admin handler.

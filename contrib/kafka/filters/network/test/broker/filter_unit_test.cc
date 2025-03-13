@@ -6,6 +6,7 @@
 #include "contrib/kafka/filters/network/source/broker/filter.h"
 #include "contrib/kafka/filters/network/source/broker/filter_config.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
+#include "contrib/kafka/filters/network/test/broker/mock_request.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -32,6 +33,15 @@ public:
 };
 
 using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
+
+class MockRequestHandler : public RequestHandler {
+public:
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
+  MOCK_METHOD(void, setReadFilterCallbacks, (Network::ReadFilterCallbacks&));
+};
+
+using MockRequestHandlerSharedPtr = std::shared_ptr<MockRequestHandler>;
 
 class MockResponseRewriter : public ResponseRewriter {
 public:
@@ -81,14 +91,6 @@ public:
   MOCK_METHOD(void, onBrokenResponse, ());
 };
 
-class MockRequest : public AbstractRequest {
-public:
-  MockRequest(const int16_t api_key, const int16_t api_version, const int32_t correlation_id)
-      : AbstractRequest{{api_key, api_version, correlation_id, ""}} {};
-  uint32_t computeSize() const override { return 0; };
-  uint32_t encode(Buffer::Instance&) const override { return 0; };
-};
-
 class MockResponse : public AbstractResponse {
 public:
   MockResponse(const int16_t api_key, const int32_t correlation_id)
@@ -102,15 +104,18 @@ public:
 class KafkaBrokerFilterUnitTest : public testing::Test {
 protected:
   MockKafkaMetricsFacadeSharedPtr metrics_{std::make_shared<MockKafkaMetricsFacade>()};
+  MockRequestHandlerSharedPtr request_handler_{std::make_shared<MockRequestHandler>()};
   MockResponseRewriterSharedPtr response_rewriter_{std::make_shared<MockResponseRewriter>()};
   MockResponseDecoderSharedPtr response_decoder_{std::make_shared<MockResponseDecoder>()};
   MockRequestDecoderSharedPtr request_decoder_{std::make_shared<MockRequestDecoder>()};
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
-  KafkaBrokerFilter testee_{metrics_, response_rewriter_, response_decoder_, request_decoder_};
+  KafkaBrokerFilter testee_{metrics_, request_handler_, response_rewriter_, response_decoder_,
+                            request_decoder_};
 
   void initialize() {
+    EXPECT_CALL(*request_handler_, setReadFilterCallbacks(_));
     testee_.initializeReadFilterCallbacks(filter_callbacks_);
     testee_.onNewConnection();
   }

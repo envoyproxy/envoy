@@ -23,9 +23,9 @@ public:
   static constexpr CommandSyntaxFlags PARAMS_OPTIONAL = 1 << 1;
   static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
 
-  static void verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
-                           const std::string& command, const std::string& subcommand,
-                           const absl::optional<size_t>& length);
+  static absl::Status verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
+                                   absl::string_view command, absl::string_view subcommand,
+                                   absl::optional<size_t> length);
 };
 
 /**
@@ -40,7 +40,6 @@ public:
   static const std::string&
   protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol);
   static const absl::optional<std::string> getHostname();
-  static const std::string getHostnameOrDefault();
 
   /**
    * Unspecified value for protobuf.
@@ -54,13 +53,21 @@ public:
   static void truncate(std::string& str, absl::optional<size_t> max_length);
 
   /**
+   * Truncate an input string view to a maximum length, and return the resulting string view. Do not
+   * truncate if max_length is not set or max_length is greater than the length of the input string
+   * view.
+   */
+  static absl::string_view truncateStringView(absl::string_view str,
+                                              absl::optional<size_t> max_length);
+
+  /**
    * Parse a header subcommand of the form: X?Y .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
-  static void parseSubcommandHeaders(const std::string& subcommand, std::string& main_header,
-                                     std::string& alternative_header);
+  using HeaderPair = std::pair<absl::string_view, absl::string_view>;
+  static absl::StatusOr<HeaderPair> parseSubcommandHeaders(absl::string_view subcommand);
 
   /* Variadic function template to parse the
      subcommand and assign found tokens to sequence of params.
@@ -77,24 +84,23 @@ public:
      untouched.
   */
   template <typename... Tokens>
-  static void parseSubcommand(const std::string& subcommand, const char separator,
+  static void parseSubcommand(absl::string_view subcommand, const char separator,
                               Tokens&&... params) {
-    std::vector<absl::string_view> tokens;
-    tokens = absl::StrSplit(subcommand, separator);
+    std::vector<absl::string_view> tokens = absl::StrSplit(subcommand, separator);
     std::vector<absl::string_view>::iterator it = tokens.begin();
     (
         [&](auto& param) {
           if (it != tokens.end()) {
             if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
-                                         std::string>) {
-              // Compile time handler for std::string.
-              param = std::string(*it);
+                                         absl::string_view>) {
+              // Compile time handler for absl::string_view.
+              param = *it;
               it++;
             } else {
               // Compile time handler for container type. It will catch all remaining tokens and
               // move iterator to the end.
               do {
-                param.push_back(std::string(*it));
+                param.push_back(*it);
                 it++;
               } while (it != tokens.end());
             }

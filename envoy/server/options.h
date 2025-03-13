@@ -85,6 +85,18 @@ public:
   virtual bool useDynamicBaseId() const PURE;
 
   /**
+   * @return bool don't get hot restart information from the parent if the communication channel
+   *         to the parent instance fails to connect.
+   */
+  virtual bool skipHotRestartOnNoParent() const PURE;
+
+  /**
+   * @return bool don't get stats from the parent. If there are a lot of stats, getting them
+   *         from the parent instance can be slow and require a lot of memory.
+   */
+  virtual bool skipHotRestartParentStats() const PURE;
+
+  /**
    * @return const std::string& the dynamic base id output file.
    */
   virtual const std::string& baseIdPath() const PURE;
@@ -141,6 +153,11 @@ public:
    * @return bool ignore unknown fields in the dynamic configuration?
    **/
   virtual bool ignoreUnknownDynamicFields() const PURE;
+
+  /**
+   * @return bool skip deprecated warning log messages?
+   **/
+  virtual bool skipDeprecatedLogs() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

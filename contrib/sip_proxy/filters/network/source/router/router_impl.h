@@ -12,7 +12,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"

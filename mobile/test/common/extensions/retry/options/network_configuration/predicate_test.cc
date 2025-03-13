@@ -21,6 +21,10 @@ namespace Options {
 namespace {
 
 TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
+// This proto is not defined in ../source/common/protobuf/create_reflectable_message.cc
+#ifndef ENVOY_ENABLE_FULL_PROTOS
+  return;
+#endif
   ExtensionRegistry::registerFactories();
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> mock_stream_info;
@@ -52,8 +56,7 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTestWithoutConnecti
   ASSERT_NE(nullptr, factory);
 
   auto proto_config = factory->createEmptyConfigProto();
-  EXPECT_DEATH(factory->createOptionsPredicate(*proto_config, retry_extension_factory_context),
-               "unexpected nullptr network connectivity_manager");
+  EXPECT_DEATH(factory->createOptionsPredicate(*proto_config, retry_extension_factory_context), "");
 }
 
 } // namespace

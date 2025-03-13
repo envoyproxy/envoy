@@ -1,15 +1,19 @@
 #pragma once
 
 #include "envoy/common/optref.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/config/dummy_config.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -75,7 +79,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator) {}
+                                  generator, /*prefer_gro=*/true) {}
 
   MOCK_METHOD(quic::MessageStatus, SendMessage,
               (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
@@ -94,13 +98,16 @@ public:
   MockEnvoyQuicSession(const quic::QuicConfig& config,
                        const quic::ParsedQuicVersionVector& supported_versions,
                        EnvoyQuicServerConnection* connection, Event::Dispatcher& dispatcher,
-                       uint32_t send_buffer_limit)
+                       uint32_t send_buffer_limit, QuicStatNames& quic_stat_names,
+                       Stats::Scope& scope)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
         QuicFilterManagerConnectionImpl(
             *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
             std::make_unique<StreamInfo::StreamInfoImpl>(
                 dispatcher.timeSource(),
-                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr(),
+                StreamInfo::FilterState::LifeSpan::Connection),
+            quic_stat_names, scope),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -198,7 +205,7 @@ public:
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                              EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
-                               quic::QuicServerId("example.com", 443, false),
+                               quic::QuicServerId("example.com", 443),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                dispatcher, send_buffer_limit, crypto_stream_factory,
@@ -267,11 +274,12 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
+std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
-                                                            quic::HuffmanEncoding::kEnabled);
+                                                            quic::HuffmanEncoding::kEnabled,
+                                                            quic::CookieCrumbling::kEnabled);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
   // therefore the value of |stream_id| does not matter.
@@ -318,6 +326,68 @@ public:
               (const));
   MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
               extraValidationContext, (), (const));
+};
+
+class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
+public:
+  MockQuicConnectionDebugVisitor(quic::QuicSession& session,
+                                 const StreamInfo::StreamInfo& stream_info)
+      : session_(session), stream_info_(stream_info) {}
+
+  MOCK_METHOD(void, OnConnectionClosed,
+              (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
+  MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
+
+  quic::QuicSession& session_;
+  const StreamInfo::StreamInfo& stream_info_;
+};
+
+class TestEnvoyQuicConnectionDebugVisitorFactory
+    : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
+public:
+  std::unique_ptr<quic::QuicConnectionDebugVisitor>
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession& session,
+                                   const StreamInfo::StreamInfo& stream_info) override {
+    auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session, stream_info);
+    mock_debug_visitor_ = debug_visitor.get();
+    return debug_visitor;
+  }
+
+  MockQuicConnectionDebugVisitor* mock_debug_visitor_;
+};
+
+class TestEnvoyQuicConnectionDebugVisitorFactoryFactory
+    : public EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface {
+public:
+  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
+
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<::test::common::config::DummyConfig>();
+  }
+
+  EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr
+  createFactory(const Protobuf::Message&, Server::Configuration::ListenerFactoryContext&) override {
+    return std::make_unique<TestEnvoyQuicConnectionDebugVisitorFactory>();
+  }
+};
+
+DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory);
+
+REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
+                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
+
+class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
+public:
+  void onNetworkChanged() {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkChanged();
+    }
+  }
+  using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
 
 } // namespace Quic

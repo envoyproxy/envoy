@@ -6,6 +6,8 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+using ::testing::Return;
+
 class SocketOptionImplTest : public SocketOptionTest {};
 
 TEST_F(SocketOptionImplTest, BadFd) {
@@ -55,6 +57,24 @@ TEST_F(SocketOptionImplTest, SetOptionSuccessTrue) {
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
       }));
+  EXPECT_TRUE(
+      socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+}
+
+TEST_F(SocketOptionImplTest, SetDatagramOptionOnStreamSocketType) {
+  ON_CALL(socket_, socketType()).WillByDefault(Return(Socket::Type::Stream));
+  SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                 ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1, Socket::Type::Datagram};
+  EXPECT_CALL(socket_, setSocketOption(_, _, _, _)).Times(0);
+  EXPECT_TRUE(
+      socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+}
+
+TEST_F(SocketOptionImplTest, SetStreamOptionOnDatagramSocketType) {
+  ON_CALL(socket_, socketType()).WillByDefault(Return(Socket::Type::Datagram));
+  SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                 ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1, Socket::Type::Stream};
+  EXPECT_CALL(socket_, setSocketOption(_, _, _, _)).Times(0);
   EXPECT_TRUE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
 }

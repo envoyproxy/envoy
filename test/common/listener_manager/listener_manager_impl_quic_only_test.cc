@@ -24,6 +24,21 @@ public:
 
 class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
 public:
+  size_t expectedNumSocketOptions() {
+    // SO_REUSEPORT, IP_PKTINFO and IP_MTU_DISCOVER/IP_DONTFRAG.
+    const size_t num_platform_independent_socket_options =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment") ? 3 : 2;
+    size_t num_platform_dependent_socket_options = 0;
+#ifdef SO_RXQ_OVFL
+    ++num_platform_dependent_socket_options;
+#endif
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      // SO_REUSEPORT
+      ++num_platform_dependent_socket_options;
+    }
+    return num_platform_dependent_socket_options + num_platform_independent_socket_options;
+  }
+
   NiceMock<MockSupportsUdpGso> udp_gso_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&udp_gso_syscall_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -61,12 +76,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -106,13 +121,7 @@ filter_chain_matcher:
       .WillByDefault(Return(os_sys_calls_actual_.supportsUdpGso()));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
-#else
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
-#endif
+                           expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -136,6 +145,18 @@ filter_chain_matcher:
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
+#endif
+
+#ifdef ENVOY_IP_DONTFRAG
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_DONTFRAG,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#else
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
+                   /* expected_value */ IP_PMTUDISC_DO,
+                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
@@ -166,7 +187,9 @@ filter_chain_matcher:
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
+  auto [cert, key] = quic_socket_factory.getTlsCertificateAndKey("", nullptr);
+  EXPECT_TRUE(cert != nullptr);
+  EXPECT_TRUE(key != nullptr);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 
   // Stop listening shouldn't close the socket.
@@ -193,13 +216,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
-#else
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
-#endif
+                           expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -223,6 +240,18 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
+#endif
+
+#ifdef ENVOY_IP_DONTFRAG
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_DONTFRAG,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#else
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
+                   /* expected_value */ IP_PMTUDISC_DO,
+                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
@@ -274,12 +303,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -301,13 +330,7 @@ udp_listener_config:
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
-#else
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
-#endif
+                           expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -331,6 +354,18 @@ udp_listener_config:
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
+#endif
+
+#ifdef ENVOY_IP_DONTFRAG
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_DONTFRAG,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#else
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
+                   /* expected_value */ IP_PMTUDISC_DO,
+                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
@@ -357,13 +392,7 @@ listener_filters:
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
-#else
-                           /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
-#endif
+                           expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -389,6 +418,18 @@ listener_filters:
   }
 #endif
 
+#ifdef ENVOY_IP_DONTFRAG
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_DONTFRAG,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#else
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
+                   /* expected_value */ IP_PMTUDISC_DO,
+                   /* expected_num_calls */ 1);
+#endif
+
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
   // Verify that the right filter chain type is installed.
@@ -402,7 +443,7 @@ listener_filters:
   manager_->listeners()[0].get().filterChainFactory().createQuicListenerFilterChain(filter_manager);
   ASSERT_NE(nullptr, listener_filter);
   Network::MockListenerFilterCallbacks callbacks;
-  EXPECT_CALL(callbacks, filterState());
+  EXPECT_CALL(callbacks, filterState()).Times(2);
   EXPECT_CALL(callbacks, dispatcher()).WillOnce(ReturnRef(server_.dispatcher_));
   listener_filter->onAccept(callbacks);
   auto* added_filter_state =
@@ -433,12 +474,12 @@ filter_chains:
       common_tls_context:
         tls_certificates:
         - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
           private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
         validation_context:
           trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
           match_typed_subject_alt_names:
           - matcher:
               exact: localhost
@@ -482,12 +523,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -546,12 +587,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -604,12 +645,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -667,12 +708,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost
@@ -731,12 +772,12 @@ filter_chains:
         common_tls_context:
           tls_certificates:
           - certificate_chain:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
             private_key:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
           validation_context:
             trusted_ca:
-              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+              filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
             match_typed_subject_alt_names:
             - matcher:
                 exact: localhost

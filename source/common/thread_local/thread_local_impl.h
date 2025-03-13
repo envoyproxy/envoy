@@ -19,6 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
+  InstanceImpl();
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -35,7 +36,7 @@ private:
   // slot as callbacks drain from workers.
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
-    ~SlotImpl() override { parent_.removeSlot(index_); }
+    ~SlotImpl() override;
     std::function<void()> wrapCallback(const std::function<void()>& cb);
     std::function<void()> dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);
@@ -47,7 +48,9 @@ private:
     void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
-    bool isShutdown() const override { return parent_.shutdown_; }
+    bool isShutdown() const override { return isShutdownImpl(); }
+    // We need to call isShutdown inside the destructor, so it must be non-virtual.
+    bool isShutdownImpl() const { return parent_.shutdown_; }
 
     InstanceImpl& parent_;
     const uint32_t index_;

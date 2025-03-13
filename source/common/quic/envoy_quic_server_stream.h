@@ -5,10 +5,11 @@
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
 #endif
-#include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/common/platform/api/quiche_reference_counted.h"
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
+#include "quiche/quic/core/qpack/qpack_encoder.h"
+#include "quiche/quic/core/qpack/qpack_instruction_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -16,7 +17,8 @@ namespace Quic {
 // This class is a quic stream and also a response encoder.
 class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public EnvoyQuicStream,
-                              public Http::ResponseEncoder {
+                              public Http::ResponseEncoder,
+                              public quic::QuicSpdyStream::MetadataVisitor {
 public:
   EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
@@ -28,14 +30,11 @@ public:
     request_decoder_ = &decoder;
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
   }
-  QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
   void encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) override;
-  void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const Http::ResponseTrailerMap& trailers) override;
-  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
@@ -54,7 +53,8 @@ public:
     std::unique_ptr<StreamInfo::StreamInfoImpl> new_stream_info =
         std::make_unique<StreamInfo::StreamInfoImpl>(
             filterManagerConnection()->dispatcher().timeSource(),
-            filterManagerConnection()->connectionInfoProviderSharedPtr());
+            filterManagerConnection()->connectionInfoProviderSharedPtr(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
     new_stream_info->setFrom(stream_info, request_header_map.get());
     stats_gatherer_->setDeferredLoggingHeadersAndTrailers(
         request_header_map, response_header_map, response_trailer_map, std::move(new_stream_info));
@@ -65,6 +65,7 @@ public:
 
   // quic::QuicStream
   void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
+  void OnSoonToBeDestroyed() override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicResetStreamError error) override;
@@ -73,7 +74,8 @@ public:
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
-  void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
+                          quic::ConnectionCloseSource source) override;
   void CloseWriteSide() override;
 
   void clearWatermarkBuffer();
@@ -81,6 +83,9 @@ public:
   // EnvoyQuicStream
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view header_name, absl::string_view header_value) override;
+
+  // quic::QuicSpdyStream::MetadataVisitor
+  void OnMetadataComplete(size_t frame_len, const quic::QuicHeaderList& header_list) override;
 
 protected:
   // EnvoyQuicStream
@@ -121,11 +126,6 @@ private:
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 
-  quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  // Setting |http_datagram_handler_| enables HTTP Datagram support.
-  std::unique_ptr<HttpDatagramHandler> http_datagram_handler_;
-#endif
   // True if a :path header has been seen before.
   bool saw_path_{false};
 };

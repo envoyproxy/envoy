@@ -227,8 +227,9 @@ public:
    * the constructor is finished, with the exception of dynamic RTDS layers,
    * which require ClusterManager.
    * @param cm cluster manager reference.
+   * @return a status indicating if initialization was successful.
    */
-  virtual void initialize(Upstream::ClusterManager& cm) PURE;
+  virtual absl::Status initialize(Upstream::ClusterManager& cm) PURE;
 
   /**
    * @return const Snapshot& the current snapshot. This reference is safe to use for the duration of
@@ -247,8 +248,10 @@ public:
    * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for
    * a key, use an empty string as the value.
    * @param values the values to merge
+   * @return a status indicating success or failure.
    */
-  virtual void mergeValues(const absl::node_hash_map<std::string, std::string>& values) PURE;
+  virtual absl::Status
+  mergeValues(const absl::node_hash_map<std::string, std::string>& values) PURE;
 
   /**
    * Initiate all RTDS subscriptions. The `on_done` callback is invoked when all RTDS requests

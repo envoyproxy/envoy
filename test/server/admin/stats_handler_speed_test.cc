@@ -84,6 +84,14 @@ public:
 
   Health coarseHealth() const override { return Upstream::Host::Health::Healthy; }
 
+  Network::UpstreamTransportSocketFactory&
+  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr&,
+                                const envoy::config::core::v3::Metadata*) const override {
+    IS_ENVOY_BUG("unexpected call to resolveTransportSocketFactory");
+    Network::UpstreamTransportSocketFactory* ptr = nullptr;
+    return *ptr;
+  }
+
   Network::Address::InstanceConstSharedPtr address_;
   std::string hostname_;
   mutable Upstream::HostStats host_stats_;

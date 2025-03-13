@@ -19,13 +19,8 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
   for (const auto& cidr_range : cidr_ranges) {
     const std::string& address = cidr_range.address_prefix();
     const uint32_t prefix_len = cidr_range.prefix_len().value();
-    const auto range = Network::Address::CidrRange::create(address, prefix_len);
-    // We only assert that the range is valid because:
-    // * if "address" can't be parsed, it will throw an EnvoyException
-    // * prefix_len can't be < 0 as per the protobuf definition as an uint32_t
-    // * if prefix_len is too big, CidrRange::create clamps it to a valid value
-    // => it is thus not possible to create an invalid range.
-    ASSERT(range.isValid(), "address range should be valid!");
+    const auto range = THROW_OR_RETURN_VALUE(
+        Network::Address::CidrRange::create(address, prefix_len), Network::Address::CidrRange);
     ranges.emplace_back(std::move(range));
   }
 

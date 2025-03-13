@@ -76,15 +76,17 @@ public:
   Visitor(const Options& options) : options_(options) {}
 
   // ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view description) override {
-    throw ProtobufMessage::UnknownProtoFieldException(
+  absl::Status onUnknownField(absl::string_view description) override {
+    return absl::InvalidArgumentError(
         absl::StrCat("Protobuf message (", description, ") has unknown fields"));
   }
   bool skipValidation() override { return false; }
-  void onDeprecatedField(absl::string_view description, bool) override {
+  absl::Status onDeprecatedField(absl::string_view description, bool) override {
     if (options_.failOnDeprecated()) {
-      throw EnvoyException(absl::StrCat("Failing due to deprecated field: ", description));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failing due to deprecated field: ", description));
     }
+    return absl::OkStatus();
   }
   void onWorkInProgress(absl::string_view description) override {
     if (options_.failOnWip()) {

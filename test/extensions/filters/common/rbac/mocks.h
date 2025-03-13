@@ -17,9 +17,10 @@ namespace RBAC {
 class MockEngine : public RoleBasedAccessControlEngineImpl {
 public:
   MockEngine(const envoy::config::rbac::v3::RBAC& rules,
+             Server::Configuration::CommonFactoryContext& context,
              const EnforcementMode mode = EnforcementMode::Enforced)
       : RoleBasedAccessControlEngineImpl(rules, ProtobufMessage::getStrictValidationVisitor(),
-                                         mode){};
+                                         context, mode){};
 
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,

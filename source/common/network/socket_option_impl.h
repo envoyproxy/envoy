@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/memory/aligned_allocator.h"
 
 namespace Envoy {
 namespace Network {
@@ -39,6 +40,14 @@ public:
   bool isSupported() const override;
 
   /**
+   * Gets the socket type for this socket option. Empty means, the socket option is not specific to
+   * a particular socket type.
+   *
+   * @return the socket type
+   */
+  absl::optional<Network::Socket::Type> socketType() const;
+
+  /**
    * Set the option on the given socket.
    * @param socket the socket on which to apply the option.
    * @param optname the option name.
@@ -54,9 +63,10 @@ public:
 private:
   const envoy::config::core::v3::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
-  // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
-  // the buffer so its data() is not aligned in to alignof(void*).
-  const std::vector<uint8_t> value_;
+  // The vector's data() is used by the setsockopt syscall, which needs to be int-size-aligned on
+  // some platforms, the AlignedAllocator here makes it pointer-size-aligned, which satisfies the
+  // requirement, although it can be slightly over-aligned.
+  const std::vector<uint8_t, Memory::AlignedAllocator<uint8_t, alignof(void*)>> value_;
   // If present, specifies the socket type that this option applies to. Attempting to set this
   // option on a socket of a different type will be a no-op.
   absl::optional<Network::Socket::Type> socket_type_;

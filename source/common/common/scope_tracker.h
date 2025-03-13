@@ -18,9 +18,7 @@ namespace Envoy {
 class ScopeTrackerScopeState {
 public:
   ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
-      : registered_object_(object),
-        scoped_execution_context_(executionContextEnabled() ? object->executionContext() : nullptr),
-        tracker_(tracker) {
+      : registered_object_(object), tracker_(tracker) {
     tracker_.pushTrackedObject(registered_object_);
   }
 
@@ -36,14 +34,13 @@ public:
 
 private:
   friend class ScopeTrackerScopeStateTest;
-  static bool& executionContextEnabled() {
-    static bool enabled =
-        Runtime::runtimeFeatureEnabled("envoy.restart_features.enable_execution_context");
-    return enabled;
-  }
+
   const ScopeTrackedObject* registered_object_;
-  ScopedExecutionContext scoped_execution_context_;
   Event::ScopeTracker& tracker_;
+
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+  ScopedExecutionContext scoped_execution_context_{registered_object_};
+#endif
 };
 
 } // namespace Envoy

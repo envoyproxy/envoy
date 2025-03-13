@@ -17,7 +17,10 @@ namespace Decompressor {
 /**
  * All brotli decompressor stats. @see stats_macros.h
  */
-#define ALL_BROTLI_DECOMPRESSOR_STATS(COUNTER) COUNTER(brotli_error)
+#define ALL_BROTLI_DECOMPRESSOR_STATS(COUNTER)                                                     \
+  COUNTER(brotli_error)           /*Decompression error of all.*/                                  \
+  COUNTER(brotli_output_overflow) /*Decompression error because of the overflow output.*/          \
+  COUNTER(brotli_redundant_input) /*Decompression error because of the redundant input.*/
 
 /**
  * Struct definition for brotli decompressor stats. @see stats_macros.h

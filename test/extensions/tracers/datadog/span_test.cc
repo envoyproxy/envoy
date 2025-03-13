@@ -98,7 +98,7 @@ private:
   static datadog::tracing::TracerConfig
   makeConfig(const std::shared_ptr<datadog::tracing::Collector>& collector) {
     datadog::tracing::TracerConfig config;
-    config.defaults.service = "testsvc";
+    config.service = "testsvc";
     config.collector = collector;
     config.logger = std::make_shared<NullLogger>();
     // Drop all spans. Equivalently, we could keep all spans.
@@ -266,7 +266,7 @@ TEST_F(DatadogTracerSpanTest, InjectContext) {
   Span span{std::move(span_)};
 
   Tracing::TestTraceContextImpl context{};
-  span.injectContext(context, nullptr);
+  span.injectContext(context, Tracing::UpstreamContext());
   // Span::injectContext doesn't modify any of named fields.
   EXPECT_EQ("", context.context_protocol_);
   EXPECT_EQ("", context.context_host_);
@@ -386,9 +386,10 @@ TEST_F(DatadogTracerSpanTest, Baggage) {
   EXPECT_EQ("", span.getBaggage("foo"));
 }
 
-TEST_F(DatadogTracerSpanTest, GetTraceIdAsHex) {
+TEST_F(DatadogTracerSpanTest, GetTraceId) {
   Span span{std::move(span_)};
-  EXPECT_EQ("cafebabe", span.getTraceIdAsHex());
+  EXPECT_EQ("cafebabe", span.getTraceId());
+  EXPECT_EQ("", span.getSpanId());
 }
 
 TEST_F(DatadogTracerSpanTest, NoOpMode) {
@@ -414,7 +415,7 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   // `Span::log` doesn't do anything in any case.
   span.log(time_.timeSystem().systemTime(), "ignored");
   Tracing::TestTraceContextImpl context{};
-  span.injectContext(context, nullptr);
+  span.injectContext(context, Tracing::UpstreamContext());
   EXPECT_EQ("", context.context_protocol_);
   EXPECT_EQ("", context.context_host_);
   EXPECT_EQ("", context.context_path_);
@@ -429,7 +430,8 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   span.setSampled(false);
   EXPECT_EQ("", span.getBaggage("foo"));
   span.setBaggage("foo", "bar");
-  EXPECT_EQ("", span.getTraceIdAsHex());
+  EXPECT_EQ("", span.getTraceId());
+  EXPECT_EQ("", span.getSpanId());
 }
 
 } // namespace

@@ -58,9 +58,10 @@ void DynamoFilter::onDecodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(decoder_callbacks_->decodingBuffer(), data);
   if (!body.empty()) {
     try {
-      Json::ObjectSharedPtr json_body = Json::Factory::loadFromString(body);
+      Json::ObjectSharedPtr json_body =
+          THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(body), Json::ObjectSharedPtr);
       table_descriptor_ = RequestParser::parseTable(operation_, *json_body);
-    } catch (const Json::Exception& jsonEx) {
+    } catch (...) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_->incCounter({stats_->invalid_req_body_});
     }
@@ -75,7 +76,8 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
   std::string body = buildBody(encoder_callbacks_->encodingBuffer(), data);
   if (!body.empty()) {
     try {
-      Json::ObjectSharedPtr json_body = Json::Factory::loadFromString(body);
+      Json::ObjectSharedPtr json_body =
+          THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(body), Json::ObjectSharedPtr);
       chargeTablePartitionIdStats(*json_body);
 
       if (Http::CodeUtility::is4xx(status)) {
@@ -87,7 +89,7 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
       if (RequestParser::isBatchOperation(operation_)) {
         chargeUnProcessedKeysStats(*json_body);
       }
-    } catch (const Json::Exception&) {
+    } catch (...) {
       // Body parsing failed. This should not happen, just put a stat for that.
       stats_->incCounter({stats_->invalid_resp_body_});
     }

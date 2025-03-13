@@ -1,21 +1,26 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <optional>
 #include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/datasource.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -43,6 +48,29 @@ class EnvironmentCredentialsProvider : public CredentialsProvider,
                                        public Logger::Loggable<Logger::Id::aws> {
 public:
   Credentials getCredentials() override;
+  bool credentialsPending() override { return false; };
+  std::string providerName() override { return "EnvironmentCredentialsProvider"; };
+};
+
+/**
+ * Returns AWS credentials from static filter configuration.
+ *
+ * Adheres to conventions specified in:
+ * https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
+ */
+class ConfigCredentialsProvider : public CredentialsProvider,
+                                  public Logger::Loggable<Logger::Id::aws> {
+public:
+  ConfigCredentialsProvider(absl::string_view access_key_id = absl::string_view(),
+                            absl::string_view secret_access_key = absl::string_view(),
+                            absl::string_view session_token = absl::string_view())
+      : credentials_(access_key_id, secret_access_key, session_token) {}
+  Credentials getCredentials() override;
+  bool credentialsPending() override { return false; };
+  std::string providerName() override { return "ConfigCredentialsProvider"; };
+
+private:
+  const Credentials credentials_;
 };
 
 class CachedCredentialsProviderBase : public CredentialsProvider,
@@ -52,11 +80,11 @@ public:
     refreshIfNeeded();
     return cached_credentials_;
   }
+  bool credentialsPending() override { return false; };
 
 protected:
   SystemTime last_updated_;
   Credentials cached_credentials_;
-  Thread::MutexBasicLockable lock_;
 
   void refreshIfNeeded();
 
@@ -72,52 +100,85 @@ protected:
  */
 class CredentialsFileCredentialsProvider : public CachedCredentialsProviderBase {
 public:
-  CredentialsFileCredentialsProvider(Api::Api& api) : api_(api) {}
+  CredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config = {});
+  std::string providerName() override { return "CredentialsFileCredentialsProvider"; };
 
 private:
-  Api::Api& api_;
+  Server::Configuration::ServerFactoryContext& context_;
+  std::string profile_;
+  absl::optional<Config::DataSource::DataSourceProviderPtr> credential_file_data_source_provider_;
+  bool has_watched_directory_ = false;
 
   bool needsRefresh() override;
   void refresh() override;
-  void extractCredentials(const std::string& credentials_file, const std::string& profile);
+  void extractCredentials(absl::string_view credentials_string, absl::string_view profile);
 };
 
-class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase {
+#define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \
+  COUNTER(credential_refreshes_performed)                                                          \
+  COUNTER(credential_refreshes_failed)                                                             \
+  COUNTER(credential_refreshes_succeeded)                                                          \
+  GAUGE(metadata_refresh_state, Accumulate)
+
+struct MetadataCredentialsProviderStats {
+  ALL_METADATACREDENTIALSPROVIDER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
+                                        public AwsManagedClusterUpdateCallbacks {
 public:
+  friend class MetadataCredentialsProviderBaseFriend;
   using CurlMetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(
-      Api::Api& api, ServerFactoryContextOptRef context,
-      const CurlMetadataFetcher& fetch_metadata_using_curl,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri);
+  MetadataCredentialsProviderBase(Api::Api& api, ServerFactoryContextOptRef context,
+                                  AwsClusterManagerOptRef aws_cluster_manager,
+                                  absl::string_view cluster_name,
+                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
+                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                  MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                  std::chrono::seconds initialization_timer);
 
   Credentials getCredentials() override;
+  bool credentialsPending() override;
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 
+  // Store the RAII cluster callback handle following registration call with AWS cluster manager
+  void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {
+    callback_handle_ = std::move(handle);
+  }
+
+  CredentialSubscriberCallbacksHandlePtr
+  subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs);
+
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCredentialsCache() {
-      credentials_ = std::make_shared<Credentials>(); // Creating empty credentials as default.
-    }
+    ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()){};
+
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
+    // Lock guard.
+    Thread::MutexBasicLockable lock_;
   };
 
+  // Set anonymous credentials to all threads, update stats and close async
+  void credentialsRetrievalError();
+
   const std::string& clusterName() const { return cluster_name_; }
+
+  // Callback from AWS cluster manager, triggered when our cluster comes online
+  void onClusterAddOrUpdate() override;
 
   // Handle fetch done.
   void handleFetchDone();
 
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
-
-  // Returns true if http async client can be used instead of libcurl to fetch the aws credentials,
-  // else false.
-  bool useHttpAsyncClient();
 
   Api::Api& api_;
   // The optional server factory context.
@@ -127,15 +188,14 @@ protected:
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
-  const std::string cluster_name_;
-  // The cluster type to use for internal static cluster pointing towards the credentials provider.
-  const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;
-  // The uri of internal static cluster credentials provider.
-  const std::string uri_;
+  std::string cluster_name_;
   // The cache duration of the fetched credentials.
-  const std::chrono::seconds cache_duration_;
-  // The thread local slot for cache.
-  ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_;
+  std::chrono::seconds cache_duration_;
+  // Metadata receiver state, describing where we are along the initial credential refresh process
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
+  // Metadata receiver initialization timer - number of seconds between retries during the first
+  // credential retrieval process
+  std::chrono::seconds initialization_timer_;
   // The timer to trigger fetch due to cache duration.
   Envoy::Event::TimerPtr cache_duration_timer_;
   // The Metadata fetcher object.
@@ -150,12 +210,22 @@ protected:
   SystemTime last_updated_;
   // Cache credentials when using libcurl.
   Credentials cached_credentials_;
-  // Lock guard.
-  Thread::MutexBasicLockable lock_;
-  // The init target.
-  std::unique_ptr<Init::TargetImpl> init_target_;
-  // Used in logs.
-  const std::string debug_name_;
+  // The expiration time received in any returned token
+  absl::optional<SystemTime> expiration_time_;
+  // Tls slot
+  ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_ = nullptr;
+  // Stats scope
+  Stats::ScopeSharedPtr scope_ = nullptr;
+  // Pointer to our stats structure
+  std::shared_ptr<MetadataCredentialsProviderStats> stats_;
+  // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
+  AwsClusterManagerOptRef aws_cluster_manager_;
+  // RAII handle for callbacks from AWS cluster manager
+  AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
+  // Are credentials pending?
+  std::atomic<bool> credentials_pending_ = true;
+  Thread::MutexBasicLockable mu_;
+  std::list<CredentialSubscriberCallbacks*> credentials_subscribers_ ABSL_GUARDED_BY(mu_) = {};
 };
 
 /**
@@ -164,16 +234,21 @@ protected:
  * https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
+                                           public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     AwsClusterManagerOptRef aws_cluster_manager,
                                      const CurlMetadataFetcher& fetch_metadata_using_curl,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
                                      absl::string_view cluster_name);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "InstanceProfileCredentialsProvider"; };
 
 private:
   bool needsRefresh() override;
@@ -199,22 +274,26 @@ private:
  *
  * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#enable_task_iam_roles
  */
-class TaskRoleCredentialsProvider : public MetadataCredentialsProviderBase,
-                                    public MetadataFetcher::MetadataReceiver {
+class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
+                                     public Envoy::Singleton::Instance,
+                                     public MetadataFetcher::MetadataReceiver {
 public:
-  TaskRoleCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
-                              const CurlMetadataFetcher& fetch_metadata_using_curl,
-                              CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                              absl::string_view credential_uri,
-                              absl::string_view authorization_token,
-                              absl::string_view cluster_name);
+  ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                               AwsClusterManagerOptRef aws_cluster_manager,
+                               const CurlMetadataFetcher& fetch_metadata_using_curl,
+                               CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                               absl::string_view credential_uri,
+                               MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                               std::chrono::seconds initialization_timer,
+                               absl::string_view authorization_token,
+                               absl::string_view cluster_name);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "ContainerCredentialsProvider"; };
 
 private:
-  SystemTime expiration_time_;
   const std::string credential_uri_;
   const std::string authorization_token_;
 
@@ -230,21 +309,25 @@ private:
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
                                        public MetadataFetcher::MetadataReceiver {
 public:
-  WebIdentityCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
-                                 const CurlMetadataFetcher& fetch_metadata_using_curl,
-                                 CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                                 absl::string_view token_file_path, absl::string_view sts_endpoint,
-                                 absl::string_view role_arn, absl::string_view role_session_name,
-                                 absl::string_view cluster_name);
+  // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
+  // not used, and vice versa.
+  WebIdentityCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer,
+      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+          web_identity_config);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "WebIdentityCredentialsProvider"; };
 
 private:
-  SystemTime expiration_time_;
-  const std::string token_file_path_;
   const std::string sts_endpoint_;
+  absl::optional<Config::DataSource::DataSourceProviderPtr> web_identity_data_source_provider_;
   const std::string role_arn_;
   const std::string role_session_name_;
 
@@ -253,51 +336,106 @@ private:
   void extractCredentials(const std::string&& credential_document_value);
 };
 
-/**
- * AWS credentials provider chain, able to fallback between multiple credential providers.
- */
-class CredentialsProviderChain : public CredentialsProvider,
-                                 public Logger::Loggable<Logger::Id::aws> {
-public:
-  ~CredentialsProviderChain() override = default;
-
-  void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
-  }
-
-  Credentials getCredentials() override;
-
-protected:
-  std::list<CredentialsProviderSharedPtr> providers_;
-};
-
 class CredentialsProviderChainFactories {
 public:
   virtual ~CredentialsProviderChainFactories() = default;
 
   virtual CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const PURE;
 
-  virtual CredentialsProviderSharedPtr
-  createCredentialsFileCredentialsProvider(Api::Api& api) const PURE;
+  virtual CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config = {}) const PURE;
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
-      absl::string_view role_session_name) const PURE;
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+          web_identity_config) PURE;
 
-  virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
+  virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view credential_uri, absl::string_view authorization_token = {}) const PURE;
+      absl::string_view credential_uri,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      absl::string_view cluster_name) const PURE;
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
+};
+
+class CustomCredentialsProviderChainFactories {
+public:
+  virtual ~CustomCredentialsProviderChainFactories() = default;
+
+  virtual CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config = {}) const PURE;
+
+  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+          web_identity_config) PURE;
+};
+
+// TODO(nbaws) Add additional providers to the custom chain.
+class CustomCredentialsProviderChain : public CredentialsProviderChain,
+                                       public CustomCredentialsProviderChainFactories {
+public:
+  CustomCredentialsProviderChain(
+      Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
+      CustomCredentialsProviderChainFactories& factories);
+
+  CustomCredentialsProviderChain(
+      Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config)
+      : CustomCredentialsProviderChain(context, region, credential_provider_config, *this) {}
+
+  CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config = {}
+
+  ) const override {
+
+    return std::make_shared<CredentialsFileCredentialsProvider>(context, credential_file_config);
+  };
+
+  CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+          web_identity_config) override;
+
+  AwsClusterManagerPtr aws_cluster_manager_;
+};
+
+/**
+ * Credential provider based on an inline credential.
+ */
+class InlineCredentialProvider : public CredentialsProvider {
+public:
+  explicit InlineCredentialProvider(absl::string_view access_key_id,
+                                    absl::string_view secret_access_key,
+                                    absl::string_view session_token)
+      : credentials_(access_key_id, secret_access_key, session_token) {}
+
+  Credentials getCredentials() override { return credentials_; }
+  bool credentialsPending() override { return false; };
+  std::string providerName() override { return "InlineCredentialProvider"; };
+
+private:
+  const Credentials credentials_;
 };
 
 /**
@@ -311,57 +449,60 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
 public:
   DefaultCredentialsProviderChain(
       Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl)
-      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl, *this) {}
+      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config =
+          {})
+      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl,
+                                        credential_provider_config, *this) {}
 
   DefaultCredentialsProviderChain(
       Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
-      const CredentialsProviderChainFactories& factories);
+      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
+      CredentialsProviderChainFactories& factories);
 
 private:
   CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
     return std::make_shared<EnvironmentCredentialsProvider>();
   }
 
-  CredentialsProviderSharedPtr
-  createCredentialsFileCredentialsProvider(Api::Api& api) const override {
-    return std::make_shared<CredentialsFileCredentialsProvider>(api);
-  }
+  CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config
 
-  CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
+  ) const override {
+    return std::make_shared<CredentialsFileCredentialsProvider>(context, credential_file_config);
+  };
+
+  CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view credential_uri, absl::string_view authorization_token = {}) const override {
-    return std::make_shared<TaskRoleCredentialsProvider>(api, context, fetch_metadata_using_curl,
-                                                         create_metadata_fetcher_cb, credential_uri,
-                                                         authorization_token, cluster_name);
-  }
+      absl::string_view credential_uri,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer, absl::string_view authorization_token) override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<InstanceProfileCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, cluster_name);
-  }
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer, absl::string_view cluster_name) override;
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
-      absl::string_view role_session_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path,
-        sts_endpoint, role_arn, role_session_name, cluster_name);
-  }
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+          web_identity_config) override;
+
+  AwsClusterManagerPtr aws_cluster_manager_;
 };
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;
-using TaskRoleCredentialsProviderPtr = std::shared_ptr<TaskRoleCredentialsProvider>;
+using ContainerCredentialsProviderPtr = std::shared_ptr<ContainerCredentialsProvider>;
 using WebIdentityCredentialsProviderPtr = std::shared_ptr<WebIdentityCredentialsProvider>;
 
 } // namespace Aws

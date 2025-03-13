@@ -64,12 +64,12 @@ public:
    *               in order to match the regex. This is an optional performance tweak
    *               to avoid large numbers of failed regex lookups.
    * @param re_type the regular expression syntax used (Regex::Type::StdRegex or Regex::Type::Re2).
-   * @return TagExtractorPtr newly constructed TagExtractor.
+   * @return TagExtractorPtr newly constructed TagExtractor or a failure status.
    */
-  static TagExtractorPtr createTagExtractor(absl::string_view name, absl::string_view regex,
-                                            absl::string_view substr = "",
-                                            absl::string_view negative_match = "",
-                                            Regex::Type re_type = Regex::Type::StdRegex);
+  static absl::StatusOr<TagExtractorPtr>
+  createTagExtractor(absl::string_view name, absl::string_view regex, absl::string_view substr = "",
+                     absl::string_view negative_match = "",
+                     Regex::Type re_type = Regex::Type::StdRegex);
 
   TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                        absl::string_view substr = "");

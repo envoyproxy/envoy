@@ -38,6 +38,9 @@ MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
 
+MockCodecEventCallbacks::MockCodecEventCallbacks() = default;
+MockCodecEventCallbacks::~MockCodecEventCallbacks() = default;
+
 MockServerConnection::MockServerConnection() {
   ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
 }
@@ -72,6 +75,7 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, decodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
 
   ON_CALL(*this, addDownstreamWatermarkCallbacks(_))
@@ -108,15 +112,14 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
       }));
-  ON_CALL(*this, traversePerFilterConfig(_))
-      .WillByDefault(
-          Invoke([this](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            auto route = this->route();
-            if (route == nullptr) {
-              return;
-            }
-            route->traversePerFilterConfig("envoy.filter", cb);
-          }));
+  ON_CALL(*this, perFilterConfigs())
+      .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
+        auto route = this->route();
+        if (route == nullptr) {
+          return {};
+        }
+        return route->perFilterConfigs("envoy.filter");
+      }));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
@@ -157,15 +160,14 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
       }));
-  ON_CALL(*this, traversePerFilterConfig(_))
-      .WillByDefault(
-          Invoke([this](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            auto route = this->route();
-            if (route == nullptr) {
-              return;
-            }
-            route->traversePerFilterConfig("envoy.filter", cb);
-          }));
+  ON_CALL(*this, perFilterConfigs())
+      .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
+        auto route = this->route();
+        if (route == nullptr) {
+          return {};
+        }
+        return route->perFilterConfigs("envoy.filter");
+      }));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() = default;

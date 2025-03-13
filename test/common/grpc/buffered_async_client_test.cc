@@ -45,7 +45,7 @@ public:
     EXPECT_CALL(http_stream_, sendHeaders(_, _));
     EXPECT_CALL(http_stream_, reset());
 
-    raw_client_ = std::make_shared<AsyncClientImpl>(cm_, config_, dispatcher_->timeSource());
+    raw_client_ = *AsyncClientImpl::create(cm_, config_, dispatcher_->timeSource());
     client_ = std::make_unique<AsyncClient<helloworld::HelloRequest, helloworld::HelloReply>>(
         raw_client_);
   }

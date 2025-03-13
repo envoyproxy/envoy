@@ -7,6 +7,7 @@
 #include "source/common/quic/quic_network_connection.h"
 
 #include "quiche/quic/core/quic_connection.h"
+#include "quiche/quic/core/quic_packets.h"
 
 namespace Envoy {
 namespace Quic {
@@ -41,6 +42,12 @@ public:
     }
     return listener_filter_->onPeerAddressChanged(new_address, connection);
   }
+  Network::FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket& packet) override {
+    if (on_accept_by_passed_) {
+      return Network::FilterStatus::Continue;
+    }
+    return listener_filter_->onFirstPacketReceived(packet);
+  }
 
 private:
   bool on_accept_by_passed_{false};
@@ -59,8 +66,12 @@ public:
   Network::ConnectionSocket& socket() override { return socket_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   void continueFilterChain(bool /*success*/) override { IS_ENVOY_BUG("Should not be used."); }
+  void useOriginalDst(bool /*use_original_dst*/) override { IS_ENVOY_BUG("Should not be used."); }
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     stream_info_.setDynamicMetadata(name, value);
+  }
+  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+    stream_info_.setDynamicTypedMetadata(name, value);
   }
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_.dynamicMetadata();
@@ -78,7 +89,7 @@ public:
   }
   bool shouldAdvertiseServerPreferredAddress(
       const quic::QuicSocketAddress& server_preferred_address) const override {
-    for (const auto& accept_filter : accept_filters_) {
+    for (const Network::QuicListenerFilterPtr& accept_filter : accept_filters_) {
       if (!accept_filter->isCompatibleWithServerPreferredAddress(server_preferred_address)) {
         return false;
       }
@@ -87,7 +98,7 @@ public:
   }
   void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
                             Network::Connection& connection) override {
-    for (auto& accept_filter : accept_filters_) {
+    for (Network::QuicListenerFilterPtr& accept_filter : accept_filters_) {
       Network::FilterStatus status = accept_filter->onPeerAddressChanged(new_address, connection);
       if (status == Network::FilterStatus::StopIteration ||
           connection.state() != Network::Connection::State::Open) {
@@ -96,10 +107,18 @@ public:
     }
   }
   void startFilterChain() {
-    for (auto& accept_filter : accept_filters_) {
+    for (Network::QuicListenerFilterPtr& accept_filter : accept_filters_) {
       Network::FilterStatus status = accept_filter->onAccept(*this);
       if (status == Network::FilterStatus::StopIteration || !socket().ioHandle().isOpen()) {
         break;
+      }
+    }
+  }
+  void onFirstPacketReceived(const quic::QuicReceivedPacket& packet) override {
+    for (Network::QuicListenerFilterPtr& accept_filter : accept_filters_) {
+      Network::FilterStatus status = accept_filter->onFirstPacketReceived(packet);
+      if (status == Network::FilterStatus::StopIteration) {
+        return;
       }
     }
   }
@@ -128,6 +147,9 @@ public:
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
   void OnCanWrite() override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
 
   bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
 
@@ -136,6 +158,7 @@ protected:
 
 private:
   std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager_;
+  bool first_packet_received_ = false;
 };
 
 // An implementation that issues connection IDs with stable first 4 types.

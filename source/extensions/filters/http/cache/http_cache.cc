@@ -24,7 +24,8 @@ namespace HttpFilters {
 namespace Cache {
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                             const VaryAllowList& vary_allow_list)
+                             const VaryAllowList& vary_allow_list,
+                             bool ignore_request_cache_control_header)
     : request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
       vary_allow_list_(vary_allow_list), timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
@@ -36,7 +37,9 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   absl::string_view scheme = request_headers.getSchemeValue();
   ASSERT(Http::Utility::schemeIsValid(request_headers.getSchemeValue()));
 
-  initializeRequestCacheControl(request_headers);
+  if (!ignore_request_cache_control_header) {
+    initializeRequestCacheControl(request_headers);
+  }
   // TODO(toddmgreer): Let config determine whether to include scheme, host, and
   // query params.
 
@@ -54,13 +57,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 // Unless this API is still alpha, calls to stableHashKey() must always return
 // the same result, or a way must be provided to deal with a complete cache
 // flush.
-size_t stableHashKey(const Key& key) {
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
-    return DeterministicProtoHash::hash(key);
-  } else {
-    return MessageUtil::hash(key);
-  }
-}
+size_t stableHashKey(const Key& key) { return DeterministicProtoHash::hash(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =
@@ -127,8 +124,8 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                             ResponseMetadata&& metadata, uint64_t content_length,
-                                             bool has_trailers) const {
+                                             ResponseMetadata&& metadata,
+                                             absl::optional<uint64_t> content_length) const {
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
@@ -142,9 +139,20 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
                                    ? CacheEntryStatus::RequiresValidation
                                    : CacheEntryStatus::Ok;
   result.headers_ = std::move(response_headers);
-  result.content_length_ = content_length;
-  result.range_details_ = RangeUtils::createRangeDetails(requestHeaders(), content_length);
-  result.has_trailers_ = has_trailers;
+  if (content_length.has_value()) {
+    result.content_length_ = content_length;
+  } else {
+    absl::string_view content_length_header = result.headers_->getContentLengthValue();
+    int64_t length_from_header;
+    if (!content_length_header.empty() &&
+        absl::SimpleAtoi(content_length_header, &length_from_header)) {
+      result.content_length_ = length_from_header;
+    }
+  }
+  if (result.content_length_.has_value()) {
+    result.range_details_ =
+        RangeUtils::createRangeDetails(requestHeaders(), result.content_length_.value());
+  }
 
   return result;
 }

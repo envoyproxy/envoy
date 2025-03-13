@@ -20,7 +20,7 @@ namespace Stats {
 class StatName;
 
 /**
- * Holds a set of symbols used to compose hierarhical names.
+ * Holds a set of symbols used to compose hierarchical names.
  */
 class SymbolTable;
 
@@ -38,10 +38,7 @@ public:
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
    * against it in a test. Independent of the evolution of the data
-   * representation for the name, this method will be available. For storing the
-   * name as a map key, however, nameCStr() is a better choice, albeit one that
-   * might change in the future to return a symbolized representation of the
-   * elaborated string.
+   * representation for the name, this method will be available.
    */
   virtual std::string name() const PURE;
 
@@ -154,6 +151,15 @@ public:
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
+  // When adjusting a gauge both ways (e.g. buffer size update when simultaneously
+  // streaming in and out), using this helper avoids touching the atomic twice.
+  inline void adjust(uint64_t add_amount, uint64_t sub_amount) {
+    if (add_amount > sub_amount) {
+      add(add_amount - sub_amount);
+    } else {
+      sub(sub_amount - add_amount);
+    }
+  }
   virtual uint64_t value() const PURE;
 
   /**
@@ -234,8 +240,19 @@ Envoy
  */
 template <typename StatsStructType> class DeferredCreationCompatibleInterface {
 public:
-  // Helper function to get-or-create and return the StatsStructType object.
+  /**
+   * Returns an already existing StatsStructType, or creates a new one and returns it.
+   *
+   * @return The new or already existing StatsStructType.
+   */
   virtual StatsStructType& getOrCreate() PURE;
+
+  /**
+   * Returns whether or not the underlying stats have been initialized yet.
+   *
+   * @return If the underlying stats have been initialized.
+   */
+  virtual bool isPresent() const PURE;
 
   virtual ~DeferredCreationCompatibleInterface() = default;
 };
@@ -252,6 +269,13 @@ public:
 
   inline StatsStructType* operator->() { return &data_->getOrCreate(); };
   inline StatsStructType& operator*() { return data_->getOrCreate(); };
+
+  /**
+   * Returns whether or not the underlying data_ has been initialized yet.
+   *
+   * @return If the underlying data_ has been initialized.
+   */
+  bool isPresent() const { return data_->isPresent(); }
 
 private:
   std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;

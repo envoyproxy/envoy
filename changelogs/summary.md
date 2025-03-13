@@ -1,23 +1,31 @@
 **Summary of changes**:
 
-* Envoy Mobile can now be built without C++ exceptions using the `--define=envoy_exceptions=disabled` Bazel flag.
-* Add the logical `OR` operation to value matchers.
-* Add xDS support for Envoy Mobile Android (AAR) library.
-* Add configurable HTTP status when a global rate limit service fails.
-* Opentelemetry tracer: add support for environment resource detector.
-* Added HTTP basic auth extension.
-* Add support for ext_authz to send route metadata.
-* Allow per route body buffering configuration in ext_authz.
-* Datadog: honor extracted sampling decisions to avoid dropping samples.
-* gRPC side streams: make idle connection timeout configurable.
-* Support CEL expressions in ext_proc for extraction of request or response atributes.
-* HTTP: clear hop by hop `Transfer-Encoding` header.
-* Redis: Add support for the `WATCH` and `GETDEL` commands.
-* Adds strict mode for stateful session filter, that rejects requests if destination host is not available.
-* Internal redirects: support passing headers from response to request.
-* Add implementation of the `drop_overload` Cluster API.
-* HTTP/2: discard the `Host` header when `:authority` is present.
-* grpc_http1_bridge: add `<ignore_query_params>` option.
-* Access Log: Add `EMIT_TIME` command operator.
-* ECDS now supports composite filter.
-* Enable new oghttp2 codec for HTTP/2 connections.
+* c-ares:
+  - [CVE-2024-25629](https://github.com/c-ares/c-ares/security/advisories/GHSA-mg26-v6qh-x48q) Out of bounds read in c-ares (DNS)
+* HTTP:
+  - RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security issue for Envoys in multi-tenant mesh environments.
+  - Shadow requests are now streamed in parallel with the original request.
+  - Local replies now traverse the filter chain if 1xx headers have been sent to the client.
+* Tracing:
+  - Removed support for (long deprecated) Opencensus tracing extension.
+* Wasm:
+  - The route cache will *not* be cleared by default if a Wasm extension modifies the request headers and the ABI version of wasm extension is larger than 0.2.1.
+  - Remove previously deprecated xDS attributes from `get_property`, use `xds` attributes instead.
+  - Added Wasm VM reload support and support for plugins writtin in Go.
+* Access log:
+  - New implementation of the JSON formatter is enabled by default.
+* CSRF:
+  - Increase the statistics counter `missing_source_origin` only for requests with a missing source origin.
+* DNS:
+  - Added nameserver rotation and query timeouts/retries to the c-ares resolver.
+* Formatter:
+  - `NaN` and `Infinity` values of float will be serialized to `null` and `inf` respectively in the metadata (`DYNAMIC_METADATA`, `CLUSTER_METADATA`, etc.) formatters.
+* OAuth2:
+  - `use_refresh_token` is now enabled by default.
+  - Implement the Signed Double-Submit Cookie pattern.
+* QUIC:
+  - Enable UDP GRO in QUIC client connections by default.
+* SDS:
+  - Relaxed the backing cluster validation for Secret Discovery Service (SDS).
+* TLS:
+  - Added support for P-384 and P-521 curves for server certificates, improved upstream SNI and SAN validation support.

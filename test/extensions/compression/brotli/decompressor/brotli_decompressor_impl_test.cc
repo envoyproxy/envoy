@@ -106,6 +106,51 @@ TEST_F(BrotliDecompressorImplTest, CompressAndDecompress) {
   EXPECT_EQ(original_text, decompressed_text);
 }
 
+TEST_F(BrotliDecompressorImplTest, CompressAndDecompressWithRedundantInput) {
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl accumulation_buffer;
+
+  Brotli::Compressor::BrotliCompressorImpl compressor{
+      default_quality,
+      default_window_bits,
+      default_input_block_bits,
+      false,
+      Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Default,
+      4096};
+
+  std::string original_text{};
+  for (uint64_t i = 0; i < 20; ++i) {
+    TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
+    original_text.append(buffer.toString());
+    compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
+    accumulation_buffer.add(buffer);
+    drainBuffer(buffer);
+  }
+
+  ASSERT_EQ(0, buffer.length());
+
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  ASSERT_GE(10, buffer.length());
+
+  accumulation_buffer.add(buffer);
+  accumulation_buffer.add("redundant_input_here"); // Add some redundant input.
+
+  drainBuffer(buffer);
+  ASSERT_EQ(0, buffer.length());
+
+  Stats::IsolatedStoreImpl stats_store{};
+  BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 16, false};
+  decompressor.decompress(accumulation_buffer, buffer);
+  std::string decompressed_text{buffer.toString()};
+  ASSERT_EQ(original_text.length(), decompressed_text.length());
+  EXPECT_EQ(original_text, decompressed_text);
+
+  // Although we finally get the original text, we still have some redundant input and
+  // the decompression is considered as failed.
+  EXPECT_EQ(1, stats_store.counterFromString("test.brotli_error").value());
+  EXPECT_EQ(1, stats_store.counterFromString("test.brotli_redundant_input").value());
+}
+
 // Exercises decompression with a very small output buffer.
 TEST_F(BrotliDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   Buffer::OwnedImpl buffer;

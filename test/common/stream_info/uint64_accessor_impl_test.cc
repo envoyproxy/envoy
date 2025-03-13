@@ -31,6 +31,14 @@ TEST(UInt64AccessorImplTest, TestProto) {
   EXPECT_EQ(init_value, uint64_struct->value());
 }
 
+TEST(UInt64AccessorImplTest, TestString) {
+  uint64_t init_value = 0xdeadbeefdeadbeef;
+  UInt64AccessorImpl accessor(init_value);
+  absl::optional<std::string> value = accessor.serializeAsString();
+  ASSERT_TRUE(value.has_value());
+  EXPECT_EQ(value, std::to_string(init_value));
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy

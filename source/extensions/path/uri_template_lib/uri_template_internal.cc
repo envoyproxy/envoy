@@ -6,6 +6,8 @@
 #include <variant>
 #include <vector>
 
+#include "source/common/common/fmt.h"
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/flags/flag.h"
 #include "absl/functional/function_ref.h"
@@ -143,7 +145,7 @@ absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
       std::vector<absl::string_view>(absl::StrSplit(pattern, absl::MaxSplits('/', 1)))[0];
   absl::string_view unparsed_pattern = pattern.substr(literal.size());
   if (!isValidLiteral(literal)) {
-    return absl::InvalidArgumentError("Invalid literal");
+    return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", literal));
   }
   return ParsedResult<Literal>(literal, unparsed_pattern);
 }
@@ -155,24 +157,25 @@ absl::StatusOr<ParsedResult<Operator>> parseOperator(absl::string_view pattern) 
   if (absl::StartsWith(pattern, "*")) {
     return ParsedResult<Operator>(Operator::PathGlob, pattern.substr(1));
   }
-  return absl::InvalidArgumentError("Invalid Operator");
+  return absl::InvalidArgumentError(fmt::format("Invalid Operator: \"{}\"", pattern));
 }
 
 absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) {
   // Locate the variable pattern to parse.
   if (pattern.size() < 2 || (pattern)[0] != '{') {
-    return absl::InvalidArgumentError("Invalid variable");
+    return absl::InvalidArgumentError(fmt::format("Invalid variable: \"{}\"", pattern));
   }
   std::vector<absl::string_view> parts = absl::StrSplit(pattern.substr(1), absl::MaxSplits('}', 1));
   if (parts.size() != 2) {
-    return absl::InvalidArgumentError("Unmatched variable bracket");
+    return absl::InvalidArgumentError(fmt::format("Unmatched variable bracket in \"{}\"", pattern));
   }
   absl::string_view unparsed_pattern = parts[1];
 
   // Parse the actual variable pattern, starting with the variable name.
   std::vector<absl::string_view> variable_parts = absl::StrSplit(parts[0], absl::MaxSplits('=', 1));
   if (!isValidVariableName(variable_parts[0])) {
-    return absl::InvalidArgumentError("Invalid variable name");
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid variable name: \"{}\"", variable_parts[0]));
   }
   Variable var = Variable(variable_parts[0], {});
 
@@ -204,7 +207,8 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
     var.match_.push_back(match);
     if (!pattern_item.empty()) {
       if (pattern_item[0] != '/' || pattern_item.size() == 1) {
-        return absl::InvalidArgumentError("Invalid variable match");
+        return absl::InvalidArgumentError(
+            fmt::format("Invalid variable match: \"{}\"", pattern_item));
       }
       pattern_item = pattern_item.substr(1);
     }
@@ -222,16 +226,20 @@ gatherCaptureNames(const struct ParsedPathPattern& pattern) {
       continue;
     }
     if (captured_variables.size() >= kPatternMatchingMaxVariablesPerPath) {
-      return absl::InvalidArgumentError("Exceeded variable count limit");
+      return absl::InvalidArgumentError(
+          fmt::format("Exceeded variable count limit ({})", kPatternMatchingMaxVariablesPerPath));
     }
     absl::string_view name = absl::get<Variable>(segment).name_;
 
     if (name.size() < kPatternMatchingMinVariableNameLen ||
         name.size() > kPatternMatchingMaxVariableNameLen) {
-      return absl::InvalidArgumentError("Invalid variable name length");
+      return absl::InvalidArgumentError(fmt::format(
+          "Invalid variable name length (length of \"{}\" should be at least {} and no more than "
+          "{})",
+          name, kPatternMatchingMinVariableNameLen, kPatternMatchingMaxVariableNameLen));
     }
     if (captured_variables.contains(name)) {
-      return absl::InvalidArgumentError("Repeated variable name");
+      return absl::InvalidArgumentError(fmt::format("Repeated variable name: \"{}\"", name));
     }
     captured_variables.emplace(name);
   }
@@ -275,7 +283,7 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
 
   static const LazyRE2 printable_regex = {"^/[[:graph:]]*$"};
   if (!RE2::FullMatch(path, *printable_regex)) {
-    return absl::InvalidArgumentError("Invalid pattern");
+    return absl::InvalidArgumentError(fmt::format("Invalid pattern: \"{}\"", path));
   }
 
   // Parse the leading '/'

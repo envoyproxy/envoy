@@ -9,6 +9,7 @@ HTTP filters
   adaptive_concurrency_filter
   admission_control_filter
   aws_lambda_filter
+  api_key_auth_filter
   aws_request_signing_filter
   bandwidth_limit_filter
   basic_auth_filter
@@ -20,6 +21,7 @@ HTTP filters
   composite_filter
   connect_grpc_bridge_filter
   cors_filter
+  credential_injector_filter
   csrf_filter
   custom_response_filter
   decompressor_filter
@@ -35,6 +37,7 @@ HTTP filters
   grpc_field_extraction_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
+  grpc_json_reverse_transcoder_filter
   grpc_json_transcoder_filter
   grpc_stats_filter
   grpc_web_filter
@@ -51,6 +54,7 @@ HTTP filters
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
+  proto_message_extraction_filter
   rate_limit_filter
   rate_limit_quota_filter
   rbac_filter
@@ -61,5 +65,6 @@ HTTP filters
   stateful_session_filter
   sxg_filter
   tap_filter
+  thrift_to_metadata_filter
   upstream_codec_filter
   wasm_filter

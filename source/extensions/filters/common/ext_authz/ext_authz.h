@@ -41,6 +41,8 @@ struct ResponseCodeDetailsValues {
   const std::string AuthzDenied = "ext_authz_denied";
   // The ext_authz filter encountered a failure, and was configured to fail-closed.
   const std::string AuthzError = "ext_authz_error";
+  // The ext_authz filter invalidated the CheckResponse and dropped the client request.
+  const std::string AuthzInvalid = "ext_authz_invalid";
 };
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailsValues>;
 
@@ -73,44 +75,57 @@ enum class CheckStatus {
   Denied
 };
 
+using UnsafeHeader = std::pair<std::string, std::string>;
+using UnsafeHeaderVector = std::vector<UnsafeHeader>;
 /**
  * Authorization response object for a RequestCallback.
+ *
+ * Header mutations and query parameter mutations are not expected to already be validated by the
+ * client before packing them into this struct (hence they are "unsafe").
  */
 struct Response {
   // Call status.
   CheckStatus status;
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
-  Http::HeaderVector headers_to_append;
+  UnsafeHeaderVector headers_to_append{};
   // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
-  Http::HeaderVector headers_to_set;
+  UnsafeHeaderVector headers_to_set{};
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
-  Http::HeaderVector headers_to_add;
+  UnsafeHeaderVector headers_to_add{};
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses.
-  Http::HeaderVector response_headers_to_add;
+  UnsafeHeaderVector response_headers_to_add{};
   // A set of HTTP headers returned by the authorization server, will be optionally set (using
   // "setCopy") to the response sent back to the downstream client on OK auth responses.
-  Http::HeaderVector response_headers_to_set;
+  UnsafeHeaderVector response_headers_to_set{};
+  // A set of HTTP headers returned by the authorization server, will be optionally added
+  // (using "addCopy") to the response sent back to the downstream client on OK auth
+  // responses only if the headers were not returned from the authz server.
+  UnsafeHeaderVector response_headers_to_add_if_absent{};
+  // A set of HTTP headers returned by the authorization server, will be optionally set (using
+  // "setCopy") to the response sent back to the downstream client on OK auth responses
+  // only if the headers were returned from the authz server.
+  UnsafeHeaderVector response_headers_to_overwrite_if_exists{};
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
-  std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
+  std::vector<std::string> headers_to_remove{};
   // A set of query string parameters to be set (possibly overwritten) on the
   // request to the upstream server.
-  Http::Utility::QueryParamsVector query_parameters_to_set;
+  Http::Utility::QueryParamsVector query_parameters_to_set{};
   // A set of query string parameters to remove from the request to the upstream server.
-  std::vector<std::string> query_parameters_to_remove;
+  std::vector<std::string> query_parameters_to_remove{};
   // Optional http body used only on denied response.
-  std::string body;
+  std::string body{};
   // Optional http status used only on denied response.
   Http::Code status_code{};
 
   // A set of metadata returned by the authorization server, that will be emitted as filter's
   // dynamic metadata that other filters can leverage.
-  ProtobufWkt::Struct dynamic_metadata;
+  ProtobufWkt::Struct dynamic_metadata{};
 };
 
 using ResponsePtr = std::unique_ptr<Response>;
@@ -150,6 +165,11 @@ public:
   virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v3::CheckRequest& request,
                      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+
+  /**
+   * Returns streamInfo of the current request if possible. By default just return a nullptr.
+   */
+  virtual StreamInfo::StreamInfo const* streamInfo() const { return nullptr; }
 };
 
 using ClientPtr = std::unique_ptr<Client>;

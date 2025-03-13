@@ -1,7 +1,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge/utility.h"
 #include "library/common/logger/logger_delegate.h"
 
 using testing::_;
@@ -13,27 +13,25 @@ namespace Logger {
 
 class LambdaDelegateTest : public testing::Test {
 public:
-  static envoy_event_tracker tracker;
+  static std::unique_ptr<EnvoyEventTracker> event_tracker;
 
   static void SetUpTestSuite() {
-    Api::External::registerApi(std::string(envoy_event_tracker_api_name), &tracker);
+    Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker);
   }
+
+  void SetUp() override { Context::changeAllLogLevels(spdlog::level::info); }
 };
 
-envoy_event_tracker LambdaDelegateTest::tracker{};
+std::unique_ptr<EnvoyEventTracker> LambdaDelegateTest::event_tracker =
+    std::make_unique<EnvoyEventTracker>();
 
 TEST_F(LambdaDelegateTest, LogCb) {
   std::string expected_msg = "Hello LambdaDelegate";
   std::string actual_msg;
 
-  LambdaDelegate delegate({[](envoy_log_level, envoy_data data, const void* context) -> void {
-                             auto* actual_msg =
-                                 static_cast<std::string*>(const_cast<void*>(context));
-                             *actual_msg = Data::Utility::copyToString(data);
-                             release_envoy_data(data);
-                           },
-                           [](const void*) -> void {}, &actual_msg},
-                          Registry::getSink());
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
@@ -44,14 +42,9 @@ TEST_F(LambdaDelegateTest, LogCbWithLevels) {
   std::string expected_msg = "Hello LambdaDelegate";
   std::string actual_msg;
 
-  LambdaDelegate delegate({[](envoy_log_level, envoy_data data, const void* context) -> void {
-                             auto* actual_msg =
-                                 static_cast<std::string*>(const_cast<void*>(context));
-                             *actual_msg = Data::Utility::copyToString(data);
-                             release_envoy_data(data);
-                           },
-                           [](const void*) -> void {}, &actual_msg},
-                          Registry::getSink());
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   // Set the log to critical. The message should not be logged.
   Context::changeAllLogLevels(spdlog::level::critical);
@@ -73,58 +66,40 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
   bool released = false;
 
   {
-    LambdaDelegate(
-        {[](envoy_log_level, envoy_data data, const void*) -> void { release_envoy_data(data); },
-         [](const void* context) -> void {
-           bool* released = static_cast<bool*>(const_cast<void*>(context));
-           *released = true;
-         },
-         &released},
-        Registry::getSink());
+    auto logger = std::make_unique<EnvoyLogger>();
+    logger->on_exit_ = [&] { released = true; };
+    LambdaDelegate(std::move(logger), Registry::getSink());
   }
 
   EXPECT_TRUE(released);
 }
 
 class LambdaDelegateWithLevelTest
-    : public testing::TestWithParam<
-          std::tuple<envoy_log_level, Logger::Levels, spdlog::level::level_enum>> {};
+    : public testing::TestWithParam<std::tuple<Logger::Levels, spdlog::level::level_enum>> {};
 
 INSTANTIATE_TEST_SUITE_P(
     LogLevel, LambdaDelegateWithLevelTest,
-    testing::Values(std::make_tuple<>(envoy_log_level::ENVOY_LOG_LEVEL_TRACE, Logger::Levels::trace,
-                                      spdlog::level::trace),
-                    std::make_tuple<>(envoy_log_level::ENVOY_LOG_LEVEL_DEBUG, Logger::Levels::debug,
-                                      spdlog::level::debug),
-                    std::make_tuple<>(envoy_log_level::ENVOY_LOG_LEVEL_INFO, Logger::Levels::info,
-                                      spdlog::level::info),
-                    std::make_tuple<>(envoy_log_level::ENVOY_LOG_LEVEL_WARN, Logger::Levels::warn,
-                                      spdlog::level::warn),
-                    std::make_tuple<>(envoy_log_level::ENVOY_LOG_LEVEL_ERROR, Logger::Levels::error,
-                                      spdlog::level::err),
-                    std::make_tuple<>(envoy_log_level::ENVOY_LOG_LEVEL_CRITICAL,
-                                      Logger::Levels::critical, spdlog::level::critical)));
+    testing::Values(std::make_tuple<>(Logger::Levels::trace, spdlog::level::trace),
+                    std::make_tuple<>(Logger::Levels::debug, spdlog::level::debug),
+                    std::make_tuple<>(Logger::Levels::info, spdlog::level::info),
+                    std::make_tuple<>(Logger::Levels::warn, spdlog::level::warn),
+                    std::make_tuple<>(Logger::Levels::error, spdlog::level::err),
+                    std::make_tuple<>(Logger::Levels::critical, spdlog::level::critical)));
 
 TEST_P(LambdaDelegateWithLevelTest, Log) {
   std::string expected_msg = "Hello LambdaDelegate";
-  struct Actual {
-    envoy_log_level level;
-    std::string msg;
+  Logger::Levels actual_level;
+  std::string actual_msg;
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Levels level, const std::string& message) {
+    actual_level = level;
+    actual_msg = message;
   };
-  Actual actual;
 
-  LambdaDelegate delegate({[](envoy_log_level level, envoy_data data, const void* context) -> void {
-                             auto* actual = static_cast<Actual*>(const_cast<void*>(context));
-                             actual->msg = Data::Utility::copyToString(data);
-                             actual->level = level;
-                             release_envoy_data(data);
-                           },
-                           [](const void*) -> void {}, &actual},
-                          Registry::getSink());
+  LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
-  envoy_log_level c_envoy_log_level = std::get<0>(GetParam());
-  Logger::Levels envoy_log_level = std::get<1>(GetParam());
-  spdlog::level::level_enum spd_log_level = std::get<2>(GetParam());
+  Logger::Levels envoy_log_level = std::get<0>(GetParam());
+  spdlog::level::level_enum spd_log_level = std::get<1>(GetParam());
 
   Context::changeAllLogLevels(spd_log_level);
   switch (envoy_log_level) {
@@ -149,8 +124,8 @@ TEST_P(LambdaDelegateWithLevelTest, Log) {
   default:
     break;
   }
-  EXPECT_THAT(actual.msg, HasSubstr(expected_msg));
-  EXPECT_LE(actual.level, c_envoy_log_level);
+  EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
+  EXPECT_LE(actual_level, envoy_log_level);
 }
 
 } // namespace Logger

@@ -57,7 +57,7 @@ typed_config:
   token_bucket:
     max_tokens: 1
     # Set fill_interval to effectively infinite so we only get max_tokens to start and never re-fill.
-    fill_interval: 100000s
+    fill_interval: 1000s
 )EOF");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -88,7 +88,7 @@ typed_config:
   token_bucket:
     max_tokens: 2
     # Set fill_interval to effectively infinite so we only get max_tokens to start and never re-fill.
-    fill_interval: 100000s
+    fill_interval: 1000s
 )EOF");
 
     // Clone the whole listener, which includes the `share_key`.

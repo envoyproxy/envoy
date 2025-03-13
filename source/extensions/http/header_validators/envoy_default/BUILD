@@ -26,9 +26,9 @@ envoy_cc_library(
         ":path_normalizer",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_map",
-        "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/container:node_hash_set",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
@@ -98,10 +98,10 @@ envoy_cc_library(
         ":header_validator_common",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_set",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/functional:bind_front",
     ],
 )
@@ -122,12 +122,12 @@ envoy_cc_library(
         ":header_validator_common",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_map",
-        "//external:abseil_node_hash_set",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/functional:bind_front",
     ],
 )
@@ -157,11 +157,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = [
-        "//source/exe:__subpackages__",
-        "//source/extensions/filters/network/http_connection_manager:__subpackages__",
+    extra_visibility = [
         "//source/server/admin:__subpackages__",
-        "//test:__subpackages__",
     ],
     deps = [
         ":header_validator_factory",

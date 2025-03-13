@@ -20,8 +20,10 @@ namespace TcpProxy {
 
 TEST(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy(), context),
+  EXPECT_THROW(ConfigFactory()
+                   .createFilterFactoryFromProto(
+                       envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy(), context)
+                   .IgnoreError(),
                ProtoValidationException);
 }
 
@@ -39,14 +41,14 @@ TEST(ConfigTest, InvalidHeadersToAdd) {
   auto* hdr = header->mutable_header();
   hdr->set_key(":method");
   hdr->set_value("GET");
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), EnvoyException);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(), EnvoyException);
 
   config.mutable_tunneling_config()->clear_headers_to_add();
   header = config.mutable_tunneling_config()->add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("host");
   hdr->set_value("example.net:80");
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), EnvoyException);
+  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(), EnvoyException);
 }
 
 // Test that a minimal TcpProxy v2 config works.
@@ -61,7 +63,7 @@ TEST(ConfigTest, ConfigTest) {
 
   EXPECT_TRUE(factory.isTerminalFilterByProto(config, context.serverFactoryContext()));
 
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
   Network::MockConnection connection;
   NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
   EXPECT_CALL(connection, addReadFilter(_))

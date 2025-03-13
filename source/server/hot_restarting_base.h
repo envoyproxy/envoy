@@ -46,7 +46,8 @@ public:
   //
   // There is no mechanism to explicitly pair responses to requests. However, the child initiates
   // all exchanges, and blocks until a reply is received, so there is implicit pairing.
-  void sendHotRestartMessage(sockaddr_un& address, const envoy::HotRestartMessage& proto);
+  bool sendHotRestartMessage(sockaddr_un& address, const envoy::HotRestartMessage& proto,
+                             bool allow_failure = false);
 
   // Receive data, possibly enough to build one of our protocol messages.
   // If block is true, blocks until a full protocol message is available.

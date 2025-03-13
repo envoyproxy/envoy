@@ -6,8 +6,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/http_server_properties_cache_impl.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/ssl_socket.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -41,20 +41,6 @@ protected:
 name: alternate_protocols_cache
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
-  alternate_protocols_cache_options:
-    name: default_alternate_protocols_cache
-    key_value_store_config:
-      name: "envoy.common.key_value"
-      typed_config:
-        "@type": type.googleapis.com/envoy.config.common.key_value.v3.KeyValueStoreConfig
-        config:
-          name: envoy.key_value.file_based
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
-            filename: {}
-            flush_interval:
-              nanos: 0
-
 )EOF",
                                            filename);
     config_helper_.prependFilter(filter);
@@ -438,6 +424,12 @@ TEST_P(FilterIntegrationTest, RetryAfterHttp3ZeroRttHandshakeFailed) {
 TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   const uint64_t response_size = 0;
   const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -455,9 +447,9 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
 
   // First request should go out over HTTP/2. The response includes an Alt-Svc header.
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0,
+  auto response = sendRequestAndWaitForResponse(request_headers, 2048, response_headers, 0,
                                                 /*upstream_index=*/0, timeout);
-  checkSimpleRequestSuccess(0, response_size, response.get());
+  checkSimpleRequestSuccess(2048, response_size, response.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 1);
 
   // Close the connection so the HTTP/2 connection will not be used.
@@ -465,7 +457,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
   fake_upstream_connection_.reset();
   // Second request should go out over HTTP/3 because of the Alt-Svc information.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  auto response2 = codec_client_->makeRequestWithBody(request_headers, 2048);
   waitForNextUpstreamRequest(1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
   // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
@@ -480,7 +472,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
 
-  checkSimpleRequestSuccess(0, response_size, response2.get());
+  checkSimpleRequestSuccess(2048, response_size, response2.get());
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http2_total", 2);
 }
 
@@ -538,9 +530,10 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
     if (getSrtt(alt_svc, timeSystem()) != 0) {
       break;
     }
-    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(15));
   }
-  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << alt_svc;
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << "Alt-svc entry :'" << alt_svc << "'";
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

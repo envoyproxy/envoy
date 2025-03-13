@@ -28,6 +28,8 @@ public:
   const std::string Cors = "envoy.filters.http.cors";
   // Composite filter
   const std::string Composite = "envoy.filters.http.composite";
+  // Credential Injector filter
+  const std::string CredentialInjector = "envoy.filters.http.credential_injector";
   // CSRF filter
   const std::string Csrf = "envoy.filters.http.csrf";
   // Custom Response filter
@@ -42,12 +44,16 @@ public:
   const std::string GcpAuthn = "envoy.filters.http.gcp_authn";
   // GRPC http1 bridge filter
   const std::string GrpcHttp1Bridge = "envoy.filters.http.grpc_http1_bridge";
+  // GRPC json reverse transcoder filter
+  const std::string GrpcJsonReverseTranscoder = "envoy.filters.http.grpc_json_reverse_transcoder";
   // GRPC json transcoder filter
   const std::string GrpcJsonTranscoder = "envoy.filters.http.grpc_json_transcoder";
   // GRPC web filter
   const std::string GrpcWeb = "envoy.filters.http.grpc_web";
   // GRPC Field Extraction filter
   const std::string GrpcFieldExtraction = "envoy.filters.http.grpc_field_extraction";
+  // Proto Message Extraction filter
+  const std::string ProtoMessageExtraction = "envoy.filters.http.proto_message_extraction";
   // GRPC http1 reverse bridge filter
   const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
   // GRPC telemetry
@@ -74,6 +80,10 @@ public:
   const std::string JwtAuthn = "envoy.filters.http.jwt_authn";
   // Header to metadata filter
   const std::string HeaderToMetadata = "envoy.filters.http.header_to_metadata";
+  // Json to metadata filter
+  const std::string JsonToMetadata = "envoy.filters.http.json_to_metadata";
+  // Thrift to metadata filter
+  const std::string ThriftToMetadata = "envoy.filters.http.thrift_to_metadata";
   // Tap filter
   const std::string Tap = "envoy.filters.http.tap";
   // Adaptive concurrency limit filter

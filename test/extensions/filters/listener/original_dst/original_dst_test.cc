@@ -45,7 +45,7 @@ TEST_F(OriginalDstTest, Pipe) {
   NiceMock<Network::MockIoHandle> io_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
   Network::ListenerFilterBufferImpl buffer(
-      io_handle, dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, 1);
+      io_handle, dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, false, 1);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_.onData(buffer));
 }
 
@@ -82,8 +82,8 @@ TEST_F(OriginalDstTest, InternalDynamicMetadataFailure) {
 
 TEST_F(OriginalDstTest, InternalFilterState) {
   expectInternalAddress();
-  const auto local = Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
-  const auto remote = Network::Utility::parseInternetAddress("127.0.0.1", 8000, false);
+  const auto local = Network::Utility::parseInternetAddressNoThrow("10.20.30.40", 456, false);
+  const auto remote = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8000, false);
   cb_.filter_state_.setData("envoy.filters.listener.original_dst.local_ip",
                             std::make_shared<Network::AddressObject>(local),
                             StreamInfo::FilterState::StateType::Mutable,

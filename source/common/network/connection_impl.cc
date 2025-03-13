@@ -44,6 +44,10 @@ std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
   return os;
 }
 
+absl::string_view ipVersionAsString(Network::Address::IpVersion ip_version) {
+  return ip_version == Network::Address::IpVersion::v4 ? "v4" : "v6";
+}
+
 } // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
@@ -85,10 +89,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
       transport_wants_read_(false) {
 
-  // Keep it as a bool flag to reduce the times calling runtime method..
-  enable_rst_detect_send_ = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.detect_and_raise_rst_tcp_connection");
-
+  if (!socket_->isOpen()) {
+    IS_ENVOY_BUG("Client socket failure");
+    return;
+  }
   if (!connected) {
     connecting_ = true;
   }
@@ -98,8 +102,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
   socket_->ioHandle().initializeFileEvent(
-      dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        onFileEvent(events);
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 
@@ -110,7 +118,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
+  ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -137,19 +145,13 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
   uint64_t data_to_write = write_buffer_->length();
   ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "closing data_to_write={} type={}", *this,
                        data_to_write, enumToInt(type));
-
-  // RST will be sent only if enable_rst_detect_send_ is true, otherwise it is converted to normal
-  // ConnectionCloseType::Abort.
-  if (!enable_rst_detect_send_ && type == ConnectionCloseType::AbortReset) {
-    type = ConnectionCloseType::Abort;
-  }
 
   // The connection is closed by Envoy by sending RST, and the connection is closed immediately.
   if (type == ConnectionCloseType::AbortReset) {
@@ -230,7 +232,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -265,7 +267,7 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (!ConnectionImpl::ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -290,8 +292,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (enable_rst_detect_send_ && (detected_close_type_ == DetectedCloseType::RemoteReset ||
-                                  detected_close_type_ == DetectedCloseType::LocalReset)) {
+  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
+      detected_close_type_ == DetectedCloseType::LocalReset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
@@ -322,7 +324,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (!ioHandle().isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -360,7 +362,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (inDelayedClose() || !filterChainWantsData()) {
     return;
   }
-  ASSERT(ioHandle().isOpen());
+  ASSERT(socket_->isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -646,7 +648,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore read event processing.
-  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
+  if (socket_->isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
 }
@@ -684,7 +686,7 @@ void ConnectionImpl::onReadReady() {
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
   // The socket is closed immediately when receiving RST.
-  if (enable_rst_detect_send_ && result.err_code_.has_value() &&
+  if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
     if (result.bytes_processed_ != 0) {
@@ -755,7 +757,7 @@ void ConnectionImpl::onWriteReady() {
         return;
       }
     } else {
-      setFailureReason(absl::StrCat("delayed connect error: ", error));
+      setFailureReason(absl::StrCat("delayed connect error: ", errorDetails(error)));
       ENVOY_CONN_LOG_EVENT(debug, "connection_error", "{}", *this, transportFailureReason());
       closeSocket(ConnectionEvent::RemoteClose);
       return;
@@ -768,7 +770,7 @@ void ConnectionImpl::onWriteReady() {
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
 
   // The socket is closed immediately when receiving RST.
-  if (enable_rst_detect_send_ && result.err_code_.has_value() &&
+  if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     // Discard anything in the buffer.
     ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
@@ -815,7 +817,7 @@ void ConnectionImpl::onWriteReady() {
         }
 
         // If a callback closes the socket, stop iterating.
-        if (!ioHandle().isOpen()) {
+        if (!socket_->isOpen()) {
           return;
         }
       }
@@ -955,7 +957,15 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_options)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
                      false),
-      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
+      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr(),
+                   StreamInfo::FilterState::LifeSpan::Connection) {
+  if (!socket_->isOpen()) {
+    setFailureReason("socket creation failure");
+    // Set up the dispatcher to "close" the connection on the next loop after
+    // the owner has a chance to add callbacks.
+    dispatcher_.post([this]() { raiseEvent(ConnectionEvent::LocalClose); });
+    return;
+  }
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
@@ -1031,7 +1041,27 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat("immediate connect error: ", errorDetails(result.errno_)));
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.log_ip_families_on_network_error")) {
+      absl::string_view remote_address_family =
+          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
+              ? ipVersionAsString(
+                    socket_->connectionInfoProvider().remoteAddress()->ip()->version())
+              : "";
+      absl::string_view local_address_family =
+          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
+              ? ipVersionAsString(socket_->connectionInfoProvider().localAddress()->ip()->version())
+              : "";
+      setFailureReason(absl::StrCat(
+          "immediate connect error: ", errorDetails(result.errno_),
+          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString(),
+          "|remote address family:", remote_address_family,
+          "|local address family:", local_address_family));
+    } else {
+      setFailureReason(absl::StrCat(
+          "immediate connect error: ", errorDetails(result.errno_),
+          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
+    }
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

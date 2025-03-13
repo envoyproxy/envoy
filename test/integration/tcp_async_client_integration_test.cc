@@ -1,3 +1,4 @@
+#include "test/integration/filters/test_network_async_tcp_filter.pb.h"
 #include "test/integration/integration.h"
 
 #include "gtest/gtest.h"
@@ -16,15 +17,37 @@ public:
         typed_config:
           "@type": type.googleapis.com/test.integration.filters.TestNetworkAsyncTcpFilterConfig
           cluster_name: cluster_0
-    )EOF")) {}
+    )EOF")) {
+    enableHalfClose(true);
+  }
+
+  void init(bool kill_after_on_data = false) {
+    const std::string yaml = fmt::format(R"EOF(
+        cluster_name: cluster_0
+        kill_after_on_data: {}
+    )EOF",
+                                         kill_after_on_data ? "true" : "false");
+
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          test::integration::filters::TestNetworkAsyncTcpFilterConfig proto_config;
+          TestUtility::loadFromYaml(yaml, proto_config);
+
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter_chain = listener->mutable_filter_chains(0);
+          auto* filter = filter_chain->mutable_filters(0);
+          filter->mutable_typed_config()->PackFrom(proto_config);
+        });
+
+    BaseIntegrationTest::initialize();
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpAsyncClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(TcpAsyncClientIntegrationTest, SingleRequest) {
-  enableHalfClose(true);
-  initialize();
+  init();
 
   std::string request("request");
   std::string response("response");
@@ -51,8 +74,7 @@ TEST_P(TcpAsyncClientIntegrationTest, SingleRequest) {
 }
 
 TEST_P(TcpAsyncClientIntegrationTest, MultipleRequestFrames) {
-  enableHalfClose(true);
-  initialize();
+  init();
 
   std::string data_frame_1("data_frame_1");
   std::string data_frame_2("data_frame_2");
@@ -85,8 +107,7 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleRequestFrames) {
 }
 
 TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
-  enableHalfClose(true);
-  initialize();
+  init();
 
   std::string data_frame_1("data_frame_1");
   std::string response_1("response_1");
@@ -111,11 +132,55 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
   tcp_client->close();
 }
 
+TEST_P(TcpAsyncClientIntegrationTest, Reconnect) {
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    return;
+  }
+
+  init();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello1", false));
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      [&](const std::string& data) -> bool { return data == "hello1"; }));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+
+  // We use the same tcp_client to ensure that a new upstream connection is created.
+  ASSERT_TRUE(tcp_client->write("hello2", false));
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(
+      [&](const std::string& data) -> bool { return data == "hello2"; }));
+
+  tcp_client->close();
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+}
+
+TEST_P(TcpAsyncClientIntegrationTest, ClientTearDown) {
+  init(true);
+
+  std::string request("request");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(request, true));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
+
+  tcp_client->close();
+}
+
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
-  enableHalfClose(true);
-  initialize();
+  init();
 
   std::string request("request");
   std::string response("response");
@@ -146,8 +211,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {
 
 // Test if RST close can be detected from upstream.
 TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
-  enableHalfClose(true);
-  initialize();
+  init();
 
   std::string request("request");
   std::string response("response");
@@ -180,8 +244,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
 // the client. The behavior is different for windows, since RST support is literally supported for
 // unix like system, disabled the test for windows.
 TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
-  enableHalfClose(true);
-  initialize();
+  init();
 
   std::string request("request");
   std::string response("response");

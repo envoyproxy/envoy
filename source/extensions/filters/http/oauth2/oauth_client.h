@@ -18,6 +18,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
+using RouteRetryPolicy = envoy::config::route::v3::RetryPolicy;
+using HttpUri = envoy::config::core::v3::HttpUri;
+
 /**
  * An OAuth client abstracts away everything regarding how to communicate with
  * the OAuth server. The filter should only need to invoke the functions here,
@@ -43,9 +46,10 @@ public:
 
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
-  OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
+  OAuth2ClientImpl(Upstream::ClusterManager& cm, const HttpUri& uri,
+                   const OptRef<const RouteRetryPolicy> retry_policy,
                    const std::chrono::seconds default_expires_in)
-      : cm_(cm), uri_(uri), default_expires_in_(default_expires_in) {}
+      : cm_(cm), uri_(uri), retry_policy_(retry_policy), default_expires_in_(default_expires_in) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
@@ -79,7 +83,8 @@ private:
   FilterCallbacks* parent_{nullptr};
 
   Upstream::ClusterManager& cm_;
-  const envoy::config::core::v3::HttpUri uri_;
+  const HttpUri uri_;
+  const OptRef<const RouteRetryPolicy> retry_policy_;
   const std::chrono::seconds default_expires_in_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request

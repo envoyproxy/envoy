@@ -19,11 +19,11 @@ TYPE_UPGRADE_REGEXES = [
     (r'(envoy[\w\.]*\.)(v1alpha\d?|v1)', r'\1v3'),
     (r'(envoy[\w\.]*\.)(v2alpha\d?|v2)', r'\1v3'),
     # These are special cases, e.g. upgrading versionless packages.
-    ('envoy\.type\.matcher', 'envoy.type.matcher.v3'),
-    ('envoy\.type', 'envoy.type.v3'),
-    ('envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3'),
+    (r'envoy\.type\.matcher', 'envoy.type.matcher.v3'),
+    (r'envoy\.type', 'envoy.type.v3'),
+    (r'envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3'),
     (
-        'envoy\.config\.retry\.previous_priorities',
+        r'envoy\.config\.retry\.previous_priorities',
         'envoy.extensions.retry.priority.previous_priorities.v3'),
 ]
 

@@ -299,8 +299,7 @@ public final class X509Util {
     ensureInitialized();
     X509Certificate rootCert = createCertificateFromBytes(rootCertBytes);
     synchronized (sLock) {
-      sTestKeyStore.setCertificateEntry("root_cert_" + Integer.toString(sTestKeyStore.size()),
-                                        rootCert);
+      sTestKeyStore.setCertificateEntry("root_cert_" + sTestKeyStore.size(), rootCert);
       reloadTestTrustManager();
     }
   }

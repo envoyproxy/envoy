@@ -20,10 +20,11 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& fi
     : file_system_(file_system), queue_(kqueue()),
       kqueue_event_(dispatcher.createFileEvent(
           queue_,
-          [this](uint32_t events) -> void {
+          [this](uint32_t events) {
             if (events & Event::FileReadyType::Read) {
-              onKqueueEvent();
+              return onKqueueEvent();
             }
+            return absl::OkStatus();
           },
           Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
@@ -32,15 +33,20 @@ WatcherImpl::~WatcherImpl() {
   watches_.clear();
 }
 
-void WatcherImpl::addWatch(absl::string_view path, uint32_t events, Watcher::OnChangedCb cb) {
-  FileWatchPtr watch = addWatch(path, events, cb, false);
-  if (watch == nullptr) {
-    throwEnvoyExceptionOrPanic(absl::StrCat("invalid watch path ", path));
+absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events,
+                                   Watcher::OnChangedCb cb) {
+  absl::StatusOr<FileWatchPtr> watch_or_error = addWatch(path, events, cb, false);
+  RETURN_IF_NOT_OK_REF(watch_or_error.status());
+  if (watch_or_error.value() == nullptr) {
+    return absl::InvalidArgumentError(absl::StrCat("invalid watch path ", path));
   }
+  return absl::OkStatus();
 }
 
-WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t events,
-                                                Watcher::OnChangedCb cb, bool path_must_exist) {
+absl::StatusOr<WatcherImpl::FileWatchPtr> WatcherImpl::addWatch(absl::string_view path,
+                                                                uint32_t events,
+                                                                Watcher::OnChangedCb cb,
+                                                                bool path_must_exist) {
   bool watching_dir = false;
   std::string pathname(path);
   int watch_fd = open(pathname.c_str(), O_SYMLINK);
@@ -50,7 +56,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
     }
 
     const auto result_or_error = file_system_.splitPathFromFilename(path);
-    THROW_IF_STATUS_NOT_OK(result_or_error, throw);
+    RETURN_IF_NOT_OK_REF(result_or_error.status());
     watch_fd = open(std::string(result_or_error.value().directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
@@ -73,7 +79,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
          reinterpret_cast<void*>(watch_fd));
 
   if (kevent(queue_, &event, 1, nullptr, 0, nullptr) == -1 || event.flags & EV_ERROR) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("unable to add filesystem watch for file {}: {}", path, errorDetails(errno)));
   }
 
@@ -91,7 +97,7 @@ void WatcherImpl::removeWatch(FileWatchPtr& watch) {
   watches_.erase(fd);
 }
 
-void WatcherImpl::onKqueueEvent() {
+absl::Status WatcherImpl::onKqueueEvent() {
   struct kevent event = {};
   timespec nullts = {0, 0};
 
@@ -99,7 +105,7 @@ void WatcherImpl::onKqueueEvent() {
     uint32_t events = 0;
     int nevents = kevent(queue_, nullptr, 0, &event, 1, &nullts);
     if (nevents < 1 || event.udata == nullptr) {
-      return;
+      return absl::OkStatus();
     }
 
     int watch_fd = reinterpret_cast<std::intptr_t>(event.udata);
@@ -110,19 +116,21 @@ void WatcherImpl::onKqueueEvent() {
 
     absl::StatusOr<PathSplitResult> pathname_or_error =
         file_system_.splitPathFromFilename(file->file_);
-    THROW_IF_STATUS_NOT_OK(pathname_or_error, throw);
+    RETURN_IF_NOT_OK_REF(pathname_or_error.status());
     PathSplitResult& pathname = pathname_or_error.value();
 
     if (file->watching_dir_) {
       if (event.fflags & NOTE_DELETE) {
         // directory was deleted
         removeWatch(file);
-        return;
+        return absl::OkStatus();
       }
 
       if (event.fflags & NOTE_WRITE) {
         // directory was written -- check if the file we're actually watching appeared
-        FileWatchPtr new_file = addWatch(file->file_, file->events_, file->callback_, true);
+        auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
+        RETURN_IF_NOT_OK_REF(file_or_error.status());
+        FileWatchPtr new_file = file_or_error.value();
         if (new_file != nullptr) {
           removeWatch(file);
           file = new_file;
@@ -141,9 +149,11 @@ void WatcherImpl::onKqueueEvent() {
       if (event.fflags & NOTE_DELETE) {
         removeWatch(file);
 
-        FileWatchPtr new_file = addWatch(file->file_, file->events_, file->callback_, true);
+        auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
+        RETURN_IF_NOT_OK_REF(file_or_error.status());
+        FileWatchPtr new_file = file_or_error.value();
         if (new_file == nullptr) {
-          return;
+          return absl::OkStatus();
         }
 
         event.fflags |= NOTE_RENAME;
@@ -163,9 +173,10 @@ void WatcherImpl::onKqueueEvent() {
 
     if (events & file->events_) {
       ENVOY_LOG(debug, "matched callback: file: {}", file->file_);
-      file->callback_(events);
+      RETURN_IF_NOT_OK(file->callback_(events));
     }
   }
+  return absl::OkStatus();
 }
 
 } // namespace Filesystem

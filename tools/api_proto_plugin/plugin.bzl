@@ -23,7 +23,7 @@ def _path_ignoring_repository(f):
 def _input_arg(i):
     return "%s=%s" % (i.basename, i.path)
 
-def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
+def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes, output_dir = ""):
     # Compute output files from the current proto_library node's dependencies.
     transitive_outputs = depset(transitive = [dep.output_groups[output_group] for dep in ctx.rule.attr.deps])
 
@@ -53,18 +53,26 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     for f in target[ProtoInfo].transitive_sources.to_list():
         import_paths.append("{}={}".format(_path_ignoring_repository(f), f.path))
 
-    # The outputs live in the ctx.label's package root. We add some additional
-    # path information to match with protoc's notion of path relative locations.
     outputs = []
-    for output_suffix in output_suffixes:
-        outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _path_ignoring_repository(f) +
-                                             output_suffix) for f in proto_sources]
+    output_path = ""
+
+    if output_suffixes:
+        # The outputs live in the ctx.label's package root. We add some additional
+        # path information to match with protoc's notion of path relative locations.
+        outputs = []
+        for output_suffix in output_suffixes:
+            outputs += [ctx.actions.declare_file(ctx.label.name + "/" + _path_ignoring_repository(f) +
+                                                 output_suffix) for f in proto_sources]
+
+        ctx_path = ctx.label.package + "/" + ctx.label.name
+        output_path = outputs[0].root.path + "/" + outputs[0].owner.workspace_root + "/" + ctx_path
+    elif output_dir:
+        outputs.append(ctx.actions.declare_directory(output_dir))
+        output_path = outputs[0].path
 
     # Create the protoc command-line args.
     inputs = [target[ProtoInfo].transitive_sources]
 
-    ctx_path = ctx.label.package + "/" + ctx.label.name
-    output_path = outputs[0].root.path + "/" + outputs[0].owner.workspace_root + "/" + ctx_path
     args = ctx.actions.args()
     args.add(ctx.label.workspace_root, format = "-I./%s")
     args.add_all(import_paths, format_each = "-I%s")

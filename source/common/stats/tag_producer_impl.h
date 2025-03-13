@@ -28,10 +28,16 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
-  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
-                  const Stats::TagVector& cli_tags);
-
-  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config);
+  /**
+   * Create TagProducer instance. Check all tag names for conflicts to avoid
+   * unexpected tag name overwriting.
+   * @param config stats config.
+   * @param cli_tags tags that are provided by the cli
+   * @returns a tag producer or an error pointer if a conflict of tag names is found.
+   */
+  static absl::StatusOr<Stats::TagProducerPtr>
+  createTagProducer(const envoy::config::metrics::v3::StatsConfig& config,
+                    const Stats::TagVector& cli_tags);
 
   TagProducerImpl() = default;
 
@@ -46,6 +52,9 @@ public:
   const TagVector& fixedTags() const override { return fixed_tags_; }
 
 private:
+  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                  const Stats::TagVector& cli_tags, absl::Status& creation_status);
+
   friend class DefaultTagRegexTester;
 
   /**
@@ -60,9 +69,9 @@ private:
    * more than one TagExtractor can be used to generate a given tag. The default
    * extractors are specified in common/config/well_known_names.cc.
    * @param name absl::string_view the extractor to add.
-   * @return int the number of matching extractors.
+   * @return Status ok if at least 1 matching extractor was found.
    */
-  int addExtractorsMatching(absl::string_view name);
+  absl::Status addExtractorsMatching(absl::string_view name);
 
   /**
    * Roughly estimate the size of the vectors.
@@ -74,8 +83,9 @@ private:
    * Adds all default extractors from well_known_names.cc into the collection.
    *
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
+   * @return a status indicating if the default extractors were successfully added.
    */
-  void addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
+  absl::Status addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling

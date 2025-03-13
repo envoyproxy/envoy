@@ -44,7 +44,7 @@ public final class CronvoyHttpURLConnection extends HttpURLConnection {
   private boolean mTrafficStatsUidSet;
   private int mTrafficStatsUid;
 
-  private CronvoyInputStream mInputStream;
+  private final CronvoyInputStream mInputStream;
   private CronvoyOutputStream mOutputStream;
   private UrlResponseInfo mResponseInfo;
   private IOException mException;
@@ -124,7 +124,7 @@ public final class CronvoyHttpURLConnection extends HttpURLConnection {
    * only the last value is returned.
    */
   @Override
-  public final String getHeaderField(String fieldName) {
+  public String getHeaderField(String fieldName) {
     try {
       getResponse();
     } catch (IOException e) {
@@ -143,7 +143,7 @@ public final class CronvoyHttpURLConnection extends HttpURLConnection {
    * if there are fewer than {@code pos} fields.
    */
   @Override
-  public final String getHeaderFieldKey(int pos) {
+  public String getHeaderFieldKey(int pos) {
     Map.Entry<String, String> header = getHeaderFieldEntry(pos);
     if (header == null) {
       return null;
@@ -156,7 +156,7 @@ public final class CronvoyHttpURLConnection extends HttpURLConnection {
    * has fewer than {@code pos} fields.
    */
   @Override
-  public final String getHeaderField(int pos) {
+  public String getHeaderField(int pos) {
     Map.Entry<String, String> header = getHeaderFieldEntry(pos);
     if (header == null) {
       return null;
@@ -356,7 +356,7 @@ public final class CronvoyHttpURLConnection extends HttpURLConnection {
    * Adds the given property to the request header.
    */
   @Override
-  public final void addRequestProperty(String key, String value) {
+  public void addRequestProperty(String key, String value) {
     setRequestPropertyInternal(key, value, false);
   }
 
@@ -364,11 +364,11 @@ public final class CronvoyHttpURLConnection extends HttpURLConnection {
    * Sets the value of the specified request header field.
    */
   @Override
-  public final void setRequestProperty(String key, String value) {
+  public void setRequestProperty(String key, String value) {
     setRequestPropertyInternal(key, value, true);
   }
 
-  private final void setRequestPropertyInternal(String key, String value, boolean overwrite) {
+  private void setRequestPropertyInternal(String key, String value, boolean overwrite) {
     if (connected) {
       throw new IllegalStateException("Cannot modify request property after connection is made.");
     }

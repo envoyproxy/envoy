@@ -93,8 +93,12 @@ enum CoreResponseFlag : uint16_t {
   DnsResolutionFailed,
   // Drop certain percentage of overloaded traffic.
   DropOverLoad,
+  // Downstream remote codec level reset was received on the stream.
+  DownstreamRemoteReset,
+  // Unconditionally drop all traffic due to drop_overload is set to 100%.
+  UnconditionalDropOverload,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DropOverLoad,
+  LastFlag = UnconditionalDropOverload,
 };
 
 class ResponseFlagUtils;
@@ -178,6 +182,8 @@ struct ResponseCodeDetailValues {
   const std::string PathNormalizationFailed = "path_normalization_failed";
   // The request was rejected because it attempted an unsupported upgrade.
   const std::string UpgradeFailed = "upgrade_failed";
+  // The websocket handshake is unsuccessful and only SwitchingProtocols is considering successful.
+  const std::string WebsocketHandshakeUnsuccessful = "websocket_handshake_unsuccessful";
 
   // The request was rejected by the HCM because there was no route configuration found.
   const std::string RouteConfigurationNotFound = "route_configuration_not_found";
@@ -192,6 +198,9 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
   const std::string DropOverload = "drop_overload";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration is set to
+  // 100%.
+  const std::string UnconditionalDropOverload = "unconditional_drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
@@ -350,8 +359,7 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
-class DownstreamTiming {
-public:
+struct DownstreamTiming {
   void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
 
   absl::optional<MonotonicTime> getValue(absl::string_view value) const {
@@ -406,7 +414,6 @@ public:
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
 
-private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
   // The time when the last byte of the request was received.
   absl::optional<MonotonicTime> last_downstream_rx_byte_received_;
@@ -649,6 +656,15 @@ public:
   virtual void
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
+  /*
+   * @param short string type flag to indicate the noteworthy event of this stream. Mutliple flags
+   * could be added and will be concatenated with comma. It should not contain any empty or space
+   * characters (' ', '\t', '\f', '\v', '\n', '\r').
+   *
+   * The short string should not duplicate with the any registered response flags.
+   */
+  virtual void addCustomFlag(absl::string_view) PURE;
+
   /**
    * @return std::string& the name of the route. The name is get from the route() and it is
    *         empty if there is no route.
@@ -802,6 +818,11 @@ public:
   virtual uint64_t legacyResponseFlags() const PURE;
 
   /**
+   * @return all stream flags that are added.
+   */
+  virtual absl::string_view customFlags() const PURE;
+
+  /**
    * @return whether the request is a health check request or not.
    */
   virtual bool healthCheck() const PURE;
@@ -835,6 +856,13 @@ public:
    * the same key overriding existing.
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+
+  /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter.
+   * @param value of type protobuf any to set on the namespace.
+   */
+  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
 
   /**
    * Object on which filters can share data on a per-request basis. For singleton data objects, only
@@ -949,11 +977,42 @@ public:
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
+   * Checked by routing filters before forwarding a request upstream.
+   * @return to override the scheme header to match the upstream transport
+   * protocol at routing filters.
+   */
+  virtual bool shouldSchemeMatchUpstream() const PURE;
+
+  /**
+   * Called if a filter decides that the scheme should match the upstream transport protocol
+   * @param should_match_upstream true to hint to routing filters to override the scheme header
+   * to match the upstream transport protocol.
+   */
+  virtual void setShouldSchemeMatchUpstream(bool should_match_upstream) PURE;
+
+  /**
    * Checked by streams after finishing serving the request.
    * @return bool true if the connection should be drained once this stream has
    * finished sending and receiving.
    */
   virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Set the parent for this StreamInfo. This is used to associate the
+   * stream info of an async client with the stream info of the downstream
+   * connection.
+   */
+  virtual void setParentStreamInfo(const StreamInfo& parent_stream_info) PURE;
+
+  /**
+   * Get the parent for this StreamInfo, if available.
+   */
+  virtual OptRef<const StreamInfo> parentStreamInfo() const PURE;
+
+  /**
+   * Clear the parent for this StreamInfo.
+   */
+  virtual void clearParentStreamInfo() PURE;
 
   /**
    * Called if the connection decides to drain itself after serving this request.

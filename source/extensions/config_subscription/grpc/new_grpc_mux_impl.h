@@ -17,7 +17,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
-#include "source/extensions/config_subscription/grpc/grpc_stream.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
 
@@ -69,7 +69,7 @@ public:
 
   void onStreamEstablished() override;
 
-  void onEstablishmentFailure() override;
+  void onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) override;
 
   void onWriteable() override;
 
@@ -78,16 +78,30 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
+  absl::Status
+  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
+                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+
+  GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                      envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
-    return grpc_stream_;
+    // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+    // return grpc_stream_.currentStreamForTest() directly (defined in GrpcMuxFailover).
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+      return dynamic_cast<GrpcMuxFailover<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                                          envoy::service::discovery::v3::DeltaDiscoveryResponse>*>(
+                 grpc_stream_.get())
+          ->currentStreamForTest();
+    }
+    return *grpc_stream_.get();
   }
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      CustomConfigValidators& config_validators,
+                      CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
                       EdsResourcesCacheOptRef eds_resources_cache)
         : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
@@ -140,6 +154,15 @@ private:
     const SubscriptionOptions options_;
   };
 
+  // Helper function to create the grpc_stream_ object.
+  std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                                      envoy::service::discovery::v3::DeltaDiscoveryResponse>>
+  createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
+                         Grpc::RawAsyncClientPtr&& failover_async_client,
+                         const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+                         BackOffStrategyPtr&& backoff_strategy,
+                         const RateLimitSettings& rate_limit_settings);
+
   void removeWatch(const std::string& type_url, Watch* watch);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
@@ -181,17 +204,23 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3::DeltaDiscoveryResponse>
+  Event::Dispatcher& dispatcher_;
+  // Multiplexes the stream to the primary and failover sources.
+  // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
+  // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
+  std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                                      envoy::service::discovery::v3::DeltaDiscoveryResponse>>
       grpc_stream_;
 
   const LocalInfo::LocalInfo& local_info_;
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  Event::Dispatcher& dispatcher_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   EdsResourcesCachePtr eds_resources_cache_;
 
+  // Used to track whether initial_resource_versions should be populated on the
+  // next reconnection.
+  bool should_send_initial_resource_versions_{true};
   bool started_{false};
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

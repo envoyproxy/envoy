@@ -20,14 +20,12 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "dfp_setter_filter_config_lib",
-    srcs = ["dfp_setter.h"],
+    hdrs = ["dfp_setter.h"],
     deps = [
         ":dfp_setter_filter_proto_cc_proto",
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/test_common:utility_lib",
     ],
     alwayslink = 1,
@@ -37,6 +35,7 @@ envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.udp.session.dynamic_forward_proxy"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
@@ -52,6 +51,7 @@ envoy_extension_cc_test(
     name = "dynamic_forward_proxy_filter_integration_test",
     srcs = ["proxy_filter_integration_test.cc"],
     extension_names = ["envoy.filters.udp.session.dynamic_forward_proxy"],
+    rbe_pool = "6gig",
     deps = [
         ":dfp_setter_filter_config_lib",
         ":dfp_setter_filter_proto_cc_proto",
@@ -61,6 +61,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:proxy_filter_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_proto_cc_proto",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

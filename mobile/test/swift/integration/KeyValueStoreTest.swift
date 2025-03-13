@@ -1,5 +1,6 @@
 import Envoy
 import EnvoyEngine
+import EnvoyTestServer
 import Foundation
 import TestExtensions
 import XCTest
@@ -10,55 +11,16 @@ final class KeyValueStoreTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testKeyValueStore() {
     // swiftlint:disable:next line_length
-    let ehcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-    // swiftlint:disable:next line_length
     let kvStoreType = "type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore"
-    let testKey = "foo"
-    let testValue = "bar"
-    let config =
-"""
-listener_manager:
-    name: envoy.listener_manager_impl.api
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.listener.v3.ApiListenerManager
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address:
-        protocol: TCP
-        address: 0.0.0.0
-        port_value: 10000
-    api_listener:
-      api_listener:
-        "@type": \(ehcmType)
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-              - name: api
-                domains:
-                  - "*"
-                routes:
-                  - match:
-                      prefix: "/"
-                    direct_response:
-                      status: 200
-          http_filters:
-            - name: envoy.filters.http.test_kv_store
-              typed_config:
-                "@type": \(kvStoreType)
-                kv_store_name: envoy.key_value.platform_test
-                test_key: \(testKey)
-                test_value: \(testValue)
-            - name: envoy.router
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-"""
-
     let readExpectation = self.expectation(description: "Read called on key-value store")
     // Called multiple times for validation in test filter.
     readExpectation.assertForOverFulfill = false
@@ -81,20 +43,30 @@ static_resources:
     let testStore = TestKeyValueStore(readExpectation: readExpectation,
                                       saveExpectation: saveExpectation)
 
-    let engine = EngineBuilder(yaml: config)
-      .addLogLevel(.trace)
+    EnvoyTestServer.startHttp1Server()
+
+    let engine = EngineBuilder()
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addKeyValueStore(
         name: "envoy.key_value.platform_test",
         keyValueStore: testStore
       )
-      .setRuntimeGuard("test_feature_false", true)
+      .addNativeFilter(
+        name: "envoy.filters.http.test_kv_store",
+        // swiftlint:disable:next line_length
+        typedConfig: "[\(kvStoreType)]{ kv_store_name: 'envoy.key_value.platform_test', test_key: 'foo', test_value: 'bar'}"
+      )
+      .addRuntimeGuard("test_feature_false", true)
       .build()
 
     let client = engine.streamClient()
 
     let requestHeaders = RequestHeadersBuilder(
-      method: .get, scheme: "https",
-      authority: "example.com", path: "/test"
+      method: .get, scheme: "http",
+      authority: "localhost:" + String(EnvoyTestServer.getHttpPort()), path: "/simple.txt"
     )
     .build()
 
@@ -112,5 +84,6 @@ static_resources:
     )
 
     engine.terminate()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

@@ -22,9 +22,11 @@ envoy_cc_library(
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers/common:grpc_access_logger",
+        "//source/extensions/access_loggers/common:grpc_access_logger_clients_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_cc_proto",
+        "@opentelemetry_proto//:logs_proto_cc",
+        "@opentelemetry_proto//:logs_service_proto_cc",
     ],
 )
 
@@ -43,7 +45,8 @@ envoy_cc_library(
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_cc_proto",
+        "@opentelemetry_proto//:logs_proto_cc",
+        "@opentelemetry_proto//:logs_service_proto_cc",
     ],
 )
 
@@ -77,11 +80,11 @@ envoy_cc_library(
     name = "substitution_formatter_lib",
     srcs = ["substitution_formatter.cc"],
     hdrs = ["substitution_formatter.h"],
-    external_deps = ["abseil_str_format"],
     deps = [
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/formatter:substitution_formatter_lib",
-        "@opentelemetry_proto//:common_cc_proto",
+        "@com_google_absl//absl/strings:str_format",
+        "@opentelemetry_proto//:common_proto_cc",
     ],
 )

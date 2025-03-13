@@ -57,7 +57,8 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   }
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
-      secret_provider_certificate, secret_provider_private_key, server_context.api());
+      std::move(secret_provider_certificate), std::move(secret_provider_private_key),
+      server_context.threadLocal(), server_context.api());
   auto config = std::make_shared<FilterConfig>(proto_config, server_context.timeSource(),
                                                secret_reader, stat_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

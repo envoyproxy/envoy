@@ -66,17 +66,16 @@ std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
   return prefix;
 }
 
-TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
-                                                         absl::string_view regex,
-                                                         absl::string_view substr,
-                                                         absl::string_view negative_match,
-                                                         Regex::Type re_type) {
+absl::StatusOr<TagExtractorPtr>
+TagExtractorImplBase::createTagExtractor(absl::string_view name, absl::string_view regex,
+                                         absl::string_view substr, absl::string_view negative_match,
+                                         Regex::Type re_type) {
   if (name.empty()) {
-    throwEnvoyExceptionOrPanic("tag_name cannot be empty");
+    return absl::InvalidArgumentError("tag_name cannot be empty");
   }
 
   if (regex.empty()) {
-    throwEnvoyExceptionOrPanic(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
   switch (re_type) {

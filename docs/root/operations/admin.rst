@@ -250,6 +250,11 @@ modify different aspects of the server:
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
+.. http:post:: /allocprofiler
+
+  Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
 .. _operations_admin_interface_healthcheck_fail:
 
 .. http:post:: /healthcheck/fail
@@ -321,10 +326,10 @@ modify different aspects of the server:
 
   .. code-block:: text
 
-    source/server/admin/admin_filter.cc: 0
-    source/common/event/dispatcher_impl.cc: 0
-    source/common/network/tcp_listener_impl.cc: 0
-    source/common/network/udp_listener_impl.cc: 0
+    source/server/admin/admin_filter.cc: trace
+    source/common/event/dispatcher_impl.cc: trace
+    source/common/network/tcp_listener_impl.cc: trace
+    source/common/network/udp_listener_impl.cc: trace
 
   - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
   - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
@@ -358,7 +363,8 @@ modify different aspects of the server:
 
    :ref:`Drains <arch_overview_draining>` all inbound listeners. ``traffic_direction`` field in
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
-   is inbound or outbound.
+   is inbound or outbound. May not be effective for network filters like :ref:`Redis <config_network_filters_redis_proxy>`,
+   :ref:`Mongo <config_network_filters_mongo_proxy>`, or :ref:`Thrift <config_network_filters_thrift_proxy>`.
 
    .. http:post:: /drain_listeners?graceful
 
@@ -769,6 +775,59 @@ modify different aspects of the server:
     in Prometheus, which can dramatically increase the amount of data stored.
     Text readout stats create a new label value every time the value
     of the text readout stat changes, which could create an unbounded number of time series.
+
+  .. http:get:: /stats?format=prometheus&histogram_buckets=summary
+
+  Optional ``histogram_buckets`` query parameter is used to control how histogram metrics get reported.
+  If unset, histograms get reported as the "histogram" prometheus metric type, but can also be used to
+  emit prometheus "summary" metrics if set to ``summary``. Each emitted summary is over the interval
+  of the last :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`.
+
+  Example histogram output:
+
+  .. code-block:: text
+
+    # TYPE envoy_server_initialization_time_ms histogram
+    envoy_server_initialization_time_ms_bucket{le="0.5"} 0
+    envoy_server_initialization_time_ms_bucket{le="1"} 0
+    envoy_server_initialization_time_ms_bucket{le="5"} 0
+    envoy_server_initialization_time_ms_bucket{le="10"} 0
+    envoy_server_initialization_time_ms_bucket{le="25"} 0
+    envoy_server_initialization_time_ms_bucket{le="50"} 0
+    envoy_server_initialization_time_ms_bucket{le="100"} 0
+    envoy_server_initialization_time_ms_bucket{le="250"} 1
+    envoy_server_initialization_time_ms_bucket{le="500"} 1
+    envoy_server_initialization_time_ms_bucket{le="1000"} 1
+    envoy_server_initialization_time_ms_bucket{le="2500"} 1
+    envoy_server_initialization_time_ms_bucket{le="5000"} 1
+    envoy_server_initialization_time_ms_bucket{le="10000"} 1
+    envoy_server_initialization_time_ms_bucket{le="30000"} 1
+    envoy_server_initialization_time_ms_bucket{le="60000"} 1
+    envoy_server_initialization_time_ms_bucket{le="300000"} 1
+    envoy_server_initialization_time_ms_bucket{le="600000"} 1
+    envoy_server_initialization_time_ms_bucket{le="1800000"} 1
+    envoy_server_initialization_time_ms_bucket{le="3600000"} 1
+    envoy_server_initialization_time_ms_bucket{le="+Inf"} 1
+    envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+    envoy_server_initialization_time_ms_count{} 1
+
+  Example summary output:
+
+  .. code-block:: text
+
+    # TYPE envoy_server_initialization_time_ms summary
+    envoy_server_initialization_time_ms{quantile="0"} 110.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.25"} 112.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.5"} 115.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.75"} 117.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.9"} 119.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.95"} 119.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.99"} 119.90000000000002
+    envoy_server_initialization_time_ms{quantile="0.995"} 119.95000000000002
+    envoy_server_initialization_time_ms{quantile="0.999"} 119.99000000000001
+    envoy_server_initialization_time_ms{quantile="1"} 120.00000000000001
+    envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+    envoy_server_initialization_time_ms_count{} 1
 
 .. http:get:: /stats/recentlookups
 

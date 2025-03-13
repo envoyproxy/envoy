@@ -17,12 +17,14 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_server_name_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stream_info:bool_accessor_lib",
         "//source/common/tcp_proxy",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
@@ -52,6 +54,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":tcp_proxy_test_base",
         "//envoy/common:hashable_interface",
@@ -63,6 +66,7 @@ envoy_cc_test(
     srcs = [
         "tcp_proxy_test.cc",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":tcp_proxy_test_base",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
@@ -76,12 +80,19 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
+    rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/tcp_proxy",
+        "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/router:router_filter_interface",
+        "//test/mocks/router:upstream_request",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/test_common:test_runtime_lib",
     ],
 )

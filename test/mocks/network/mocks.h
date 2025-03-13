@@ -43,6 +43,8 @@ public:
 
   // Network::ActiveDnsQuery
   MOCK_METHOD(void, cancel, (CancelReason reason));
+  MOCK_METHOD(void, addTrace, (uint8_t));
+  MOCK_METHOD(std::string, getTraces, ());
 };
 
 class MockFilterManager : public FilterManager {
@@ -72,7 +74,7 @@ public:
   MockDnsResolverFactory() = default;
   ~MockDnsResolverFactory() override = default;
 
-  MOCK_METHOD(DnsResolverSharedPtr, createDnsResolver,
+  MOCK_METHOD(absl::StatusOr<DnsResolverSharedPtr>, createDnsResolver,
               (Event::Dispatcher & dispatcher, Api::Api& api,
                const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config),
               (const, override));
@@ -188,6 +190,7 @@ public:
   MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData && data));
   MOCK_METHOD(void, post, (Network::UdpRecvData && data));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+  MOCK_METHOD(const IoHandle::UdpSaveCmsgConfig&, udpSaveCmsgConfig, (), (const));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -195,8 +198,9 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
-  MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
+  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb,
+              (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {
@@ -254,6 +258,7 @@ public:
               (const));
 
   MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
+  MOCK_METHOD(void, onFirstPacketReceived, (const quic::QuicReceivedPacket&));
 };
 
 #endif
@@ -409,7 +414,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
-  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
@@ -424,9 +428,11 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
+  MOCK_METHOD(void, useOriginalDst, (bool));
 
   StreamInfo::FilterStateImpl filter_state_;
   NiceMock<MockConnectionSocket> socket_;
@@ -442,7 +448,7 @@ public:
   MOCK_METHOD(bool, reusePort, (), (const));
   MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
   MOCK_METHOD(void, closeAllSockets, ());
-  MOCK_METHOD(void, doFinalPreWorkerInit, ());
+  MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
 
 class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
@@ -473,6 +479,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(bool, isQuic, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -499,8 +506,9 @@ public:
   MOCK_METHOD(uint32_t, maxConnectionsToAcceptPerSocketEvent, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
   }
 
@@ -512,7 +520,7 @@ public:
   ListenerInfoConstSharedPtr listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
-  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  const AccessLog::InstanceSharedPtrVector empty_access_logs_;
 };
 
 class MockListener : public Listener {
@@ -525,6 +533,7 @@ public:
   MOCK_METHOD(void, disable, ());
   MOCK_METHOD(void, setRejectFraction, (UnitFloat));
   MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 };
 
 class MockConnectionHandler : public virtual ConnectionHandler {
@@ -656,6 +665,7 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
   MOCK_METHOD(void, activateRead, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
   Event::MockDispatcher dispatcher_;
 };
@@ -712,10 +722,11 @@ public:
   MOCK_METHOD(void, processPacket,
               (Address::InstanceConstSharedPtr local_address,
                Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-               MonotonicTime receive_time));
+               MonotonicTime receive_time, uint8_t tos, Buffer::OwnedImpl saved_cmsg));
   MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
   MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+  MOCK_METHOD(const IoHandle::UdpSaveCmsgConfig&, saveCmsgConfig, (), (const));
 };
 
 class MockSocketInterface : public SocketInterfaceImpl {

@@ -12,9 +12,10 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -94,11 +95,11 @@ common_tls_context:
   }
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   TestUtility::loadFromYaml(TestEnvironment::substitute(target), config);
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      config, factory_context_);
+  auto cfg =
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
+      *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
           std::move(cfg), *context_manager_, *client_stats_store->rootScope())};
 }
 
@@ -111,27 +112,27 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
   tls_cert->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context_, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()),
       std::vector<std::string>{});
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(
+      "tcp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+      std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                              Network::Test::createRawBufferSocket(), nullptr,
                                              nullptr);
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(
+      "tcp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+      std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_mtls_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
@@ -169,8 +170,8 @@ void XfccIntegrationTest::initialize() {
     config_helper_.addSslConfig();
   }
 
-  context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   client_tls_ssl_ctx_ = createClientSslContext(false);
   client_mtls_ssl_ctx_ = createClientSslContext(true);
   HttpIntegrationTest::initialize();

@@ -1,3 +1,5 @@
+load("@rules_java//java:defs.bzl", "java_common")
+
 def _sources_javadocs_impl(ctx):
     javabase = ctx.attr._javabase[java_common.JavaRuntimeInfo]
     plugins_classpath = ";".join([
@@ -106,7 +108,7 @@ sources_javadocs = rule(
         ),
         # Java Runtime
         "_javabase": attr.label(
-            default = Label("@bazel_tools//tools/jdk:current_java_runtime"),
+            default = Label("@rules_java//toolchains:current_java_runtime"),
             allow_files = True,
             providers = [java_common.JavaRuntimeInfo],
         ),

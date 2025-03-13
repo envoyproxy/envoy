@@ -8,7 +8,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,11 +17,12 @@ import org.chromium.net.testing.Feature;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Tests {@link CronetEngine.Builder}.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetEngineBuilderTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 

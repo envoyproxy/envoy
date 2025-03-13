@@ -65,6 +65,18 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "The server chooses a base ID dynamically. Supersedes a static base ID. May not be used "
       "when the restart epoch is non-zero.",
       cmd, false);
+  TCLAP::SwitchArg skip_hot_restart_on_no_parent(
+      "", "skip-hot-restart-on-no-parent",
+      "When hot restarting with epoch>0, the default behavior is for the child to crash if the"
+      " connection to the parent cannot be established. Set this to true to instead continue with"
+      " a regular startup, while retaining the new epoch value.",
+      cmd, false);
+  TCLAP::SwitchArg skip_hot_restart_parent_stats(
+      "", "skip-hot-restart-parent-stats",
+      "When hot restarting, by default the child instance copies stats from the parent"
+      " instance periodically during the draining period. This can potentially be an"
+      " expensive operation; set this to true to reset all stats in child process.",
+      cmd, false);
   TCLAP::ValueArg<std::string> base_id_path(
       "", "base-id-path", "Path to which the base ID is written", false, "", "string", cmd);
   TCLAP::ValueArg<uint32_t> concurrency("", "concurrency", "# of worker threads to run", false,
@@ -87,6 +99,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg ignore_unknown_dynamic_fields("", "ignore-unknown-dynamic-fields",
                                                  "Ignore unknown fields in dynamic configuration",
                                                  cmd, false);
+  TCLAP::SwitchArg skip_deprecated_logs(
+      "", "skip-deprecated-logs",
+      "Skips the logging of deprecated field warnings during Protobuf message validation", cmd,
+      false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
@@ -202,7 +218,12 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   log_format_ = log_format.getValue();
   log_format_set_ = log_format.isSet();
   log_format_escaped_ = log_format_escaped.getValue();
+
   enable_fine_grain_logging_ = enable_fine_grain_logging.getValue();
+  if (enable_fine_grain_logging_ && !component_log_level.getValue().empty()) {
+    throw MalformedArgvException(
+        "error: --component-log-level will not work with --enable-fine-grain-logging");
+  }
 
   parseComponentLogLevels(component_log_level.getValue());
 
@@ -228,6 +249,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
   base_id_ = base_id.getValue();
   use_dynamic_base_id_ = use_dynamic_base_id.getValue();
+  skip_hot_restart_on_no_parent_ = skip_hot_restart_on_no_parent.getValue();
+  skip_hot_restart_parent_stats_ = skip_hot_restart_parent_stats.getValue();
   base_id_path_ = base_id_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
 
@@ -260,6 +283,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       allow_unknown_static_fields.getValue() || allow_unknown_fields.getValue();
   reject_unknown_dynamic_fields_ = reject_unknown_dynamic_fields.getValue();
   ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields.getValue();
+  skip_deprecated_logs_ = skip_deprecated_logs.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   service_cluster_ = service_cluster.getValue();
@@ -372,6 +396,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
       std::make_unique<envoy::admin::v3::CommandLineOptions>();
   command_line_options->set_base_id(baseId());
   command_line_options->set_use_dynamic_base_id(useDynamicBaseId());
+  command_line_options->set_skip_hot_restart_on_no_parent(skipHotRestartOnNoParent());
+  command_line_options->set_skip_hot_restart_parent_stats(skipHotRestartParentStats());
   command_line_options->set_base_id_path(baseIdPath());
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
@@ -379,6 +405,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_allow_unknown_static_fields(allow_unknown_static_fields_);
   command_line_options->set_reject_unknown_dynamic_fields(reject_unknown_dynamic_fields_);
   command_line_options->set_ignore_unknown_dynamic_fields(ignore_unknown_dynamic_fields_);
+  command_line_options->set_skip_deprecated_logs(skip_deprecated_logs_);
   command_line_options->set_admin_address_path(adminAddressPath());
   command_line_options->set_component_log_level(component_log_level_str_);
   command_line_options->set_log_level(spdlog::level::to_string_view(logLevel()).data(),

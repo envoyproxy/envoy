@@ -3,6 +3,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
+#include "extensions/regex_functions.h"
+
+#include "cel/expr/syntax.pb.h"
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
@@ -16,7 +19,7 @@ namespace {
 
 #define ACTIVATION_TOKENS(_f)                                                                      \
   _f(Request) _f(Response) _f(Connection) _f(Upstream) _f(Source) _f(Destination) _f(Metadata)     \
-      _f(FilterState) _f(XDS)
+      _f(FilterState) _f(XDS) _f(UpstreamFilterState)
 
 #define _DECLARE(_t) _t,
 enum class ActivationToken { ACTIVATION_TOKENS(_DECLARE) };
@@ -69,6 +72,12 @@ absl::optional<CelValue> StreamActivation::FindValue(absl::string_view name,
         Protobuf::Arena::Create<FilterStateWrapper>(arena, *arena, info.filterState()));
   case ActivationToken::XDS:
     return {};
+  case ActivationToken::UpstreamFilterState:
+    if (info.upstreamInfo().has_value() &&
+        info.upstreamInfo().value().get().upstreamFilterState() != nullptr) {
+      return CelValue::CreateMap(Protobuf::Arena::Create<FilterStateWrapper>(
+          arena, *arena, *info.upstreamInfo().value().get().upstreamFilterState()));
+    }
   }
   return {};
 }
@@ -98,6 +107,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   options.enable_comprehension = false;
   options.enable_regex = true;
   options.regex_max_program_size = 100;
+  options.enable_qualified_identifier_rewrites = true;
   options.enable_string_conversion = false;
   options.enable_string_concat = false;
   options.enable_list_concat = false;
@@ -115,6 +125,12 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
     throw CelException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
+  auto ext_register_status =
+      cel::extensions::RegisterRegexFunctions(builder->GetRegistry(), options);
+  if (!ext_register_status.ok()) {
+    throw CelException(absl::StrCat("failed to register extension regex functions: ",
+                                    ext_register_status.message()));
+  }
   return builder;
 }
 
@@ -124,6 +140,32 @@ BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext&
   return context.singletonManager().getTyped<BuilderInstance>(
       SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
       [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
+}
+
+// Converts from CEL canonical to CEL v1alpha1
+absl::optional<google::api::expr::v1alpha1::Expr>
+getExpr(const ::xds::type::v3::CelExpression& expression) {
+  ::cel::expr::Expr expr;
+  if (expression.has_cel_expr_checked()) {
+    expr = expression.cel_expr_checked().expr();
+  } else if (expression.has_cel_expr_parsed()) {
+    expr = expression.cel_expr_parsed().expr();
+  } else {
+    return {};
+  }
+
+  std::string data;
+  if (!expr.SerializeToString(&data)) {
+    return {};
+  }
+
+  // Parse the string into the target namespace message
+  google::api::expr::v1alpha1::Expr v1alpha1Expr;
+  if (!v1alpha1Expr.ParseFromString(data)) {
+    return {};
+  }
+
+  return v1alpha1Expr;
 }
 
 ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {

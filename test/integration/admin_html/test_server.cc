@@ -1,4 +1,5 @@
 #include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/http/headers.h"
 #include "source/exe/main_common.h"
 #include "source/server/admin/admin_html_util.h"
 
@@ -14,7 +15,8 @@ namespace {
  * a query param but it could not be found.
  *
  * This test-server is only for testing; it potentially makes the
- * entire file-system avail
+ * entire file-system available to HTTP clients, so this should not
+ * be used for production systems.
  */
 Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                         Server::AdminStream& admin_stream) {
@@ -41,7 +43,7 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
   std::string path = absl::StrCat(prefix, leaf);
   TRY_ASSERT_MAIN_THREAD {
     auto file_or_error = file_system.fileReadToEnd(path);
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     response.add(file_or_error.value());
   }
   END_TRY

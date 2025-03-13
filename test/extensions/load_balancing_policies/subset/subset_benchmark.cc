@@ -3,18 +3,21 @@
 #include <memory>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.validate.h"
 
 #include "source/common/common/random_generator.h"
 #include "source/common/memory/stats.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/load_balancing_policies/maglev/maglev_lb.h"
-#include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
 #include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/load_balancer.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/types/optional.h"
@@ -26,24 +29,31 @@ namespace LoadBalancingPolices {
 namespace Subset {
 namespace {
 
-class SubsetLbTester : public LoadBalancingPolices::Common::BaseTester {
+class SubsetLbTester : public Upstream::BaseTester {
 public:
   SubsetLbTester(uint64_t num_hosts, bool single_host_per_subset)
       : BaseTester(num_hosts, 0, 0, true /* attach metadata */) {
-    envoy::config::cluster::v3::Cluster::LbSubsetConfig subset_config;
-    subset_config.set_fallback_policy(
-        envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT);
-    auto* selector = subset_config.mutable_subset_selectors()->Add();
-    selector->set_single_host_per_subset(single_host_per_subset);
-    *selector->mutable_keys()->Add() = std::string(metadata_key);
+    envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config_proto{};
+    subset_config_proto.set_fallback_policy(
+        envoy::extensions::load_balancing_policies::subset::v3::Subset::ANY_ENDPOINT);
+    auto* selector_proto = subset_config_proto.mutable_subset_selectors()->Add();
+    selector_proto->set_single_host_per_subset(single_host_per_subset);
+    *selector_proto->mutable_keys()->Add() = std::string(metadata_key);
 
-    subset_info_ = std::make_unique<Upstream::LoadBalancerSubsetInfoImpl>(subset_config);
-    auto child_lb_creator = std::make_unique<Upstream::LegacyChildLoadBalancerCreatorImpl>(
-        Upstream::LoadBalancerType::Random, absl::nullopt, absl::nullopt, absl::nullopt,
-        absl::nullopt, common_config_);
-    lb_ = std::make_unique<Upstream::SubsetLoadBalancer>(
-        *subset_info_, std::move(child_lb_creator), priority_set_, &local_priority_set_, stats_,
-        stats_scope_, runtime_, random_, simTime());
+    auto* child_lb = subset_config_proto.mutable_subset_lb_policy()->mutable_policies()->Add();
+    child_lb->mutable_typed_extension_config()->set_name("envoy.load_balancing_policies.random");
+    envoy::extensions::load_balancing_policies::random::v3::Random random_lb_config;
+    child_lb->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(random_lb_config);
+    NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+    absl::Status status = absl::OkStatus();
+    subset_config_ = std::make_unique<Upstream::SubsetLoadBalancerConfig>(
+        factory_context, subset_config_proto, status);
+    ASSERT(status.ok());
+
+    lb_ = std::make_unique<Upstream::SubsetLoadBalancer>(*subset_config_, *info_, priority_set_,
+                                                         &local_priority_set_, stats_, stats_scope_,
+                                                         runtime_, random_, simTime());
 
     const Upstream::HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);
@@ -64,7 +74,7 @@ public:
         host_moved_, {}, random_.random(), absl::nullopt);
   }
 
-  std::unique_ptr<Upstream::LoadBalancerSubsetInfoImpl> subset_info_;
+  std::unique_ptr<Upstream::SubsetLoadBalancerConfig> subset_config_;
   std::unique_ptr<Upstream::SubsetLoadBalancer> lb_;
   Upstream::HostVectorConstSharedPtr orig_hosts_;
   Upstream::HostVectorConstSharedPtr smaller_hosts_;

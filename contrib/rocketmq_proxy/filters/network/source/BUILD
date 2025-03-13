@@ -108,7 +108,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:timespan_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg_cc_proto",
     ],
@@ -139,8 +139,8 @@ envoy_cc_contrib_extension(
 envoy_cc_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/http:header_map_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )

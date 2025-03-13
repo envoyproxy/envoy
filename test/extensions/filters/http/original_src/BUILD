@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.original_src"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/original_src:config_lib",
         "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
@@ -25,6 +26,7 @@ envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
     extension_names = ["envoy.filters.http.original_src"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/original_src:config",
         "//source/extensions/filters/http/original_src:config_lib",
@@ -38,6 +40,7 @@ envoy_extension_cc_test(
     name = "original_src_test",
     srcs = ["original_src_test.cc"],
     extension_names = ["envoy.filters.http.original_src"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:socket_option_lib",
         "//source/extensions/filters/http/original_src:original_src_lib",
@@ -46,6 +49,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",

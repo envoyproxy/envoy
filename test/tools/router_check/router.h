@@ -98,7 +98,7 @@ public:
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-      std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+      std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
       Api::ApiPtr api, Coverage coverage);
 
   /**
@@ -191,7 +191,7 @@ private:
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context_;
-  std::unique_ptr<Router::ConfigImpl> config_;
+  std::shared_ptr<Router::ConfigImpl> config_;
   std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
   Api::ApiPtr api_;
   std::string active_runtime_;

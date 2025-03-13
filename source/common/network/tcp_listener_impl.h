@@ -18,7 +18,7 @@ class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                   Runtime::Loader& runtime, SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                  bool bind_to_port, bool ignore_global_conn_limit,
+                  bool bind_to_port, bool ignore_global_conn_limit, bool bypass_overload_manager,
                   uint32_t max_connections_to_accept_per_socket_event,
                   Server::ThreadLocalOverloadStateOptRef overload_state);
   ~TcpListenerImpl() override {
@@ -30,12 +30,13 @@ public:
   void enable() override;
   void setRejectFraction(UnitFloat reject_fraction) override;
   void configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) override;
+  bool shouldBypassOverloadManager() const override;
 
 protected:
   TcpListenerCallbacks& cb_;
 
 private:
-  void onSocketEvent(short flags);
+  absl::Status onSocketEvent(short flags);
 
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
@@ -46,6 +47,7 @@ private:
   bool bind_to_port_;
   UnitFloat reject_fraction_;
   const bool ignore_global_conn_limit_;
+  const bool bypass_overload_manager_;
   const uint32_t max_connections_to_accept_per_socket_event_;
   Server::LoadShedPoint* listener_accept_{nullptr};
   Server::ThreadLocalOverloadStateOptRef overload_state_;

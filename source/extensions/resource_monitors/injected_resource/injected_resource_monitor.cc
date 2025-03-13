@@ -17,8 +17,11 @@ InjectedResourceMonitor::InjectedResourceMonitor(
     Server::Configuration::ResourceMonitorFactoryContext& context)
     : filename_(config.filename()),
       watcher_(context.mainThreadDispatcher().createFilesystemWatcher()), api_(context.api()) {
-  watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo,
-                     [this](uint32_t) { onFileChanged(); });
+  THROW_IF_NOT_OK(
+      watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+        onFileChanged();
+        return absl::OkStatus();
+      }));
 }
 
 void InjectedResourceMonitor::onFileChanged() { file_changed_ = true; }
@@ -28,7 +31,7 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallback
     file_changed_ = false;
     TRY_ASSERT_MAIN_THREAD {
       auto file_or_error = api_.fileSystem().fileReadToEnd(filename_);
-      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      THROW_IF_NOT_OK_REF(file_or_error.status());
       const std::string contents = file_or_error.value();
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {

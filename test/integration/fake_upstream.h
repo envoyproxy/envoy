@@ -39,6 +39,7 @@
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_factory_context.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/active_quic_listener.h"
@@ -74,9 +75,14 @@ public:
     absl::MutexLock lock(&lock_);
     return body_.length();
   }
-  Buffer::Instance& body() {
+  // Returns a buffer containing the data that was received since the last
+  // invocation of `body()` or since the stream first received data.
+  Buffer::OwnedImpl body() {
     absl::MutexLock lock(&lock_);
-    return body_;
+    Buffer::OwnedImpl body_ret;
+    body_ret.move(body_);
+    ASSERT(body_.length() == 0);
+    return body_ret;
   }
   bool complete() {
     absl::MutexLock lock(&lock_);
@@ -98,10 +104,17 @@ public:
   void readDisable(bool disable);
   const Http::RequestHeaderMap& headers() {
     absl::MutexLock lock(&lock_);
-    return *headers_;
+    if (client_headers_ != headers_) {
+      client_headers_ = headers_;
+    }
+    return *client_headers_;
   }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
-  const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
+  Http::RequestTrailerMapConstSharedPtr trailers() {
+    absl::MutexLock lock(&lock_);
+    Http::RequestTrailerMapConstSharedPtr trailers{trailers_};
+    return trailers;
+  }
   bool receivedData() { return received_data_; }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
@@ -159,6 +172,11 @@ public:
   testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForReset(Event::Dispatcher& client_dispatcher,
+               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // gRPC convenience methods.
   void startGrpcStream(bool send_headers = true);
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
@@ -198,7 +216,7 @@ public:
     {
       absl::MutexLock lock(&lock_);
       last_body_size = body_.length();
-      if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
+      if (!grpc_decoder_.decode(body_, decoded_grpc_frames_).ok()) {
         return testing::AssertionFailure()
                << "Couldn't decode gRPC data frame: " << body_.toString();
       }
@@ -210,7 +228,7 @@ public:
       }
       {
         absl::MutexLock lock(&lock_);
-        if (!grpc_decoder_.decode(body_, decoded_grpc_frames_)) {
+        if (!grpc_decoder_.decode(body_, decoded_grpc_frames_).ok()) {
           return testing::AssertionFailure()
                  << "Couldn't decode gRPC data frame: " << body_.toString();
         }
@@ -231,9 +249,7 @@ public:
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-    return access_log_handlers_;
-  }
+  AccessLog::InstanceSharedPtrVector accessLogHandlers() override { return access_log_handlers_; }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -252,13 +268,43 @@ public:
 
 protected:
   absl::Mutex lock_;
+  // Headers get updated in decodeHeaders() and accessed in headers() methods. Those methods can
+  // be called from different threads, but we can rely on a few assumptions:
+  //
+  // 1. headers() method is only called from a single thread, which may or may not be different
+  //    from the thread that calls decodeHeaders()
+  // 2. headers can only be replaced completely - they are never modified in place.
+  //
+  // With those two assumptions, we can use a synchronization pattern with two header maps, that
+  // allows us to return an unprotected reference to the clients from the headers() method. The
+  // approach works as follows:
+  //
+  // 1. When headers are updated in decodeHeaders(), we store them in the internal headers_ map
+  // 2. When headers() is called, we check if the internal headers_ and external client_headers_
+  //    map point to different places, and if so, we update client_headers_ map to point to the
+  //    same map as internal headers_.
+  //
+  // Because both internal headers_ and client_headers_ are shared pointers, the map will stay
+  // around as long as at least one of those pointers keeps a reference to the map and thus
+  // the returned reference stay valid as well. And because headers() is only called from a single
+  // thread, it's safe to return a reference to client_headers_ from headers() call.
+  //
+  // The reason why we want to return an unprotected reference is because historically that's what
+  // the interface of the FakeStream::headers() was, and over time we accumulated quite a few tests
+  // that rely on that. Changing the interface would require updating all the tests and we decided
+  // not to do that.
+  //
+  // That's why we have both headers_ and client_headers_ map below.
   Http::RequestHeaderMapSharedPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
   FakeHttpConnection& parent_;
 
 private:
   Http::ResponseEncoder& encoder_;
-  Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
+  // See the comment for headers_ above that explains why we need both headers_ and
+  // client_headers_.
+  Http::RequestHeaderMapSharedPtr client_headers_;
+  Http::RequestTrailerMapSharedPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
   bool saw_reset_ ABSL_GUARDED_BY(lock_){};
   Grpc::Decoder grpc_decoder_;
@@ -268,7 +314,7 @@ private:
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::shared_ptr<StreamInfo::StreamInfo> stream_info_;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
   Http::ServerHeaderValidatorPtr header_validator_;
@@ -510,9 +556,11 @@ public:
   // Update the maximum number of concurrent streams.
   void updateConcurrentStreams(uint64_t max_streams);
 
+  // Wait for the first occurrence of data, and strip the leading data up to the first occurrence.
+  // The out parameter will contain the stripped pieces.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForInexactRawData(const char* data, std::string* out = nullptr,
+  waitForInexactRawData(absl::string_view data, std::string& out,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   void writeRawData(absl::string_view data);
@@ -644,6 +692,7 @@ struct FakeUpstreamConfig {
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);
     http3_options_.set_allow_extended_connect(true);
+    http3_options_.set_allow_metadata(true);
   }
 
   Event::TestTimeSystem& time_system_;
@@ -724,8 +773,7 @@ public:
   }
 
   // Wait for one of the upstreams to receive a connection
-  ABSL_MUST_USE_RESULT
-  static testing::AssertionResult
+  static absl::StatusOr<int>
   waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                         std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                         FakeHttpConnectionPtr& connection,
@@ -813,7 +861,7 @@ private:
     Network::SocketSharedPtr getListenSocket(uint32_t) override { return socket_; }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
     void closeAllSockets() override {}
-    void doFinalPreWorkerInit() override;
+    absl::Status doFinalPreWorkerInit() override;
 
   private:
     Network::SocketSharedPtr socket_;
@@ -863,9 +911,14 @@ private:
           listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
+        if (context_ == nullptr) {
+          // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
+          context_ = std::make_unique<
+              testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
+        }
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
-            absl::nullopt);
+            *context_);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else
@@ -899,7 +952,8 @@ private:
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return connection_balancer_;
     }
-    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    bool shouldBypassOverloadManager() const override { return false; }
+    const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
       return empty_access_logs_;
     }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
@@ -922,9 +976,10 @@ private:
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl connection_resource_;
-    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    const AccessLog::InstanceSharedPtrVector empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const Network::ListenerInfoConstSharedPtr listener_info_;
+    std::unique_ptr<Server::Configuration::MockListenerFactoryContext> context_;
   };
 
   void threadRoutine();
@@ -964,6 +1019,7 @@ private:
   // Setting this true disables all events and does not re-enable as the above does.
   bool disable_and_do_not_enable_{};
   const bool enable_half_close_;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
@@ -971,7 +1027,6 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif

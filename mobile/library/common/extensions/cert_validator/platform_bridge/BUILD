@@ -20,7 +20,7 @@ envoy_cc_library(
     hdrs = ["c_types.h"],
     repository = "@envoy",
     deps = [
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
     ],
 )
 
@@ -35,7 +35,11 @@ envoy_cc_library(
         ":c_types_lib",
         ":platform_bridge_cc_proto",
         "//library/common/system:system_helper_lib",
-        "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "@envoy//envoy/thread:thread_interface",
+        "@envoy//source/common/common:macros",
+        "@envoy//source/common/common:thread_impl_lib_posix",
+        "@envoy//source/common/config:utility_lib",
+        "@envoy//source/common/tls/cert_validator:cert_validator_lib",
     ],
 )
 
@@ -50,7 +54,7 @@ envoy_cc_extension(
     deps = [
         ":platform_bridge_cert_validator_lib",
         "//library/common/api:external_api_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "@envoy//envoy/registry",
     ],
 )

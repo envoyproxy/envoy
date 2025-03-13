@@ -32,6 +32,8 @@ public:
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setUseDynamicBaseId(bool use_dynamic_base_id) { use_dynamic_base_id_ = use_dynamic_base_id; }
+  void setSkipHotRestartOnNoParent(bool skip) { skip_hot_restart_on_no_parent_ = skip; }
+  void setSkipHotRestartParentStats(bool skip) { skip_hot_restart_parent_stats_ = skip; }
   void setBaseIdPath(const std::string& base_id_path) { base_id_path_ = base_id_path; }
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
@@ -86,6 +88,9 @@ public:
   void setIgnoreUnknownFieldsDynamic(bool ignore_unknown_dynamic_fields) {
     ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields;
   }
+  void setSkipDeprecatedLog(bool skip_deprecated_logs) {
+    skip_deprecated_logs_ = skip_deprecated_logs;
+  }
 
   void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
 
@@ -96,6 +101,8 @@ public:
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
+  bool skipHotRestartOnNoParent() const override { return skip_hot_restart_on_no_parent_; }
+  bool skipHotRestartParentStats() const override { return skip_hot_restart_parent_stats_; }
   const std::string& baseIdPath() const override { return base_id_path_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
@@ -106,6 +113,7 @@ public:
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   bool ignoreUnknownDynamicFields() const override { return ignore_unknown_dynamic_fields_; }
+  bool skipDeprecatedLogs() const override { return skip_deprecated_logs_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -167,6 +175,8 @@ private:
 
   uint64_t base_id_{0};
   bool use_dynamic_base_id_{false};
+  bool skip_hot_restart_on_no_parent_{false};
+  bool skip_hot_restart_parent_stats_{false};
   std::string base_id_path_;
   uint32_t concurrency_{1};
   std::string config_path_;
@@ -176,6 +186,7 @@ private:
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};
+  bool skip_deprecated_logs_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_{Network::Address::IpVersion::v4};
   spdlog::level::level_enum log_level_{spdlog::level::info};

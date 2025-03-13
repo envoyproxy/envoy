@@ -104,6 +104,7 @@ private:
 
   const PayloadMatcher::MatchSegments send_bytes_;
   PayloadMatcher::MatchSegments receive_bytes_;
+  const std::unique_ptr<envoy::config::core::v3::ProxyProtocolConfig> proxy_protocol_config_;
 };
 
 } // namespace Upstream

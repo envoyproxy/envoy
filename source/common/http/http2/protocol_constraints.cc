@@ -64,9 +64,9 @@ Status ProtocolConstraints::checkOutboundFrameLimits() {
 
 Status ProtocolConstraints::trackInboundFrame(uint8_t type, bool end_stream, bool is_empty) {
   switch (type) {
-  case NGHTTP2_HEADERS:
-  case NGHTTP2_CONTINUATION:
-  case NGHTTP2_DATA:
+  case OGHTTP2_HEADERS_FRAME_TYPE:
+  case OGHTTP2_CONTINUATION_FRAME_TYPE:
+  case OGHTTP2_DATA_FRAME_TYPE:
     // Track frames with an empty payload and no end stream flag.
     if (is_empty && !end_stream) {
       consecutive_inbound_frames_with_empty_payload_++;
@@ -74,10 +74,10 @@ Status ProtocolConstraints::trackInboundFrame(uint8_t type, bool end_stream, boo
       consecutive_inbound_frames_with_empty_payload_ = 0;
     }
     break;
-  case NGHTTP2_PRIORITY:
+  case OGHTTP2_PRIORITY_FRAME_TYPE:
     inbound_priority_frames_++;
     break;
-  case NGHTTP2_WINDOW_UPDATE:
+  case OGHTTP2_WINDOW_UPDATE_FRAME_TYPE:
     inbound_window_update_frames_++;
     break;
   default:

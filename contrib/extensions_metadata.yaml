@@ -18,6 +18,11 @@ envoy.compression.qatzip.compressor:
   - envoy.compression.compressor
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
+envoy.compression.qatzstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http
@@ -108,30 +113,20 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tap_sinks.udp_sink:
+  categories:
+  - envoy.filters.http
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.tap_sinks.udp_sink.v3alpha.UdpSink
 envoy.xds_delegates.kv_store:
   categories:
   - envoy.xds_delegates
   security_posture: data_plane_agnostic
   status: wip
-envoy.filters.network.generic_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: wip
-envoy.filters.generic.router:
-  categories:
-  - envoy.generic_proxy.filters
-  security_posture: requires_trusted_downstream_and_upstream
-  status: wip
-  type_urls:
-  - envoy.extensions.filters.network.generic_proxy.router.v3.Router
-envoy.generic_proxy.codecs.dubbo:
-  categories:
-  - envoy.generic_proxy.codecs
-  security_posture: requires_trusted_downstream_and_upstream
-  status: wip
-  type_urls:
-  - envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
 envoy.generic_proxy.codecs.kafka:
   categories:
   - envoy.generic_proxy.codecs
@@ -142,5 +137,10 @@ envoy.generic_proxy.codecs.kafka:
 envoy.router.cluster_specifier_plugin.golang:
   categories:
   - envoy.router.cluster_specifier_plugin
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.upstreams.http.tcp.golang:
+  categories:
+  - envoy.upstreams
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha

@@ -33,7 +33,6 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   domain: test
   timeout: 2s
   rate_limit_service:
-    transport_api_version: V3
     grpc_service:
       envoy_grpc:
         cluster_name: ratelimit_cluster
@@ -80,6 +79,28 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
+}
+
+TEST(RateLimitFilterConfigTest, PerRouteRateLimits) {
+  const std::string yaml = R"EOF(
+  domain: test
+  rate_limits:
+    - actions:
+      - remote_address: {}
+      hits_addend:
+        number: 1234
+  )EOF";
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  RateLimitFilterConfig factory;
+  auto status_or_error = factory.createRouteSpecificFilterConfig(
+      proto_config, factory_context,
+      factory_context.validation_context_.static_validation_visitor_);
+  EXPECT_TRUE(status_or_error.ok());
+  EXPECT_NE(nullptr, status_or_error.value());
 }
 
 } // namespace

@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
@@ -38,7 +39,7 @@ void addFileDescriptorsRecursively(const Protobuf::FileDescriptor& descriptor,
 
 void addBookstoreProtoDescriptor(Protobuf::Message* message) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<
+      *Envoy::Protobuf::DynamicCastMessage<
           envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder>(message);
   config.clear_services();
   config.add_services("bookstore.Bookstore");
@@ -51,6 +52,23 @@ void addBookstoreProtoDescriptor(Protobuf::Message* message) {
   absl::flat_hash_set<absl::string_view> added_descriptors;
   addFileDescriptorsRecursively(*file_descriptor, descriptor_set, added_descriptors);
   descriptor_set.SerializeToString(config.mutable_proto_descriptor_bin());
+}
+
+void addBookstoreDescriptorReverseTranscoder(Protobuf::Message* message) {
+  envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder&
+      config = *Envoy::Protobuf::DynamicCastMessage<
+          envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+              GrpcJsonReverseTranscoder>(message);
+  config.mutable_max_request_body_size()->set_value(101);
+  config.mutable_max_response_body_size()->set_value(101);
+  Protobuf::FileDescriptorSet descriptor_set;
+  const auto* file_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindFileByName("test/proto/bookstore.proto");
+  ASSERT(file_descriptor != nullptr);
+  // Create a set to keep track of descriptors as they are added.
+  absl::flat_hash_set<absl::string_view> added_descriptors;
+  addFileDescriptorsRecursively(*file_descriptor, descriptor_set, added_descriptors);
+  descriptor_set.SerializeToString(config.mutable_descriptor_binary());
 }
 } // namespace
 
@@ -82,8 +100,7 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
 
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<envoy::extensions::filters::http::tap::v3::Tap>(
-          message);
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::tap::v3::Tap>(message);
   if (config.common_config().config_type_case() ==
       envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kStaticConfig) {
     auto const& output_config = config.common_config().static_config().output_config();
@@ -111,7 +128,7 @@ void cleanTapConfig(Protobuf::Message* message) {
 
 void cleanFileSystemBufferConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<
+      *Envoy::Protobuf::DynamicCastMessage<
           envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig>(
           message);
   if (config.manager_config().thread_pool().thread_count() > kMaxAsyncFileManagerThreadCount) {
@@ -128,6 +145,9 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   if (filter_name == "envoy.filters.http.grpc_json_transcoder") {
     // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
+  } else if (filter_name == "envoy.filters.http.grpc_json_reverse_transcoder") {
+    // Add a valid proto descriptor.
+    addBookstoreDescriptorReverseTranscoder(message);
   } else if (filter_name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);

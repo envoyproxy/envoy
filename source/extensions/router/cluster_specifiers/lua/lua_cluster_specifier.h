@@ -4,6 +4,7 @@
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
@@ -23,6 +24,8 @@ public:
   }
 
   int clusterFunctionRef() { return lua_state_.getGlobalRef(cluster_function_slot_); }
+
+  void runtimeGC() { lua_state_.runtimeGC(); }
 
 private:
   uint64_t cluster_function_slot_{};
@@ -51,20 +54,61 @@ private:
 
 using HeaderMapRef = Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper>;
 
+class ClusterWrapper : public Filters::Common::Lua::BaseLuaObject<ClusterWrapper> {
+public:
+  ClusterWrapper(Upstream::ClusterInfoConstSharedPtr cluster) : cluster_(cluster) {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {
+        {"numConnections", static_luaNumConnections},
+        {"numRequests", static_luaNumRequests},
+        {"numPendingRequests", static_luaNumPendingRequests},
+    };
+  }
+
+  void onMarkDead() override { cluster_.reset(); }
+
+private:
+  DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumConnections);
+  DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumRequests);
+  DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumPendingRequests);
+
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+};
+
+using ClusterRef = Filters::Common::Lua::LuaDeathRef<ClusterWrapper>;
+
 class RouteHandleWrapper : public Filters::Common::Lua::BaseLuaObject<RouteHandleWrapper> {
 public:
-  RouteHandleWrapper(const Http::HeaderMap& headers) : headers_(headers) {}
+  RouteHandleWrapper(const Http::HeaderMap& headers, Upstream::ClusterManager& cm)
+      : headers_(headers), cm_(cm) {}
 
-  static ExportedFunctions exportedFunctions() { return {{"headers", static_luaHeaders}}; }
+  static ExportedFunctions exportedFunctions() {
+    return {
+        {"headers", static_luaHeaders},
+        {"getCluster", static_luaGetCluster},
+    };
+  }
+
+  // All embedded references should be reset when the object is marked dead. This is to ensure that
+  // we won't do the resetting in the destructor, which may be called after the referenced
+  // coroutine's lua_State is closed. And if that happens, the resetting will cause a crash.
+  void onMarkDead() override {
+    headers_wrapper_.reset();
+    clusters_.clear();
+  }
 
 private:
   /**
    * @return a handle to the headers.
    */
   DECLARE_LUA_FUNCTION(RouteHandleWrapper, luaHeaders);
+  DECLARE_LUA_FUNCTION(RouteHandleWrapper, luaGetCluster);
 
   const Http::HeaderMap& headers_;
+  Upstream::ClusterManager& cm_;
   HeaderMapRef headers_wrapper_;
+  std::vector<ClusterRef> clusters_;
 };
 
 using RouteHandleRef = Filters::Common::Lua::LuaDeathRef<RouteHandleWrapper>;
@@ -74,25 +118,12 @@ public:
   LuaClusterSpecifierConfig(const LuaClusterSpecifierConfigProto& config,
                             Server::Configuration::CommonFactoryContext& context);
 
-  ~LuaClusterSpecifierConfig() {
-    // The design of the TLS system does not allow TLS state to be modified in worker threads.
-    // However, when the route configuration is dynamically updated via RDS, the old
-    // LuaClusterSpecifierConfig object may be destructed in a random worker thread. Therefore, to
-    // ensure thread safety, ownership of per_lua_code_setup_ptr_ must be transferred to the main
-    // thread and destroyed when the LuaClusterSpecifierConfig object is not destructed in the main
-    // thread.
-    if (per_lua_code_setup_ptr_ && !main_thread_dispatcher_.isThreadSafe()) {
-      auto shared_ptr_wrapper =
-          std::make_shared<PerLuaCodeSetupPtr>(std::move(per_lua_code_setup_ptr_));
-      main_thread_dispatcher_.post([shared_ptr_wrapper] { shared_ptr_wrapper->reset(); });
-    }
-  }
-
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
   const std::string& defaultCluster() const { return default_cluster_; }
+  Upstream::ClusterManager& clusterManager() { return cm_; }
 
 private:
-  Event::Dispatcher& main_thread_dispatcher_;
+  Upstream::ClusterManager& cm_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
   const std::string default_cluster_;
 };

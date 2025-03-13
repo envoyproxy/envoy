@@ -26,7 +26,7 @@ namespace {
 
 std::shared_ptr<grpc::ChannelCredentials>
 getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service,
-                                Api::Api& api) {
+                                Server::Configuration::CommonFactoryContext& context) {
   GoogleGrpcCredentialsFactory* credentials_factory = nullptr;
   const std::string& google_grpc_credentials_factory_name =
       grpc_service.google_grpc().credentials_factory_name();
@@ -41,7 +41,7 @@ getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc
     throw EnvoyException(absl::StrCat("Unknown google grpc credentials factory: ",
                                       google_grpc_credentials_factory_name));
   }
-  return credentials_factory->getChannelCredentials(grpc_service, api);
+  return credentials_factory->getChannelCredentials(grpc_service, context);
 }
 
 } // namespace
@@ -133,8 +133,10 @@ GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcServic
 }
 
 std::shared_ptr<grpc::Channel>
-GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api) {
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
+GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config,
+                               Server::Configuration::CommonFactoryContext& context) {
+  std::shared_ptr<grpc::ChannelCredentials> creds =
+      getGoogleGrpcChannelCredentials(config, context);
   const grpc::ChannelArguments args = channelArgsFromConfig(config);
   return CreateCustomChannel(config.google_grpc().target_uri(), creds, args);
 }

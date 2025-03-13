@@ -25,7 +25,7 @@ public:
               const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  Envoy::Http::HeaderMutations mutations_;
+  std::unique_ptr<Envoy::Http::HeaderMutations> mutations_;
 };
 
 } // namespace HeaderMutation

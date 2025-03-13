@@ -109,7 +109,7 @@ typed_config:
 
   Http::TestRequestHeaderMapImpl incoming_headers_{{":scheme", "http"},
                                                    {":path", "/ping"},
-                                                   {":method", "GET"},
+                                                   {":method", "POST"},
                                                    {":authority", "host"},
                                                    {"Content-Type", "application/json"}};
   Http::TestRequestTrailerMapImpl incoming_trailers_{{"request1", "trailer1"},
@@ -200,7 +200,7 @@ TEST_P(JsonToMetadataIntegrationTest, MismatchedContentType) {
 
   const Http::TestRequestHeaderMapImpl incoming_headers{{":scheme", "http"},
                                                         {":path", "/ping"},
-                                                        {":method", "GET"},
+                                                        {":method", "POST"},
                                                         {":authority", "host"},
                                                         {"Content-Type", "application/x-thrift"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
@@ -222,7 +222,13 @@ TEST_P(JsonToMetadataIntegrationTest, MismatchedContentType) {
 TEST_P(JsonToMetadataIntegrationTest, NoBody) {
   initializeFilter();
 
-  runTest(incoming_headers_, "", response_headers_, "");
+  const Http::TestRequestHeaderMapImpl incoming_headers{{":scheme", "http"},
+                                                        {":path", "/ping"},
+                                                        {":method", "GET"},
+                                                        {":authority", "host"},
+                                                        {"Content-Type", "application/json"}};
+
+  runTest(incoming_headers, "", response_headers_, "");
 
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.success")->value());
   EXPECT_EQ(0UL, test_server_->counter("json_to_metadata.rq.mismatched_content_type")->value());

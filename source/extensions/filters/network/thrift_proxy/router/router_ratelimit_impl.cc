@@ -70,10 +70,11 @@ bool GenericKeyAction::populateDescriptor(const RouteEntry&, RateLimit::Descript
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
-    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action)
+    const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
     : descriptor_value_(action.descriptor_value()),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers(), context)) {}
 
 bool HeaderValueMatchAction::populateDescriptor(const RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,
@@ -89,7 +90,8 @@ bool HeaderValueMatchAction::populateDescriptor(const RouteEntry&,
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
-    const envoy::config::route::v3::RateLimit& config)
+    const envoy::config::route::v3::RateLimit& config,
+    Server::Configuration::CommonFactoryContext& context)
     : disable_key_(config.disable_key()),
       stage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0)) {
   for (const auto& action : config.actions()) {
@@ -110,7 +112,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new GenericKeyAction(action.generic_key()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
-      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match()));
+      actions_.emplace_back(new HeaderValueMatchAction(action.header_value_match(), context));
       break;
     default:
       throw EnvoyException(
@@ -139,11 +141,12 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
 }
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
-    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits)
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
+    Server::Configuration::CommonFactoryContext& context)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit));
+        new RateLimitPolicyEntryImpl(rate_limit, context));
     uint32_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

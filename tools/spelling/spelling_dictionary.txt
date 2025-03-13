@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AJAX
 AllMuxes
 ALPN
 ALS
@@ -26,18 +27,30 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+CCL
+CGROUP
+CROSSSLOT
+ECN
+ECS
+EKS
+Millicores
 NID
 NIST
+NORMALISATION
 bm
 BSON
 BPF
 Bdecoded
 Bencoded
 CIO
+cbegin
+cend
+constness
 deadcode
 DFP
 Dynatrace
 DOM
+DONTFRAG
 Gasd
 GiB
 IPTOS
@@ -66,6 +79,7 @@ DSR
 DSS
 EBADF
 ECH
+ECT
 ENDIF
 ENOTCONN
 ENQ
@@ -76,6 +90,7 @@ ETB
 ETX
 FS
 FIXME
+gperf
 HEXDIG
 HEXDIGIT
 HPE
@@ -87,6 +102,7 @@ OWS
 Preconnecting
 RCVBUF
 RTCP
+RTLD
 RTP
 SOH
 SPC
@@ -176,6 +192,7 @@ FIRSTHDR
 FQDN
 FREEBIND
 curr
+doo
 eslint
 freeifaddrs
 FUZZER
@@ -224,6 +241,7 @@ IANA
 IDL
 IETF
 IFADDRS
+IMUsed
 INADDR
 INET
 INVAL
@@ -252,12 +270,14 @@ KiB
 Kille
 LBs
 LC
+LCOV
 LDS
 LEDS
 LEV
 LF
 LHS
 hls
+hoo
 iframe
 ilp
 ingressed
@@ -295,9 +315,15 @@ NGHTTP
 NLOHMANN
 NOAUTH
 NOCHECKRESP
+NODATA
 NODELAY
+NODELETE
 NOLINT
+NOLINTBEGIN
+NOLINTEND
 NOLINTNEXTLINE
+NOLOAD
+NONAME
 NONBLOCK
 NONCES
 NOSORT
@@ -312,6 +338,11 @@ ODCDS
 middlewildcard
 monostate
 mpd
+msan
+mutators
+mybucket
+myobject
+myproject
 na
 oghttp
 OID
@@ -353,6 +384,7 @@ QUIC
 QoS
 qat
 qatzip
+qatzstd
 RAII
 RANLUX
 RBAC
@@ -361,6 +393,7 @@ RDS
 README
 RECVDSTADDR
 RECVPKTINFO
+RECVTOS
 REFNIL
 REQ
 REUSEADDR
@@ -409,7 +442,9 @@ SPD
 SPDY
 SPIFFE
 SPKI
+SQE
 SQL
+SQPOLL
 SR
 SRCDIR
 SRDS
@@ -451,6 +486,7 @@ UDP
 UDS
 UHV
 UNC
+UPN
 URI
 URL
 USEVC
@@ -469,7 +505,6 @@ VM
 VPN
 WAITFORONE
 WASM
-WAVM
 WIP
 WKT
 WRONGPASS
@@ -684,6 +719,8 @@ deleter
 delim
 denylist
 deque
+dep
+deps
 deprecations
 dereference
 dereferences
@@ -706,6 +743,9 @@ dgst
 dir
 dirname
 djb
+dlclose
+dlopen
+dlsym
 downcalls
 downcasted
 downcased
@@ -747,6 +787,7 @@ exe
 execlp
 exprfor
 expectable
+extensibility
 extrahelp
 faceplant
 facto
@@ -768,6 +809,8 @@ fixdate
 fixup
 flatbuffer
 flatc
+fluentd
+Fluentd
 fmt
 fmtlib
 fn
@@ -858,6 +901,7 @@ inotify
 inserter
 instantiation
 instantiations
+interop
 interpretable
 intra
 ints
@@ -878,6 +922,7 @@ iteratively
 javascript
 jitter
 jittered
+joinable
 js
 kafka
 keepalive
@@ -907,6 +952,8 @@ lightstep
 linearization
 linearize
 linearized
+linkability
+linkable
 linux
 livelock
 llvm
@@ -964,6 +1011,7 @@ moveable
 msec
 msg
 msghdr
+msgpack
 multi
 multicast
 multikill
@@ -992,6 +1040,7 @@ netblocks
 netfilter
 netlink
 netmask
+NLB
 NLMSG
 nonblocking
 noncopyable
@@ -1016,7 +1065,6 @@ oneof
 oneway
 oob
 opcode
-opencensus
 openssl
 opentracing
 optimizations
@@ -1062,6 +1110,7 @@ plaintext
 pluggable
 pointee
 poller
+polymorphism
 popen
 pos
 posix
@@ -1157,6 +1206,7 @@ refcount
 referencee
 referer
 refetch
+reframed
 refvec
 regex
 regexes
@@ -1172,6 +1222,7 @@ reparse
 repeatability
 reperform
 repicked
+replayable
 repo
 reproducibility
 requirepass
@@ -1186,6 +1237,7 @@ resolv
 resolvers
 responder
 restarter
+resumable
 resync
 ret
 retransmissions
@@ -1205,6 +1257,7 @@ rollout
 roundtrip
 rpcs
 rq
+rtest
 rtrim
 rtt
 ruleset
@@ -1235,6 +1288,7 @@ servercert
 setenv
 setsockopt
 sfixed
+sidestream
 sig
 sigaction
 sigactions
@@ -1319,6 +1373,7 @@ suf
 superclass
 superroot
 superset
+supportability
 svc
 symlink
 symlinked
@@ -1329,6 +1384,7 @@ sys
 syscall
 syscalls
 sysctl
+sysroot
 sz
 tchar
 tchars
@@ -1359,6 +1415,7 @@ tokenized
 tokenizes
 tokenizing
 toolchain
+tos
 traceid
 traceparent
 tracestate
@@ -1402,8 +1459,10 @@ upcasts
 upstreams
 uptime
 upvalue
+uring
 urlencoded
 urls
+useragent
 userdata
 userinfo
 username
@@ -1431,8 +1490,10 @@ viewport
 vip
 virtualhost
 virtualize
+virtualized
 vptr
 vtable
+vtest
 vtt
 wakeup
 wakeups
@@ -1461,6 +1522,7 @@ xxhash
 xxs
 xyz
 xyzwebservices
+yml
 zag
 zig
 zipkin
@@ -1487,3 +1549,8 @@ DLB
 PCIE
 EDNS
 CNAME
+NAT
+NXDOMAIN
+DNAT
+RSP
+EWMA

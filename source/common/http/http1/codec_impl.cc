@@ -24,7 +24,6 @@
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
@@ -976,8 +975,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ExecutionContext* ConnectionImpl::executionContext() const {
-  return getConnectionExecutionContext(connection_);
+OptRef<const StreamInfo::StreamInfo> ConnectionImpl::trackedStream() const {
+  return connection_.trackedStream();
 }
 
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
@@ -1071,8 +1070,8 @@ ServerConnectionImpl::ServerConnectionImpl(
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
       headers_with_underscores_action_(headers_with_underscores_action),
-      abort_dispatch_(
-          overload_manager.getLoadShedPoint("envoy.load_shed_points.http1_server_abort_dispatch")) {
+      abort_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H1ServerAbortDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
                     "found. Is it configured?");
@@ -1341,7 +1340,7 @@ CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   if (active_request_) {
-    active_request_->response_encoder_.runResetCallbacks(reason);
+    active_request_->response_encoder_.runResetCallbacks(reason, absl::string_view());
     connection_.dispatcher().deferredDelete(std::move(active_request_));
   }
 }
@@ -1362,6 +1361,10 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   // We do this here because we may get a protocol error before we have a logical stream.
   if (active_request_ == nullptr) {
     RETURN_IF_ERROR(onMessageBeginImpl());
+  }
+
+  if (resetStreamCalled()) {
+    return okStatus();
   }
   ASSERT(active_request_);
 
@@ -1428,15 +1431,19 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
+                                           absl::optional<uint16_t> max_response_headers_kb,
                                            const uint32_t max_response_headers_count,
                                            bool passing_through_proxy)
-    : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
+    : ConnectionImpl(connection, stats, settings, MessageType::Response,
+                     max_response_headers_kb.value_or(MAX_RESPONSE_HEADERS_KB),
                      max_response_headers_count),
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
-      passing_through_proxy_(passing_through_proxy) {
+      passing_through_proxy_(passing_through_proxy),
+      force_reset_on_premature_upstream_half_close_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1587,6 +1594,16 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
       response.decoder_->decodeData(buffer, true);
     }
 
+    if (force_reset_on_premature_upstream_half_close_ && !encode_complete_) {
+      // H/1 connections are always reset if upstream is done before downstream.
+      // When the allow_multiplexed_upstream_half_close is enabled the router filter does not
+      // reset streams where upstream half closed before downstream. In this case the H/1 codec
+      // has to reset the stream.
+      ENVOY_CONN_LOG(trace, "Resetting stream due to premature H/1 upstream close.", connection_);
+      response.encoder_.runResetCallbacks(StreamResetReason::Http1PrematureUpstreamHalfClose,
+                                          absl::string_view());
+    }
+
     // Reset to ensure no information from one requests persists to the next.
     pending_response_.reset();
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
@@ -1599,7 +1616,7 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
 void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   // Only raise reset if we did not already dispatch a complete response.
   if (pending_response_.has_value() && !pending_response_done_) {
-    pending_response_.value().encoder_.runResetCallbacks(reason);
+    pending_response_.value().encoder_.runResetCallbacks(reason, absl::string_view());
     pending_response_done_ = true;
     pending_response_.reset();
   }

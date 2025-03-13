@@ -62,7 +62,7 @@ TEST_P(HttpCapsuleIntegrationTest, BasicFlow) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string request = "hello";
@@ -100,7 +100,7 @@ TEST_P(HttpCapsuleIntegrationTest, SendSplitCapsule) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string request = "hello";
@@ -150,7 +150,7 @@ TEST_P(HttpCapsuleIntegrationTest, SendMultipleCapsules) {
   setup();
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string request = "hello";

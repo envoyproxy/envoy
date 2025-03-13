@@ -29,7 +29,7 @@ envoy_cc_library(
     hdrs = ["prefix_map_matcher.h"],
     deps = [
         ":map_matcher_lib",
-        "//source/common/common:utility_lib",
+        "//source/common/common:trie_lookup_table_lib",
     ],
 )
 

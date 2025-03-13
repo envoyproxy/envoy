@@ -38,7 +38,7 @@ NSString *_REQUEST_SCHEME = @"http";
 - (void)startEnvoy {
   NSLog(@"starting Envoy...");
   EngineBuilder *builder = [[EngineBuilder alloc] init];
-  [builder addLogLevel:LogLevelDebug];
+  [builder setLogLevel:LogLevelDebug];
   [builder enableDNSCache:YES saveInterval:1];
   [builder addKeyValueStoreWithName:@"reserved.platform_store"
                       keyValueStore:NSUserDefaults.standardUserDefaults];

@@ -233,11 +233,11 @@ environment. In general, there should be no non-local network access. In additio
 
 Tests should be deterministic. They should not rely on randomness or details
 such as the current time. Instead, mocks such as
-[`MockRandomGenerator`](test/mocks/runtime/mocks.h) and
-[`Mock*TimeSource`](test/mocks/common.h) should be used.
+[`MockRandomGenerator`](test/mocks/common.h) and
+[`SimulatedTimeSystem`](test/test_common/simulated_time_system.h) should be used.
 
 # Google style guides for other languages
 
 * [Python](https://google.github.io/styleguide/pyguide.html)
 * [Bash](https://google.github.io/styleguide/shell.xml)
-* [Bazel](https://bazel.build/versions/master/docs/skylark/build-style.html)
+* [Bazel](https://bazel.build/build/style-guide)

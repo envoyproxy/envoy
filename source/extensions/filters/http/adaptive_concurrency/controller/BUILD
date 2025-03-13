@@ -19,9 +19,6 @@ envoy_cc_library(
         "controller.h",
         "gradient_controller.h",
     ],
-    external_deps = [
-        "libcircllhist",
-    ],
     deps = [
         "//envoy/common:time_interface",
         "//source/common/common:thread_synchronizer_lib",
@@ -30,6 +27,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "@com_github_openhistogram_libcircllhist//:libcircllhist",
         "@envoy_api//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg_cc_proto",
     ],
 )

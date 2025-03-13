@@ -5,6 +5,7 @@
 #include "source/common/network/filter_state_dst_address.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/thread/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -22,12 +23,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Golang {
 namespace {
-
-class MockThreadFactory : public Thread::ThreadFactory {
-public:
-  MOCK_METHOD(Thread::ThreadPtr, createThread, (std::function<void()>, Thread::OptionsOptConstRef));
-  MOCK_METHOD(Thread::ThreadId, currentThreadId, ());
-};
 
 class UpstreamConnTest : public testing::Test {
 public:
@@ -47,7 +42,7 @@ public:
   }
 
   ThreadLocal::MockInstance slot_allocator_;
-  NiceMock<MockThreadFactory> thread_factory_;
+  NiceMock<Thread::MockThreadFactory> thread_factory_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<Dso::MockNetworkFilterDsoImpl> dso_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -61,7 +56,7 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
   initialize();
 
   const auto* dst_addr =
-      upConn_->requestStreamInfo()->filterState().getDataReadOnly<Network::AddressObject>(
+      upConn_->requestStreamInfo()->filterState()->getDataReadOnly<Network::AddressObject>(
           "envoy.network.transport_socket.original_dst_address");
   EXPECT_EQ(dst_addr->address()->asString(), addr_);
 
@@ -114,6 +109,9 @@ TEST_F(UpstreamConnTest, WriteAndClose) {
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(upstream_connection_));
   upConn_->onPoolReady(std::move(data), nullptr);
+
+  EXPECT_CALL(upstream_connection_, enableHalfClose(true));
+  upConn_->enableHalfClose(true);
 
   Buffer::OwnedImpl someData("123");
   EXPECT_CALL(upstream_connection_, write(_, false));

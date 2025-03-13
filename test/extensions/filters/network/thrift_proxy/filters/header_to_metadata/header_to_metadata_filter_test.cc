@@ -55,11 +55,12 @@ public:
     envoy::extensions::filters::network::thrift_proxy::filters::header_to_metadata::v3::
         HeaderToMetadata proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
-    const auto& filter_config = std::make_shared<Config>(proto_config);
+    const auto& filter_config = std::make_shared<Config>(proto_config, regex_engine_);
     filter_ = std::make_shared<HeaderToMetadataFilter>(filter_config);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  Regex::GoogleReEngine regex_engine_;
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   std::shared_ptr<HeaderToMetadataFilter> filter_;

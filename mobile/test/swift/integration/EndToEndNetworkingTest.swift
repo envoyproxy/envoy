@@ -10,19 +10,30 @@ final class EndToEndNetworkingTest: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testNetworkRequestReturnsHeadersAndData() {
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
     EnvoyTestServer.setHeadersAndData(
       "x-response-foo", header_value: "aaa", response_body: "hello world")
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
     let requestHeaders = RequestHeadersBuilder(
       method: .get, scheme: "http", authority: "localhost:" + port, path: "/"
     )
     .build()
 
     let engine = EngineBuilder()
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .build()
 
     var responseBuffer = Data()
@@ -49,6 +60,6 @@ final class EndToEndNetworkingTest: XCTestCase {
     XCTAssertEqual(.completed, XCTWaiter().wait(for: expectations, timeout: 10, enforceOrder: true))
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

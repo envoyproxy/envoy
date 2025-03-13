@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -54,7 +56,7 @@ static constexpr FileTriggerType PlatformDefaultTriggerType = determinePlatformP
 /**
  * Callback invoked when a FileEvent is ready for reading or writing.
  */
-using FileReadyCb = std::function<void(uint32_t events)>;
+using FileReadyCb = std::function<absl::Status(uint32_t events)>;
 
 /**
  * Wrapper for file based (read/write) event notifications.

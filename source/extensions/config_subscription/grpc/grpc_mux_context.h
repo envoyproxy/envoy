@@ -19,6 +19,7 @@ namespace Config {
 // These are parameters needed for the creation of all GrpcMux objects.
 struct GrpcMuxContext {
   Grpc::RawAsyncClientPtr async_client_;
+  Grpc::RawAsyncClientPtr failover_async_client_;
   Event::Dispatcher& dispatcher_;
   const Protobuf::MethodDescriptor& service_method_;
   const LocalInfo::LocalInfo& local_info_;

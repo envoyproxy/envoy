@@ -35,7 +35,7 @@ struct NullRateLimitPolicy : public Router::RateLimitPolicy {
 };
 
 struct NullCommonConfig : public Router::CommonConfig {
-  const std::list<LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
 
@@ -50,11 +50,12 @@ struct NullCommonConfig : public Router::CommonConfig {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
 
-  static const std::list<LowerCaseString> internal_only_headers_;
+  static const std::vector<LowerCaseString> internal_only_headers_;
 };
 
 struct NullVirtualHost : public Router::VirtualHost {
   // Router::VirtualHost
+  const std::string& name() const override { return EMPTY_STRING; }
   Stats::StatName statName() const override { return {}; }
   const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
@@ -64,17 +65,20 @@ struct NullVirtualHost : public Router::VirtualHost {
   bool includeIsTimeoutRetryHeader() const override { return false; }
   uint32_t retryShadowBufferLimit() const override { return std::numeric_limits<uint32_t>::max(); }
   const Router::RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string&) const override {
+  mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
   }
-  void traversePerFilterConfig(
-      const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Router::RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override {
+    return {};
+  }
   const envoy::config::core::v3::Metadata& metadata() const override {
     return Router::DefaultRouteMetadataPack::get().proto_metadata_;
   }
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
+  }
+  const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+    return nullptr;
   }
 
   static const NullRateLimitPolicy rate_limit_policy_;
@@ -87,19 +91,41 @@ struct NullPathMatchCriterion : public Router::PathMatchCriterion {
 };
 
 struct RouteEntryImpl : public Router::RouteEntry {
+  static absl::StatusOr<std::unique_ptr<RouteEntryImpl>>
+  create(const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
+         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
+             hash_policy,
+         const Router::RetryPolicy& retry_policy, Regex::Engine& regex_engine,
+         const Router::MetadataMatchCriteria* metadata_match) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::unique_ptr<RouteEntryImpl>(
+        new RouteEntryImpl(cluster_name, timeout, hash_policy, retry_policy, regex_engine,
+                           creation_status, metadata_match));
+    RETURN_IF_NOT_OK(creation_status);
+    return ret;
+  }
+
+protected:
   RouteEntryImpl(
       const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
           hash_policy,
-      const Router::RetryPolicy& retry_policy)
-      : retry_policy_(retry_policy), cluster_name_(cluster_name), timeout_(timeout) {
+      const Router::RetryPolicy& retry_policy, Regex::Engine& regex_engine,
+      absl::Status& creation_status, const Router::MetadataMatchCriteria* metadata_match)
+      : metadata_match_(metadata_match), retry_policy_(retry_policy), cluster_name_(cluster_name),
+        timeout_(timeout) {
     if (!hash_policy.empty()) {
-      hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      auto policy_or_error = HashPolicyImpl::create(hash_policy, regex_engine);
+      SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+      hash_policy_ = std::move(*policy_or_error);
     }
   }
 
   // Router::RouteEntry
   const std::string& clusterName() const override { return cluster_name_; }
+  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override {
+    return std::string(headers.getHostValue());
+  }
   const Router::RouteStatsContextOptRef routeStatsContext() const override {
     return Router::RouteStatsContextOptRef();
   }
@@ -125,7 +151,9 @@ struct RouteEntryImpl : public Router::RouteEntry {
   }
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
   const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+    return metadata_match_;
+  }
   Upstream::ResourcePriority priority() const override {
     return Upstream::ResourcePriority::Default;
   }
@@ -164,16 +192,12 @@ struct RouteEntryImpl : public Router::RouteEntry {
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
     return absl::nullopt;
   }
-  const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
-    return nullptr;
-  }
   const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
     return nullptr;
   }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
-  const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
   bool autoHostRewrite() const override { return false; }
   bool appendXfh() const override { return false; }
   bool includeVirtualHostRateLimits() const override { return true; }
@@ -188,6 +212,7 @@ struct RouteEntryImpl : public Router::RouteEntry {
   const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
+  const Router::MetadataMatchCriteria* metadata_match_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   const Router::RetryPolicy& retry_policy_;
 
@@ -197,7 +222,6 @@ struct RouteEntryImpl : public Router::RouteEntry {
   static const Router::PathMatcherSharedPtr path_matcher_;
   static const Router::PathRewriterSharedPtr path_rewriter_;
   static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
-  static const NullVirtualHost virtual_host_;
   static const std::multimap<std::string, std::string> opaque_config_;
   static const NullPathMatchCriterion path_match_criterion_;
 
@@ -211,24 +235,32 @@ struct RouteEntryImpl : public Router::RouteEntry {
 };
 
 struct NullRouteImpl : public Router::Route {
-  NullRouteImpl(const std::string cluster_name, const Router::RetryPolicy& retry_policy,
-                const absl::optional<std::chrono::milliseconds>& timeout = {},
-                const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
-                    hash_policy = {})
-      : route_entry_(cluster_name, timeout, hash_policy, retry_policy) {}
+  static absl::StatusOr<std::unique_ptr<NullRouteImpl>>
+  create(const std::string cluster_name, const Router::RetryPolicy& retry_policy,
+         Regex::Engine& regex_engine, const absl::optional<std::chrono::milliseconds>& timeout = {},
+         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
+             hash_policy = {},
+         const Router::MetadataMatchCriteria* metadata_match = nullptr) {
+    absl::Status creation_status;
+    auto ret = std::unique_ptr<NullRouteImpl>(new NullRouteImpl(cluster_name, retry_policy,
+                                                                regex_engine, timeout, hash_policy,
+                                                                creation_status, metadata_match));
+    RETURN_IF_NOT_OK(creation_status);
+    return ret;
+  }
 
   // Router::Route
   const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
-  const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
+  const Router::RouteEntry* routeEntry() const override { return route_entry_.get(); }
   const Router::Decorator* decorator() const override { return nullptr; }
   const Router::RouteTracing* tracingConfig() const override { return nullptr; }
   const Router::RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string&) const override {
+  mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
   }
-  void traversePerFilterConfig(
-      const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Router::RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override {
+    return {};
+  }
   const envoy::config::core::v3::Metadata& metadata() const override {
     return Router::DefaultRouteMetadataPack::get().proto_metadata_;
   }
@@ -237,8 +269,24 @@ struct NullRouteImpl : public Router::Route {
   }
   absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
+  const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
 
-  RouteEntryImpl route_entry_;
+  std::unique_ptr<RouteEntryImpl> route_entry_;
+  static const NullVirtualHost virtual_host_;
+
+protected:
+  NullRouteImpl(const std::string cluster_name, const Router::RetryPolicy& retry_policy,
+                Regex::Engine& regex_engine,
+                const absl::optional<std::chrono::milliseconds>& timeout,
+                const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
+                    hash_policy,
+                absl::Status& creation_status,
+                const Router::MetadataMatchCriteria* metadata_match) {
+    auto entry_or_error = RouteEntryImpl::create(cluster_name, timeout, hash_policy, retry_policy,
+                                                 regex_engine, metadata_match);
+    SET_AND_RETURN_IF_NOT_OK(entry_or_error.status(), creation_status);
+    route_entry_ = std::move(*entry_or_error);
+  }
 };
 
 } // namespace Http

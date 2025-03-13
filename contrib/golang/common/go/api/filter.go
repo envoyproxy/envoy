@@ -34,6 +34,9 @@ type (
 	EmptyDownstreamFilter struct{}
 	// EmptyUpstreamFilter provides the no-op implementation of the UpstreamFilter interface
 	EmptyUpstreamFilter struct{}
+
+	// PassThroughHttpTcpBridge provides the no-op implementation of the HttpTcpBridge interface
+	PassThroughHttpTcpBridge struct{}
 )
 
 // request
@@ -81,25 +84,28 @@ type StreamFilter interface {
 	StreamEncoderFilter
 
 	// log
-	OnLog()
-	OnLogDownstreamStart()
-	OnLogDownstreamPeriodic()
+	OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
+	OnLogDownstreamStart(RequestHeaderMap)
+	OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
 
 	// destroy filter
 	OnDestroy(DestroyReason)
-	// TODO add more for stream complete
+	OnStreamComplete()
 }
 
-func (*PassThroughStreamFilter) OnLog() {
+func (*PassThroughStreamFilter) OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
 }
 
-func (*PassThroughStreamFilter) OnLogDownstreamStart() {
+func (*PassThroughStreamFilter) OnLogDownstreamStart(RequestHeaderMap) {
 }
 
-func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
+}
+
+func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
 type StreamFilterConfigParser interface {
@@ -152,15 +158,12 @@ type StreamInfo interface {
 
 type StreamFilterCallbacks interface {
 	StreamInfo() StreamInfo
-}
 
-type FilterCallbacks interface {
-	StreamFilterCallbacks
-	// Continue or SendLocalReply should be last API invoked, no more code after them.
-	Continue(StatusType)
-	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
-	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
-	RecoverPanic()
+	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
+	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
+	ClearRouteCache()
+	// RefreshRouteCache works like ClearRouteCache, but it will re-fetch the route immediately.
+	RefreshRouteCache()
 	Log(level LogType, msg string)
 	LogLevel() LogType
 	// GetProperty fetch Envoy attribute and return the value as a string.
@@ -177,8 +180,35 @@ type FilterCallbacks interface {
 	// TODO add more for filter callbacks
 }
 
+// FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
+type FilterProcessCallbacks interface {
+	// Continue or SendLocalReply should be last API invoked, no more code after them.
+	Continue(StatusType)
+	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
+	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
+	RecoverPanic()
+	// AddData add extra data when processing headers/trailers.
+	// For example, turn a headers only request into a request with a body, add more body when processing trailers, and so on.
+	// The second argument isStreaming supplies if this caller streams data or buffers the full body.
+	AddData(data []byte, isStreaming bool)
+	// InjectData inject the content of slice data via Envoy StreamXXFilterCallbacks's injectXXDataToFilterChaininjectData.
+	InjectData(data []byte)
+}
+
+type DecoderFilterCallbacks interface {
+	FilterProcessCallbacks
+}
+
+type EncoderFilterCallbacks interface {
+	FilterProcessCallbacks
+}
+
 type FilterCallbackHandler interface {
-	FilterCallbacks
+	StreamFilterCallbacks
+	// DecoderFilterCallbacks could only be used in DecodeXXX phases.
+	DecoderFilterCallbacks() DecoderFilterCallbacks
+	// EncoderFilterCallbacks could only be used in EncodeXXX phases.
+	EncoderFilterCallbacks() EncoderFilterCallbacks
 }
 
 type DynamicMetadata interface {
@@ -243,6 +273,8 @@ type ConnectionCallback interface {
 	Write(buffer []byte, endStream bool)
 	// Close the connection.
 	Close(closeType ConnectionCloseType)
+	// EnableHalfClose only for upstream connection
+	EnableHalfClose(enabled bool)
 }
 
 type StateType int
@@ -308,4 +340,54 @@ type GaugeMetric interface {
 
 // TODO
 type HistogramMetric interface {
+}
+
+type HttpTcpBridgeCallbackHandler interface {
+	// GetRouteName returns the name of the route which got matched
+	GetRouteName() string
+	// GetVirtualClusterName returns the name of the virtual cluster which got matched
+	GetVirtualClusterName() string
+	// SetSelfHalfCloseForUpstreamConn default is false
+	SetSelfHalfCloseForUpstreamConn(enabled bool)
+}
+
+type HttpTcpBridge interface {
+
+	// Invoked when header is delivered from the downstream.
+	// Notice-1: when return HttpTcpBridgeContinue or HttpTcpBridgeStopAndBuffer, dataForSet is used to be sent to upstream; when return HttpTcpBridgeEndStream, dataForSet is useed to sent to downstream as response body.
+	// Notice-2: headerMap and dataToUpstream cannot be invoked after the func return.
+	EncodeHeaders(headerMap RequestHeaderMap, dataForSet BufferInstance, endOfStream bool) HttpTcpBridgeStatus
+
+	// Streaming, Invoked when data is delivered from the downstream.
+	// Notice: buffer cannot be invoked after the func return.
+	EncodeData(buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus
+
+	// Streaming, Called when data is read on from tcp upstream.
+	// Notice-1: when return HttpTcpBridgeContinue, resp headers will be send to http all at once; from then on, you MUST NOT invoke responseHeaderForSet at any time(or you will get panic).
+	// Notice-2: responseHeaderForSet and buffer cannot be invoked after the func return.
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus
+
+	// destroy filter
+	OnDestroy()
+}
+
+func (*PassThroughHttpTcpBridge) EncodeHeaders(headerMap RequestHeaderMap, dataForSet BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+	return HttpTcpBridgeContinue
+}
+
+func (*PassThroughHttpTcpBridge) EncodeData(buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+	return HttpTcpBridgeContinue
+}
+
+func (*PassThroughHttpTcpBridge) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+	return HttpTcpBridgeContinue
+}
+
+func (*PassThroughHttpTcpBridge) OnDestroy() {
+}
+
+type HttpTcpBridgeFactory func(config interface{}, callbacks HttpTcpBridgeCallbackHandler) HttpTcpBridge
+
+type HttpTcpBridgeConfigParser interface {
+	Parse(any *anypb.Any) (interface{}, error)
 }

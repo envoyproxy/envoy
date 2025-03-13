@@ -21,6 +21,7 @@ namespace Router {
   COUNTER(passthrough_internal_redirect_too_many_redirects)                                        \
   COUNTER(passthrough_internal_redirect_unsafe_scheme)                                             \
   COUNTER(rq_direct_response)                                                                      \
+  COUNTER(rq_overload_local_reply)                                                                 \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_reset_after_downstream_response_started)                                              \
   COUNTER(rq_total)                                                                                \

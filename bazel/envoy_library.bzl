@@ -1,3 +1,11 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_CONFIG_VISIBILITY",
+)
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
 load(
@@ -5,41 +13,23 @@ load(
     "envoy_copts",
     "envoy_external_dep_path",
     "envoy_linkstatic",
-)
-load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
-    "EXTENSION_CONFIG_VISIBILITY",
+    "repo_label",
 )
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
+load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
 # https://github.com/bazelbuild/bazel/issues/2273.
 def tcmalloc_external_deps(repository):
-    return select({
-        repository + "//bazel:disable_tcmalloc": [],
-        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": [],
-        repository + "//bazel:disable_tcmalloc_on_linux_aarch64": [],
-        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:gperftools_tcmalloc": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:linux_x86_64": [
-            envoy_external_dep_path("tcmalloc"),
-            envoy_external_dep_path("tcmalloc_profile_marshaler"),
-            envoy_external_dep_path("tcmalloc_malloc_extension"),
-        ],
-        repository + "//bazel:linux_aarch64": [
-            envoy_external_dep_path("tcmalloc"),
-            envoy_external_dep_path("tcmalloc_profile_marshaler"),
-            envoy_external_dep_path("tcmalloc_malloc_extension"),
-        ],
-        "//conditions:default": [envoy_external_dep_path("gperftools")],
+    _repo = repo_label(repository)
+    return selects.with_or({
+        _repo("//bazel:disable_tcmalloc"): [],
+        (
+            _repo("//bazel:debug_tcmalloc"),
+            _repo("//bazel:gperftools_tcmalloc"),
+        ): [_repo("//bazel/foreign_cc:gperftools")],
+        "//conditions:default": [_repo("//bazel:tcmalloc_all_libs")],
     })
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
@@ -97,6 +87,8 @@ def envoy_cc_library(
         hdrs = [],
         copts = [],
         visibility = None,
+        rbe_pool = None,
+        exec_properties = {},
         external_deps = [],
         tcmalloc_dep = None,
         repository = "",
@@ -107,9 +99,14 @@ def envoy_cc_library(
         textual_hdrs = None,
         alwayslink = None,
         defines = [],
+        local_defines = [],
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
@@ -130,11 +127,13 @@ def envoy_cc_library(
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
                envoy_pch_deps(repository, "//source/common/common:common_pch"),
+        exec_properties = exec_properties,
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
         defines = envoy_mobile_defines(repository) + defines,
+        local_defines = local_defines,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
@@ -213,12 +212,12 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
     )
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, **kwargs):
+def envoy_proto_library(name, visibility = ["//visibility:public"], **kwargs):
     api_cc_py_proto_library(
         name,
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
         linkstatic = 1,
-        visibility = ["//visibility:public"],
+        visibility = visibility,
         **kwargs
     )

@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e -o pipefail
 
 LLVM_VERSION=${LLVM_VERSION:-"14.0.0"}
-CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*\)\ */\1/')
-LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
+CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \([0-9.]*\).*/\1/')
+LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \([0-9.]*\).*/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
 if [ "${CLANG_VERSION}" != "${LLVM_VERSION}" ]
@@ -163,6 +163,7 @@ if [[ -e ./test/per_file_coverage.sh ]]; then
             exit 1
         fi
         echo Per-extension coverage passed.
+        echo "$output"
     fi
 else
     echo "No per-file-coverage file found"

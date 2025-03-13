@@ -99,7 +99,7 @@ protected:
       // Receive LEDS ack.
       EXPECT_TRUE(compareDeltaDiscoveryRequest(
           Config::TypeUrl::get().LbEndpoint, {}, {},
-          leds_upstream_info_.stream_by_resource_name_[localities_prefixes_[locality_idx]]));
+          leds_upstream_info_.stream_by_resource_name_[localities_prefixes_[locality_idx]].get()));
     }
   }
 
@@ -319,14 +319,14 @@ protected:
     // (ClusterLoadAssignment).
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
                                              {"cluster_0"}, {},
-                                             eds_upstream_info_.defaultStream()));
+                                             eds_upstream_info_.defaultStream().get()));
     sendDeltaDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment_}, {}, "2",
-        eds_upstream_info_.defaultStream());
+        eds_upstream_info_.defaultStream().get());
 
     // Receive EDS ack.
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, {}, {},
-                                             eds_upstream_info_.defaultStream()));
+                                             eds_upstream_info_.defaultStream().get()));
 
     EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
     EXPECT_EQ(2, test_server_->gauge("cluster_manager.active_clusters")->value());
@@ -798,7 +798,7 @@ TEST_P(LedsIntegrationTest, LedsSameAddressEndpoints) {
   // Await for update (LEDS Ack).
   EXPECT_TRUE(compareDeltaDiscoveryRequest(
       Config::TypeUrl::get().LbEndpoint, {}, {},
-      leds_upstream_info_.stream_by_resource_name_[localities_prefixes_[0]]));
+      leds_upstream_info_.stream_by_resource_name_[localities_prefixes_[0]].get()));
 
   // Verify that the update is successful.
   test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);

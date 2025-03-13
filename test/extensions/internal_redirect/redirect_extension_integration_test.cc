@@ -16,6 +16,17 @@ constexpr char kTestHeaderKey[] = "test-header";
 
 class RedirectExtensionIntegrationTest : public HttpProtocolIntegrationTest {
 public:
+  void TearDown() override {
+    for (auto& fake_upstream_connection : upstream_connections_) {
+      AssertionResult result = fake_upstream_connection->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fake_upstream_connection.reset();
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);

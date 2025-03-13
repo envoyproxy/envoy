@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "http_capsule_filter_test",
     srcs = ["http_capsule_filter_test.cc"],
     extension_names = ["envoy.filters.udp.session.http_capsule"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/udp/udp_proxy/session_filters/http_capsule:config",
         "//test/extensions/filters/udp/udp_proxy:mocks",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
     name = "http_capsule_integration_test",
     srcs = ["http_capsule_integration_test.cc"],
     extension_names = ["envoy.filters.udp.session.http_capsule"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/server:filter_config_interface",

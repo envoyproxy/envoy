@@ -54,11 +54,15 @@ TEST_F(DeferredCreationStatsTest, StatsGoneWithScope) {
     MyStats x = createDeferredCompatibleStats<AwesomeStats>(scope, stats_names_, true);
     MyStats y = createDeferredCompatibleStats<AwesomeStats>(scope, stats_names_, true);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
+    EXPECT_FALSE(x.isPresent());
     x->foo_.inc();
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
+    EXPECT_TRUE(x.isPresent());
+    EXPECT_FALSE(y.isPresent());
     EXPECT_EQ(x->foo_.value(), 1);
     EXPECT_EQ(y->foo_.value(), 1);
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 2);
+    EXPECT_TRUE(y.isPresent());
   }
   // Deleted as scope deleted.
   EXPECT_EQ(TestUtility::findCounter(store_, "bluh.foo"), nullptr);
@@ -68,11 +72,13 @@ TEST_F(DeferredCreationStatsTest, StatsGoneWithScope) {
     ScopeSharedPtr scope = store_.createScope("bluh");
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized"), nullptr);
     MyStats x = createDeferredCompatibleStats<AwesomeStats>(scope, stats_names_, true);
+    EXPECT_FALSE(x.isPresent());
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 0);
     // Previous data is gone, as scope_v2 and scope_1's lifecycle do not overlap.
     EXPECT_EQ(x->foo_.value(), 0);
     // Initialized now.
     EXPECT_EQ(TestUtility::findGauge(store_, "bluh.AwesomeStats.initialized")->value(), 1);
+    EXPECT_TRUE(x.isPresent());
   }
 }
 

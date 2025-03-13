@@ -42,6 +42,7 @@ envoy_cc_test_library(
         "uber_per_filter.cc",
     ],
     hdrs = ["uber_filter.h"],
+    rbe_pool = "6gig",
     deps = [
         ":filter_fuzz_proto_cc_proto",
         ":http_filter_fuzzer_lib",
@@ -57,6 +58,7 @@ envoy_cc_test_library(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/file_system_buffer/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
@@ -67,6 +69,7 @@ envoy_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
+    rbe_pool = "6gig",
     # All Envoy extensions must be linked to the test in order for the fuzzer to pick
     # these up via the NamedHttpFilterConfigFactory.
     deps = [

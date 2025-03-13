@@ -3,6 +3,7 @@
 #include <memory>
 #include <ostream>
 
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
@@ -59,7 +60,8 @@ public:
       quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
       uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats);
+      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
 
   ~EnvoyQuicServerSession() override;
 
@@ -80,8 +82,6 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
-  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
-                               quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                         const quic::QuicSocketAddress& peer_address,
@@ -116,13 +116,7 @@ protected:
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
-  quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-    return quic::HttpDatagramSupport::kRfc;
-#else
-    return quic::HttpDatagramSupport::kNone;
-#endif
-  }
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
@@ -141,12 +135,11 @@ private:
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 
-  QuicStatNames& quic_stat_names_;
-  Stats::Scope& listener_scope_;
-
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   absl::optional<ConnectionMapPosition> position_;
   QuicConnectionStats& connection_stats_;
+  quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
+  std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
 };
 
 } // namespace Quic

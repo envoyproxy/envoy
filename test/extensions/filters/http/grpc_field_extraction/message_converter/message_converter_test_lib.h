@@ -25,7 +25,7 @@ void checkSerializedData(Envoy::Buffer::Instance& data,
                          std::vector<MessageType> expected_requests) {
   ::Envoy::Grpc::Decoder grpc_decoder;
   std::vector<::Envoy::Grpc::Frame> frames_after_processing;
-  ASSERT_TRUE(grpc_decoder.decode(data, frames_after_processing));
+  ASSERT_TRUE(grpc_decoder.decode(data, frames_after_processing).ok());
 
   ASSERT_EQ(expected_requests.size(), frames_after_processing.size());
   for (unsigned long i = 0; i < frames_after_processing.size(); i++) {

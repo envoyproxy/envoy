@@ -50,9 +50,9 @@ protected:
             .value();
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
-    filter_config_ = std::make_unique<FilterConfig>(
+    filter_config_ = std::make_shared<FilterConfig>(
         proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
-    filter_ = std::make_unique<Filter>(*filter_config_);
+    filter_ = std::make_unique<Filter>(filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
   }
 
@@ -77,7 +77,7 @@ extractions_by_method: {
 
   Api::ApiPtr api_;
   GrpcFieldExtractionConfig proto_config_;
-  std::unique_ptr<FilterConfig> filter_config_;
+  std::shared_ptr<FilterConfig> filter_config_;
   testing::NiceMock<MockStreamDecoderFilterCallbacks> mock_decoder_callbacks_;
   std::unique_ptr<Filter> filter_;
 };
@@ -639,6 +639,11 @@ extractions_by_method: {
       value: {
       }
     }
+    request_field_extractions: {
+      key: "repeated_supported_types.map"
+      value: {
+      }
+    }
   }
 })pb");
   TestRequestHeaderMapImpl req_headers =
@@ -677,6 +682,8 @@ repeated_supported_types: {
   sfixed64: 1111
   float: 1.212
   double: 1.313
+  map { key: "key1" value: "value1" }
+  map { key: "key2" value: "value2" }
 }
 
 )pb");
@@ -850,6 +857,25 @@ fields {
       }
       values {
         string_value: "33"
+      }
+    }
+  }
+}
+fields {
+  key: "repeated_supported_types.map"
+  value {
+    list_value {
+      values {
+        struct_value {
+          fields {
+            key: "key1"
+            value { string_value: "value1" }
+          }
+          fields {
+            key: "key2"
+            value { string_value: "value2" }
+          }
+        }
       }
     }
   }

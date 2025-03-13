@@ -12,13 +12,13 @@
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "openssl/ssl.h"
+#include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "quiche/spdy/core/http2_header_block.h"
 
 namespace Envoy {
 namespace Quic {
@@ -101,9 +101,10 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 
 template <class T>
 std::unique_ptr<T>
-http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block, uint32_t max_headers_kb,
-                                uint32_t max_headers_allowed, HeaderValidator& validator,
-                                absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+http2HeaderBlockToEnvoyTrailers(const quiche::HttpHeaderBlock& header_block,
+                                uint32_t max_headers_kb, uint32_t max_headers_allowed,
+                                HeaderValidator& validator, absl::string_view& details,
+                                quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create(max_headers_kb, max_headers_allowed);
   if (header_block.size() > max_headers_allowed) {
     details = Http3ResponseCodeDetailValues::too_many_trailers;
@@ -138,7 +139,7 @@ http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block, uint
   return headers;
 }
 
-spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers);
+quiche::HttpHeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers);
 
 // Called when Envoy wants to reset the underlying QUIC stream.
 quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason);
@@ -161,7 +162,8 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       bool prefer_gro = false);
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.
@@ -188,10 +190,8 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config);
 
-// Modify new_connection_id according to given old_connection_id to make sure packets with the new
-// one can be routed to the same listener.
-void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
-                                     const quic::QuicConnectionId& old_connection_id);
+// Extract the two ECN bits from the TOS byte in the IP header.
+quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
 
 } // namespace Quic
 } // namespace Envoy

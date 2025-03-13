@@ -1,12 +1,12 @@
-agent-ubuntu: ubuntu-22.04
+agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: d736c58f06f36848e7966752cc7e01519cc1b5101a178d5c6634807e8ac3deab
-  mobile-sha: 13674edd989ada8b94257f410e38e5e8e4c6a0a9c2fdf8bda9261047a7f843e4
+  sha: 63598080c3cccb6d7c9f3eeaa16fffd72f13f4c799d08ef891cd3f02978b6284
+  mobile-sha: 67fa99e90cbc9a238ff7ad558993d68732a4ab59d3ef8d95b8e4373e24ea390b
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 0434d2f6a65895a00f8936fba83b7ff14d21e149dc15c9ac25a31a6fa018234f
-  tag: 0ca52447572ee105a4730da5e76fe47c9c5a7c64
+  gcr-sha: b4bc62cde8bc10ebc7e91e93fcf92e6e0737b705363478bfd14d86c92d80db2c
+  tag: 506aa20d3a216fa2f5677c1f13d2b1656b000b86
 
 config:
   envoy:
@@ -23,6 +23,13 @@ checks:
   #
   # For example if macos is marked as `required: true` but then has a path
   # selection that means its doesnt run the check will be `skipped` and pass
+  checks:
+    name: Envoy/Checks
+    on-run:
+    - check-build
+    - check-coverage
+    - check-san
+    required: true
   macos:
     name: Envoy/macOS
     required: true
@@ -48,16 +55,6 @@ checks:
     required: true
     on-run:
     - mobile-cc
-  mobile-compile-time-options:
-    name: Mobile/Compile time options
-    on-run:
-    - mobile-compile-time-cc
-    - mobile-compile-time-options
-  mobile-core:
-    name: Mobile/Core
-    required: true
-    on-run:
-    - mobile-core
   mobile-coverage:
     name: Mobile/Coverage
     required: true
@@ -102,6 +99,8 @@ checks:
     name: Envoy/Prechecks
     on-run:
     - precheck-deps
+    - precheck-format
+    - precheck-publish
     required: true
     # yamllint disable rule:line-length
     advice:
@@ -150,26 +149,8 @@ checks:
     - publish
     - verify
     required: true
-  windows:
-    name: Envoy/Windows
-    required: true
-    on-run:
-    - build-windows
 
 run:
-  build-windows:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - api/**/*
-    - bazel/**/*
-    - ci/**/*
-    - configs/**/*
-    - contrib/**/*
-    - envoy/**/*
-    - source/**/*
-    - test/**/*
   build-macos:
     paths:
     - .bazelrc
@@ -183,6 +164,15 @@ run:
     - envoy/**/*
     - source/**/*
     - test/**/*
+  check-build:
+    paths:
+    - "**/*"
+  check-coverage:
+    paths:
+    - "**/*"
+  check-san:
+    paths:
+    - "**/*"
   mobile-android:
     paths:
     - .bazelrc
@@ -190,6 +180,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-android-all:
@@ -199,6 +190,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
     push: never
@@ -209,6 +201,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-asan:
@@ -218,6 +211,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-cc:
@@ -225,22 +219,17 @@ run:
     - .bazelrc
     - .bazelversion
     - .github/config.yml
+    - api/**/*
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - envoy/**/*
+    - mobile/.bazelrc
     - mobile/**/*
-    - tools/code_format/check_format.py
-  mobile-compile-time-cc:
-    paths:
-    - "**/*"
-  mobile-compile-time-options:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - bazel/external/quiche.BUILD
-    - bazel/repository_locations.bzl
-    - mobile/**/*
-    - tools/code_format/check_format.py
+    - source/**/*
+    - test/config/**/*
+    - test/integration/*
+    - test/mocks/**/*
+    - test/test_common/**/*
   mobile-coverage:
     paths:
     - .bazelrc
@@ -248,11 +237,9 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
-  mobile-core:
-    paths:
-    - "**/*"
   mobile-format:
     paths:
     - .bazelrc
@@ -260,6 +247,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-ios:
@@ -269,6 +257,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-ios-all:
@@ -278,6 +267,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
     push: never
@@ -288,6 +278,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-perf:
@@ -297,6 +288,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-release-validation:
@@ -306,6 +298,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   mobile-tsan:
@@ -315,6 +308,7 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - bazel/repository_locations.bzl
+    - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
   precheck-deps:
@@ -329,6 +323,13 @@ run:
     - "**/requirements.txt"
     - "**/go.mod"
     - "**/Dockerfile*"
+    push: paths
+  precheck-format:
+    paths:
+    - "**/*"
+  precheck-publish:
+    paths:
+    - "**/*"
   publish:
     paths:
     - .bazelrc

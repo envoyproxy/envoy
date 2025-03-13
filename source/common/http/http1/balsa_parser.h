@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "source/common/http/http1/parser.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/base/attributes.h"
 #include "quiche/balsa/balsa_enums.h"
@@ -76,9 +77,17 @@ private:
   const bool allow_custom_methods_ = false;
   bool first_byte_processed_ = false;
   bool headers_done_ = false;
+  // True until the first byte of the second message arrives.
+  bool first_message_ = true;
   ParserStatus status_ = ParserStatus::Ok;
   // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
+  // Latched value of `envoy.reloadable_features.http1_balsa_delay_reset`.
+  const bool delay_reset_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_balsa_delay_reset");
+  // Latched value of `envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`.
+  const bool wait_for_first_byte_before_msg_done_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done");
 };
 
 } // namespace Http1

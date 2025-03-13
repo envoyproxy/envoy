@@ -26,7 +26,8 @@ OpenTelemetryFormatMapVisitorHelper(Ts...) -> OpenTelemetryFormatMapVisitorHelpe
  */
 class OpenTelemetryFormatter {
 public:
-  OpenTelemetryFormatter(const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping);
+  OpenTelemetryFormatter(const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping,
+                         const std::vector<Formatter::CommandParserPtr>& commands);
 
   ::opentelemetry::proto::common::v1::KeyValueList
   format(const Formatter::HttpFormatterContext& context, const StreamInfo::StreamInfo& info) const;
@@ -62,12 +63,17 @@ private:
   // Methods for building the format map.
   class FormatBuilder {
   public:
+    explicit FormatBuilder(const std::vector<Formatter::CommandParserPtr>& commands)
+        : commands_(commands) {}
     std::vector<Formatter::FormatterProviderPtr>
     toFormatStringValue(const std::string& string_format) const;
     OpenTelemetryFormatMapWrapper
     toFormatMapValue(const ::opentelemetry::proto::common::v1::KeyValueList& struct_format) const;
     OpenTelemetryFormatListWrapper toFormatListValue(
         const ::opentelemetry::proto::common::v1::ArrayValue& list_value_format) const;
+
+  private:
+    const std::vector<Formatter::CommandParserPtr>& commands_;
   };
 
   // Methods for doing the actual formatting.

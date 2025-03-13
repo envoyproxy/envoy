@@ -3,6 +3,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 
+#include "source/common/protobuf/utility.h"
+
 #include "test/integration/base_overload_integration_test.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -19,11 +21,36 @@ using testing::HasSubstr;
 class OverloadIntegrationTest : public BaseOverloadIntegrationTest,
                                 public HttpProtocolIntegrationTest {
 protected:
-  void
-  initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action) {
+  void initializeOverloadManager(const envoy::config::overload::v3::OverloadAction& overload_action,
+                                 absl::optional<bool> appendLocalOverloadHeader = absl::nullopt) {
     setupOverloadManagerConfig(overload_action);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+
+    if (appendLocalOverloadHeader.has_value() && appendLocalOverloadHeader.value()) {
+      config_helper_.addConfigModifier(
+          [=](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& cm) -> void { cm.set_append_local_overload(true); });
+    }
+
+    initialize();
+    updateResource(0);
+  }
+
+  void initializeWithBypassOverloadManager(
+      const envoy::config::overload::v3::OverloadAction& overload_action) {
+    setupOverloadManagerConfig(overload_action);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_bypass_overload_manager(true);
+      auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+      new_listener->CopyFrom(*listener);
+      new_listener->set_name("http_2");
+      new_listener->set_bypass_overload_manager(false);
     });
     initialize();
     updateResource(0);
@@ -62,6 +89,8 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  // Verify that no local overload header is added by default
+  EXPECT_EQ(true, response->headers().get(Http::Headers::get().EnvoyLocalOverloaded).empty());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -71,6 +100,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(true, response->headers().get(Http::Headers::get().EnvoyLocalOverloaded).empty());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -86,6 +116,56 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0U, response->body().size());
+}
+
+TEST_P(OverloadIntegrationTest, AppendLocalOverloadHeader) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"),
+      true);
+
+  // Put envoy in overloaded state and check that it drops new requests and the local overload is
+  // correctly added. Test both header-only and header+body requests since the code paths are
+  // slightly different.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(Http::Headers::get().EnvoyOverloadedValues.True,
+            response->headers()
+                .get(Http::Headers::get().EnvoyLocalOverloaded)[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("envoy overloaded", response->body());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(Http::Headers::get().EnvoyOverloadedValues.True,
+            response->headers()
+                .get(Http::Headers::get().EnvoyLocalOverloaded)[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("envoy overloaded", response->body());
+  codec_client_->close();
 }
 
 TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
@@ -179,6 +259,44 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   codec_client_->close();
 }
 
+TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
+  initializeWithBypassOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
+
+  // Put envoy in overloaded state and validate that it doesn't drop new requests
+  // because we chose to bypass the overload manager on this listener.
+  updateResource(1);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0U, response->body().size());
+  codec_client_->close();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http_2"))));
+  response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  // Verify that no local overload header is added by default
+  EXPECT_EQ(true, response->headers().get(Http::Headers::get().EnvoyLocalOverloaded).empty());
+  EXPECT_EQ("envoy overloaded", response->body());
+  codec_client_->close();
+}
+
 class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
 protected:
   void initializeOverloadManager(
@@ -260,12 +378,150 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   codec_client_->close();
 }
 
+TEST_P(OverloadScaledTimerIntegrationTest, MaxConnectionDuration) {
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cm) -> void {
+        cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(20));
+      });
+
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+          min_timeout: 5s
+    )EOF"));
+
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
+
+  // Create an HTTP connection and complete a request.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // At this point, the connection should be idle but still open.
+  ASSERT_TRUE(codec_client_->connected());
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+  // Advancing past the minimum time shouldn't close the connection.
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+
+  // Increase load so that the minimum time has now elapsed.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Wait for the proxy to notice and take action for the overload.
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
+    // For HTTP1, Envoy will start draining but will wait to close the
+    // connection. If a new stream comes in, it will set the connection header
+    // to "close" on the response and close the connection after.
+    auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ(response->headers().getConnectionValue(), "close");
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  }
+  codec_client_->close();
+}
+
+TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cm) -> void {
+        cm.set_http1_safe_max_connection_duration(true);
+        // Drain timeout is not used for max_connection_duration if
+        // http1_safe_max_connection_duration is enabled.
+        cm.mutable_drain_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
+        cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(20));
+      });
+
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+          min_timeout: 5s
+    )EOF"));
+
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
+
+  // Create an HTTP connection and complete a request.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // At this point, the connection should be idle but still open.
+  ASSERT_TRUE(codec_client_->connected());
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+  // Advancing past the minimum time shouldn't close the connection.
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+
+  // Increase load so that the minimum time has now elapsed.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Wait for the proxy to notice and take action for the overload.
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
+    // There's no drain timer. We can even advance time again and the connection will still be
+    // intact.
+    timeSystem().advanceTimeWait(std::chrono::seconds(5));
+    // For HTTP1, Envoy will start draining but will wait to close the
+    // connection. If a new stream comes in, it will set the connection header
+    // to "close" on the response and close the connection after.
+    auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ(response->headers().getConnectionValue(), "close");
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  }
+  codec_client_->close();
+}
+
 TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHandshake) {
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
     return;
   }
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_fix_filter_manager_uaf", "true"}});
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
@@ -288,6 +544,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
   // Create an HTTP connection without finishing the handshake.
   codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                        absl::nullopt,
                                         /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
 
@@ -303,12 +560,77 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
                                100);
 
   // Create another HTTP connection without finishing handshake.
-  IntegrationCodecClientPtr codec_client2 = makeRawHttpConnection(
-      makeClientConnection((lookupPort("http"))), absl::nullopt, /*wait_till_connected=*/false);
+  IntegrationCodecClientPtr codec_client2 =
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                            absl::nullopt, /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_idle_timeout", 2);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_FALSE(codec_client_->sawGoAway());
+  EXPECT_FALSE(codec_client2->connected());
+  ASSERT_TRUE(codec_client2->waitForDisconnect());
+  EXPECT_FALSE(codec_client2->sawGoAway());
+}
+
+TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseMaxDurationHttpConnectionsDuringHandshake) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cm) -> void {
+        cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(20));
+      });
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* proof_source_config = bootstrap.mutable_static_resources()
+                                    ->mutable_listeners(0)
+                                    ->mutable_udp_listener_config()
+                                    ->mutable_quic_options()
+                                    ->mutable_proof_source_config();
+    proof_source_config->set_name("envoy.quic.proof_source.pending_signing");
+    proof_source_config->mutable_typed_config();
+  });
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+          min_timeout: 3s
+    )EOF"));
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+  // Create an HTTP connection without finishing the handshake.
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                        absl::nullopt,
+                                        /*wait_till_connected=*/false);
+  EXPECT_FALSE(codec_client_->connected());
+
+  // Advancing past the minimum time shouldn't close the connection.
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(codec_client_->connected());
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  // Increase load more so that the timer is reduced to the minimum.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Create another HTTP connection without finishing handshake.
+  IntegrationCodecClientPtr codec_client2 =
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                            absl::nullopt, /*wait_till_connected=*/false);
+  EXPECT_FALSE(codec_client2->connected());
+  // Advancing past the minimum time and wait for the proxy to notice and close both connections.
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 2);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_FALSE(codec_client_->sawGoAway());
   EXPECT_FALSE(codec_client2->connected());
@@ -452,6 +774,24 @@ protected:
     setupOverloadManagerConfig(config);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+  void
+  initializeWithBypassOverloadManager(const envoy::config::overload::v3::LoadShedPoint& config) {
+    setupOverloadManagerConfig(config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_bypass_overload_manager(true);
+      // add a listener that doesn't bypass overload manager.
+      auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+      new_listener->CopyFrom(*listener);
+      new_listener->set_name("http_2");
+      new_listener->set_bypass_overload_manager(false);
     });
     initialize();
     updateResource(0);
@@ -752,6 +1092,142 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   updateResource(0.80);
   test_server_->waitForGaugeEq(
       "overload.envoy.load_shed_points.http2_server_go_away_on_dispatch.scale_percent", 0);
+}
+
+TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.hcm_ondata_creating_codec"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.hcm_ondata_creating_codec.scale_percent", 100);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.hcm_ondata_creating_codec.scale_percent", 0);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+}
+
+TEST_P(LoadShedPointIntegrationTest, HttpDownstreamFilterLoadShed) {
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_downstream_filter_check"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Put envoy in overloaded state and check that it sends a local reply from router.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_downstream_filter_check.scale_percent", 100);
+  auto response_with_local_reply = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_with_local_reply->waitForEndStream());
+  EXPECT_EQ(response_with_local_reply->headers().getStatusValue(), "503");
+
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_downstream_filter_check.scale_percent", 0);
+
+  auto response_that_is_proxied = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_that_is_proxied->waitForEndStream());
+  EXPECT_EQ(response_that_is_proxied->headers().getStatusValue(), "200");
+}
+
+TEST_P(LoadShedPointIntegrationTest, HttpConnManagerDoesNotShedLoadWhenBypassed) {
+  // QUIC uses UDP, not TCP.
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeWithBypassOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http_connection_manager_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that
+  // the listener that bypasses the overload manager does not reject the new request.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http_connection_manager_decode_headers.scale_percent", 100);
+  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response_that_is_proxied = codec_client->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_that_is_proxied->waitForEndStream());
+  EXPECT_EQ(response_that_is_proxied->headers().getStatusValue(), "200");
+  codec_client->close();
+
+  // Check that the other listener gets its requests rejected.
+  auto codec_client2 = makeHttpConnection(makeClientConnection((lookupPort("http_2"))));
+  auto response_gets_local_reply = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response_gets_local_reply->waitForEndStream());
+  EXPECT_EQ(response_gets_local_reply->headers().getStatusValue(), "503");
+  codec_client2->close();
+}
+
+TEST_P(LoadShedPointIntegrationTest, ListenerAcceptDoesNotShedLoadWhenBypassed) {
+  // QUIC uses UDP, not TCP.
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeWithBypassOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.tcp_listener_accept"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  // Put envoy in overloaded state and check that it does not reject the new client connection
+  // on the listener that bypasses overload manager.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq("overload.envoy.load_shed_points.tcp_listener_accept.scale_percent",
+                               100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // on the other listener though, we should reject the connection
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http_2"))));
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_overload_reject", 1);
+  } else {
+    test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_overload_reject", 1);
+  }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace Envoy

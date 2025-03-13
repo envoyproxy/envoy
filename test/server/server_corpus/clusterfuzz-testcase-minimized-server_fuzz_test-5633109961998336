@@ -38,7 +38,6 @@ static_resources {
 cluster_manager {
   load_stats_config {
     api_type: REST
-    transport_api_version: V3
     rate_limit_settings {
       fill_rate {
         value: 2.36453327863576e-312

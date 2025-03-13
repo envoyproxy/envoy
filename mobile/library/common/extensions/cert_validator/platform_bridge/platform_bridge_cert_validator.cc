@@ -2,9 +2,12 @@
 
 #include <list>
 #include <memory>
-#include <type_traits>
 
-#include "library/common/data/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+
+#include "library/common/bridge//utility.h"
+#include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/system/system_helper.h"
 
 namespace Envoy {
@@ -12,23 +15,44 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+absl::StatusOr<std::unique_ptr<PlatformBridgeCertValidator>>
+PlatformBridgeCertValidator::create(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                    SslStats& stats) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<PlatformBridgeCertValidator>(new PlatformBridgeCertValidator(
+      config, stats, Thread::PosixThreadFactory::create(), creation_status));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return ret;
+}
+
 PlatformBridgeCertValidator::PlatformBridgeCertValidator(
-    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats)
+    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
+    Thread::PosixThreadFactoryPtr thread_factory, absl::Status& creation_status)
     : allow_untrusted_certificate_(config != nullptr &&
                                    config->trustChainVerification() ==
                                        envoy::extensions::transport_sockets::tls::v3::
                                            CertificateValidationContext::ACCEPT_UNTRUSTED),
-      stats_(stats) {
+      stats_(stats), thread_factory_(std::move(thread_factory)) {
   ENVOY_BUG(config != nullptr && config->caCert().empty() &&
                 config->certificateRevocationList().empty(),
             "Invalid certificate validation context config.");
+  if (config != nullptr && config->customValidatorConfig().has_value()) {
+    envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator cfg;
+    SET_AND_RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+                                 config->customValidatorConfig().value().typed_config(),
+                                 ProtobufMessage::getStrictValidationVisitor(), cfg),
+                             creation_status);
+    if (cfg.has_thread_priority()) {
+      thread_priority_ = cfg.thread_priority().value();
+    }
+  }
 }
 
 PlatformBridgeCertValidator::~PlatformBridgeCertValidator() {
   // Wait for validation threads to finish.
   for (auto& [id, job] : validation_jobs_) {
-    if (job.validation_thread_.joinable()) {
-      job.validation_thread_.join();
+    if (job.validation_thread_->joinable()) {
+      job.validation_thread_->join();
     }
   }
 }
@@ -84,10 +108,21 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 
   ValidationJob job;
   job.result_callback_ = std::move(callback);
-  job.validation_thread_ =
-      std::thread(&verifyCertChainByPlatform, &(job.result_callback_->dispatcher()),
-                  std::move(certs), std::string(host), std::move(subject_alt_names), this);
-  std::thread::id thread_id = job.validation_thread_.get_id();
+  Event::Dispatcher& dispatcher = job.result_callback_->dispatcher();
+  Thread::Options thread_options;
+  thread_options.priority_ = thread_priority_;
+  job.validation_thread_ = thread_factory_->createThread(
+      [this, &dispatcher, certs = std::move(certs), host = std::string(host),
+       subject_alt_names = std::move(subject_alt_names)]() -> void {
+        verifyCertChainByPlatform(&dispatcher, certs, host, subject_alt_names);
+      },
+      thread_options, /* crash_on_failure=*/false);
+  if (job.validation_thread_ == nullptr) {
+    return {ValidationResults::ValidationStatus::Failed,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt,
+            "Failed creating a thread for cert chain validation."};
+  }
+  Thread::ThreadId thread_id = job.validation_thread_->pthreadId();
   validation_jobs_[thread_id] = std::move(job);
   return {ValidationResults::ValidationStatus::Pending,
           Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
@@ -95,7 +130,7 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
 
 void PlatformBridgeCertValidator::verifyCertChainByPlatform(
     Event::Dispatcher* dispatcher, std::vector<std::string> cert_chain, std::string hostname,
-    std::vector<std::string> subject_alt_names, PlatformBridgeCertValidator* parent) {
+    std::vector<std::string> subject_alt_names) {
   ASSERT(!cert_chain.empty());
   ENVOY_LOG(trace, "Start verifyCertChainByPlatform for host {}", hostname);
   // This is running in a stand alone thread other than the engine thread.
@@ -109,7 +144,7 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
   if (!success) {
     ENVOY_LOG(debug, result.error_details);
     postVerifyResultAndCleanUp(success, std::move(hostname), result.error_details, result.tls_alert,
-                               ValidationFailureType::FAIL_VERIFY_ERROR, dispatcher, parent);
+                               ValidationFailureType::FailVerifyError, dispatcher, this);
     return;
   }
 
@@ -122,12 +157,12 @@ void PlatformBridgeCertValidator::verifyCertChainByPlatform(
     error_details = "PlatformBridgeCertValidator_verifySubjectAltName failed: SNI mismatch.";
     ENVOY_LOG(debug, error_details);
     postVerifyResultAndCleanUp(success, std::move(hostname), error_details, SSL_AD_BAD_CERTIFICATE,
-                               ValidationFailureType::FAIL_VERIFY_SAN, dispatcher, parent);
+                               ValidationFailureType::FailVerifySan, dispatcher, this);
     return;
   }
   postVerifyResultAndCleanUp(success, std::move(hostname), error_details,
-                             SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::SUCCESS, dispatcher,
-                             parent);
+                             SSL_AD_CERTIFICATE_UNKNOWN, ValidationFailureType::Success, dispatcher,
+                             this);
 }
 
 void PlatformBridgeCertValidator::postVerifyResultAndCleanUp(bool success, std::string hostname,
@@ -146,7 +181,7 @@ void PlatformBridgeCertValidator::postVerifyResultAndCleanUp(bool success, std::
 
   dispatcher->post([weak_alive_indicator, success, hostname = std::move(hostname),
                     error = std::string(error_details), tls_alert, failure_type,
-                    thread_id = std::this_thread::get_id(), parent]() {
+                    thread_id = parent->thread_factory_->currentPthreadId(), parent]() {
     if (weak_alive_indicator.expired()) {
       return;
     }
@@ -154,9 +189,10 @@ void PlatformBridgeCertValidator::postVerifyResultAndCleanUp(bool success, std::
   });
 }
 
-void PlatformBridgeCertValidator::onVerificationComplete(std::thread::id thread_id,
-                                                         std::string hostname, bool success,
-                                                         std::string error, uint8_t tls_alert,
+void PlatformBridgeCertValidator::onVerificationComplete(const Thread::ThreadId& thread_id,
+                                                         const std::string& hostname, bool success,
+                                                         const std::string& error,
+                                                         uint8_t tls_alert,
                                                          ValidationFailureType failure_type) {
   ENVOY_LOG(trace, "Got validation result for {} from platform", hostname);
 
@@ -166,18 +202,18 @@ void PlatformBridgeCertValidator::onVerificationComplete(std::thread::id thread_
     return;
   }
   ValidationJob& job = job_handle.mapped();
-  job.validation_thread_.join();
+  job.validation_thread_->join();
 
   Ssl::ClientValidationStatus detailed_status = Envoy::Ssl::ClientValidationStatus::NotValidated;
   switch (failure_type) {
-  case ValidationFailureType::SUCCESS:
+  case ValidationFailureType::Success:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;
     break;
-  case ValidationFailureType::FAIL_VERIFY_ERROR:
+  case ValidationFailureType::FailVerifyError:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_error_.inc();
     break;
-  case ValidationFailureType::FAIL_VERIFY_SAN:
+  case ValidationFailureType::FailVerifySan:
     detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_san_.inc();
     break;

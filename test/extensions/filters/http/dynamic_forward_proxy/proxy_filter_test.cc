@@ -169,6 +169,31 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   filter_->onDestroy();
 }
 
+TEST_F(ProxyFilterTest, EmptyHostHeader) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AnyNumber());
+
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(_, _, _, _)).Times(0);
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", ""}};
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::BadRequest, Eq("Empty host header"), _, _,
+                                         Eq("empty_host_header")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  filter_->onDestroy();
+}
+
 // Cache overflow.
 TEST_F(ProxyFilterTest, CacheOverflow) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
@@ -555,7 +580,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
 
   // Setup test host
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+  host_info->address_ = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -595,7 +620,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
-  const auto pre_address = Network::Utility::parseInternetAddress("1.2.3.3", 80);
+  const auto pre_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 80);
   auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
   address_obj->address_ = pre_address;
   filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
@@ -606,7 +631,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // Setup test host
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-  host_info->address_ = Network::Utility::parseInternetAddress("1.2.3.4", 80);
+  host_info->address_ = Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 80);
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
@@ -656,7 +681,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   InSequence s;
 
   // Setup test host
-  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  auto host_info =
+      std::make_shared<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>();
   host_info->address_ = nullptr;
 
   EXPECT_CALL(callbacks_, route());
@@ -672,15 +698,62 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
       }));
 
   EXPECT_CALL(*host_info, address());
-  EXPECT_CALL(callbacks_,
-              sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
-                             Eq("dns_resolution_failure")));
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
+                                         Eq("DNS resolution failure"), _, _, _));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
   filter_->onDestroy();
+}
+
+class MockProxyFilter : public ProxyFilter {
+public:
+  MockProxyFilter(const ProxyFilterConfigSharedPtr& config) : ProxyFilter(config) {}
+  ~MockProxyFilter() override = default;
+  MOCK_METHOD(bool, isProxying, ());
+};
+
+class ProxySettingsProxyFilterTest : public ProxyFilterTest {
+public:
+  virtual void setupFilter() override {
+    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+
+    Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+        *factory_context_.server_factory_context_.singleton_manager_);
+    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
+    mock_filter_ = std::make_unique<NiceMock<MockProxyFilter>>(filter_config_);
+    // Set it up such that the filter has proxy settings enabled.
+    ON_CALL(*mock_filter_, isProxying()).WillByDefault(Return(true));
+    mock_filter_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+protected:
+  std::unique_ptr<NiceMock<MockProxyFilter>> mock_filter_;
+};
+
+TEST_F(ProxySettingsProxyFilterTest, HttpWithProxySettings) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+  InSequence s;
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillRepeatedly(Return(circuit_breakers_));
+
+  auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(_, _, _, _))
+      .WillRepeatedly(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info}));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            mock_filter_->decodeHeaders(request_headers_, false));
+
+  mock_filter_->onDestroy();
 }
 
 } // namespace

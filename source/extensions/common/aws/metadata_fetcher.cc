@@ -23,7 +23,8 @@ public:
   MetadataFetcherImpl(Upstream::ClusterManager& cm, absl::string_view cluster_name)
       : cm_(cm), cluster_name_(std::string(cluster_name)) {}
 
-  ~MetadataFetcherImpl() override { cancel(); }
+  // TODO(suniltheta): Verify that bypassing virtual dispatch here was intentional
+  ~MetadataFetcherImpl() override { MetadataFetcherImpl::cancel(); }
 
   void cancel() override {
     if (request_ && !complete_) {
@@ -51,6 +52,12 @@ public:
     ASSERT(!request_);
     complete_ = false;
     receiver_ = makeOptRef(receiver);
+
+    // Stop processing if we are shutting down
+    if (cm_.isShutdown()) {
+      return;
+    }
+
     const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
     if (thread_local_cluster == nullptr) {
       ENVOY_LOG(error, "{} AWS Metadata failed: [cluster = {}] not found", __func__, cluster_name_);

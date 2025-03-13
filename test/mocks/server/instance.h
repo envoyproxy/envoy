@@ -2,6 +2,8 @@
 
 #include "envoy/server/instance.h"
 
+#include "test/mocks/config/xds_manager.h"
+#include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 
@@ -21,7 +23,9 @@ public:
   MOCK_METHOD(void, run, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
+  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
@@ -37,6 +41,8 @@ public:
   MOCK_METHOD(Envoy::MutexTracer*, mutexTracer, ());
   MOCK_METHOD(const Options&, options, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(Runtime::Loader&, runtime, ());
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
@@ -52,6 +58,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Configuration::StatsConfig&, statsConfig, (), ());
+  MOCK_METHOD(Regex::Engine&, regexEngine, ());
   MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
@@ -76,9 +83,11 @@ public:
   Event::GlobalTimeSystem time_system_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  testing::NiceMock<Config::MockXdsManager> xds_manager_;
+  testing::NiceMock<Http::MockHttpServerPropertiesCacheManager>
+      http_server_properties_cache_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -89,6 +98,7 @@ public:
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  testing::NiceMock<MockOverloadManager> null_overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
@@ -101,6 +111,8 @@ public:
       server_factory_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
       transport_socket_factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
+  Regex::GoogleReEngine regex_engine_;
 };
 
 } // namespace Server

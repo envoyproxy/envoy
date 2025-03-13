@@ -85,7 +85,10 @@ Http::Code ServerInfoHandler::handlerServerInfo(Http::ResponseHeaderMap& headers
   server_info.mutable_uptime_all_epochs()->set_seconds(uptime_all_epochs);
   envoy::admin::v3::CommandLineOptions* command_line_options =
       server_info.mutable_command_line_options();
-  *command_line_options = *server_.options().toCommandLineOptions();
+  Server::CommandLineOptionsPtr options = server_.options().toCommandLineOptions();
+  if (options) {
+    *command_line_options = *options;
+  }
   server_info.mutable_node()->MergeFrom(server_.localInfo().node());
   response.add(MessageUtil::getJsonStringFromMessageOrError(server_info, true, true));
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

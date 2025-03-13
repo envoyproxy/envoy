@@ -18,6 +18,7 @@ envoy_cc_test_library(
     name = "listener_filter_fuzzer_lib",
     srcs = ["listener_filter_fuzzer.cc"],
     hdrs = ["listener_filter_fuzzer.h"],
+    rbe_pool = "6gig",
     deps = [
         ":listener_filter_fakes",
         ":listener_filter_fuzzer_proto_cc_proto",
@@ -34,6 +35,7 @@ envoy_cc_test_library(
     name = "listener_filter_fakes",
     srcs = ["listener_filter_fakes.cc"],
     hdrs = ["listener_filter_fakes.h"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//test/mocks/network:network_mocks",

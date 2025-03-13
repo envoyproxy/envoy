@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
@@ -30,19 +31,24 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
       });
 }
 
-::Envoy::AccessLog::InstanceSharedPtr
-AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                          ::Envoy::AccessLog::FilterPtr&& filter,
-                                          Server::Configuration::FactoryContext& context) {
+::Envoy::AccessLog::InstanceSharedPtr AccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
+    Server::Configuration::FactoryContext& context,
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<AccessLog>(std::move(filter), proto_config,
-                                     context.serverFactoryContext().threadLocal(),
-                                     getAccessLoggerCacheSingleton(context.serverFactoryContext()));
+  auto commands =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                proto_config.formatters(), context, std::move(command_parsers)),
+                            std::vector<Formatter::CommandParserPtr>);
+
+  return std::make_shared<AccessLog>(
+      std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+      getAccessLoggerCacheSingleton(context.serverFactoryContext()), commands);
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {

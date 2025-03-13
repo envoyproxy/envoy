@@ -35,9 +35,11 @@ public:
   OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override {
     return transport_socket_factory_->clientContextConfig();
   }
+#ifdef ENVOY_ENABLE_QUIC
   std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() override {
     return transport_socket_factory_->getCryptoConfig();
   }
+#endif
 
 protected:
   // The wrapped factory.

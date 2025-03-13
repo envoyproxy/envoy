@@ -6,8 +6,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
-#include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -21,29 +21,50 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
                                Ssl::ContextManager& ssl_context_manager,
                                Outlier::EventLoggerSharedPtr outlier_event_logger,
                                bool added_via_api) {
-  std::string cluster_type;
+  std::string cluster_name;
+  std::string cluster_config_type_name;
 
-  if (!cluster.has_cluster_type()) {
-    switch (cluster.type()) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-    case envoy::config::cluster::v3::Cluster::STATIC:
-      cluster_type = "envoy.cluster.static";
-      break;
-    case envoy::config::cluster::v3::Cluster::STRICT_DNS:
-      cluster_type = "envoy.cluster.strict_dns";
-      break;
-    case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
-      cluster_type = "envoy.cluster.logical_dns";
-      break;
-    case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
-      cluster_type = "envoy.cluster.original_dst";
-      break;
-    case envoy::config::cluster::v3::Cluster::EDS:
-      cluster_type = "envoy.cluster.eds";
-      break;
+  ClusterFactory* factory;
+  // try to look up by typed_config
+  if (cluster.has_cluster_type() && cluster.cluster_type().has_typed_config() &&
+      (TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url()) !=
+       ProtobufWkt::Struct::GetDescriptor()->full_name())) {
+    cluster_config_type_name =
+        TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url());
+    factory = Registry::FactoryRegistry<ClusterFactory>::getFactoryByType(cluster_config_type_name);
+    if (factory == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("Didn't find a registered cluster factory implementation for type: '{}'",
+                      cluster_config_type_name));
     }
   } else {
-    cluster_type = cluster.cluster_type().name();
+    if (!cluster.has_cluster_type()) {
+      switch (cluster.type()) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+      case envoy::config::cluster::v3::Cluster::STATIC:
+        cluster_name = "envoy.cluster.static";
+        break;
+      case envoy::config::cluster::v3::Cluster::STRICT_DNS:
+        cluster_name = "envoy.cluster.strict_dns";
+        break;
+      case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
+        cluster_name = "envoy.cluster.logical_dns";
+        break;
+      case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
+        cluster_name = "envoy.cluster.original_dst";
+        break;
+      case envoy::config::cluster::v3::Cluster::EDS:
+        cluster_name = "envoy.cluster.eds";
+        break;
+      }
+    } else {
+      cluster_name = cluster.cluster_type().name();
+    }
+    factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_name);
+    if (factory == nullptr) {
+      return absl::InvalidArgumentError(fmt::format(
+          "Didn't find a registered cluster factory implementation for name: '{}'", cluster_name));
+    }
   }
 
   if (cluster.common_lb_config().has_consistent_hashing_lb_config() &&
@@ -51,13 +72,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       cluster.type() != envoy::config::cluster::v3::Cluster::STRICT_DNS) {
     return absl::InvalidArgumentError(fmt::format(
         "Cannot use hostname for consistent hashing loadbalancing for cluster of type: '{}'",
-        cluster_type));
-  }
-  ClusterFactory* factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_type);
-
-  if (factory == nullptr) {
-    return absl::InvalidArgumentError(fmt::format(
-        "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
+        cluster_name));
   }
 
   ClusterFactoryContextImpl context(server_context, cm, dns_resolver_fn, ssl_context_manager,
@@ -65,7 +80,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   return factory->create(cluster, context);
 }
 
-Network::DnsResolverSharedPtr
+absl::StatusOr<Network::DnsResolverSharedPtr>
 ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
                                           ClusterFactoryContext& context) {
   // We make this a shared pointer to deal with the distinct ownership
@@ -97,7 +112,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
 
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
       status_or_cluster = createClusterImpl(cluster, context);
-  RETURN_IF_STATUS_NOT_OK(status_or_cluster);
+  RETURN_IF_NOT_OK_REF(status_or_cluster.status());
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>& new_cluster_pair =
       status_or_cluster.value();
 
@@ -110,7 +125,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     } else {
       auto checker_or_error = HealthCheckerFactory::create(cluster.health_checks()[0],
                                                            *new_cluster_pair.first, server_context);
-      RETURN_IF_STATUS_NOT_OK(checker_or_error);
+      RETURN_IF_NOT_OK_REF(checker_or_error.status());
       new_cluster_pair.first->setHealthChecker(checker_or_error.value());
     }
   }
@@ -119,7 +134,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       *new_cluster_pair.first, cluster, server_context.mainThreadDispatcher(),
       server_context.runtime(), context.outlierEventLogger(),
       server_context.api().randomGenerator());
-  RETURN_IF_STATUS_NOT_OK(detector_or_error);
+  RETURN_IF_NOT_OK_REF(detector_or_error.status());
   new_cluster_pair.first->setOutlierDetector(detector_or_error.value());
 
   return status_or_cluster;

@@ -1,6 +1,7 @@
 #include <sys/types.h>
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
 
 #include "test/mocks/common.h"
@@ -69,15 +70,19 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callback;
 
-  EXPECT_CALL(
-      cluster_manager_.thread_local_cluster_.async_client_,
-      send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(250))))
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_,
+              send_(_, _,
+                    Http::AsyncClient::RequestOptions()
+                        .setTimeout(std::chrono::milliseconds(250))
+                        .setDiscardResponseBody(true)))
       .WillOnce(
           Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
+            EXPECT_EQ(message->headers().getUserAgentValue(),
+                      "OTel-OTLP-Exporter-Envoy/" + Envoy::VersionInfo::version());
             EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
                       message->headers().getContentTypeValue());
 

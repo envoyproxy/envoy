@@ -77,6 +77,29 @@ public:
 };
 
 /**
+ * Implemented by each UDP session filter and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
+ */
+class NamedUdpSessionFilterConfigFactory : public Envoy::Config::TypedFactory {
+public:
+  ~NamedUdpSessionFilterConfigFactory() override = default;
+
+  /**
+   * Create a particular UDP session filter factory implementation. If the implementation is
+   * unable to produce a factory with the provided parameters, it should throw an EnvoyException
+   * in the case of general error. The returned callback should always be initialized.
+   * @param config supplies the configuration for the filter
+   * @param context supplies the filter's context.
+   * @return UdpSessionFilterFactoryCb the factory creation function.
+   */
+  virtual Network::UdpSessionFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               Server::Configuration::FactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.filters.udp.session"; }
+};
+
+/**
  * Implemented by each QUIC listener filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
@@ -148,9 +171,9 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param filter_chain_factory_context supplies the filter's context.
-   * @return Network::FilterFactoryCb the factory creation function.
+   * @return Network::FilterFactoryCb the factory creation function or an error status.
    */
-  virtual Network::FilterFactoryCb
+  virtual absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                FactoryContext& filter_chain_factory_context) PURE;
 
@@ -219,7 +242,7 @@ public:
    * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
    * config. Returned object will be stored in the loaded route configuration.
    */
-  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) {
     return nullptr;
@@ -255,7 +278,7 @@ public:
     auto config_types = TypedFactory::configTypes();
 
     if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
-      config_types.insert(createReflectableMessage(*message)->GetDescriptor()->full_name());
+      config_types.emplace(createReflectableMessage(*message)->GetDescriptor()->full_name());
     }
 
     return config_types;

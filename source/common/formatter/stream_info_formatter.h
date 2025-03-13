@@ -19,17 +19,40 @@
 namespace Envoy {
 namespace Formatter {
 
-class StreamInfoFormatterProvider {
+class StreamInfoFormatterProvider : public FormatterProvider {
 public:
-  virtual ~StreamInfoFormatterProvider() = default;
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+    return format(stream_info);
+  }
+  ProtobufWkt::Value
+  formatValueWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+    return formatValue(stream_info);
+  }
 
-  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo&) const PURE;
-  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const PURE;
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return absl::optional<std::string> optional string containing a single value extracted from
+   *         the given stream info.
+   */
+  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
+   */
+  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
+
 using StreamInfoFormatterProviderCreateFunc =
-    std::function<StreamInfoFormatterProviderPtr(const std::string&, absl::optional<size_t>)>;
+    std::function<StreamInfoFormatterProviderPtr(absl::string_view, absl::optional<size_t>)>;
+
+enum class DurationPrecision { Milliseconds, Microseconds, Nanoseconds };
 
 enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
 
@@ -40,7 +63,7 @@ class MetadataFormatter : public StreamInfoFormatterProvider {
 public:
   using GetMetadataFunction =
       std::function<const envoy::config::core::v3::Metadata*(const StreamInfo::StreamInfo&)>;
-  MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
+  MetadataFormatter(absl::string_view filter_namespace, const std::vector<absl::string_view>& path,
                     absl::optional<size_t> max_length, GetMetadataFunction get);
 
   // StreamInfoFormatterProvider
@@ -64,8 +87,9 @@ private:
  */
 class DynamicMetadataFormatter : public MetadataFormatter {
 public:
-  DynamicMetadataFormatter(const std::string& filter_namespace,
-                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+  DynamicMetadataFormatter(absl::string_view filter_namespace,
+                           const std::vector<absl::string_view>& path,
+                           absl::optional<size_t> max_length);
 };
 
 /**
@@ -73,8 +97,9 @@ public:
  */
 class ClusterMetadataFormatter : public MetadataFormatter {
 public:
-  ClusterMetadataFormatter(const std::string& filter_namespace,
-                           const std::vector<std::string>& path, absl::optional<size_t> max_length);
+  ClusterMetadataFormatter(absl::string_view filter_namespace,
+                           const std::vector<absl::string_view>& path,
+                           absl::optional<size_t> max_length);
 };
 
 /**
@@ -82,8 +107,8 @@ public:
  */
 class UpstreamHostMetadataFormatter : public MetadataFormatter {
 public:
-  UpstreamHostMetadataFormatter(const std::string& filter_namespace,
-                                const std::vector<std::string>& path,
+  UpstreamHostMetadataFormatter(absl::string_view filter_namespace,
+                                const std::vector<absl::string_view>& path,
                                 absl::optional<size_t> max_length);
 };
 
@@ -95,11 +120,11 @@ enum class FilterStateFormat { String, Proto, Field };
 class FilterStateFormatter : public StreamInfoFormatterProvider {
 public:
   static std::unique_ptr<FilterStateFormatter>
-  create(const std::string& format, const absl::optional<size_t>& max_length, bool is_upstream);
+  create(absl::string_view format, absl::optional<size_t> max_length, bool is_upstream);
 
-  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length,
+  FilterStateFormatter(absl::string_view key, absl::optional<size_t> max_length,
                        bool serialize_as_string, bool is_upstream = false,
-                       const std::string& field_name = "");
+                       absl::string_view field_name = {});
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
@@ -115,7 +140,61 @@ private:
   const bool is_upstream_;
   FilterStateFormat format_;
   std::string field_name_;
-  StreamInfo::FilterState::ObjectFactory* factory_;
+};
+
+class CommonDurationFormatter : public StreamInfoFormatterProvider {
+public:
+  using TimePointGetter =
+      std::function<absl::optional<MonotonicTime>(const StreamInfo::StreamInfo&)>;
+
+  static std::unique_ptr<CommonDurationFormatter> create(absl::string_view sub_command);
+
+  CommonDurationFormatter(TimePointGetter beg, TimePointGetter end,
+                          DurationPrecision duration_precision)
+      : time_point_beg_(std::move(beg)), time_point_end_(std::move(end)),
+        duration_precision_(duration_precision) {}
+
+  // StreamInfoFormatterProvider
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+  static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
+
+private:
+  absl::optional<uint64_t> getDurationCount(const StreamInfo::StreamInfo& info) const;
+
+  static TimePointGetter getTimePointGetterByName(absl::string_view name);
+
+  static constexpr absl::string_view MillisecondsPrecision = "ms";
+  static constexpr absl::string_view MicrosecondsPrecision = "us";
+  static constexpr absl::string_view NanosecondsPrecision = "ns";
+
+  static constexpr absl::string_view FirstDownstreamRxByteReceived =
+      "DS_RX_BEG"; // Downstream request receiving begin.
+  static constexpr absl::string_view LastDownstreamRxByteReceived =
+      "DS_RX_END"; // Downstream request receiving end.
+  static constexpr absl::string_view UpstreamConnectStart =
+      "US_CX_BEG"; // Upstream TCP connection establishment start.
+  static constexpr absl::string_view UpstreamConnectEnd =
+      "US_CX_END"; // Upstream TCP connection establishment start.
+  static constexpr absl::string_view UpstreamTLSConnectEnd =
+      "US_HS_END"; // Upstream TLS connection establishment start.
+  static constexpr absl::string_view FirstUpstreamTxByteSent =
+      "US_TX_BEG"; // Upstream request sending begin.
+  static constexpr absl::string_view LastUpstreamTxByteSent =
+      "US_TX_END"; // Upstream request sending end.
+  static constexpr absl::string_view FirstUpstreamRxByteReceived =
+      "US_RX_BEG"; // Upstream response receiving begin.
+  static constexpr absl::string_view LastUpstreamRxByteReceived =
+      "US_RX_END"; // Upstream response receiving end.
+  static constexpr absl::string_view FirstDownstreamTxByteSent =
+      "DS_TX_BEG"; // Downstream response sending begin.
+  static constexpr absl::string_view LastDownstreamTxByteSent =
+      "DS_TX_END"; // Downstream response sending end.
+
+  TimePointGetter time_point_beg_;
+  TimePointGetter time_point_end_;
+  DurationPrecision duration_precision_;
 };
 
 /**
@@ -127,7 +206,7 @@ public:
       std::function<absl::optional<SystemTime>(const StreamInfo::StreamInfo& stream_info)>;
   using TimeFieldExtractorPtr = std::unique_ptr<TimeFieldExtractor>;
 
-  SystemTimeFormatter(const std::string& format, TimeFieldExtractorPtr f);
+  SystemTimeFormatter(absl::string_view format, TimeFieldExtractorPtr f, bool local_time = false);
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
@@ -136,6 +215,8 @@ public:
 private:
   const Envoy::DateFormatter date_formatter_;
   const TimeFieldExtractorPtr time_field_extractor_;
+  // Whether use local time zone.
+  const bool local_time_;
 };
 
 /**
@@ -143,7 +224,7 @@ private:
  */
 class StartTimeFormatter : public SystemTimeFormatter {
 public:
-  StartTimeFormatter(const std::string& format);
+  StartTimeFormatter(absl::string_view format);
 };
 
 /**
@@ -152,7 +233,7 @@ public:
  */
 class DownstreamPeerCertVStartFormatter : public SystemTimeFormatter {
 public:
-  DownstreamPeerCertVStartFormatter(const std::string& format);
+  DownstreamPeerCertVStartFormatter(absl::string_view format);
 };
 
 /**
@@ -161,7 +242,7 @@ public:
  */
 class DownstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 public:
-  DownstreamPeerCertVEndFormatter(const std::string& format);
+  DownstreamPeerCertVEndFormatter(absl::string_view format);
 };
 
 /**
@@ -170,7 +251,7 @@ public:
  */
 class UpstreamPeerCertVStartFormatter : public SystemTimeFormatter {
 public:
-  UpstreamPeerCertVStartFormatter(const std::string& format);
+  UpstreamPeerCertVStartFormatter(absl::string_view format);
 };
 
 /**
@@ -179,7 +260,7 @@ public:
  */
 class UpstreamPeerCertVEndFormatter : public SystemTimeFormatter {
 public:
-  UpstreamPeerCertVEndFormatter(const std::string& format);
+  UpstreamPeerCertVEndFormatter(absl::string_view format);
 };
 
 /**
@@ -187,7 +268,7 @@ public:
  */
 class EnvironmentFormatter : public StreamInfoFormatterProvider {
 public:
-  EnvironmentFormatter(const std::string& key, absl::optional<size_t> max_length);
+  EnvironmentFormatter(absl::string_view key, absl::optional<size_t> max_length);
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
@@ -197,123 +278,13 @@ private:
   ProtobufWkt::Value str_;
 };
 
-using StreamInfoFormatterProviderLookupTable =
-    absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
-                                                     StreamInfoFormatterProviderCreateFunc>>;
-const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders();
-
-/**
- * FormatterProvider for string literals. It ignores headers and stream info and returns string by
- * which it was initialized.
- */
-template <class FormatterContext>
-class CommonPlainStringFormatterBase : public FormatterProviderBase<FormatterContext> {
+class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {
 public:
-  CommonPlainStringFormatterBase(const std::string& str) { str_.set_string_value(str); }
-
-  // FormatterProviderBase
-  absl::optional<std::string> formatWithContext(const FormatterContext&,
-                                                const StreamInfo::StreamInfo&) const override {
-    return str_.string_value();
-  }
-  ProtobufWkt::Value formatValueWithContext(const FormatterContext&,
-                                            const StreamInfo::StreamInfo&) const override {
-    return str_;
-  }
-
-private:
-  ProtobufWkt::Value str_;
+  std::string name() const override;
+  CommandParserPtr createCommandParser() const override;
 };
 
-template <class FormatterContext>
-class PlainStringFormatterBase : public CommonPlainStringFormatterBase<FormatterContext> {
-public:
-  using CommonPlainStringFormatterBase<FormatterContext>::CommonPlainStringFormatterBase;
-};
-
-/**
- * FormatterProvider for numbers.
- */
-template <class FormatterContext>
-class CommonPlainNumberFormatterBase : public FormatterProviderBase<FormatterContext> {
-public:
-  CommonPlainNumberFormatterBase(double num) { num_.set_number_value(num); }
-
-  // FormatterProviderBase
-  absl::optional<std::string> formatWithContext(const FormatterContext&,
-                                                const StreamInfo::StreamInfo&) const override {
-    std::string str = absl::StrFormat("%g", num_.number_value());
-    return str;
-  }
-  ProtobufWkt::Value formatValueWithContext(const FormatterContext&,
-                                            const StreamInfo::StreamInfo&) const override {
-    return num_;
-  }
-
-private:
-  ProtobufWkt::Value num_;
-};
-
-template <class FormatterContext>
-class PlainNumberFormatterBase : public CommonPlainNumberFormatterBase<FormatterContext> {
-public:
-  using CommonPlainNumberFormatterBase<FormatterContext>::CommonPlainNumberFormatterBase;
-};
-
-/**
- * FormatterProvider based on StreamInfo fields.
- */
-template <class FormatterContext>
-class CommonStreamInfoFormatterBase : public FormatterProviderBase<FormatterContext> {
-public:
-  CommonStreamInfoFormatterBase(const std::string& command, const std::string& sub_command = "",
-                                absl::optional<size_t> max_length = absl::nullopt) {
-
-    const auto& formatters = getKnownStreamInfoFormatterProviders();
-
-    auto it = formatters.find(command);
-
-    if (it == formatters.end()) {
-      throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
-    }
-
-    // Check flags for the command.
-    CommandSyntaxChecker::verifySyntax((*it).second.first, command, sub_command, max_length);
-
-    // Create a pointer to the formatter by calling a function
-    // associated with formatter's name.
-    formatter_ = (*it).second.second(sub_command, max_length);
-  }
-
-  CommonStreamInfoFormatterBase(StreamInfoFormatterProviderPtr formatter)
-      : formatter_(std::move(formatter)) {}
-
-  // FormatterProvider
-  absl::optional<std::string>
-  formatWithContext(const FormatterContext&,
-                    const StreamInfo::StreamInfo& stream_info) const override {
-    return formatter_->format(stream_info);
-  }
-  ProtobufWkt::Value
-  formatValueWithContext(const FormatterContext&,
-                         const StreamInfo::StreamInfo& stream_info) const override {
-    return formatter_->formatValue(stream_info);
-  }
-
-private:
-  StreamInfoFormatterProviderPtr formatter_;
-};
-
-template <class FormatterContext>
-class StreamInfoFormatterBase : public CommonStreamInfoFormatterBase<FormatterContext> {
-public:
-  using CommonStreamInfoFormatterBase<FormatterContext>::CommonStreamInfoFormatterBase;
-};
-
-// Aliases for backward compatibility.
-using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
-using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
-using StreamInfoFormatter = StreamInfoFormatterBase<HttpFormatterContext>;
+DECLARE_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

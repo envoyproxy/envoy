@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: HTTP Cache Filter]
 
 // [#extension: envoy.filters.http.cache]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cache.v2alpha.CacheConfig";
@@ -88,4 +88,9 @@ message CacheConfig {
   // Max body size the cache filter will insert into a cache. 0 means unlimited (though the cache
   // storage implementation may have its own limit beyond which it will reject insertions).
   uint32 max_body_bytes = 4;
+
+  // By default, a ``cache-control: no-cache`` or ``pragma: no-cache`` header in the request
+  // causes the cache to validate with its upstream even if the lookup is a hit. Setting this
+  // to true will ignore these headers.
+  bool ignore_request_cache_control_header = 6;
 }

@@ -1,9 +1,14 @@
 package io.envoyproxy.envoymobile.engine;
 
+import android.net.ConnectivityManager;
+
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
+import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
 
 public class JniLibrary {
 
@@ -20,6 +25,7 @@ public class JniLibrary {
     if (System.getProperty("envoy_jni_library_name") != null) {
       envoyLibraryName = System.getProperty("envoy_jni_library_name");
     }
+    load();
   }
 
   // Load and initialize Envoy and its dependencies, but only once.
@@ -56,55 +62,41 @@ public class JniLibrary {
    * Open an underlying HTTP stream. Note: Streams must be started before other
    * other interaction can can occur.
    *
-   * @param engine,  handle to the stream's associated engine.
-   * @param stream,  handle to the stream to be started.
-   * @param context, context that contains dispatch logic to fire callbacks
-   *                 callbacks.
-   * @param explicitFlowControl, whether explicit flow control should be enabled
-   *                             for the stream.
-   * @return envoy_stream, with a stream handle and a success status, or a failure
-   * status.
+   * @param engine  handle to the stream's associated engine.
+   * @param stream  handle to the stream to be started.
+   * @param callbacks context that contains dispatch logic to fire callbacks.
+   * @param explicitFlowControl whether explicit flow control should be enabled for the stream.
+   * @return a stream handle and a success status, or a failure status.
    */
-  protected static native int startStream(long engine, long stream, JvmCallbackContext context,
+  protected static native int startStream(long engine, long stream, EnvoyHTTPCallbacks callbacks,
                                           boolean explicitFlowControl);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and
    * needs to be called before send_data.
    *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send headers over.
-   * @param headers,   the headers to send.
-   * @param endStream, supplies whether this is headers only.
-   * @return int, the resulting status of the operation.
+   * @param engine     the stream's associated engine.
+   * @param stream     the stream to send headers over.
+   * @param headers    the headers to send.
+   * @param endStream  supplies whether this is headers only.
+   * @param idempotent indicates that the request is idempotent. When idempotent is set to true
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
+   * @return the resulting status of the operation.
    */
-  protected static native int sendHeaders(long engine, long stream, byte[][] headers,
-                                          boolean endStream);
+  protected static native int sendHeaders(long engine, long stream,
+                                          Map<String, List<String>> headers, boolean endStream,
+                                          boolean idempotent);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple
    * times.
    *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send data over.
-   * @param data,      the data to send.
-   * @param length,    the size in bytes of the data to send. 0 <= length <= data.length
-   * @param endStream, supplies whether this is the last data in the stream.
-   * @return int,      the resulting status of the operation.
-   */
-  protected static native int sendDataByteArray(long engine, long stream, byte[] data, int length,
-                                                boolean endStream);
-
-  /**
-   * Send data over an open HTTP stream. This method can be invoked multiple
-   * times.
-   *
-   * @param engine,    the stream's associated engine.
-   * @param stream,    the stream to send data over.
-   * @param data,      the data to send; must be a <b>direct</b> ByteBuffer.
-   * @param length,    the size in bytes of the data to send. 0 <= length <= data.capacity()
-   * @param endStream, supplies whether this is the last data in the stream.
-   * @return int,      the resulting status of the operation.
+   * @param engine    the stream's associated engine.
+   * @param stream    the stream to send data over.
+   * @param data      the data to send. It can be direct or non-direct byteBuffer.
+   * @param length    the size in bytes of the data to send. 0 <= length <= data.capacity()
+   * @param endStream supplies whether this is the last data in the stream.
+   * @return int      the resulting status of the operation.
    */
   protected static native int sendData(long engine, long stream, ByteBuffer data, int length,
                                        boolean endStream);
@@ -124,12 +116,13 @@ public class JniLibrary {
    * Send trailers over an open HTTP stream. This method can only be invoked once
    * per stream. Note that this method implicitly ends the stream.
    *
-   * @param engine,   the stream's associated engine.
-   * @param stream,   the stream to send trailers over.
-   * @param trailers, the trailers to send.
+   * @param engine   the stream's associated engine.
+   * @param stream   the stream to send trailers over.
+   * @param trailers the trailers to send.
    * @return int, the resulting status of the operation.
    */
-  protected static native int sendTrailers(long engine, long stream, byte[][] trailers);
+  protected static native int sendTrailers(long engine, long stream,
+                                           Map<String, List<String>> trailers);
 
   /**
    * Detach all callbacks from a stream and send an interrupt upstream if
@@ -137,7 +130,7 @@ public class JniLibrary {
    *
    * @param engine, the stream's associated engine.
    * @param stream, the stream to evict.
-   * @return int, the resulting status of the operation.
+   * @return the resulting status of the operation.
    */
   protected static native int resetStream(long engine, long stream);
 
@@ -171,13 +164,11 @@ public class JniLibrary {
    * If a bootstrap pointer is passed, the engine will take ownership of the proto.
    *
    * @param engine,          the engine to run.
-   * @param config,          the configuration blob to run envoy with.
-   * @param bootstrap,       a bootstrap pointer generated by createBootstrap, or 0 to use config.
+   * @param bootstrap,       a bootstrap pointer generated by createBootstrap.
    * @param logLevel,        the logging level to run envoy with.
    * @return int, the resulting status of the operation.
    */
-  protected static native int runEngine(long engine, String config, long bootstrap,
-                                        String logLevel);
+  protected static native int runEngine(long engine, long bootstrap, String logLevel);
 
   /**
    * Terminate the engine.
@@ -234,14 +225,24 @@ public class JniLibrary {
   protected static native int resetConnectivityState(long engine);
 
   /**
-   * Update the network interface to the preferred network for opening new
-   * streams. Note that this state is shared by all engines.
-   *
-   * @param engine  Handle to the engine whose preferred network will be set.
-   * @param network the network to be preferred for new streams.
-   * @return The resulting status of the operation.
+   * A callback into the Envoy Engine when the default network is available.
    */
-  protected static native int setPreferredNetwork(long engine, int network);
+  protected static native void onDefaultNetworkAvailable(long engine);
+
+  /**
+   * A callback into the Envoy Engine when the default network was changed.
+   */
+  protected static native void onDefaultNetworkChanged(long engine, int networkType);
+
+  /**
+   * A more modern callback into the Envoy Engine when the default network was changed.
+   */
+  protected static native void onDefaultNetworkChangeEvent(long engine, int networkType);
+
+  /**
+   * A callback into the Envoy Engine when the default network is unavailable.
+   */
+  protected static native void onDefaultNetworkUnavailable(long engine);
 
   /**
    * Update the proxy settings.
@@ -256,9 +257,10 @@ public class JniLibrary {
   /**
    * Update the log level for all active logs
    *
-   * @param log_level The Log level to change to. Must be an integer 0-6.
+   * @param logLevel The Log level to change to. Must be an integer 0-6.
+   *                 See source/common/common/base_logger.h
    */
-  protected static native void setLogLevel(int log_level);
+  protected static native void setLogLevel(int logLevel);
 
   /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
@@ -275,7 +277,7 @@ public class JniLibrary {
    * Mimic a call to AndroidNetworkLibrary#addTestRootCertificate from native code.
    * To be used for testing only.
    *
-   * @param rootCert DER encoded bytes of the certificate.
+   * @param cert DER encoded bytes of the certificate.
    */
   public static native void callAddTestRootCertificateFromNative(byte[] cert);
 
@@ -287,6 +289,14 @@ public class JniLibrary {
   public static native void callClearTestRootCertificateFromNative();
 
   /**
+   * Given a filter name, create the proto config for adding the native filter
+   *
+   * @param filterName the name of the native filter
+   * @return a filter config which can be passed back to createBootstrap
+   */
+  public static native String getNativeFilterConfig(String filterName);
+
+  /**
    * Uses the provided fields to generate an Envoy bootstrap proto.
    * The returned pointer is "owned" by the caller until ownership is passed back to C++ via
    * runEngine.
@@ -295,18 +305,31 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      long connectTimeoutSeconds, long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase,
-      long dnsFailureRefreshSecondsMax, long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds,
-      byte[][] dnsPreresolveHostnames, boolean enableDNSCache, long dnsCacheSaveIntervalSeconds,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
-      String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
+      boolean disableDnsRefreshOnNetworkChange, long dnsRefreshSeconds,
+      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
+      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
+      String http3ConnectionOptions, String http3ClientConnectionOptions, byte[][] quicHints,
+      byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,
       boolean enableSocketTagging, boolean enableInterfaceBinding,
       long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
       long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
       String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
-      boolean enablePlatformCertificatesValidation, byte[][] runtimeGuards, String rtdsResourceName,
-      long rtdsTimeoutSeconds, String xdsAddress, long xdsPort, byte[][] xdsGrpcInitialMetadata,
-      String xdsRootCerts, String nodeId, String nodeRegion, String nodeZone, String nodeSubZone,
-      byte[] nodeMetadata, String cdsResourcesLocator, long cdsTimeoutSeconds, boolean enableCds);
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
+      byte[][] cares_fallback_resolvers, long h3ConnectionKeepaliveInitialIntervalMilliseconds);
+
+  /**
+   * Initializes c-ares.
+   * See <a
+   * href="https://c-ares.org/docs/ares_library_init_android.html">ares_library_init_android</a>.
+   */
+  public static native void initCares(ConnectivityManager connectivityManager);
+
+  /**
+   * Returns true if the runtime feature is enabled.
+   */
+  public static native boolean isRuntimeFeatureEnabled(String featureName);
 }

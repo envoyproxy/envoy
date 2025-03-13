@@ -114,12 +114,14 @@ Transactions
 ------------
 
 Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
-and you execute it with EXEC. Within the transaction only commands that are supported by Envoy (see below) and are single-key
-commands are supported, i.e. MGET and MSET are not supported. The DISCARD command is supported.
+and you execute it with EXEC. Within the transaction, from the list of commands supported by Envoy (see below), only single-key
+commands (e.g. GET, SET), multi-key commands (e.g. DEL, MSET) and transaction commands (e.g. WATCH, UNWATCH, DISCARD, EXEC) are supported.
+
 
 When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
-key-based command in the transaction. It is the user's responsibility to ensure that all keys in the transaction are mapped
-to the same hashslot, as commands will not be redirected.
+key-based command in the transaction. If this command is multi-key, it will send it to the server corresponding to the first key
+in the command. It is the user's responsibility to ensure that all keys in the transaction are mapped to the same hashslot, as
+commands will not be redirected.
 
 Supported commands
 ------------------
@@ -127,13 +129,17 @@ Supported commands
 At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
+At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
-configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream
-authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
-Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are
-functionally identical to the original Redis command except possibly in failure scenarios.
+configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
+to an external service and act according to the authentication response. If a downstream password is set together
+with external authentication, the validation will be done still externally and the downstream password used for
+upstream authentication. Envoy will transparently issue AUTH commands upon connecting to upstream servers,
+if upstream authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
+Arguments to PING are not allowed. Envoy responds to ECHO immediately with the command argument.
+All other supported commands must contain a key. Supported commands are functionally identical to the
+original Redis command except possibly in failure scenarios.
 
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
@@ -143,6 +149,7 @@ For details on each command's usage see the official
   :widths: 1, 1
 
   AUTH, Authentication
+  ECHO, Connection
   PING, Connection
   QUIT, Connection
   DEL, Generic
@@ -152,11 +159,13 @@ For details on each command's usage see the official
   EXISTS, Generic
   EXPIRE, Generic
   EXPIREAT, Generic
+  KEYS, String
   PERSIST, Generic
   PEXPIRE, Generic
   PEXPIREAT, Generic
   PTTL, Generic
   RESTORE, Generic
+  SELECT, Generic
   TOUCH, Generic
   TTL, Generic
   TYPE, Generic
@@ -198,6 +207,7 @@ For details on each command's usage see the official
   RPOP, List
   RPUSH, List
   RPUSHX, List
+  PUBLISH, Pubsub
   EVAL, Scripting
   EVALSHA, Scripting
   SADD, Set
@@ -209,6 +219,7 @@ For details on each command's usage see the official
   SREM, Set
   SSCAN, Set
   WATCH, String
+  UNWATCH, String
   ZADD, Sorted Set
   ZCARD, Sorted Set
   ZCOUNT, Sorted Set
@@ -253,6 +264,26 @@ For details on each command's usage see the official
   SETNX, String
   SETRANGE, String
   STRLEN, String
+  XACK, Stream
+  XADD, Stream
+  XAUTOCLAIM, Stream
+  XCLAIM, Stream
+  XDEL, Stream
+  XLEN, Stream
+  XPENDING, Stream
+  XRANGE, Stream
+  XREVRANGE, Stream
+  XTRIM, Stream
+  BF.ADD, Bloom
+  BF.CARD, Bloom
+  BF.EXISTS, Bloom
+  BF.INFO, Bloom
+  BF.INSERT, Bloom
+  BF.LOADCHUNK, Bloom
+  BF.MADD, Bloom
+  BF.MEXISTS, Bloom
+  BF.RESERVE, Bloom
+  BF.SCANDUMP, Bloom
 
 Failure modes
 -------------
@@ -273,7 +304,7 @@ Envoy can also generate its own errors in response to the client.
   the connection."
   invalid request, "Command was rejected by the first stage of the command splitter due to
   datatype or length."
-  unsupported command, "The command was not recognized by Envoy and therefore cannot be serviced
+  ERR unknown command, "The command was not recognized by Envoy and therefore cannot be serviced
   because it cannot be hashed to a backend server."
   finished with n errors, "Fragmented commands which sum the response (e.g. DEL) will return the
   total number of errors received if any were received."
@@ -282,10 +313,11 @@ Envoy can also generate its own errors in response to the client.
   wrong number of arguments for command, "Certain commands check in Envoy that the number of
   arguments is correct."
   "NOAUTH Authentication required.", "The command was rejected because a downstream authentication
-  password has been set and the client has not successfully authenticated."
+  password or external authentication have been set and the client has not successfully authenticated."
   ERR invalid password, "The authentication command failed due to an invalid password."
+  ERR <external-message>, "The authentication command failed on the external auth provider."
   "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
-  downstream authentication password has been configured."
+  downstream authentication password or external authentication provider have been configured."
 
 
 In the case of MGET, each individual key that cannot be fetched will generate an error response.
@@ -300,3 +332,9 @@ response for each in place of the value.
   3) (error) upstream failure
   4) (error) upstream failure
   5) "echo"
+
+Protocol
+--------
+
+Although `RESP <https://redis.io/docs/reference/protocol-spec/>`_ is recommended for production use,
+`inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_ are also supported.

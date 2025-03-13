@@ -224,6 +224,49 @@ TEST_F(EdsResourcesCacheImplTest, ExplicitRemoveCallback) {
   EXPECT_EQ(0, callback.calls_counter_map_["foo_cla"]);
 }
 
+// Validate explicit callback removal of multiple callbacks with the same name,
+// and a call to setResource in between is executed properly.
+TEST_F(EdsResourcesCacheImplTest, ExplicitSameNameRemoveCallbacks) {
+  ResourceRemovalCallbackCounter callback1;
+  ResourceRemovalCallbackCounter callback2;
+
+  // Emulate receiving a resource.
+  ClusterLoadAssignment resource;
+  resource.set_cluster_name("foo");
+  // Set the CLA resource to some resource_name.
+  resources_cache_.setResource("foo_cla", resource);
+  EXPECT_EQ(1, resources_cache_.cacheSizeForTest());
+
+  // Emulate resource fetched from cache with 2 different callbacks.
+  // Fetch the resource by the first name and register a callback.
+  const auto& fetched_resource1 = resources_cache_.getResource("foo_cla", &callback1);
+  EXPECT_TRUE(fetched_resource1.has_value());
+  EXPECT_EQ("foo", fetched_resource1->cluster_name());
+  EXPECT_EQ(0, callback1.calls_counter_map_["foo_cla"]);
+  // Fetch the resource by the second name and register the same callback.
+  const auto& fetched_resource2 = resources_cache_.getResource("foo_cla", &callback2);
+  EXPECT_TRUE(fetched_resource2.has_value());
+  EXPECT_EQ("foo", fetched_resource2->cluster_name());
+  EXPECT_EQ(0, callback2.calls_counter_map_["foo_cla"]);
+
+  // Emulate receiving the resource again, and invoking the callbacks removal.
+  resources_cache_.removeCallback("foo_cla", &callback1);
+
+  // Set the resource again (an ongoing update).
+  ClusterLoadAssignment resource2;
+  resource2.set_cluster_name("foo");
+  resources_cache_.setResource("foo_cla", resource2);
+
+  // Remove the callback using the second name.
+  resources_cache_.removeCallback("foo_cla", &callback2);
+
+  // Remove the resource using the first name, callback not invoked.
+  resources_cache_.removeResource("foo_cla");
+  EXPECT_EQ(0, resources_cache_.cacheSizeForTest());
+  EXPECT_EQ(0, callback1.calls_counter_map_["foo_cla"]);
+  EXPECT_EQ(0, callback2.calls_counter_map_["foo_cla"]);
+}
+
 // Validate correct removal callback gets notified when multiple resources are used.
 TEST_F(EdsResourcesCacheImplTest, MultipleResourcesRemoveCallbackCalled) {
   ResourceRemovalCallbackCounter callback;

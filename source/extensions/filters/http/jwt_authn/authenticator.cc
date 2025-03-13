@@ -13,6 +13,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/time/time.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/struct_utils.h"
 #include "jwt_verify_lib/verify.h"
@@ -59,7 +60,7 @@ public:
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface.
-  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+  void verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens,
               SetExtractedJwtDataCallback set_extracted_jwt_data_cb, AuthenticatorCallback callback,
               ClearRouteCacheCallback clear_route_cb) override;
@@ -110,7 +111,7 @@ private:
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
-  Http::HeaderMap* headers_{};
+  Http::RequestHeaderMap* headers_{};
   // The active span for the request
   Tracing::Span* parent_span_{&Tracing::NullSpan::instance()};
   // The callback function called to set the extracted payload and header from a verified JWT.
@@ -144,7 +145,7 @@ std::string AuthenticatorImpl::name() const {
   return "_UNKNOWN_";
 }
 
-void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+void AuthenticatorImpl::verify(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
                                std::vector<JwtLocationConstPtr>&& tokens,
                                SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                                AuthenticatorCallback callback,
@@ -199,7 +200,7 @@ void AuthenticatorImpl::startVerify() {
     }
   }
 
-  ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
+  ENVOY_LOG(debug, "{}: Verifying JWT of issuer {}", name(), jwt_->iss_);
   // Check if `iss` is allowed.
   if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
     doneWithStatus(Status::JwtUnknownIssuer);
@@ -238,6 +239,25 @@ void AuthenticatorImpl::startVerify() {
                                           : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
   if (!is_allowed) {
     doneWithStatus(Status::JwtAudienceNotAllowed);
+    return;
+  }
+
+  const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
+
+  if (!sub_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
+    return;
+  }
+
+  absl::optional<absl::Time> exp;
+  if (jwt_->exp_) {
+    exp = absl::FromUnixSeconds(jwt_->exp_);
+  }
+  const bool exp_allowed = jwks_data_->isLifetimeAllowed(
+      absl::FromChrono(timeSource().systemTime()), exp ? &exp.value() : nullptr);
+
+  if (!exp_allowed) {
+    doneWithStatus(Status::JwtVerificationFail);
     return;
   }
 
@@ -341,7 +361,7 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
     }
     default:
       ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'", claim_name,
-                claim_value->kind_case());
+                static_cast<int>(claim_value->kind_case()));
       break;
     }
 
@@ -405,7 +425,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
 void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payload) {
   const auto& provider = jwks_data_->getJwtProvider();
   const auto& normalize = provider.normalize_payload_in_metadata();
-  if (normalize.space_delimited_claims().size() == 0) {
+  if (normalize.space_delimited_claims().empty()) {
     set_extracted_jwt_data_cb_(provider.payload_in_metadata(), jwt_payload);
   }
   // Make a temporary copy to normalize the JWT struct.
@@ -424,7 +444,7 @@ void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payloa
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
-  ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
+  ENVOY_LOG(debug, "{}: JWT verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
   if (Status::Ok != status) {
@@ -460,6 +480,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   // Unless allowing failed or missing, all tokens must be verified successfully.
   if ((Status::Ok != status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
     tokens_.clear();
+    if (clear_route_cache_ && clear_route_cb_) {
+      clear_route_cb_();
+    }
+    clear_route_cb_ = nullptr;
+
     if (is_allow_failed_) {
       callback_(Status::Ok);
     } else if (is_allow_missing_ && status == Status::JwtMissed) {
@@ -468,11 +493,6 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
       callback_(status);
     }
     callback_ = nullptr;
-
-    if (clear_route_cache_ && clear_route_cb_) {
-      clear_route_cb_();
-    }
-    clear_route_cb_ = nullptr;
 
     return;
   }

@@ -320,10 +320,11 @@ public:
     envoy::config::route::v3::RateLimit rate_limit;
     TestUtility::loadFromYaml(yaml, rate_limit);
 
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(rate_limit);
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(rate_limit, context_);
     descriptors_.clear();
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   MessageMetadata metadata_;
   NiceMock<MockRouteEntry> route_;
@@ -367,8 +368,8 @@ actions:
 
   initialize(yaml);
 
-  Network::Address::PipeInstance pipe_address("/hello");
-  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", metadata_, pipe_address);
+  auto pipe_address = *Network::Address::PipeInstance::create("/hello");
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "", metadata_, *pipe_address);
   EXPECT_TRUE(descriptors_.empty());
 }
 
@@ -596,6 +597,17 @@ actions:
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);
   EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(ThriftRateLimitPolicyEntryTest, ThrowsOnQueryParameters) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException, "unsupported RateLimit Action 12");
 }
 
 } // namespace

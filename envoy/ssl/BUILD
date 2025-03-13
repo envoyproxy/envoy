@@ -10,11 +10,15 @@ envoy_package()
 
 envoy_cc_library(
     name = "connection_interface",
-    hdrs = ["connection.h"],
-    external_deps = ["abseil_optional"],
+    hdrs = [
+        "connection.h",
+        "parsed_x509_name.h",
+    ],
     deps = [
         ":ssl_socket_state",
+        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -61,8 +65,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "certificate_validation_context_config_interface",
     hdrs = ["certificate_validation_context_config.h"],
-    external_deps = ["abseil_optional"],
     deps = [
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -88,6 +92,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:post_io_action_interface",
         "//envoy/protobuf:message_validator_interface",
+        "//envoy/server:lifecycle_notifier_interface",
         "//envoy/server:options_interface",
         "//envoy/singleton:manager_interface",
     ],

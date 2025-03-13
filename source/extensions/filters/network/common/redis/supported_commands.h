@@ -20,19 +20,29 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& simpleCommands() {
     CONSTRUCT_ON_FIRST_USE(
-        absl::flat_hash_set<std::string>, "append", "bitcount", "bitfield", "bitpos", "decr",
-        "decrby", "dump", "expire", "expireat", "geoadd", "geodist", "geohash", "geopos",
-        "georadius_ro", "georadiusbymember_ro", "get", "getbit", "getdel", "getrange", "getset",
-        "hdel", "hexists", "hget", "hgetall", "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget",
-        "hmset", "hscan", "hset", "hsetnx", "hstrlen", "hvals", "incr", "incrby", "incrbyfloat",
-        "lindex", "linsert", "llen", "lmove", "lpop", "lpush", "lpushx", "lrange", "lrem", "lset",
-        "ltrim", "persist", "pexpire", "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "restore",
-        "rpop", "rpush", "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange",
-        "sismember", "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type",
-        "watch", "zadd", "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange",
-        "zrangebylex", "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank",
-        "zremrangebyscore", "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan",
-        "zscore");
+        absl::flat_hash_set<std::string>, "append", "bf.add", "bf.card", "bf.exists", "bf.info",
+        "bf.insert", "bf.loadchunk", "bf.madd", "bf.mexists", "bf.reserve", "bf.scandump",
+        "bitcount", "bitfield", "bitpos", "decr", "decrby", "dump", "expire", "expireat", "geoadd",
+        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "get", "getbit",
+        "getdel", "getrange", "getset", "hdel", "hexists", "hget", "hgetall", "hincrby",
+        "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx", "hstrlen",
+        "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop",
+        "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
+        "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush", "rpushx",
+        "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
+        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
+        "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
+        "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
+        "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
+        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+  }
+
+  /**
+   * @return multi-key commands
+   */
+  static const absl::flat_hash_set<std::string>& multiKeyCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "del", "mget", "mset", "touch",
+                           "unlink");
   }
 
   /**
@@ -53,13 +63,19 @@ struct SupportedCommands {
    * @return commands which handle Redis transactions.
    */
   static const absl::flat_hash_set<std::string>& transactionCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard", "watch",
+                           "unwatch");
   }
 
   /**
    * @return auth command
    */
   static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
+
+  /**
+   * @return echo command
+   */
+  static const std::string& echo() { CONSTRUCT_ON_FIRST_USE(std::string, "echo"); }
 
   /**
    * @return mget command
@@ -70,6 +86,11 @@ struct SupportedCommands {
    * @return mset command
    */
   static const std::string& mset() { CONSTRUCT_ON_FIRST_USE(std::string, "mset"); }
+
+  /**
+   * @return keys command
+   */
+  static const std::string& keys() { CONSTRUCT_ON_FIRST_USE(std::string, "keys"); }
 
   /**
    * @return ping command
@@ -85,6 +106,11 @@ struct SupportedCommands {
    * @return quit command
    */
   static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
+
+  /**
+   * @return select command
+   */
+  static const std::string& select() { CONSTRUCT_ON_FIRST_USE(std::string, "select"); }
 
   /**
    * @return commands which alters the state of redis
@@ -104,6 +130,8 @@ struct SupportedCommands {
   static bool isReadCommand(const std::string& command) {
     return !writeCommands().contains(command);
   }
+
+  static bool isSupportedCommand(const std::string& command);
 };
 
 } // namespace Redis

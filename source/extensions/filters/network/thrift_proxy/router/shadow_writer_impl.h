@@ -9,7 +9,7 @@
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
@@ -46,10 +46,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     decoder_->onData(upstream_buffer_, underflow);
     return underflow;
   }
-  MessageMetadataSharedPtr& responseMetadata() {
-    ASSERT(metadata_ != nullptr);
-    return metadata_;
-  }
+  MessageMetadataSharedPtr& responseMetadata() { return metadata_; }
   bool responseSuccess() { return success_.value_or(false); }
 
   // ProtocolConverter

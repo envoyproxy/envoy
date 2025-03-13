@@ -9,6 +9,7 @@ namespace HttpFilters {
 namespace BasicAuth {
 
 using envoy::extensions::filters::http::basic_auth::v3::BasicAuth;
+using envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute;
 
 namespace {
 
@@ -63,13 +64,24 @@ UserMap readHtpasswd(const std::string& htpasswd) {
 Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
     const BasicAuth& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
-  UserMap users = readHtpasswd(
-      Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api()));
-  FilterConfigConstSharedPtr config =
-      std::make_unique<FilterConfig>(std::move(users), stats_prefix, context.scope());
+  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(proto_config.users(), false, context.serverFactoryContext().api()),
+      std::string));
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), proto_config.forward_username_header(),
+      proto_config.authentication_header(), stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
+    const BasicAuthPerRoute& proto_config, Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor&) {
+  UserMap users = readHtpasswd(THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(proto_config.users(), true, context.api()), std::string));
+  return std::make_unique<FilterConfigPerRoute>(std::move(users));
 }
 
 REGISTER_FACTORY(BasicAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

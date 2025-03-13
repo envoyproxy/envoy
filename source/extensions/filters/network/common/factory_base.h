@@ -16,16 +16,8 @@ namespace Common {
  * boilerplate.
  */
 template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
-class FactoryBase : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class FactoryCommon : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::FactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, context.messageValidationVisitor()),
-                                             context);
-  }
-
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ConfigProto>();
   }
@@ -52,7 +44,7 @@ public:
   }
 
 protected:
-  FactoryBase(const std::string& name, bool is_terminal = false)
+  FactoryCommon(const std::string& name, bool is_terminal = false)
       : name_(name), is_terminal_filter_(is_terminal) {}
 
 private:
@@ -60,19 +52,62 @@ private:
                                             Server::Configuration::ServerFactoryContext&) {
     return is_terminal_filter_;
   }
-  virtual Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    Server::Configuration::FactoryContext& context) PURE;
 
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  virtual absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsTyped(const ProtocolOptionsProto&,
                              Server::Configuration::ProtocolOptionsFactoryContext&) {
-    ExceptionUtil::throwEnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("filter {} does not support protocol options", name_));
   }
 
   const std::string name_;
   const bool is_terminal_filter_;
+};
+
+/**
+ * Common base class for network filter factory registrations. Removes a substantial amount of
+ * boilerplate.
+ */
+template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
+class FactoryBase : public FactoryCommon<ConfigProto, ProtocolOptionsProto> {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, context.messageValidationVisitor()),
+                                             context);
+  }
+
+protected:
+  FactoryBase(const std::string& name, bool is_terminal = false)
+      : FactoryCommon<ConfigProto, ProtocolOptionsProto>(name, is_terminal) {}
+
+private:
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                    Server::Configuration::FactoryContext& context) PURE;
+};
+
+template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
+class ExceptionFreeFactoryBase : public FactoryCommon<ConfigProto, ProtocolOptionsProto> {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                                 proto_config, context.messageValidationVisitor()),
+                                             context);
+  }
+
+protected:
+  ExceptionFreeFactoryBase(const std::string& name, bool is_terminal = false)
+      : FactoryCommon<ConfigProto, ProtocolOptionsProto>(name, is_terminal) {}
+
+private:
+  virtual absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
+                                    Server::Configuration::FactoryContext& context) PURE;
 };
 
 } // namespace Common

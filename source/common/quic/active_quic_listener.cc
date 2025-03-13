@@ -1,5 +1,6 @@
 #include "source/common/quic/active_quic_listener.h"
 
+#include <utility>
 #include <vector>
 
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
@@ -12,6 +13,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
@@ -34,14 +36,18 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-    QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector)
+    QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    bool reject_new_connections)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
               dispatcher, listen_socket, *this, dispatcher.timeSource(),
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
+      dispatcher_(dispatcher),
+      version_manager_(reject_new_connections ? quic::ParsedQuicVersionVector()
+                                              : quic::CurrentSupportedHttp3Versions()),
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory),
@@ -65,11 +71,30 @@ ActiveQuicListener::ActiveQuicListener(
                                    quic::QuicCryptoServerConfig::ConfigOptions());
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
+  // Set the socket to report incoming ECN.
+  if (udp_listener_->localAddress() == nullptr || udp_listener_->localAddress()->ip() == nullptr) {
+    IS_ENVOY_BUG("UDP Listener does not have local IP address");
+  } else {
+    int optval = 1;
+    socklen_t optlen = sizeof(optval);
+    if (udp_listener_->localAddress()->ip()->ipv6() != nullptr) {
+      listen_socket_.setSocketOption(IPPROTO_IPV6, IPV6_RECVTCLASS, &optval, optlen);
+#ifndef __APPLE__
+      // Linux dual-stack sockets require setting IP_RECVTOS separately. Apple
+      // sockets will return an error.
+      if (!udp_listener_->localAddress()->ip()->ipv6()->v6only()) {
+        listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
+      }
+#endif // __APPLE__
+    } else {
+      listen_socket_.setSocketOption(IPPROTO_IP, IP_RECVTOS, &optval, optlen);
+    }
+  }
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_);
+      *connection_id_generator_, debug_visitor_factory);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -86,6 +111,22 @@ ActiveQuicListener::ActiveQuicListener(
     udp_packet_writer.release();
   } else {
     quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
+  }
+
+  if (listener_config.udpListenerConfig()) {
+    const auto& save_cmsg_configs =
+        listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config();
+    if (!save_cmsg_configs.empty()) {
+      // QUIC only supports a single cmsg config.
+      const envoy::config::core::v3::SocketCmsgHeaders save_cmsg_config = save_cmsg_configs.at(0);
+      if (save_cmsg_config.has_level()) {
+        udp_save_cmsg_config_.level = save_cmsg_config.level().value();
+      }
+      if (save_cmsg_config.has_type()) {
+        udp_save_cmsg_config_.type = save_cmsg_config.type().value();
+      }
+      udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
+    }
   }
 }
 
@@ -116,8 +157,10 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
   // TODO(danzh): pass in TTL and UDP header.
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
-                                  /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false);
+                                  reinterpret_cast<char*>(data.saved_cmsg_.frontSlice().mem_),
+                                  data.saved_cmsg_.frontSlice().len_,
+                                  /*owns_header_buffer*/ false,
+                                  getQuicEcnCodepointFromTosByte(data.tos_));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
       non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
@@ -180,6 +223,8 @@ void ActiveQuicListener::shutdownListener(const Network::ExtraShutdownListenerOp
 
 uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const {
   if (kernel_worker_routing_) {
+    ASSERT(select_connection_id_worker_(*data.buffer_, worker_index_) == worker_index_);
+
     // The kernel has already routed the packet correctly. Make it stay on the current worker.
     return worker_index_;
   }
@@ -216,12 +261,12 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
-    ProcessContextOptRef context)
+    Server::Configuration::ListenerFactoryContext& context)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
-      context_(context) {
+      context_(context), reject_new_connections_(config.reject_new_connections()) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -265,6 +310,17 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   proof_source_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicProofSourceFactoryInterface>(
       proof_source_config);
 
+  // Initialize connection debug visitor factory if one is configured.
+  if (config.has_connection_debug_visitor_config()) {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface>(
+            config.connection_debug_visitor_config());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config.connection_debug_visitor_config().typed_config(),
+        context_.messageValidationVisitor(), factory);
+    connection_debug_visitor_factory_ = factory.createFactory(*message, context_);
+  }
+
   // Initialize connection ID generator factory.
   envoy::config::core::v3::TypedExtensionConfig cid_generator_config;
   if (!config.has_connection_id_generator_config()) {
@@ -280,7 +336,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           cid_generator_config);
   quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
-                                                 cid_generator_config_factory));
+                                                 cid_generator_config_factory),
+      validation_visitor, context_);
 
   if (config.has_server_preferred_address_config()) {
     const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
@@ -293,29 +350,29 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
             *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
                                                        validation_visitor,
                                                        server_preferred_address_config_factory),
-            validation_visitor, context_);
+            validation_visitor, context_.serverFactoryContext());
   }
 
   worker_selector_ =
       quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
-      options_->push_back(
-          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_));
+      Network::Socket::OptionConstSharedPtr opt =
+          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_);
+      if (opt != nullptr) {
+        options_->push_back(opt);
+        kernel_worker_routing_ = true;
+      } else {
+        ENVOY_LOG(warn,
+                  "Efficient routing of QUIC packets to the correct worker is not supported or "
+                  "not implemented by Envoy on this platform or by the configured "
+                  "connection_id_generator. QUIC performance may be degraded.");
+      }
     } else {
       ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
+      kernel_worker_routing_ = true;
     }
-
-    kernel_worker_routing_ = true;
   };
-
-#else
-  if (concurrency_ != 1) {
-    ENVOY_LOG(warn, "Efficient routing of QUIC packets to the correct worker is not supported or "
-                    "not implemented by Envoy on this platform. QUIC performance may be degraded.");
-  }
-#endif
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
@@ -324,22 +381,37 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
     Network::ListenerConfig& config) {
   ASSERT(crypto_server_stream_factory_.has_value());
   if (server_preferred_address_config_ != nullptr) {
-    std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> addresses =
+    const EnvoyQuicServerPreferredAddressConfig::Addresses addresses =
         server_preferred_address_config_->getServerPreferredAddresses(
             listen_socket_ptr->connectionInfoProvider().localAddress());
-    quic::QuicSocketAddress v4_address = addresses.first;
-    if (v4_address.IsInitialized()) {
-      ENVOY_BUG(v4_address.host().address_family() == quiche::IpAddressFamily::IP_V4,
+    if (addresses.ipv4_.IsInitialized()) {
+      ENVOY_BUG(addresses.ipv4_.host().address_family() == quiche::IpAddressFamily::IP_V4,
                 absl::StrCat("Configured IPv4 server's preferred address isn't a v4 address:",
-                             v4_address.ToString()));
-      quic_config_.SetIPv4AlternateServerAddressToSend(v4_address);
+                             addresses.ipv4_.ToString()));
+      if (addresses.dnat_ipv4_.IsInitialized()) {
+        ENVOY_BUG(
+            addresses.dnat_ipv4_.host().address_family() == quiche::IpAddressFamily::IP_V4,
+            absl::StrCat("Configured IPv4 server's preferred DNAT address isn't a v4 address:",
+                         addresses.dnat_ipv4_.ToString()));
+        quic_config_.SetIPv4AlternateServerAddressForDNat(addresses.ipv4_, addresses.dnat_ipv4_);
+      } else {
+        quic_config_.SetIPv4AlternateServerAddressToSend(addresses.ipv4_);
+      }
     }
-    quic::QuicSocketAddress v6_address = addresses.second;
-    if (v6_address.IsInitialized()) {
-      ENVOY_BUG(v6_address.host().address_family() == quiche::IpAddressFamily::IP_V6,
+
+    if (addresses.ipv6_.IsInitialized()) {
+      ENVOY_BUG(addresses.ipv6_.host().address_family() == quiche::IpAddressFamily::IP_V6,
                 absl::StrCat("Configured IPv6 server's preferred address isn't a v6 address:",
-                             v4_address.ToString()));
-      quic_config_.SetIPv6AlternateServerAddressToSend(v6_address);
+                             addresses.ipv6_.ToString()));
+      if (addresses.dnat_ipv6_.IsInitialized()) {
+        ENVOY_BUG(
+            addresses.dnat_ipv6_.host().address_family() == quiche::IpAddressFamily::IP_V6,
+            absl::StrCat("Configured IPv6 server's preferred DNAT address isn't a v6 address:",
+                         addresses.dnat_ipv6_.ToString()));
+        quic_config_.SetIPv6AlternateServerAddressForDNat(addresses.ipv6_, addresses.dnat_ipv6_);
+      } else {
+        quic_config_.SetIPv6AlternateServerAddressToSend(addresses.ipv6_);
+      }
     }
   }
 
@@ -365,7 +437,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
-      std::move(cid_generator), worker_selector_);
+      std::move(cid_generator), worker_selector_,
+      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
 }
 
 } // namespace Quic

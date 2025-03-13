@@ -70,29 +70,33 @@ absl::flat_hash_map<int32_t, MonotonicTime>& KafkaMetricsFacadeImpl::getRequestA
 }
 
 KafkaBrokerFilter::KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_source,
-                                     const BrokerFilterConfig& filter_config)
+                                     const BrokerFilterConfigSharedPtr& filter_config)
     : KafkaBrokerFilter{filter_config, std::make_shared<KafkaMetricsFacadeImpl>(
-                                           scope, time_source, filter_config.stat_prefix())} {};
+                                           scope, time_source, filter_config->statPrefix())} {};
 
-KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfig& filter_config,
+KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfigSharedPtr& filter_config,
                                      const KafkaMetricsFacadeSharedPtr& metrics)
-    : metrics_{metrics}, response_rewriter_{createRewriter(filter_config)},
-      response_decoder_{new ResponseDecoder({metrics, response_rewriter_})},
-      request_decoder_{
-          new RequestDecoder({std::make_shared<Forwarder>(*response_decoder_), metrics})} {};
+    : metrics_{metrics}, request_handler_{new RequestHandlerImpl(filter_config)},
+      response_rewriter_{createRewriter(filter_config)}, response_decoder_{new ResponseDecoder(
+                                                             {metrics, response_rewriter_})},
+      request_decoder_{new RequestDecoder(
+          {std::make_shared<Forwarder>(*response_decoder_), metrics, request_handler_})} {};
 
 KafkaBrokerFilter::KafkaBrokerFilter(KafkaMetricsFacadeSharedPtr metrics,
+                                     RequestHandlerSharedPtr request_handler,
                                      ResponseRewriterSharedPtr response_rewriter,
                                      ResponseDecoderSharedPtr response_decoder,
                                      RequestDecoderSharedPtr request_decoder)
-    : metrics_{metrics}, response_rewriter_{response_rewriter}, response_decoder_{response_decoder},
-      request_decoder_{request_decoder} {};
+    : metrics_{metrics}, request_handler_{request_handler}, response_rewriter_{response_rewriter},
+      response_decoder_{response_decoder}, request_decoder_{request_decoder} {};
 
 Network::FilterStatus KafkaBrokerFilter::onNewConnection() {
   return Network::FilterStatus::Continue;
 }
 
-void KafkaBrokerFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&) {}
+void KafkaBrokerFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  request_handler_->setReadFilterCallbacks(callbacks);
+}
 
 Network::FilterStatus KafkaBrokerFilter::onData(Buffer::Instance& data, bool) {
   ENVOY_LOG(trace, "data from Kafka client [{} request bytes]", data.length());

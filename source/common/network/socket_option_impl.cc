@@ -61,6 +61,8 @@ SocketOptionImpl::getOptionDetails(const Socket&,
 
 bool SocketOptionImpl::isSupported() const { return optname_.hasValue(); }
 
+absl::optional<Socket::Type> SocketOptionImpl::socketType() const { return socket_type_; }
+
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
                                                         const Network::SocketOptionName& optname,
                                                         const void* value, size_t size) {

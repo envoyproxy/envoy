@@ -8,6 +8,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -50,17 +51,26 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Protobuf);
 
+  // User-Agent header follows the OTLP specification:
+  // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.30.0/specification/protocol/exporter.md#user-agent
+  message->headers().setReferenceUserAgent(OtlpUtils::getOtlpUserAgentHeader());
+
   // Add all custom headers to the request.
   for (const auto& header_pair : parsed_headers_to_add_) {
     message->headers().setReference(header_pair.first, header_pair.second);
   }
   message->body().add(request_body);
 
-  const auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
-      DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())));
+  const auto options =
+      Http::AsyncClient::RequestOptions()
+          .setTimeout(std::chrono::milliseconds(
+              DurationUtil::durationToMilliseconds(http_service_.http_uri().timeout())))
+          .setDiscardResponseBody(true);
 
   Http::AsyncClient::Request* in_flight_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
+
+  OpenTelemetryTraceExporter::logExportedSpans(request);
 
   if (in_flight_request == nullptr) {
     return false;

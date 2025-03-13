@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -13,6 +13,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/union_string.h"
 #include "envoy/http/header_formatter.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -743,6 +744,8 @@ class RequestTrailerMap
     : public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+using RequestTrailerMapSharedPtr = std::shared_ptr<RequestTrailerMap>;
+using RequestTrailerMapConstSharedPtr = std::shared_ptr<const RequestTrailerMap>;
 using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
 using RequestTrailerMapOptConstRef = OptRef<const RequestTrailerMap>;
 
@@ -780,6 +783,14 @@ using ResponseTrailerMapSharedPtr = std::shared_ptr<ResponseTrailerMap>;
 using ResponseTrailerMapConstSharedPtr = std::shared_ptr<const ResponseTrailerMap>;
 using ResponseTrailerMapOptRef = OptRef<ResponseTrailerMap>;
 using ResponseTrailerMapOptConstRef = OptRef<const ResponseTrailerMap>;
+
+/**
+ * Base class for both tunnel response headers and trailers.
+ */
+class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
+public:
+  virtual const HeaderMap& value() const PURE;
+};
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.

@@ -11,7 +11,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/upstream/thread_aware_lb_impl.h"
+#include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -100,7 +100,7 @@ private:
          bool use_hostname_for_hashing, RingHashLoadBalancerStats& stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-    HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+    HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
     std::vector<RingEntry> ring_;
 

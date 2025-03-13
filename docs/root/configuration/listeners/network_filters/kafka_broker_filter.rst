@@ -5,8 +5,8 @@ Kafka Broker filter
 
 The Apache Kafka broker filter decodes the client protocol for
 `Apache Kafka <https://kafka.apache.org/>`_, both the requests and responses in the payload.
-The message versions in `Kafka 3.5.1 <http://kafka.apache.org/35/protocol.html#protocol_api_keys>`_
-are supported (apart from ConsumerGroupHeartbeat).
+The message versions in `Kafka 3.8.0 <http://kafka.apache.org/38/protocol.html#protocol_api_keys>`_
+are supported.
 
 By default the filter attempts not to influence the communication between client and brokers, so
 the messages that could not be decoded (due to Kafka client or broker running a newer version than
@@ -178,6 +178,36 @@ The responses that can be mutated are:
 * describe cluster.
 
 .. _config_network_filters_kafka_broker_debugging:
+
+Filtering requests
+------------------
+
+Broker filter can be used to filter out unwanted types of requests, e.g. fetch ones or produce ones.
+Both allowlist and denylist are possible.
+
+For example to allow only basic producer acces we can limit the access to the related requests:
+
+.. code-block:: yaml
+
+  - name: envoy.filters.network.kafka_broker
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+      stat_prefix: prefix
+      api_keys_allowed:
+      - 0 # Produce
+      - 3 # Metadata
+      - 18 # API versions
+
+To disable consumers' read capability, we can just disable Fetch requests:
+
+.. code-block:: yaml
+
+  - name: envoy.filters.network.kafka_broker
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+      stat_prefix: prefix
+      api_keys_denied:
+      - 1 # Fetch
 
 Debugging
 ---------

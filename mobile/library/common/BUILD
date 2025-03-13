@@ -24,17 +24,21 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":engine_common_lib",
+        ":engine_types_lib",
+        ":mobile_process_wide_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/data:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/logger:logger_delegate_lib",
         "//library/common/network:connectivity_manager_lib",
+        "//library/common/network:proxy_api_lib",
         "//library/common/stats:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/server:lifecycle_notifier_interface",
         "@envoy//envoy/stats:stats_interface",
+        "@envoy//source/common/common:thread_impl_lib_posix",
+        "@envoy//source/common/common:utility_lib",
         "@envoy//source/common/runtime:runtime_lib",
         "@envoy_build_config//:extension_registry",
     ],
@@ -70,5 +74,37 @@ envoy_cc_library(
     deps = [
         ":engine_common_lib",
         "@envoy//source/exe:envoy_stripped_main_base_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "engine_types_lib",
+    hdrs = [
+        "engine_types.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/functional:any_invocable",
+        "@com_google_absl//absl/strings",
+        "@envoy//source/common/buffer:buffer_lib",
+        "@envoy//source/common/common:base_logger_lib",
+        "@envoy//source/common/http:header_map_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "mobile_process_wide_lib",
+    srcs = [
+        "mobile_process_wide.cc",
+    ],
+    hdrs = [
+        "mobile_process_wide.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "@envoy//source/common/common:minimal_logger_lib",
+        "@envoy//source/common/common:thread_lib",
+        "@envoy//source/server:options_base",
     ],
 )

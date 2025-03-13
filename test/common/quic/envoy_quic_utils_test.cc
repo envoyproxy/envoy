@@ -2,6 +2,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -44,7 +45,7 @@ public:
 };
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -76,7 +77,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
@@ -100,7 +100,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers2;
-  quic_headers2.OnHeaderBlockStart();
   quic_headers2.OnHeader(":authority", "www.google.com");
   quic_headers2.OnHeader(":path", "/index.hml");
   quic_headers2.OnHeader(":scheme", "https");
@@ -119,7 +118,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -140,7 +139,7 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
 }
 
 TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -159,7 +158,7 @@ TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
 }
 
 TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -191,6 +190,8 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   EXPECT_EQ(25165824, quic_config.GetInitialSessionFlowControlWindowToSend());
   EXPECT_TRUE(quic_config.SendConnectionOptions().empty());
   EXPECT_TRUE(quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).empty());
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(quic::kMaximumIdleTimeoutSecs),
+            quic_config.IdleNetworkTimeout());
 
   // Test converting values.
   config.mutable_max_concurrent_streams()->set_value(2);
@@ -198,10 +199,12 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   config.mutable_initial_connection_window_size()->set_value(50);
   config.set_connection_options("5RTO,ACKD");
   config.set_client_connection_options("6RTO,AKD4");
+  config.mutable_idle_network_timeout()->set_seconds(30);
   convertQuicConfig(config, quic_config);
   EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
   EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
   EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(30), quic_config.IdleNetworkTimeout());
   EXPECT_EQ(2, quic_config.SendConnectionOptions().size());
   EXPECT_EQ(2, quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).size());
   std::string quic_copts = "";
@@ -221,7 +224,6 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
@@ -242,7 +244,7 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   EXPECT_EQ(response_header->maxHeadersCount(), 100);
   EXPECT_EQ(response_header->maxHeadersKb(), 60);
 
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -258,6 +260,129 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
       headers_block, 60, 100, validator, details, rst);
   EXPECT_EQ(response_trailer->maxHeadersCount(), 100);
   EXPECT_EQ(response_trailer->maxHeadersKb(), 60);
+}
+
+TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {
+  EXPECT_ENVOY_BUG(envoyResetReasonToQuicRstError(Http::StreamResetReason::Overflow),
+                   "Resource overflow ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteRefusedStreamReset),
+      "Remote reset ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::Http1PrematureUpstreamHalfClose),
+      "not applicable");
+}
+
+TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
+  EXPECT_EQ(quicRstErrorToEnvoyLocalResetReason(quic::QUIC_STREAM_NO_ERROR),
+            Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECTION_ERROR),
+            Http::StreamResetReason::ConnectionTermination);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECT_ERROR),
+            Http::StreamResetReason::ConnectError);
+}
+
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321, nullptr);
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr no_local_addr = nullptr;
+  connection_socket = createConnectionSocket(peer_addr, no_local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("127.0.0.1", no_local_addr->ip()->addressAsString());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(connection_socket->getSocketOption(IPPROTO_IP, IP_DONTFRAG, &value, &val_length)
+                           .return_value_ == 0,
+                   "Failed getsockopt IP_DONTFRAG");
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IP_MTU_DISCOVER");
+    EXPECT_EQ(value, IP_PMTUDISC_DO);
+#endif
+  }
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr local_addr_v6 =
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only*/ true);
+  Network::Address::InstanceConstSharedPtr peer_addr_v6 =
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr, /*v6only*/ false);
+  connection_socket = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_TRUE(local_addr_v6->ip()->ipv6()->v6only());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_DONTFRAG, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_DONTFRAG");
+    ;
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_MTU_DISCOVER");
+    EXPECT_EQ(value, IPV6_PMTUDISC_DO);
+    // The v4 socket option is not applied to v6-only socket.
+    value = 0;
+    val_length = sizeof(value);
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IP_MTU_DISCOVER");
+    EXPECT_NE(value, IP_PMTUDISC_DO);
+#endif
+  }
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr no_local_addr_v6 = nullptr;
+  connection_socket = createConnectionSocket(peer_addr_v6, no_local_addr_v6, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("::1", no_local_addr_v6->ip()->addressAsString());
+  EXPECT_FALSE(no_local_addr_v6->ip()->ipv6()->v6only());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_DONTFRAG, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_DONTFRAG");
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_MTU_DISCOVER");
+    EXPECT_EQ(value, IPV6_PMTUDISC_DO);
+    // The v4 socket option is also applied to dual stack socket.
+    value = 0;
+    val_length = sizeof(value);
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IP_MTU_DISCOVER");
+    EXPECT_EQ(value, IP_PMTUDISC_DO);
+#endif
+  }
+  connection_socket->close();
 }
 
 } // namespace Quic

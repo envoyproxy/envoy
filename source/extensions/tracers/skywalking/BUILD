@@ -15,14 +15,12 @@ envoy_cc_library(
     name = "trace_segment_reporter_lib",
     srcs = ["trace_segment_reporter.cc"],
     hdrs = ["trace_segment_reporter.h"],
-    external_deps = [
-        "cpp2sky",
-    ],
     deps = [
         ":skywalking_stats_lib",
         "//envoy/grpc:async_client_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/grpc:async_client_lib",
+        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -37,9 +35,6 @@ envoy_cc_library(
         "skywalking_tracer_impl.h",
         "tracer.h",
     ],
-    external_deps = [
-        "cpp2sky",
-    ],
     deps = [
         ":trace_segment_reporter_lib",
         "//envoy/common:time_interface",
@@ -49,6 +44,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

@@ -5,6 +5,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
@@ -21,8 +22,10 @@ public:
   MatcherConstPtr createMatcher(const char* config) {
     RequirementRule rule;
     TestUtility::loadFromYaml(config, rule);
-    return Matcher::create(rule);
+    return Matcher::create(rule, context_);
   }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(MatcherTest, TestMatchPrefix) {
@@ -248,6 +251,30 @@ TEST_F(MatcherTest, TestMatchPathSeparatedPrefixBaseCondition) {
   EXPECT_FALSE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/rest/api"}, {"cookies", ""}};
   EXPECT_FALSE(matcher->matches(headers));
+}
+
+TEST_F(MatcherTest, TestMatchPathMatchPolicy) {
+  const char config[] = R"(match:
+  path_match_policy:
+    name: envoy.path.match.uri_template.uri_template_matcher
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+      path_template: "/bar/*/foo"
+  )";
+  MatcherConstPtr matcher = createMatcher(config);
+  auto headers = TestRequestHeaderMapImpl{{":path", "/bar/test/foo"}};
+  EXPECT_TRUE(matcher->matches(headers));
+}
+
+TEST_F(MatcherTest, TestMatchPathMatchPolicyError) {
+  const char config[] = R"(match:
+  path_match_policy:
+    name: envoy.path.match.uri_template.uri_template_matcher
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+      wrong_key: "/bar/*/foo"
+  )";
+  EXPECT_THROW_WITH_REGEX(createMatcher(config), EnvoyException, "INVALID_ARGUMENT")
 }
 
 } // namespace

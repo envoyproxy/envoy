@@ -22,8 +22,8 @@ public:
         connectivity_manager_(std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_)) {
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
-    ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_GENERIC);
-    ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WLAN);
+    ConnectivityManagerImpl::setPreferredNetwork(1);
+    ConnectivityManagerImpl::setPreferredNetwork(2);
   }
 
   std::shared_ptr<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager>>
@@ -35,7 +35,7 @@ public:
 
 TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WWAN);
+  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(4);
   EXPECT_NE(original_key, new_key);
   EXPECT_EQ(new_key, connectivity_manager_->getConfigurationKey());
 }
@@ -43,7 +43,7 @@ TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigur
 TEST_F(ConnectivityManagerTest,
        DISABLED_SetPreferredNetworkWithUnchangedNetworkReturnsStaleConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WLAN);
+  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(2);
   EXPECT_NE(original_key, stale_key);
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
@@ -81,15 +81,15 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefre
   connectivity_manager_->onDnsResolutionComplete(
       "cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
   connectivity_manager_->onDnsResolutionComplete(
       "not-cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
   connectivity_manager_->onDnsResolutionComplete(
       "not-cached2.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
 }
 
 TEST_F(ConnectivityManagerTest, WhenDrainPostDnsNotEnabledDoesntDrainPostDnsRefresh) {
@@ -102,90 +102,90 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsNotEnabledDoesntDrainPostDnsRefr
   EXPECT_CALL(cm_, drainConnections(_)).Times(0);
   connectivity_manager_->onDnsResolutionComplete(
       "example.com", std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
 }
 
 TEST_F(ConnectivityManagerTest,
        ReportNetworkUsageDoesntAlterNetworkConfigurationWhenBoundInterfacesAreDisabled) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(false);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_EQ(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest,
        ReportNetworkUsageTriggersOverrideAfterFirstFaultAfterNetworkUpdate) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisablesOverrideAfterFirstFaultAfterOverride) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
   configuration_key = connectivity_manager_->getConfigurationKey();
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisablesOverrideAfterThirdFaultAfterSuccess) {
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, false /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_EQ(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(configuration_key, true /* network_fault */);
 
   EXPECT_NE(configuration_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisregardsCallsWithStaleConfigurationKey) {
   envoy_netconf_t stale_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t current_key = ConnectivityManagerImpl::setPreferredNetwork(ENVOY_NET_WWAN);
+  envoy_netconf_t current_key = ConnectivityManagerImpl::setPreferredNetwork(4);
   EXPECT_NE(stale_key, current_key);
 
   connectivity_manager_->setInterfaceBindingEnabled(true);
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(stale_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(stale_key, true /* network_fault */);
   connectivity_manager_->reportNetworkUsage(stale_key, true /* network_fault */);
 
   EXPECT_EQ(current_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::DefaultPreferredNetworkMode, connectivity_manager_->getSocketMode());
 
   connectivity_manager_->reportNetworkUsage(stale_key, false /* network_fault */);
   connectivity_manager_->reportNetworkUsage(current_key, true /* network_fault */);
 
   EXPECT_NE(current_key, connectivity_manager_->getConfigurationKey());
-  EXPECT_EQ(AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
+  EXPECT_EQ(SocketMode::AlternateBoundInterfaceMode, connectivity_manager_->getSocketMode());
 }
 
 TEST_F(ConnectivityManagerTest, EnumerateInterfacesFiltersByFlags) {
@@ -240,6 +240,24 @@ TEST_F(ConnectivityManagerTest, IgnoresDuplicatedProxySettingsUpdates) {
   const auto proxy_settings2 = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
   connectivity_manager_->setProxySettings(proxy_settings2);
   EXPECT_EQ(proxy_settings1, connectivity_manager_->getProxySettings());
+}
+
+TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_network_type_socket_option", true);
+  auto options1 = std::make_shared<Socket::Options>();
+  connectivity_manager_->addUpstreamSocketOptions(options1);
+  std::vector<uint8_t> hash1;
+  for (const auto& option : *options1) {
+    option->hashKey(hash1);
+  }
+  ConnectivityManagerImpl::setPreferredNetwork(64);
+  auto options2 = std::make_shared<Socket::Options>();
+  connectivity_manager_->addUpstreamSocketOptions(options2);
+  std::vector<uint8_t> hash2;
+  for (const auto& option : *options2) {
+    option->hashKey(hash2);
+  }
+  EXPECT_NE(hash1, hash2);
 }
 
 } // namespace Network

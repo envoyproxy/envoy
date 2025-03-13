@@ -9,12 +9,13 @@
 #include "envoy/stream_info/uint32_accessor.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
+#include "source/common/tls/utility.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,6 +47,15 @@ public:
   }
 };
 
+bool isProxying(StreamInfo::StreamInfo* stream_info) {
+  // Should not hit this call unless the flag is enabled.
+  ASSERT(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
+  return stream_info && stream_info->filterState() &&
+         stream_info->filterState()->hasData<Network::Http11ProxyInfoFilterState>(
+             Network::Http11ProxyInfoFilterState::key());
+}
+
 } // namespace
 
 REGISTER_FACTORY(DynamicHostObjectFactory, StreamInfo::FilterState::ObjectFactory);
@@ -56,8 +66,9 @@ Cluster::Cluster(
     Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Upstream::ClusterFactoryContext& context,
-    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager)
-    : Upstream::BaseDynamicClusterImpl(cluster, context),
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+    absl::Status& creation_status)
+    : Upstream::BaseDynamicClusterImpl(cluster, context, creation_status),
       dns_cache_manager_(std::move(cache_manager)), dns_cache_(std::move(cache)),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)),
       local_info_(context.serverFactoryContext().localInfo()),
@@ -92,16 +103,25 @@ Cluster::~Cluster() {
     auto cluster_name = it->first;
     ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
     cluster_map_.erase(it++);
-    cm_.removeCluster(cluster_name);
+    cm_.removeCluster(cluster_name,
+                      Runtime::runtimeFeatureEnabled(
+                          "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
   }
 }
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
+  std::unique_ptr<Upstream::HostVector> hosts_added;
   dns_cache_->iterateHostMap(
       [&](absl::string_view host, const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
-        addOrUpdateHost(host, info);
+        absl::Status status = addOrUpdateHost(host, info, hosts_added);
+        if (!status.ok()) {
+          ENVOY_LOG(warn, "Failed to add host from cache: {}", status.message());
+        }
       });
+  if (hosts_added) {
+    updatePriorityState(*hosts_added, {});
+  }
   onPreInitComplete();
 }
 
@@ -126,7 +146,9 @@ void Cluster::checkIdleSubCluster() {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
         cluster_map_.erase(it++);
-        cm_.removeCluster(cluster_name);
+        cm_.removeCluster(cluster_name,
+                          Runtime::runtimeFeatureEnabled(
+                              "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
       } else {
         ++it;
       }
@@ -179,10 +201,12 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   return std::make_pair(true, absl::make_optional(config));
 }
 
-Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
-                                                 Upstream::LoadBalancerContext* context) const {
+Upstream::HostSelectionResponse Cluster::chooseHost(absl::string_view host,
+                                                    Upstream::LoadBalancerContext* context) const {
   uint16_t default_port = 80;
-  if (info_->transportSocketMatcher().resolve(nullptr).factory_.implementsSecureTransport()) {
+  if (info_->transportSocketMatcher()
+          .resolve(nullptr, nullptr)
+          .factory_.implementsSecureTransport()) {
     default_port = 443;
   }
 
@@ -197,7 +221,7 @@ Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
   auto cluster = cm_.getThreadLocalCluster(cluster_name);
   if (cluster == nullptr) {
     ENVOY_LOG(debug, "cluster='{}' get thread local failed, too short ttl?", cluster_name);
-    return nullptr;
+    return {nullptr};
   }
 
   return cluster->loadBalancer().chooseHost(context);
@@ -231,13 +255,11 @@ bool Cluster::ClusterInfo::checkIdle() {
   return false;
 }
 
-void Cluster::addOrUpdateHost(
+absl::Status Cluster::addOrUpdateHost(
     absl::string_view host,
-    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-  Upstream::HostVector hosts_added, hosts_removed;
-  Upstream::LogicalHostSharedPtr new_host = std::make_shared<Upstream::LogicalHost>(
-      info(), std::string{host}, host_info->address(), host_info->addressList(),
-      dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr, time_source_);
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+    std::unique_ptr<Upstream::HostVector>& hosts_added) {
+  Upstream::LogicalHostSharedPtr emplaced_host;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
 
@@ -249,6 +271,7 @@ void Cluster::addOrUpdateHost(
     // future.
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
+      // If we only have an address change, we can do that swap inline without any other updates.
       // The appropriate R/W locking is in place to allow this. The details of this locking are:
       //  - Hosts are not thread local, they are global.
       //  - We take a read lock when reading the address and a write lock when changing it.
@@ -264,31 +287,48 @@ void Cluster::addOrUpdateHost(
       //                     semantics, meaning the cache would expose multiple addresses and the
       //                     cluster would create multiple logical hosts based on those addresses.
       //                     We will leave this is a follow up depending on need.
+      ASSERT(host_info == host_map_it->second.shared_host_info_);
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
-
-      // remove the old host
-      hosts_removed.emplace_back(host_map_it->second.logical_host_);
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_.erase(host_map_it);
-      host_map_.try_emplace(host, host_info, new_host);
-
-    } else {
-      ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
-      host_map_.try_emplace(host, host_info, new_host);
+      host_map_it->second.logical_host_->setNewAddresses(
+          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
+      return absl::OkStatus();
     }
-    hosts_added.emplace_back(new_host);
+
+    ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
+    auto host_or_error = Upstream::LogicalHost::create(
+        info(), std::string{host}, host_info->address(), host_info->addressList(),
+        dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr, time_source_);
+    RETURN_IF_NOT_OK_REF(host_or_error.status());
+
+    emplaced_host =
+        host_map_
+            .try_emplace(host, host_info,
+                         std::shared_ptr<Upstream::LogicalHost>(host_or_error->release()))
+            .first->second.logical_host_;
   }
 
-  ASSERT(hosts_added.size() > 0);
-  updatePriorityState(hosts_added, hosts_removed);
+  ASSERT(emplaced_host);
+  if (hosts_added == nullptr) {
+    hosts_added = std::make_unique<Upstream::HostVector>();
+  }
+  hosts_added->emplace_back(emplaced_host);
+  return absl::OkStatus();
 }
 
-void Cluster::onDnsHostAddOrUpdate(
+absl::Status Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
-  ENVOY_LOG(debug, "Adding/Updating host info for {}", host);
-  addOrUpdateHost(host, host_info);
+  ENVOY_LOG(debug, "Adding host info for {}", host);
+
+  std::unique_ptr<Upstream::HostVector> hosts_added;
+  RETURN_IF_NOT_OK(addOrUpdateHost(host, host_info, hosts_added));
+  if (hosts_added != nullptr) {
+    ASSERT(!hosts_added->empty());
+    updatePriorityState(*hosts_added, {});
+  }
+  return absl::OkStatus();
 }
 
 void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
@@ -320,16 +360,16 @@ void Cluster::onDnsHostRemove(const std::string& host) {
   updatePriorityState({}, hosts_removed);
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (!context) {
-    return nullptr;
+    return {nullptr};
   }
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
   if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+        context->requestStreamInfo()->filterState()->getDataReadOnly<Router::StringAccessor>(
             DynamicHostFilterStateKey);
   }
 
@@ -349,12 +389,12 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   // stream metadata, or configuration (which is then added as stream metadata).
   const bool is_secure = cluster_.info()
                              ->transportSocketMatcher()
-                             .resolve(nullptr)
+                             .resolve(nullptr, nullptr)
                              .factory_.implementsSecureTransport();
   uint32_t port = is_secure ? 443 : 80;
   if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+        context->requestStreamInfo()->filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
             DynamicPortFilterStateKey);
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
@@ -362,21 +402,68 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     }
   }
 
-  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
-
-  if (host.empty()) {
+  if (raw_host.empty()) {
     ENVOY_LOG(debug, "host empty");
-    return nullptr;
+    return {nullptr, "empty_host_header"};
   }
+  std::string hostname =
+      Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (cluster_.enableSubCluster()) {
-    return cluster_.chooseHost(host, context);
+    return cluster_.chooseHost(hostname, context);
+  }
+  Upstream::HostConstSharedPtr host = findHostByName(hostname);
+  bool force_refresh =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections") &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") &&
+      host && !host->used();
+  if ((host && !force_refresh) ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+    return {host};
   }
 
+  // If the host is not found, the DFP cluster cluster can now do asynchronous lookup.
+  Upstream::ResourceAutoIncDecPtr handle = cluster_.dns_cache_->canCreateDnsRequest();
+
+  // Return an immediate failure if there's too many requests already.
+  if (!handle) {
+    return {nullptr, "dns_cache_pending_requests_overflow"};
+  }
+
+  // Attempt to load the host from cache. Generally this will result in async
+  // resolution so create a DFPHostSelectionHandle to handle this.
+  std::unique_ptr<DFPHostSelectionHandle> cancelable =
+      std::make_unique<DFPHostSelectionHandle>(context, cluster_, hostname);
+  bool is_proxying = isProxying(context->requestStreamInfo());
+  auto result = cluster_.dns_cache_->loadDnsCacheEntryWithForceRefresh(raw_host, port, is_proxying,
+                                                                       force_refresh, *cancelable);
+  switch (result.status_) {
+  case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache:
+    return {nullptr, result.host_info_.has_value() ? result.host_info_.value()->details() : ""};
+  case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
+    // Here the DFP kicks off an async lookup. The DFPHostSelectionHandle will
+    // call onLoadDnsCacheComplete and onAsyncHostSelection unless the
+    // resolution is canceled by the stream.
+    cancelable->setHandle(std::move(result.handle_));
+    cancelable->setAutoDec(std::move(handle));
+    return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
+  case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
+    // In the case of overflow, return immediate failure.
+    ENVOY_LOG(debug, "host {} lookup failed due to overflow", hostname);
+    break; // fall through
+  }
+  return {nullptr, "dns_cache_overflow"};
+}
+
+Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::string& host) const {
+  return cluster_.findHostByName(host);
+}
+
+Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
   {
-    absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
-    const auto host_it = cluster_.host_map_.find(host);
-    if (host_it == cluster_.host_map_.end()) {
+    absl::ReaderMutexLock lock{&host_map_lock_};
+    const auto host_it = host_map_.find(host);
+    if (host_it == host_map_.end()) {
       ENVOY_LOG(debug, "host {} not found", host);
       return nullptr;
     } else {
@@ -477,11 +564,13 @@ ClusterFactory::createClusterWithConfig(
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr cache_manager =
       cache_manager_factory.get();
   auto dns_cache_or_error = cache_manager->getCache(proto_config.dns_cache_config());
-  RETURN_IF_STATUS_NOT_OK(dns_cache_or_error);
+  RETURN_IF_NOT_OK_REF(dns_cache_or_error.status());
 
-  auto new_cluster =
-      std::shared_ptr<Cluster>(new Cluster(cluster_config, std::move(dns_cache_or_error.value()),
-                                           proto_config, context, std::move(cache_manager)));
+  absl::Status creation_status = absl::OkStatus();
+  auto new_cluster = std::shared_ptr<Cluster>(
+      new Cluster(cluster_config, std::move(dns_cache_or_error.value()), proto_config, context,
+                  std::move(cache_manager), creation_status));
+  RETURN_IF_NOT_OK(creation_status);
 
   Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
       context.serverFactoryContext().singletonManager());

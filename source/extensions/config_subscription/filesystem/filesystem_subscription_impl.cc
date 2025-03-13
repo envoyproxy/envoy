@@ -27,18 +27,22 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
       stats_(stats), api_(api), validation_visitor_(validation_visitor) {
   if (!path_config_source.has_watched_directory()) {
     file_watcher_ = dispatcher.createFilesystemWatcher();
-    file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-      if (started_) {
-        refresh();
-      }
-    });
+    THROW_IF_NOT_OK(
+        file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+          if (started_) {
+            refresh();
+          }
+          return absl::OkStatus();
+        }));
   } else {
-    directory_watcher_ =
-        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
+    directory_watcher_ = THROW_OR_RETURN_VALUE(
+        WatchedDirectory::create(path_config_source.watched_directory(), dispatcher),
+        std::unique_ptr<WatchedDirectory>);
     directory_watcher_->setCallback([this]() {
       if (started_) {
         refresh();
       }
+      return absl::OkStatus();
     });
   }
 }
@@ -66,11 +70,13 @@ void FilesystemSubscriptionImpl::configRejected(const EnvoyException& e,
 std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
   auto owned_message = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   auto& message = *owned_message;
-  MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
+  THROW_IF_NOT_OK(MessageUtil::loadFromFile(path_, message, validation_visitor_, api_));
   *config_update = std::move(owned_message);
   const auto decoded_resources =
-      DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
-  THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info()));
+      THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(*resource_decoder_, message.resources(),
+                                                            message.version_info()),
+                            std::unique_ptr<DecodedResourcesWrapper>);
+  THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources->refvec_, message.version_info()));
   return message.version_info();
 }
 
@@ -88,12 +94,11 @@ void FilesystemSubscriptionImpl::refresh() {
               config_update->DebugString());
   }
   END_TRY
-  catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
-  }
   catch (const EnvoyException& e) {
     if (config_update != nullptr) {
       configRejected(e, config_update->DebugString());
+    } else if (absl::EndsWith(e.what(), "has unknown fields")) {
+      configRejected(e, "");
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: in {}, {}", path_, e.what());
       stats_.update_failure_.inc();
@@ -116,7 +121,7 @@ std::string
 FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
   auto owned_resource_message = std::make_unique<envoy::service::discovery::v3::Resource>();
   auto& resource_message = *owned_resource_message;
-  MessageUtil::loadFromFile(path_, resource_message, validation_visitor_, api_);
+  THROW_IF_NOT_OK(MessageUtil::loadFromFile(path_, resource_message, validation_visitor_, api_));
   // Dynamically load the collection message.
   const std::string collection_type =
       std::string(TypeUtil::typeUrlToDescriptorFullName(resource_message.resource().type_url()));
@@ -128,7 +133,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   Protobuf::DynamicMessageFactory dmf;
   ProtobufTypes::MessagePtr collection_message;
   collection_message.reset(dmf.GetPrototype(collection_descriptor)->New());
-  MessageUtil::unpackTo(resource_message.resource(), *collection_message);
+  THROW_IF_NOT_OK(MessageUtil::unpackTo(resource_message.resource(), *collection_message));
   const auto* collection_entries_field_descriptor = collection_descriptor->field(0);
   // Verify collection message type structure.
   if (collection_entries_field_descriptor == nullptr ||

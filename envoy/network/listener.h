@@ -78,8 +78,9 @@ public:
    * workers. For example, the actual listen() call, post listen socket options, etc. This is done
    * so that all error handling can occur on the main thread and the gap between performing these
    * actions and using the socket is minimized.
+   * @return a status indicating if an error occurred.
    */
-  virtual void doFinalPreWorkerInit() PURE;
+  virtual absl::Status doFinalPreWorkerInit() PURE;
 };
 
 /**
@@ -162,6 +163,11 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return bool whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
@@ -267,9 +273,9 @@ public:
   virtual ResourceLimit& openConnections() PURE;
 
   /**
-   * @return std::vector<AccessLog::InstanceSharedPtr> access logs emitted by the listener.
+   * @return AccessLog::InstanceSharedPtrVector access logs emitted by the listener.
    */
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
 
   /**
    * @return pending connection backlog for TCP listeners.
@@ -291,6 +297,11 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
+
+  /**
+   * @return bool whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 /**
@@ -347,6 +358,8 @@ struct UdpRecvData {
   LocalPeerAddresses addresses_;
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
+  uint8_t tos_ = 0;
+  Buffer::OwnedImpl saved_cmsg_;
 };
 
 /**
@@ -435,6 +448,11 @@ public:
    * An estimated number of UDP packets this callback expects to process in current read event.
    */
   virtual size_t numPacketsExpectedPerEventLoop() const PURE;
+
+  /**
+   * Information about which cmsg to save to QuicReceivedPacket, if any.
+   */
+  virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
 using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
@@ -467,6 +485,11 @@ public:
    */
   virtual void
   configureLoadShedPoints(Server::LoadShedPointProvider& load_shed_point_provider) PURE;
+
+  /**
+   * Check whether the listener should bypass overload manager actions
+   */
+  virtual bool shouldBypassOverloadManager() const PURE;
 };
 
 using ListenerPtr = std::unique_ptr<Listener>;

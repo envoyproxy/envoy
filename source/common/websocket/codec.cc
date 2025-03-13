@@ -128,7 +128,11 @@ uint8_t Decoder::doDecodeExtendedLength(absl::Span<const uint8_t>& data) {
   num_remaining_extended_length_bytes_ -= bytes_to_decode;
 
   if (num_remaining_extended_length_bytes_ == 0) {
+#if ABSL_IS_BIG_ENDIAN
+    length_ = state_ == State::FrameHeaderExtendedLength16Bit ? htole16(le64toh(length_)) : length_;
+#else
     length_ = state_ == State::FrameHeaderExtendedLength16Bit ? htobe16(length_) : htobe64(length_);
+#endif
     if (num_remaining_masking_key_bytes_ > 0) {
       state_ = State::FrameHeaderMaskingKey;
     } else {

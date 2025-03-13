@@ -29,7 +29,7 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  Network::DrainableFilterChainSharedPtr
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
@@ -53,19 +53,19 @@ public:
 
     if (absl::StartsWith(destination_address, "/")) {
       res->connection_info_provider_->setLocalAddress(
-          std::make_shared<Network::Address::PipeInstance>(destination_address));
+          *Network::Address::PipeInstance::create(destination_address));
     } else {
       res->connection_info_provider_->setLocalAddress(
-          Network::Utility::parseInternetAddress(destination_address, destination_port));
+          Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port));
     }
     if (absl::StartsWith(source_address, "/")) {
       res->connection_info_provider_->setRemoteAddress(
-          std::make_shared<Network::Address::PipeInstance>(source_address));
+          *Network::Address::PipeInstance::create(source_address));
     } else {
       res->connection_info_provider_->setRemoteAddress(
-          Network::Utility::parseInternetAddress(source_address, source_port));
+          Network::Utility::parseInternetAddressNoThrow(source_address, source_port));
       res->connection_info_provider_->setDirectRemoteAddressForTest(
-          Network::Utility::parseInternetAddress(source_address, source_port));
+          Network::Utility::parseInternetAddressNoThrow(source_address, source_port));
     }
     res->server_name_ = server_name;
     res->ja3_hash_ = ja3_hash;
@@ -155,11 +155,11 @@ const char YamlHeader[] = R"EOF(
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 const char YamlSingleServer[] = R"EOF(
     - filter_chain_match:
         server_names: "server1.example.com"
@@ -170,11 +170,11 @@ const char YamlSingleServer[] = R"EOF(
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 const char YamlSingleDstPortTop[] = R"EOF(
     - filter_chain_match:
         destination_port: )EOF";
@@ -185,11 +185,11 @@ const char YamlSingleDstPortBottom[] = R"EOF(
           "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
 class FilterChainBenchmarkFixture : public ::benchmark::Fixture {
@@ -233,8 +233,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
-    filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
-                                         filter_chain_manager);
+    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
+                                                         dummy_builder_, filter_chain_manager));
   }
 }
 
@@ -257,8 +257,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
   FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
 
-  filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
-                                       filter_chain_manager);
+  THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
+                                                       dummy_builder_, filter_chain_manager));
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

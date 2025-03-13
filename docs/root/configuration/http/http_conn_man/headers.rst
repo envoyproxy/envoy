@@ -164,14 +164,14 @@ x-forwarded-client-cert
 or all of the clients or proxies that a request has flowed through, on its way from the client to the
 server. A proxy may choose to sanitize/append/forward the XFCC header before proxying the request.
 
-The XFCC header value is a comma (",") separated string. Each substring is an XFCC element, which
+The XFCC header value is a comma (``,``) separated string. Each substring is an XFCC element, which
 holds information added by a single proxy. A proxy can append the current client certificate
 information as an XFCC element, to the end of the request's XFCC header after a comma.
 
-Each XFCC element is a semicolon ";" separated string. Each substring is a key-value pair, grouped
-together by an equals ("=") sign. The keys are case-insensitive, the values are case-sensitive. If
-",", ";" or "=" appear in a value, the value should be double-quoted. Double-quotes in the value
-should be replaced by backslash-double-quote (\").
+Each XFCC element is a semicolon ``;`` separated string. Each substring is a key-value pair, grouped
+together by an equals (``=``) sign. The keys are case-insensitive, the values are case-sensitive. If
+``,``, ``;`` or ``=`` appear in a value, the value should be double-quoted. Double-quotes in the
+value should be replaced by backslash-double-quote (``\"``).
 
 The following keys are supported:
 
@@ -183,9 +183,9 @@ The following keys are supported:
 6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
 
-A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 2459`_.
+A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 5280`_.
 
-.. _RFC 2459: https://tools.ietf.org/html/rfc2459#section-4.2.1.7
+.. _RFC 5280: https://tools.ietf.org/html/rfc5280#section-4.2.1.6
 
 Some examples of the XFCC header are:
 
@@ -213,12 +213,16 @@ address of the nearest client to the XFF list before proxying the request. Some 
 2. ``x-forwarded-for: 50.0.0.1, 40.0.0.1`` (external proxy hop)
 3. ``x-forwarded-for: 50.0.0.1, 10.0.0.1`` (internal proxy hop)
 
-Envoy will only append to XFF if the :ref:`use_remote_address
+Envoy will only append to XFF when at least one of the following conditions is met:
+1. The :ref:`use_remote_address
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
-HTTP connection manager option is set to true and the :ref:`skip_xff_append
+HTTP connection manager option is set to true
+2. The :ref:`skip_xff_append
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
-is set false. This means that if ``use_remote_address`` is false (which is the default) or
-``skip_xff_append`` is true, the connection manager operates in a transparent mode where it does not
+is set to false.
+
+This means that if ``use_remote_address`` is set to false (which is the default) or
+``skip_xff_append`` is set to true, the connection manager operates in a transparent mode where it does not
 modify XFF.
 
 .. attention::
@@ -264,6 +268,18 @@ additional addresses from XFF:
   greater than zero, the trusted client address is the Nth address from the right end of XFF. (If
   the XFF contains fewer than N addresses, Envoy falls back to using the immediate downstream
   connection's source address as trusted client address.)
+
+.. note::
+
+ If the trusted client address should be determined from a list of known CIDRs, use the
+ :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` original IP
+ detection option instead.
+
+* If the remote address is contained by an entry in ``xff_trusted_cidrs``, and the *last*
+  (rightmost) entry is also contained by an entry in ``xff_trusted_cidrs``, the trusted client
+  address is *second-last* IP address in XFF.
+* If all entries in XFF are contained by an entry in ``xff_trusted_cidrs``, the trusted client
+  address is the *first* (leftmost) IP address in XFF.
 
 Envoy uses the trusted client address contents to determine whether a request originated
 externally or internally. This influences whether the
@@ -355,6 +371,36 @@ Example 6: The internal Envoy from Example 5, receiving a request proxied by ano
       | X-Envoy-External-Address remains unset
       | X-Envoy-Internal is set to "true"
 
+Example 7: Envoy as edge proxy, with one trusted CIDR
+    Settings:
+      | use_remote_address = false
+      | xff_trusted_cidrs = 192.0.2.0/24
+
+    Request details:
+      | Downstream IP address = 192.0.2.5
+      | XFF = "203.0.113.128, 203.0.113.10, 192.0.2.1"
+
+    Result:
+      | Trusted client address = 203.0.113.10
+      | X-Envoy-External-Address remains unset
+      | XFF is changed to "203.0.113.128, 203.0.113.10, 192.0.2.1, 192.0.2.5"
+      | X-Envoy-Internal is removed (if it was present in the incoming request)
+
+Example 8: Envoy as edge proxy, with two trusted CIDRs
+    Settings:
+      | use_remote_address = false
+      | xff_trusted_cidrs = 192.0.2.0/24, 198.51.100.0/24
+
+    Request details:
+      | Downstream IP address = 192.0.2.5
+      | XFF = "203.0.113.128, 203.0.113.10, 198.51.100.1"
+
+    Result:
+      | Trusted client address = 203.0.113.10
+      | X-Envoy-External-Address remains unset
+      | XFF is changed to "203.0.113.128, 203.0.113.10, 198.51.100.1, 192.0.2.5"
+      | X-Envoy-Internal is removed (if it was present in the incoming request)
+
 A few very important notes about XFF:
 
 1. If ``use_remote_address`` is set to true, Envoy sets the
@@ -434,6 +480,16 @@ configuration option, ``x-forwarded-proto`` will be updated as well.
 The ``x-forwarded-proto`` header will be used by Envoy over ``:scheme`` where the underlying
 encryption is wanted, for example clearing default ports based on ``x-forwarded-proto``. See
 :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
+
+.. _config_http_conn_man_headers_x-envoy-local-overloaded:
+
+x-envoy-local-overloaded
+------------------------
+
+Envoy will set this header on the downstream response
+if a request was dropped due to :ref:`overload manager<arch_overview_overload_manager>` and
+:ref:`configuration option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_local_overload>`
+is set to true.
 
 .. _config_http_conn_man_headers_x-request-id:
 

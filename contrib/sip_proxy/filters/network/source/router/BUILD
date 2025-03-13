@@ -27,10 +27,10 @@ envoy_cc_contrib_extension(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//contrib/sip_proxy/filters/network/source:metadata_lib",
         "//envoy/router:router_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -57,7 +57,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg_cc_proto",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],

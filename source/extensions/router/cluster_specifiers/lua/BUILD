@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:config_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/lua/v3:pkg_cc_proto",

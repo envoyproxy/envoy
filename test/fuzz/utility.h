@@ -170,16 +170,22 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           replaceInvalidHostCharacters(
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
-      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address()).value();
+      auto address_or_error = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      THROW_IF_NOT_OK_REF(address_or_error.status());
+      address = address_or_error.value();
     }
   } else {
-    address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+    address = *Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   }
-  auto upstream_local_address =
-      stream_info.has_upstream_local_address()
-          ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
-                .value()
-          : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  Envoy::Network::Address::InstanceConstSharedPtr upstream_local_address;
+  if (stream_info.has_upstream_local_address()) {
+    auto upstream_local_address_or_error =
+        Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address());
+    THROW_IF_NOT_OK_REF(upstream_local_address_or_error.status());
+    upstream_local_address = upstream_local_address_or_error.value();
+  } else {
+    upstream_local_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  }
   test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);

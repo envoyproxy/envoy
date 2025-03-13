@@ -85,8 +85,7 @@ void Span::log(SystemTime, const std::string&) {
 
 void Span::finishSpan() { span_.reset(); }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   if (!span_) {
     return;
   }
@@ -129,18 +128,23 @@ void Span::setSampled(bool sampled) {
 
 std::string Span::getBaggage(absl::string_view) {
   // not implemented
-  return std::string{};
+  return EMPTY_STRING;
 }
 
 void Span::setBaggage(absl::string_view, absl::string_view) {
   // not implemented
 }
 
-std::string Span::getTraceIdAsHex() const {
+std::string Span::getTraceId() const {
   if (!span_) {
-    return std::string{};
+    return EMPTY_STRING;
   }
   return absl::StrCat(absl::Hex(span_->id()));
+}
+
+std::string Span::getSpanId() const {
+  // TODO(#34412): This method is not yet implemented for Datadog.
+  return EMPTY_STRING;
 }
 
 } // namespace Datadog

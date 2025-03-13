@@ -14,6 +14,7 @@ namespace DynamicForwardProxy {
 
 using FilterConfig =
     envoy::extensions::filters::udp::udp_proxy::session::dynamic_forward_proxy::v3::FilterConfig;
+using FilterFactoryCb = Network::UdpSessionFilterFactoryCb;
 
 /**
  * Config registration for the dynamic_forward_proxy filter. @see

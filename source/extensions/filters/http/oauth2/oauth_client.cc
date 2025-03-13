@@ -41,6 +41,9 @@ constexpr const char* UrlBodyTemplateWithoutCredentialsForRefreshToken =
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
                                            const std::string& cb_url, AuthType auth_type) {
+  ASSERT(state_ == OAuthState::Idle);
+  state_ = OAuthState::PendingAccessToken;
+
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
@@ -65,14 +68,14 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
-
-  ASSERT(state_ == OAuthState::Idle);
-  state_ = OAuthState::PendingAccessToken;
 }
 
 void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
                                                const std::string& client_id,
                                                const std::string& secret, AuthType auth_type) {
+  ASSERT(state_ == OAuthState::Idle);
+  state_ = OAuthState::PendingAccessTokenByRefreshToken;
+
   Http::RequestMessagePtr request = createPostRequest();
   std::string body;
 
@@ -98,18 +101,21 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   request->headers().setContentLength(body.length());
   ENVOY_LOG(debug, "Dispatching OAuth request for update access token by refresh token.");
   dispatchRequest(std::move(request));
-
-  ASSERT(state_ == OAuthState::Idle);
-  state_ = OAuthState::PendingAccessTokenByRefreshToken;
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
-    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
-        std::move(msg), *this,
-        Http::AsyncClient::RequestOptions().setTimeout(
-            std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+    auto options = Http::AsyncClient::RequestOptions().setTimeout(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout)));
+
+    if (retry_policy_.has_value()) {
+      options.setRetryPolicy(retry_policy_.value());
+      options.setBufferBodyForRetry(true);
+    }
+
+    in_flight_request_ =
+        thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
   } else {
     parent_->sendUnauthorizedResponse();
   }

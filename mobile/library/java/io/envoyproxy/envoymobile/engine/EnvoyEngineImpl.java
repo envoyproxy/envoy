@@ -5,11 +5,11 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
@@ -18,6 +18,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   private static final int ENVOY_NET_WLAN = 2;
 
   private final long engineHandle;
+  private final AtomicBoolean terminated = new AtomicBoolean(false);
 
   /**
    * @param runningCallback Called when the engine finishes its async startup and begins running.
@@ -39,6 +40,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean explicitFlowControl) {
+    checkIsTerminated();
     long streamHandle = JniLibrary.initStream(engineHandle);
     EnvoyHTTPStream stream =
         new EnvoyHTTPStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
@@ -48,11 +50,14 @@ public class EnvoyEngineImpl implements EnvoyEngine {
 
   @Override
   public void terminate() {
+    checkIsTerminated();
     JniLibrary.terminateEngine(engineHandle);
+    terminated.set(true);
   }
 
   @Override
   public String dumpStats() {
+    checkIsTerminated();
     return JniLibrary.dumpStats(engineHandle);
   }
 
@@ -63,6 +68,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public void performRegistration(EnvoyConfiguration envoyConfiguration) {
+    checkIsTerminated();
     for (EnvoyHTTPFilterFactory filterFactory : envoyConfiguration.httpPlatformFilterFactories) {
       JniLibrary.registerFilterFactory(filterFactory.getFilterName(),
                                        new JvmFilterFactoryContext(filterFactory));
@@ -82,20 +88,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   /**
-   * Run the Envoy engine with the provided yaml string and log level.
-   *
-   * This does not perform registration, and performRegistration may need to be called first.
-   *
-   * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param logLevel          The log level to use when starting Envoy.
-   * @return A status indicating if the action was successful.
-   */
-  @Override
-  public EnvoyStatus runWithYaml(String configurationYAML, String logLevel) {
-    return runWithResolvedYAML(configurationYAML, logLevel);
-  }
-
-  /**
    * Run the Envoy engine with the provided envoyConfiguration and log level.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
@@ -104,23 +96,12 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
+    checkIsTerminated();
     performRegistration(envoyConfiguration);
     int status =
-        JniLibrary.runEngine(this.engineHandle, "", envoyConfiguration.createBootstrap(), logLevel);
+        JniLibrary.runEngine(this.engineHandle, envoyConfiguration.createBootstrap(), logLevel);
     if (status == 0) {
       return EnvoyStatus.ENVOY_SUCCESS;
-    }
-    return EnvoyStatus.ENVOY_FAILURE;
-  }
-
-  private EnvoyStatus runWithResolvedYAML(String configurationYAML, String logLevel) {
-    try {
-      int status = JniLibrary.runEngine(this.engineHandle, configurationYAML, 0, logLevel);
-      if (status == 0) {
-        return EnvoyStatus.ENVOY_SUCCESS;
-      }
-    } catch (Throwable throwable) {
-      // TODO: Need to have a way to log the exception somewhere.
     }
     return EnvoyStatus.ENVOY_FAILURE;
   }
@@ -135,44 +116,61 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public int recordCounterInc(String elements, Map<String, String> tags, int count) {
+    checkIsTerminated();
     return JniLibrary.recordCounterInc(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
                                        count);
   }
 
   @Override
   public int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor) {
+    checkIsTerminated();
     return JniLibrary.registerStringAccessor(accessor_name, new JvmStringAccessorContext(accessor));
   }
 
   @Override
   public void resetConnectivityState() {
+    checkIsTerminated();
     JniLibrary.resetConnectivityState(engineHandle);
   }
 
   @Override
-  public void setPreferredNetwork(EnvoyNetworkType network) {
-    switch (network) {
-    case ENVOY_NETWORK_TYPE_WWAN:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WWAN);
-      return;
-    case ENVOY_NETWORK_TYPE_WLAN:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_WLAN);
-      return;
-    case ENVOY_NETWORK_TYPE_GENERIC:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
-      return;
-    default:
-      JniLibrary.setPreferredNetwork(engineHandle, ENVOY_NET_GENERIC);
-      return;
-    }
+  public void onDefaultNetworkAvailable() {
+    checkIsTerminated();
+    JniLibrary.onDefaultNetworkAvailable(engineHandle);
+  }
+
+  @Override
+  public void onDefaultNetworkChanged(int network) {
+    checkIsTerminated();
+    JniLibrary.onDefaultNetworkChanged(engineHandle, network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangeEvent(int network) {
+    checkIsTerminated();
+    JniLibrary.onDefaultNetworkChangeEvent(engineHandle, network);
+  }
+
+  @Override
+  public void onDefaultNetworkUnavailable() {
+    checkIsTerminated();
+    JniLibrary.onDefaultNetworkUnavailable(engineHandle);
   }
 
   public void setProxySettings(String host, int port) {
+    checkIsTerminated();
     JniLibrary.setProxySettings(engineHandle, host, port);
   }
 
   @Override
   public void setLogLevel(LogLevel log_level) {
+    checkIsTerminated();
     JniLibrary.setLogLevel(log_level.ordinal());
+  }
+
+  private void checkIsTerminated() {
+    if (terminated.get()) {
+      throw new IllegalStateException("The EnvoyEngine has been terminated.");
+    }
   }
 }

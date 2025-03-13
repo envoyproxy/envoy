@@ -26,7 +26,7 @@ envoy_cc_library(
         "filter_cc_proto",
         "//library/common/api:c_types",
         "//library/common/api:external_api_lib",
-        "//library/common/data:utility_lib",
+        "//library/common/bridge:utility_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],

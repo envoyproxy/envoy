@@ -43,6 +43,11 @@ MockUpstreamInfo::MockUpstreamInfo()
           Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_local_address) {
             upstream_local_address_ = upstream_local_address;
           }));
+  ON_CALL(*this, setUpstreamRemoteAddress(_))
+      .WillByDefault(
+          Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_remote_address) {
+            upstream_remote_address_ = upstream_remote_address;
+          }));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, setUpstreamTransportFailureReason(_))
       .WillByDefault(Invoke([this](absl::string_view failure_reason) {
@@ -200,6 +205,17 @@ MockStreamInfo::MockStreamInfo()
         upstream_cluster_info_ = std::move(cluster_info);
       }));
   ON_CALL(*this, upstreamClusterInfo()).WillByDefault(ReturnPointee(&upstream_cluster_info_));
+  ON_CALL(*this, addCustomFlag(_)).WillByDefault(Invoke([this](absl::string_view flag) {
+    if (stream_flags_.empty()) {
+      stream_flags_.append(flag);
+    } else {
+      stream_flags_.push_back(',');
+      stream_flags_.append(flag);
+    }
+  }));
+  ON_CALL(*this, customFlags()).WillByDefault(Invoke([this]() {
+    return absl::string_view(stream_flags_);
+  }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

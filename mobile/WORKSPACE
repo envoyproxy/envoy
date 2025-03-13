@@ -46,6 +46,10 @@ load("@envoy//bazel:api_repositories.bzl", "envoy_api_dependencies")
 
 envoy_api_dependencies()
 
+load("@envoy//bazel:repo.bzl", "envoy_repo")
+
+envoy_repo()
+
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 envoy_dependencies()
@@ -70,26 +74,12 @@ load("@envoy_mobile//bazel:envoy_mobile_toolchains.bzl", "envoy_mobile_toolchain
 
 envoy_mobile_toolchains()
 
-load("@pybind11_bazel//:python_configure.bzl", "python_configure")
-
-python_configure(
-    name = "local_config_python",
-    python_version = "3",
-)
-
-load("//bazel:python.bzl", "declare_python_abi")
-
-declare_python_abi(
-    name = "python_abi",
-    python_version = "3",
-)
-
 load("//bazel:android_configure.bzl", "android_configure")
 
 android_configure(
     name = "local_config_android",
     build_tools_version = "30.0.2",
-    ndk_api_level = 21,
+    ndk_api_level = 23,
     sdk_api_level = 30,
 )
 

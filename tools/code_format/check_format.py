@@ -146,6 +146,10 @@ class FormatChecker:
         return not self.args.skip_envoy_build_rule_check
 
     @property
+    def run_code_validation(self):
+        return not self.args.skip_code_validation
+
+    @property
     def excluded_prefixes(self):
         return (
             self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
@@ -154,6 +158,10 @@ class FormatChecker:
     @cached_property
     def error_messages(self):
         return []
+
+    @property
+    def run_build_fixer(self):
+        return not self.args.skip_build_fixer
 
     @property
     def operation_type(self):
@@ -196,6 +204,8 @@ class FormatChecker:
             action="store_true",
             help="skip checking for '@envoy//' prefix in build rules.")
         parser.add_argument(
+            "--skip_code_validation", action="store_true", help="skip custom code validation steps")
+        parser.add_argument(
             "--namespace_check",
             type=str,
             nargs="?",
@@ -207,6 +217,8 @@ class FormatChecker:
             nargs="+",
             default=[],
             help="exclude paths from the namespace_check.")
+        parser.add_argument(
+            "--skip_build_fixer", action="store_true", help="skip running build fixer script")
         parser.add_argument(
             "--build_fixer_check_excluded_paths",
             type=str,
@@ -257,7 +269,7 @@ class FormatChecker:
 
     @cached_property
     def namespace_re(self):
-        return re.compile("^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
+        return re.compile(r"^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
 
     # Map a line transformation function across each line of a file,
     # writing the result lines as requested.
@@ -299,7 +311,7 @@ class FormatChecker:
     def read_lines(self, path):
         with open(path) as f:
             for l in f:
-                yield l[:-1]
+                yield l.rstrip('\r\n')
         yield ""
 
     # Read a UTF-8 encoded file as a str.
@@ -382,13 +394,6 @@ class FormatChecker:
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in self.config.paths["grpc_init"]["include"]
 
-    def allow_listed_for_unpack_to(self, file_path):
-        return file_path.startswith("./test") or file_path in [
-            "./source/common/protobuf/deterministic_hash.cc",
-            "./source/common/protobuf/utility.cc",
-            "./source/common/protobuf/utility.h",
-        ]
-
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
@@ -398,14 +403,18 @@ class FormatChecker:
         # core and exception code. Source files are also discouraged but
         # extensions source files are currently exempt from checks as many factory creation
         # calls do not yet support StatusOr.
-        return ((
-            file_path.endswith('.h') and file_path.startswith("./source/")
-            and not file_path.startswith("./source/extensions/")
-            and not file_path in self.config.paths["exception"]["include"]) or (
-                file_path.endswith('.cc') and file_path.startswith("./source/")
-                and not file_path.startswith("./source/extensions/")
-                and not file_path in self.config.paths["exception"]["include"])
-                or self.is_in_subdir(file_path, 'tools/testdata'))
+        if not file_path.startswith("./source/") or not (file_path.endswith('.h')
+                                                         or file_path.endswith('.cc')):
+            return False
+
+        # Extensions can have entire directories exempted
+        if file_path.startswith("./source/extensions/"):
+            for entry in self.config.paths["exception"]["include"]:
+                if entry in file_path:
+                    return False
+
+        # As core code is mostly exception free, list individual files.
+        return not file_path in self.config.paths["exception"]["include"]
 
     def allow_listed_for_build_urls(self, file_path):
         return file_path in self.config.paths["build_urls"]["include"]
@@ -420,9 +429,7 @@ class FormatChecker:
         return False
 
     def is_external_build_file(self, file_path):
-        return self.is_build_file(file_path) and (
-            file_path.startswith("./bazel/external/")
-            or file_path.startswith("./tools/clang_tools"))
+        return self.is_build_file(file_path) and (file_path.startswith("./bazel/external/"))
 
     def is_starlark_file(self, file_path):
         return file_path.endswith(".bzl")
@@ -633,10 +640,6 @@ class FormatChecker:
                 report_error(
                     "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
                     "use Registry::InjectFactory instead.")
-        if not self.allow_listed_for_unpack_to(file_path):
-            if "UnpackTo" in line:
-                report_error(
-                    "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
         # Check that we use the absl::Time library
         if self.token_in_line("std::get_time", line):
             if "test/" in file_path:
@@ -802,7 +805,9 @@ class FormatChecker:
             return False
 
         if self.deny_listed_for_exceptions(file_path):
-            if has_non_comment_throw(line) or "THROW" in line or "throwExceptionOrPanic" in line:
+            if has_non_comment_throw(
+                    line) or "THROW" in line or "throwEnvoyExceptionOrPanic" in line:
+
                 report_error(
                     "Don't introduce throws into exception-free files, use error "
                     "statuses instead.")
@@ -879,7 +884,9 @@ class FormatChecker:
         return error_messages
 
     def check_source_path(self, file_path):
-        error_messages = self.check_file_contents(file_path, self.check_source_line)
+        error_messages = []
+        if self.run_code_validation:
+            error_messages = self.check_file_contents(file_path, self.check_source_line)
         if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
             command = (
@@ -1102,8 +1109,9 @@ class FormatChecker:
 
     def _run_build_fixer(self, filepath: str) -> bool:
         return (
-            not self.is_build_fixer_excluded_file(filepath) and not self.is_api_file(filepath)
-            and not self.is_starlark_file(filepath) and not self.is_workspace_file(filepath))
+            self.run_build_fixer and not self.is_build_fixer_excluded_file(filepath)
+            and not self.is_api_file(filepath) and not self.is_starlark_file(filepath)
+            and not self.is_workspace_file(filepath))
 
 
 def main(*args):

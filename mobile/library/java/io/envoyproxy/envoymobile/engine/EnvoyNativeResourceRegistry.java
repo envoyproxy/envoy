@@ -16,11 +16,11 @@ public enum EnvoyNativeResourceRegistry {
   SINGLETON();
 
   // References are automatically enqueued when the gc flags them as unreachable.
-  private ReferenceQueue<EnvoyNativeResourceWrapper> refQueue;
+  private final ReferenceQueue<EnvoyNativeResourceWrapper> refQueue;
   // Maintains references in the object graph while we wait for them to be enqueued.
-  private Set refMaintainer;
+  private final Set refMaintainer;
   // Blocks on the reference queue and calls the releaser of queued references.
-  private RefQueueThread refQueueThread;
+  private final RefQueueThread refQueueThread;
 
   private class RefQueueThread extends Thread {
     public void run() {
@@ -52,7 +52,7 @@ public enum EnvoyNativeResourceRegistry {
     void releaseResource() { releaser.release(nativeHandle); }
   }
 
-  private EnvoyNativeResourceRegistry() {
+  EnvoyNativeResourceRegistry() {
     refQueue = new ReferenceQueue<>();
     refQueueThread = new RefQueueThread();
     refMaintainer = new ConcurrentHashMap().newKeySet();

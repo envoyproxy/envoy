@@ -30,7 +30,7 @@ protected:
 TEST_F(EngineTest, Matcher) {
   setup();
 
-  EXPECT_NO_THROW(engine_->matcher("^/asdf/.+"));
+  EXPECT_TRUE(engine_->matcher("^/asdf/.+").status().ok());
 }
 
 } // namespace Hyperscan

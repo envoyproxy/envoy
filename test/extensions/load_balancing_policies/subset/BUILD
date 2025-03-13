@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/header_to_metadata:config",
@@ -48,18 +50,24 @@ envoy_extension_cc_test(
     name = "subset_test",
     srcs = ["subset_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
@@ -69,6 +77,7 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )
 
@@ -76,13 +85,17 @@ envoy_extension_cc_benchmark_binary(
     name = "subset_benchmark",
     srcs = ["subset_benchmark.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
-    external_deps = [
-        "benchmark",
-    ],
+    rbe_pool = "6gig",
     deps = [
+        "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/upstream:load_balancer_mocks",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/subset/v3:pkg_cc_proto",
     ],
 )
 

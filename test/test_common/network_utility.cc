@@ -60,7 +60,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
                                                     Socket::Type type) {
-  auto instance = Utility::parseInternetAddressAndPort(addr_port);
+  auto instance = Utility::parseInternetAddressAndPortNoThrow(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
   } else {
@@ -174,7 +174,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), errorDetails(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
-    throw EnvoyException(msg);
+    throwEnvoyExceptionOrPanic(msg);
   }
 
   return std::make_pair(sock->connectionInfoProvider().localAddress(), std::move(sock));
@@ -206,15 +206,23 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override {
-    Network::UdpRecvData datagram{
-        {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::OwnedImpl saved_cmsg) override {
+    Network::UdpRecvData datagram{{std::move(local_address), std::move(peer_address)},
+                                  std::move(buffer),
+                                  receive_time,
+                                  tos,
+                                  std::move(saved_cmsg)};
     data_.push_back(std::move(datagram));
   }
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t) override {}
   size_t numPacketsExpectedPerEventLoop() const override {
     return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+  }
+  const IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const override {
+    static const IoHandle::UdpSaveCmsgConfig empty_config{};
+    return empty_config;
   }
 
   std::list<Network::UdpRecvData>& data_;
@@ -226,8 +234,13 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
                                        std::list<UdpRecvData>& data,
                                        uint64_t max_rx_datagram_size) {
   SyncPacketProcessor processor(data, max_rx_datagram_size);
+  UdpRecvMsgMethod recv_msg_method = UdpRecvMsgMethod::RecvMsg;
+  if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
+    recv_msg_method = UdpRecvMsgMethod::RecvMmsg;
+  }
   return Network::Utility::readFromSocket(handle, local_address, processor,
-                                          MonotonicTime(std::chrono::seconds(0)), false, nullptr);
+                                          MonotonicTime(std::chrono::seconds(0)), recv_msg_method,
+                                          nullptr, nullptr);
 }
 
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_datagram_size)
@@ -252,6 +265,33 @@ void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
   }
   datagram = std::move(received_datagrams_.front());
   received_datagrams_.pop_front();
+}
+
+sockaddr_storage getV6SockAddr(const std::string& ip, uint32_t port) {
+  sockaddr_storage ss;
+  auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+  memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+  ipv6_addr->sin6_family = AF_INET6;
+  inet_pton(AF_INET6, ip.c_str(), &ipv6_addr->sin6_addr);
+  ipv6_addr->sin6_port = htons(port);
+  return ss;
+}
+
+sockaddr_storage getV4SockAddr(const std::string& ip, uint32_t port) {
+  sockaddr_storage ss;
+  auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+  memset(ipv4_addr, 0, sizeof(sockaddr_in));
+  ipv4_addr->sin_family = AF_INET;
+  inet_pton(AF_INET, ip.c_str(), &ipv4_addr->sin_addr);
+  ipv4_addr->sin_port = htons(port);
+  return ss;
+}
+
+socklen_t getSockAddrLen(const sockaddr_storage& ss) {
+  if (ss.ss_family == AF_INET6) {
+    return sizeof(sockaddr_in6);
+  }
+  return sizeof(sockaddr_in);
 }
 
 } // namespace Test

@@ -19,6 +19,7 @@ envoy_cc_library(
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":active_raw_udp_listener_config",
         ":connection_handler_lib",
@@ -137,8 +138,10 @@ envoy_cc_library(
         "//source/common/config:api_version_lib",
         "//source/common/config:subscription_base_interface",
         "//source/common/config:utility_lib",
+        "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/container:node_hash_set",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

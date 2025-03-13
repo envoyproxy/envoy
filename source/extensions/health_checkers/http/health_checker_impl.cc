@@ -48,37 +48,39 @@ getMethod(const envoy::config::core::v3::RequestMethod config_method) {
 Upstream::HealthCheckerSharedPtr HttpHealthCheckerFactory::createCustomHealthChecker(
     const envoy::config::core::v3::HealthCheck& config,
     Server::Configuration::HealthCheckerFactoryContext& context) {
-  return std::make_shared<ProdHttpHealthCheckerImpl>(
-      context.cluster(), config, context.mainThreadDispatcher(), context.runtime(),
-      context.api().randomGenerator(), context.eventLogger());
+  return std::make_shared<ProdHttpHealthCheckerImpl>(context.cluster(), config, context,
+                                                     context.eventLogger());
 }
 
 REGISTER_FACTORY(HttpHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
 
-HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
-                                             const envoy::config::core::v3::HealthCheck& config,
-                                             Event::Dispatcher& dispatcher,
-                                             Runtime::Loader& runtime,
-                                             Random::RandomGenerator& random,
-                                             HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+HttpHealthCheckerImpl::HttpHealthCheckerImpl(
+    const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+    Server::Configuration::HealthCheckerFactoryContext& context,
+    HealthCheckEventLoggerPtr&& event_logger)
+    : HealthCheckerImplBase(cluster, config, context.mainThreadDispatcher(), context.runtime(),
+                            context.api().randomGenerator(), std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       method_(getMethod(config.http_health_check().method())),
       response_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.http_health_check(), response_buffer_size, kDefaultMaxBytesInBuffer)),
-      request_headers_parser_(
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
-                                          config.http_health_check().request_headers_to_remove())),
+                                          config.http_health_check().request_headers_to_remove()),
+          Router::HeaderParserPtr)),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
-      random_generator_(random) {
+      random_generator_(context.api().randomGenerator()) {
+  // TODO(boteng): introduce additional validation for the authority and path headers
+  // based on the default UHV when it is available.
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
-  THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+  THROW_IF_NOT_OK_REF(bytes_or_error.status());
   receive_bytes_ = bytes_or_error.value();
   if (config.http_health_check().has_service_name_matcher()) {
-    service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
+    service_name_matcher_.emplace(config.http_health_check().service_name_matcher(),
+                                  context.serverFactoryContext());
   }
 
   if (response_buffer_size_ != 0 && !receive_bytes_.empty()) {
@@ -183,7 +185,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
       response_body_(std::make_unique<Buffer::OwnedImpl>()),
       hostname_(
           HealthCheckerFactory::getHostname(host, parent_.host_value_, parent_.cluster_.info())),
-
       local_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           Network::Utility::getCanonicalIpv4LoopbackAddress(),
           Network::Utility::getCanonicalIpv4LoopbackAddress())),
@@ -267,9 +268,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       *request_headers,
       // Here there is no downstream connection so scheme will be based on
       // upstream crypto
-      host_->transportSocketFactory().implementsSecureTransport());
+      false, host_->transportSocketFactory().implementsSecureTransport(), true);
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource(),
-                                         local_connection_info_provider_);
+                                         local_connection_info_provider_,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);

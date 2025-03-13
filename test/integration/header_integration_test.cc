@@ -224,10 +224,8 @@ public:
                   type: EDS
                   eds_cluster_config:
                     eds_config:
-                      resource_api_version: V3
                       api_config_source:
                         api_type: GRPC
-                        transport_api_version: V3
                         grpc_services:
                           envoy_grpc:
                             cluster_name: "eds-cluster"
@@ -1339,78 +1337,6 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
                                        {"location", "/private/../%2e\\public"},
                                        {":status", "307"},
                                    });
-}
-
-// Validates legacy TE handling: TE header is forwarded if it contains a supported value
-TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
-  initializeFilter(HeaderMode::Append, false);
-  performRequest(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
-          {"connection", "te, close"},
-          {"te", "trailers"},
-      },
-      Http::TestRequestHeaderMapImpl{
-          {":authority", "no-headers.com"},
-          {":path", "/"},
-          {":method", "GET"},
-          {"x-request-foo", "downstram"},
-          {"te", "trailers"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
-          {"x-return-foo", "upstream"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"x-return-foo", "upstream"},
-          {":status", "200"},
-          {"connection", "close"},
-      });
-}
-
-// Validates legacy TE handling: that TE header stripped if it contains an unsupported value.
-TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
-  initializeFilter(HeaderMode::Append, false);
-  performRequest(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
-          {"connection", "te, mike, sam, will, close"},
-          {"te", "gzip"},
-          {"mike", "foo"},
-          {"sam", "bar"},
-          {"will", "baz"},
-      },
-      Http::TestRequestHeaderMapImpl{
-          {":authority", "no-headers.com"},
-          {":path", "/"},
-          {":method", "GET"},
-          {"x-request-foo", "downstram"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
-          {"x-return-foo", "upstream"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"x-return-foo", "upstream"},
-          {":status", "200"},
-          {"connection", "close"},
-      });
 }
 
 using EmptyHeaderIntegrationTest = HttpProtocolIntegrationTest;

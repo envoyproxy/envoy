@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -32,12 +33,13 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
+#include "source/common/memory/stats.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
-#include "source/common/upstream/health_discovery_service.h"
+#include "source/common/singleton/manager_impl.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -140,10 +142,10 @@ public:
    * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
    */
-  static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  const Options& options,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api);
+  static absl::Status loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                          const Options& options,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor,
+                                          Api::Api& api);
 };
 
 /**
@@ -155,7 +157,7 @@ public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             Init::Manager& init_manager, OverloadManager& overload_manager,
-            std::function<void()> workers_start_cb);
+            OverloadManager& null_overload_manager, std::function<void()> workers_start_cb);
 
 private:
   Init::WatcherImpl init_watcher_;
@@ -176,12 +178,19 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return server_.xdsManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return server_.httpServerPropertiesCacheManager();
+  }
   Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
+  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+    return server_.transportSocketFactoryContext();
+  };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Stats::Scope& serverScope() override { return *server_scope_; }
@@ -197,9 +206,11 @@ public:
   ProcessContextOptRef processContext() override { return server_.processContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
+  Regex::Engine& regexEngine() override { return server_.regexEngine(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
+  OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
 
   // Configuration::TransportSocketFactoryContext
@@ -249,8 +260,13 @@ public:
   ~InstanceBase() override;
 
   virtual void maybeCreateHeapShrinker() PURE;
-  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
+  virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<HdsDelegateApi>
+  maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+                         Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
+                         Ssl::ContextManager& ssl_context_manager) PURE;
 
   void run() override;
 
@@ -259,6 +275,9 @@ public:
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
   const Upstream::ClusterManager& clusterManager() const override;
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return *http_server_properties_cache_manager_;
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -273,11 +292,12 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
   void shutdownAdmin() override;
-  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   bool healthCheckFailed() override;
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
@@ -292,6 +312,7 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
@@ -310,6 +331,7 @@ public:
   void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) override {
     stats_store_.setSinkPredicates(std::move(sink_predicates));
   }
+  Config::XdsManager& xdsManager() override { return *xds_manager_; }
 
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
@@ -325,10 +347,10 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  // This does most of the work of initialization, but can throw errors caught
+  // This does most of the work of initialization, but can throw or return errors caught
   // by initialize().
-  void initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
-                         ComponentFactory& component_factory);
+  absl::Status initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
+                                 ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
@@ -336,7 +358,6 @@ private:
       Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
-
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 
@@ -377,8 +398,8 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
-  std::unique_ptr<Admin> admin_;
-  Singleton::ManagerPtr singleton_manager_;
+  std::shared_ptr<Admin> admin_;
+  Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;
   ProdWorkerFactory worker_factory_;
@@ -397,10 +418,12 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
-  Upstream::ProdClusterInfoFactory info_factory_;
-  Upstream::HdsDelegatePtr hds_delegate_;
+  Config::XdsManagerPtr xds_manager_;
+  std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
+  std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
@@ -414,8 +437,8 @@ private:
   ServerFactoryContextImpl server_contexts_;
   bool enable_reuse_port_default_{false};
   Regex::EnginePtr regex_engine_;
-
   bool stats_flush_in_progress_ : 1;
+  std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

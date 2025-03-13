@@ -177,7 +177,6 @@ static_resources {
 }
 cluster_manager {
   load_stats_config {
-    transport_api_version: V3
   }
 }
 stats_sinks {

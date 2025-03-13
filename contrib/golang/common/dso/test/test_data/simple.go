@@ -6,6 +6,10 @@ typedef struct {
 } httpRequest;
 
 typedef struct {
+  int state;
+} processState;
+
+typedef struct {
   unsigned long long int plugin_name_ptr;
   unsigned long long int plugin_name_len;
   unsigned long long int config_ptr;
@@ -43,17 +47,23 @@ func envoyGoFilterMergeHttpPluginConfig(namePtr, nameLen, parentId, childId uint
 }
 
 //export envoyGoFilterOnHttpHeader
-func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
+func envoyGoFilterOnHttpHeader(s *C.processState, endStream, headerNum, headerBytes uint64) uint64 {
 	return 0
 }
 
 //export envoyGoFilterOnHttpData
-func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
+func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64) uint64 {
 	return 0
 }
 
 //export envoyGoFilterOnHttpLog
-func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64) {
+func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64, decodingState *C.processState, encodingState *C.processState,
+	reqHeaderNum, reqHeaderBytes, reqTrailerNum, reqTrailerBytes,
+	respHeaderNum, respHeaderBytes, respTrailerNum, respTrailerBytes uint64) {
+}
+
+//export envoyGoFilterOnHttpStreamComplete
+func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 }
 
 //export envoyGoFilterOnHttpDestroy
@@ -113,6 +123,10 @@ func envoyGoFilterOnSemaDec(wrapper unsafe.Pointer) {
 
 //export envoyGoRequestSemaDec
 func envoyGoRequestSemaDec(r *C.httpRequest) {
+}
+
+//export envoyGoFilterCleanUp
+func envoyGoFilterCleanUp() {
 }
 
 func main() {

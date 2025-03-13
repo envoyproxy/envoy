@@ -25,7 +25,7 @@ envoy_extension_cc_test(
     name = "cluster_refresh_manager_test",
     srcs = ["cluster_refresh_manager_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    flaky = True,
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",

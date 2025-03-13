@@ -18,6 +18,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "aws_cluster_manager_lib",
+    srcs = ["aws_cluster_manager.cc"],
+    hdrs = ["aws_cluster_manager.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/http:message_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/init:target_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "signer_base_impl",
     srcs = ["signer_base_impl.cc"],
     hdrs = ["signer_base_impl.h"],
@@ -91,8 +106,15 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "credentials_provider_interface",
-    hdrs = ["credentials_provider.h"],
-    external_deps = ["abseil_optional"],
+    hdrs = [
+        "credentials_provider.h",
+        "credentials_provider_impl.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -111,26 +133,35 @@ envoy_cc_library(
     name = "credentials_provider_impl_lib",
     srcs = ["credentials_provider_impl.cc"],
     hdrs = ["credentials_provider_impl.h"],
-    external_deps = ["abseil_time"],
     deps = [
+        ":aws_cluster_manager_lib",
         ":credentials_provider_interface",
         ":metadata_fetcher_lib",
         ":utility_lib",
         "//envoy/api:api_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/http:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@com_google_absl//absl/time",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "credentials_provider.h",
+        "signer.h",
+        "signer_base_impl.h",
+        "utility.h",
+    ],
     copts = envoy_select_boringssl(
         [
             "-DENVOY_SSL_FIPS",
@@ -145,6 +176,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
@@ -154,7 +186,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "region_provider_interface",
     hdrs = ["region_provider.h"],
-    external_deps = ["abseil_optional"],
+    deps = [
+        "@com_google_absl//absl/types:optional",
+    ],
 )
 
 envoy_cc_library(
@@ -165,5 +199,6 @@ envoy_cc_library(
         ":region_provider_interface",
         ":utility_lib",
         "//source/common/common:logger_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

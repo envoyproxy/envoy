@@ -186,7 +186,7 @@ public:
   virtual uint32_t connectionRateLimitPerSec() const PURE;
 };
 
-using ConfigSharedPtr = std::shared_ptr<Config>;
+using ConfigSharedPtr = std::shared_ptr<const Config>;
 
 /**
  * A factory for individual redis client connections.
@@ -207,7 +207,7 @@ public:
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config,
+                           const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
                            const std::string& auth_password, bool is_transaction_client) PURE;

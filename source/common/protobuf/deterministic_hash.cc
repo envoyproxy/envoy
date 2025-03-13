@@ -196,12 +196,11 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
 // This is intentionally ignoring unknown fields.
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) {
   using Protobuf::FieldDescriptor;
-  std::string scratch;
   const Protobuf::Reflection* reflection = message.GetReflection();
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   seed = HashUtil::xxHash64(descriptor->full_name(), seed);
   if (descriptor->well_known_type() == Protobuf::Descriptor::WELLKNOWNTYPE_ANY) {
-    const ProtobufWkt::Any* any = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
+    const ProtobufWkt::Any* any = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(&message);
     ASSERT(any != nullptr, "casting to any should always work for WELLKNOWNTYPE_ANY");
     std::unique_ptr<Protobuf::Message> submsg = unpackAnyForReflection(*any);
     if (submsg == nullptr) {

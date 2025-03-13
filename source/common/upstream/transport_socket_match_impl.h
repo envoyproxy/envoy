@@ -22,6 +22,12 @@ namespace Upstream {
 class TransportSocketMatcherImpl : public Logger::Loggable<Logger::Id::upstream>,
                                    public TransportSocketMatcher {
 public:
+  static absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> create(
+      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+          socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
+
   struct FactoryMatch {
     FactoryMatch(std::string match_name, Network::UpstreamTransportSocketFactoryPtr socket_factory,
                  TransportSocketMatchStats match_stats)
@@ -32,13 +38,8 @@ public:
     mutable TransportSocketMatchStats stats;
   };
 
-  TransportSocketMatcherImpl(
-      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
-          socket_matches,
-      Server::Configuration::TransportSocketFactoryContext& factory_context,
-      Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
-
-  MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const override;
+  MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                    const envoy::config::core::v3::Metadata* locality_metadata) const override;
 
   bool allMatchesSupportAlpn() const override {
     if (!default_match_.factory->supportsAlpn()) {
@@ -53,6 +54,13 @@ public:
   }
 
 protected:
+  TransportSocketMatcherImpl(
+      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+          socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
+      absl::Status& creation_status);
+
   TransportSocketMatchStats generateStats(const std::string& prefix);
   Stats::Scope& stats_scope_;
   FactoryMatch default_match_;

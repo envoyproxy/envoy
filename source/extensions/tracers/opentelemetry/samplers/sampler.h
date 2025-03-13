@@ -10,8 +10,9 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
 
+#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+
 #include "absl/types/optional.h"
-#include "opentelemetry/proto/trace/v1/trace.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,35 +24,28 @@ class SpanContext;
 enum class Decision {
   // IsRecording will be false, the Span will not be recorded and all events and attributes will be
   // dropped.
-  DROP,
+  Drop,
   // IsRecording will be true, but the Sampled flag MUST NOT be set.
-  RECORD_ONLY,
+  RecordOnly,
   // IsRecording will be true and the Sampled flag MUST be set.
-  RECORD_AND_SAMPLE
+  RecordAndSample
 };
-
-/**
- * @brief The type of the span.
- * see
- * https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#spankind
- */
-using OTelSpanKind = ::opentelemetry::proto::trace::v1::Span::SpanKind;
 
 struct SamplingResult {
   /// @see Decision
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
-  std::unique_ptr<const std::map<std::string, std::string>> attributes;
+  std::unique_ptr<const OtelAttributes> attributes;
   // A Tracestate that will be associated with the Span. If the sampler
   // returns an empty Tracestate here, the Tracestate will be cleared, so samplers SHOULD normally
   // return the passed-in Tracestate if they do not intend to change it
   std::string tracestate;
 
   inline bool isRecording() const {
-    return decision == Decision::RECORD_ONLY || decision == Decision::RECORD_AND_SAMPLE;
+    return decision == Decision::RecordOnly || decision == Decision::RecordAndSample;
   }
 
-  inline bool isSampled() const { return decision == Decision::RECORD_AND_SAMPLE; }
+  inline bool isSampled() const { return decision == Decision::RecordAndSample; }
 };
 
 /**
@@ -76,7 +70,8 @@ public:
    * @param links Collection of links that will be associated with the Span to be created.
    * @return SamplingResult @see SamplingResult
    */
-  virtual SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
+  virtual SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
+                                      const absl::optional<SpanContext> parent_context,
                                       const std::string& trace_id, const std::string& name,
                                       OTelSpanKind spankind,
                                       OptRef<const Tracing::TraceContext> trace_context,

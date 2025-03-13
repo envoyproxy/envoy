@@ -1,12 +1,12 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
+#include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/extensions/filters/http/ext_proc/unit_test_fuzz/ext_proc_unit_test_fuzz.pb.validate.h"
-#include "test/extensions/filters/http/ext_proc/unit_test_fuzz/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -20,7 +20,7 @@ namespace UnitTestFuzz {
 class FuzzerMocks {
 public:
   FuzzerMocks()
-      : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")), buffer_("foo") {
+      : addr_(*Network::Address::PipeInstance::create("/test/test.sock")), buffer_("foo") {
     ON_CALL(decoder_callbacks_, connection())
         .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -47,7 +47,7 @@ public:
   NiceMock<Http::TestResponseTrailerMapImpl> response_trailers_;
   NiceMock<Buffer::OwnedImpl> buffer_;
   NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 };
 
 DEFINE_PROTO_FUZZER(
@@ -69,6 +69,14 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
+  // Limiting the max supported request body size to 128k.
+  if (input.request().has_proto_body()) {
+    const uint32_t max_body_size = 128 * 1024;
+    if (input.request().proto_body().message().value().size() > max_body_size) {
+      return;
+    }
+  }
+
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
 
@@ -77,47 +85,42 @@ DEFINE_PROTO_FUZZER(
       input.config();
   ExternalProcessing::FilterConfigSharedPtr config;
 
-  // Create regex engine which is used by regex matcher code.
-  Regex::EnginePtr regex_engine = std::make_shared<Regex::GoogleReEngine>();
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine.get());
-
   try {
     config = std::make_shared<ExternalProcessing::FilterConfig>(
-        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "",
+        proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        mocks.local_info_);
+        mocks.factory_context_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;
   }
 
-  MockClient* client = new MockClient();
+  ExternalProcessing::MockClient* client = new ExternalProcessing::MockClient();
   std::unique_ptr<ExternalProcessing::Filter> filter = std::make_unique<ExternalProcessing::Filter>(
-      config, ExternalProcessing::ExternalProcessorClientPtr{client}, proto_config.grpc_service());
+      config, ExternalProcessing::ExternalProcessorClientPtr{client});
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
-  EXPECT_CALL(*client, start(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&](ExternalProcessing::ExternalProcessorCallbacks&,
-              const Grpc::GrpcServiceConfigWithHashKey&,
-              const StreamInfo::StreamInfo&) -> ExternalProcessing::ExternalProcessorStreamPtr {
-            auto stream = std::make_unique<MockStream>();
-            EXPECT_CALL(*stream, send(_, _))
-                .WillRepeatedly(
-                    Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&, bool) -> void {
-                      auto response =
-                          std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>(
-                              input.response());
-                      filter->onReceiveMessage(std::move(response));
-                    }));
-            EXPECT_CALL(*stream, streamInfo())
-                .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
-            EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
-            return stream;
-          }));
+  EXPECT_CALL(*client, start(_, _, _, _))
+      .WillRepeatedly(Invoke([&](ExternalProcessing::ExternalProcessorCallbacks&,
+                                 const Grpc::GrpcServiceConfigWithHashKey&,
+                                 const Envoy::Http::AsyncClient::StreamOptions&,
+                                 Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&)
+                                 -> ExternalProcessing::ExternalProcessorStreamPtr {
+        auto stream = std::make_unique<ExternalProcessing::MockStream>();
+        EXPECT_CALL(*stream, send(_, _))
+            .WillRepeatedly(Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&,
+                                       bool) -> void {
+              auto response = std::make_unique<envoy::service::ext_proc::v3::ProcessingResponse>(
+                  input.response());
+              filter->onReceiveMessage(std::move(response));
+            }));
+        EXPECT_CALL(*stream, streamInfo())
+            .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
+        EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
+        return stream;
+      }));
 
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()), input.request());

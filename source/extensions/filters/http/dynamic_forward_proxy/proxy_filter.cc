@@ -32,15 +32,16 @@ struct ResponseStringValues {
   const std::string SubClusterOverflow = "Sub cluster overflow";
   const std::string SubClusterWarmingTimeout = "Sub cluster warming timeout";
   const std::string DFPClusterIsGone = "Dynamic forward proxy cluster is gone";
+  const std::string EmptyHostHeader = "Empty host header";
 };
 
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
-  const std::string DnsResolutionFailure = "dns_resolution_failure";
   const std::string SubClusterOverflow = "sub_cluster_overflow";
   const std::string SubClusterWarmingTimeout = "sub_cluster_warming_timeout";
   const std::string DFPClusterIsGone = "dynamic_forward_proxy_cluster_is_gone";
+  const std::string EmptyHostHeader = "empty_host_header";
 };
 
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
@@ -87,7 +88,19 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
     ENVOY_LOG(debug, "deliver dynamic cluster {} creation to main thread", cluster_name);
     main_thread_dispatcher_.post([this, cluster, version_info]() {
       ENVOY_LOG(debug, "initializing dynamic cluster {} creation in main thread", cluster.name());
-      cluster_manager_.addOrUpdateCluster(cluster, version_info);
+
+      // Set avoid_cds_removal to true to prevent the cluster from being removed during a CDS
+      // update. As this cluster lifecycle is managed by DFP cluster, it should not be removed by
+      // CDS. https://github.com/envoyproxy/envoy/issues/35171
+      absl::Status status =
+          cluster_manager_
+              .addOrUpdateCluster(
+                  cluster, version_info,
+                  Runtime::runtimeFeatureEnabled(
+                      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"))
+              .status();
+      ENVOY_BUG(status.ok(),
+                absl::StrCat("Failed to update DFP cluster due to ", status.message()));
     });
   } else {
     ENVOY_LOG(debug, "cluster='{}' already created, waiting it warming", cluster_name);
@@ -100,11 +113,6 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
                                                       cluster_name, callbacks);
 }
 
-Upstream::ClusterUpdateCallbacksHandlePtr
-ProxyFilterConfig::addThreadLocalClusterUpdateCallbacks() {
-  return cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
-}
-
 ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
   for (const auto& it : pending_clusters_) {
     for (auto cluster : it.second) {
@@ -112,25 +120,23 @@ ProxyFilterConfig::ThreadLocalClusterInfo::~ThreadLocalClusterInfo() {
     }
   }
 }
-
-void ProxyFilterConfig::onClusterAddOrUpdate(absl::string_view cluster_name,
-                                             Upstream::ThreadLocalClusterCommand&) {
+void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterAddOrUpdate(
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
   ENVOY_LOG(debug, "thread local cluster {} added or updated", cluster_name);
-  ThreadLocalClusterInfo& tls_cluster_info = *tls_slot_;
-  auto it = tls_cluster_info.pending_clusters_.find(cluster_name);
-  if (it != tls_cluster_info.pending_clusters_.end()) {
+  auto it = pending_clusters_.find(cluster_name);
+  if (it != pending_clusters_.end()) {
     for (auto* cluster : it->second) {
       auto& callbacks = cluster->callbacks_;
       cluster->cancel();
       callbacks.onLoadClusterComplete();
     }
-    tls_cluster_info.pending_clusters_.erase(it);
+    pending_clusters_.erase(it);
   } else {
     ENVOY_LOG(debug, "but not pending request waiting on {}", cluster_name);
   }
 }
 
-void ProxyFilterConfig::onClusterRemoval(const std::string&) {
+void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterRemoval(const std::string&) {
   // do nothing, should have no pending clusters.
 }
 
@@ -191,7 +197,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
-          .resolve(nullptr)
+          .resolve(nullptr, nullptr)
           .factory_.implementsSecureTransport()) {
     default_port = 443;
   }
@@ -246,15 +252,45 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  bool force_cache_refresh = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections")) {
+    // For Envoy Mobile, we need to handle endpoints becoming unreachable and needing a new DNS
+    // resolution on network change (WIFI to cellular and vice versa). This is expected to be
+    // more performant than the current pattern when enable_drain_post_dns_refresh_ = true
+    // in mobile/library/common/network/connectivity_manager.cc because that force-drains endpoints
+    // even if addresses don't change where this does induce DNS latency if there hasn't been a
+    // network change if the endpoint hasn't been referenced recently, but also guarantees there
+    // will be a DNS resolution relevant to the current network and is more consistent with other
+    // vetted and tested client stacks and resolution any time an endpoint becomes unreachable.
+    //
+    // If this runtime guard proves useful for Envoy Mobile, it will be replaced
+    // either with a permanent knob or non-reloadable runtime guard (see TODO in
+    // runtime_features.cc)
+    auto dfp_lb =
+        dynamic_cast<Extensions::Common::DynamicForwardProxy::DfpLb*>(&cluster->loadBalancer());
+    if (dfp_lb) {
+      std::string hostname = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(
+          headers.getHostValue(), default_port);
+      auto host = dfp_lb->findHostByName(hostname);
+      if (host && !host->used()) {
+        force_cache_refresh = true;
+      }
+    }
+  }
+
   latchTime(decoder_callbacks_, DNS_START);
-  // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded
-  // ports.
-  // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
-  //                     not obvious to the user if something is misconfigured. We should see if
-  //                     we can do better here, perhaps by checking the cache to see if anything
-  //                     else is attached to it or something else?
-  auto result = config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
-                                                   default_port, isProxying(), *this);
+  const bool is_proxying = isProxying();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_fail_on_empty_host_header")) {
+    if (headers.Host()->value().getStringView().empty()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                         ResponseStrings::get().EmptyHostHeader, nullptr,
+                                         absl::nullopt, RcDetails::get().EmptyHostHeader);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
+  auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
+      headers.Host()->value().getStringView(), default_port, is_proxying, force_cache_refresh,
+      *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();
@@ -267,8 +303,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     auto const& host = result.host_info_;
     latchTime(decoder_callbacks_, DNS_END);
+    if (is_proxying) {
+      ENVOY_BUG(host.has_value(), "Proxying request but no host entry in DNS cache.");
+      return Http::FilterHeadersStatus::Continue;
+    }
     if (!host.has_value() || !host.value()->address()) {
-      onDnsResolutionFail();
+      onDnsResolutionFail((host.has_value() && *host) ? ((*host)->details()) : "no_host");
       return Http::FilterHeadersStatus::StopIteration;
     }
     addHostAddressToFilterState(host.value()->address());
@@ -373,7 +413,7 @@ void ProxyFilter::onClusterInitTimeout() {
                                      absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);
 }
 
-void ProxyFilter::onDnsResolutionFail() {
+void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
   if (isProxying()) {
     decoder_callbacks_->continueDecoding();
     return;
@@ -383,7 +423,7 @@ void ProxyFilter::onDnsResolutionFail() {
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                      ResponseStrings::get().DnsResolutionFailure, nullptr,
-                                     absl::nullopt, RcDetails::get().DnsResolutionFailure);
+                                     absl::nullopt, details);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
@@ -395,7 +435,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
   circuit_breaker_.reset();
 
   if (!host_info->address()) {
-    onDnsResolutionFail();
+    onDnsResolutionFail(host_info->details());
     return;
   }
   addHostAddressToFilterState(host_info->address());

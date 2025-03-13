@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.http.original_ip_detection.xff.v3;
 
+import "envoy/config/core/v3/address.proto";
+
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.original_ip_detection.xff.v3";
@@ -22,5 +26,45 @@ message XffConfig {
   // determining the origin client's IP address. The default is zero if this option
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+  //
+  // Only one of ``xff_num_trusted_hops`` and ``xff_trusted_cidrs`` can be set.
   uint32 xff_num_trusted_hops = 1;
+
+  // The `CIDR <https://tools.ietf.org/html/rfc4632>`_ ranges to trust when
+  // evaluating the remote IP address to determine the original client's IP address.
+  // This is used instead of
+  // :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`.
+  // When the remote IP address matches a trusted CIDR and the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` header was sent, each entry
+  // in the ``x-forwarded-for`` header is evaluated from right to left and the first
+  // public non-trusted address is used as the original client address. If all
+  // addresses in ``x-forwarded-for`` are within the trusted list, the first (leftmost)
+  // entry is used.
+  //
+  // This is typically used when requests are proxied by a
+  // `CDN <https://en.wikipedia.org/wiki/Content_delivery_network>`_.
+  //
+  // Only one of ``xff_num_trusted_hops`` and ``xff_trusted_cidrs`` can be set.
+  XffTrustedCidrs xff_trusted_cidrs = 2;
+
+  // If set, Envoy will not append the remote address to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header.
+  //
+  // .. attention::
+  //
+  //   For proper proxy behaviour it is not recommended to set this option.
+  //   For backwards compatibility, if this option is unset it defaults to true.
+  //
+  // This only applies when :ref:`use_remote_address
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
+  // is false, otherwise :ref:`skip_xff_append
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
+  // applies.
+  google.protobuf.BoolValue skip_xff_append = 3;
+}
+
+message XffTrustedCidrs {
+  // The list of `CIDRs <https://tools.ietf.org/html/rfc4632>`_ from which remote
+  // connections are considered trusted.
+  repeated config.core.v3.CidrRange cidrs = 1;
 }

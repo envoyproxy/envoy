@@ -23,7 +23,6 @@ envoy_cc_library(
     ],
 )
 
-# TODO(abeyad): remove kick start ci
 envoy_cc_library(
     name = "os_sys_calls_lib",
     srcs = select({

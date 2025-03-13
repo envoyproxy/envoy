@@ -7,7 +7,8 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/transport_sockets/tls/utility.h"
+#include "source/common/tls/client_context_impl.h"
+#include "source/common/tls/utility.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
 
@@ -35,9 +36,10 @@ class QuicValidateResultCallback : public Ssl::ValidateResultCallback {
 public:
   QuicValidateResultCallback(Event::Dispatcher& dispatcher,
                              std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
-                             const std::string& hostname, const std::string& leaf_cert)
+                             const std::string& hostname, const std::string& leaf_cert,
+                             bool accept_untrusted)
       : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
-        leaf_cert_(leaf_cert) {}
+        leaf_cert_(leaf_cert), accept_untrusted_(accept_untrusted) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -46,7 +48,8 @@ public:
     std::string error;
     if (!succeeded) {
       error = error_details;
-    } else {
+    } else if (!accept_untrusted_ || !Runtime::runtimeFeatureEnabled(
+                                         "envoy.reloadable_features.extend_h3_accept_untrusted")) {
       std::unique_ptr<quic::CertificateView> cert_view =
           quic::CertificateView::ParseSingleCertificate(leaf_cert_);
       succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
@@ -62,6 +65,7 @@ private:
   const std::string hostname_;
   // Leaf cert needs to be retained in case of asynchronous validation.
   std::string leaf_cert_;
+  const bool accept_untrusted_;
 };
 
 } // namespace
@@ -90,14 +94,17 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(certs[0]);
-  ASSERT(cert_view != nullptr);
+  if (cert_view == nullptr) {
+    *error_details = "unable to parse certificate";
+    return quic::QUIC_FAILURE;
+  }
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
   if (sign_alg == 0) {
     return quic::QUIC_FAILURE;
   }
 
   auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
-      verify_context->dispatcher(), std::move(callback), hostname, certs[0]);
+      verify_context->dispatcher(), std::move(callback), hostname, certs[0], accept_untrusted_);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because

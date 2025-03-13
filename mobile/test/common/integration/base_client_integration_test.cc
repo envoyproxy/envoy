@@ -7,8 +7,6 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
-#include "library/cc/bridge_utility.h"
-#include "library/cc/log_level.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "spdlog/spdlog.h"
@@ -48,31 +46,6 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
-// Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
-// the Envoy Mobile engine.
-Platform::LogLevel getPlatformLogLevelFromOptions() {
-  switch (TestEnvironment::getOptions().logLevel()) {
-  case spdlog::level::level_enum::trace:
-    return Platform::LogLevel::trace;
-  case spdlog::level::level_enum::debug:
-    return Platform::LogLevel::debug;
-  case spdlog::level::level_enum::info:
-    return Platform::LogLevel::info;
-  case spdlog::level::level_enum::warn:
-    return Platform::LogLevel::warn;
-  case spdlog::level::level_enum::err:
-    return Platform::LogLevel::error;
-  case spdlog::level::level_enum::critical:
-    return Platform::LogLevel::critical;
-  case spdlog::level::level_enum::off:
-    return Platform::LogLevel::off;
-  default:
-    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
-                   TestEnvironment::getOptions().logLevel());
-    return Platform::LogLevel::info;
-  }
-}
-
 } // namespace
 
 // Use the Envoy mobile default config as much as possible in this test.
@@ -95,7 +68,8 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   defer_listener_finalization_ = true;
   memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
 
-  builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  builder_.setLogLevel(
+      static_cast<Logger::Logger::Levels>(TestEnvironment::getOptions().logLevel()));
   // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
   // interface gets compiled out by default in Envoy Mobile, remove it from the ConfigHelper's
   // bootstrap config.
@@ -110,66 +84,45 @@ void BaseClientIntegrationTest::initialize() {
     stream_prototype_ = engine_->streamClient()->newStreamPrototype();
   }
 
-  stream_prototype_->setOnHeaders(
-      [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
-        cc_.on_headers_calls++;
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-      });
-  stream_prototype_->setOnData([this](envoy_data c_data, bool) {
-    cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
-  stream_prototype_->setOnComplete(
-      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
-        if (expect_data_streams_) {
-          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
-        }
-        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-        cc_.on_complete_calls++;
-        cc_.terminal_callback->setReady();
-      });
-  stream_prototype_->setOnError(
-      [this](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
-        cc_.on_error_calls++;
-        cc_.terminal_callback->setReady();
-      });
-  stream_prototype_->setOnCancel([this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    EXPECT_NE(-1, final_intel.stream_start_ms);
-    cc_.on_cancel_calls++;
-    cc_.terminal_callback->setReady();
-  });
-
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
 
-std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobileHeaders(
-    const Http::TestRequestHeaderMapImpl& request_headers) {
+EnvoyStreamCallbacks BaseClientIntegrationTest::createDefaultStreamCallbacks() {
+  EnvoyStreamCallbacks stream_callbacks;
+  stream_callbacks.on_headers_ = [this](const Http::ResponseHeaderMap& headers, bool,
+                                        envoy_stream_intel intel) {
+    cc_.on_headers_calls_++;
+    cc_.status_ = absl::StrCat(headers.getStatusValue());
+    cc_.on_header_consumed_bytes_from_response_ = intel.consumed_bytes_from_response;
+  };
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t /* length */,
+                                     bool /* end_stream */,
+                                     envoy_stream_intel) { cc_.on_data_calls_++; };
+  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    memcpy(&last_stream_final_intel_, &final_intel, sizeof(envoy_final_stream_intel));
+    if (expect_data_streams_) {
+      validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls_ == 0);
+    }
+    cc_.on_complete_received_byte_count_ = final_intel.received_byte_count;
+    cc_.on_complete_calls_++;
+    cc_.terminal_callback_->setReady();
+  };
+  stream_callbacks.on_error_ = [this](EnvoyError, envoy_stream_intel, envoy_final_stream_intel) {
+    cc_.on_error_calls_++;
+    cc_.terminal_callback_->setReady();
+  };
+  stream_callbacks.on_cancel_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    EXPECT_NE(-1, final_intel.stream_start_ms);
+    cc_.on_cancel_calls_++;
+    cc_.terminal_callback_->setReady();
+  };
+  return stream_callbacks;
+}
 
-  Platform::RequestHeadersBuilder builder(
-      Platform::RequestMethod::GET,
-      std::string(default_request_headers_.Scheme()->value().getStringView()),
-      std::string(default_request_headers_.Host()->value().getStringView()),
-      std::string(default_request_headers_.Path()->value().getStringView()));
-
-  request_headers.iterate(
-      [&request_headers, &builder](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        std::string key = std::string(header.key().getStringView());
-        if (request_headers.formatter().has_value()) {
-          const Envoy::Http::StatefulHeaderKeyFormatter& formatter =
-              request_headers.formatter().value();
-          key = formatter.format(key);
-        }
-        auto value = std::vector<std::string>();
-        value.push_back(std::string(header.value().getStringView()));
-        builder.set(key, value);
-        return Http::HeaderMap::Iterate::Continue;
-      });
-
-  return std::make_shared<Platform::RequestHeaders>(builder.build());
+Platform::StreamSharedPtr
+BaseClientIntegrationTest::createNewStream(EnvoyStreamCallbacks&& stream_callbacks) {
+  return stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
@@ -221,9 +174,9 @@ uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
   uint64_t counter_value = 0UL;
   uint64_t* counter_value_ptr = &counter_value;
   absl::Notification counter_value_set;
-  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
-  engine->dispatcher().post([&] {
-    Stats::CounterSharedPtr counter = TestUtility::findCounter(engine->getStatsStore(), name);
+  internalEngine()->dispatcher().post([&] {
+    Stats::CounterSharedPtr counter =
+        TestUtility::findCounter(internalEngine()->getStatsStore(), name);
     if (counter != nullptr) {
       *counter_value_ptr = counter->value();
     }
@@ -252,9 +205,8 @@ uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
   uint64_t gauge_value = 0UL;
   uint64_t* gauge_value_ptr = &gauge_value;
   absl::Notification gauge_value_set;
-  auto engine = reinterpret_cast<Envoy::InternalEngine*>(rawEngine());
-  engine->dispatcher().post([&] {
-    Stats::GaugeSharedPtr gauge = TestUtility::findGauge(engine->getStatsStore(), name);
+  internalEngine()->dispatcher().post([&] {
+    Stats::GaugeSharedPtr gauge = TestUtility::findGauge(internalEngine()->getStatsStore(), name);
     if (gauge != nullptr) {
       *gauge_value_ptr = gauge->value();
     }
@@ -277,4 +229,5 @@ testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::st
   }
   return testing::AssertionSuccess();
 }
+
 } // namespace Envoy

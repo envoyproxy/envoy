@@ -1,89 +1,200 @@
 #include "library/common/internal_engine.h"
 
+#include <sys/resource.h>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
-#include "library/common/bridge/utility.h"
-#include "library/common/data/utility.h"
+#include "library/common/mobile_process_wide.h"
+#include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
+namespace {
+constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
+
+// There is only one shared MobileProcessWide instance for all Envoy Mobile engines.
+MobileProcessWide& initOnceMobileProcessWide(const OptionsImplBase& options) {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(MobileProcessWide, options);
+}
+
+Network::Address::InstanceConstSharedPtr ipv6ProbeAddr() {
+  // Use Google DNS IPv6 address for IPv6 probes.
+  CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
+                         new Network::Address::Ipv6Instance("2001:4860:4860::8888", 53));
+}
+
+Network::Address::InstanceConstSharedPtr ipv4ProbeAddr() {
+  // Use Google DNS IPv4 address for IPv4 probes.
+  CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
+                         new Network::Address::Ipv4Instance("8.8.8.8", 53));
+}
+
+bool hasNetworkChanged(int network_type, int prev_network_type) {
+  // The network types are both cellular and don't differ in the Network::Generic (e.g. VPN) flag,
+  // so don't consider it a network change. If the previous and current network types differ, it's a
+  // difference in cellular network subtypes (e.g. 4G to 5G).
+  if ((network_type & static_cast<int>(NetworkType::WWAN)) &&
+      (prev_network_type & static_cast<int>(NetworkType::WWAN)) &&
+      (network_type & static_cast<int>(NetworkType::Generic)) ==
+          (prev_network_type & static_cast<int>(NetworkType::Generic))) {
+    return false;
+  }
+  // Otherwise, if the current network type is different from the previous network type, it's a
+  // network change.
+  return network_type != prev_network_type;
+}
+
+bool areIpAddressesDifferent(const Network::Address::InstanceConstSharedPtr& addr,
+                             const Network::Address::InstanceConstSharedPtr& prev_addr) {
+  if (addr == nullptr && prev_addr == nullptr) {
+    return false;
+  }
+  if (addr == nullptr || prev_addr == nullptr) {
+    // Change in presence of an IP address is treated as a difference.
+    return true;
+  }
+  if (addr->ip()->version() != prev_addr->ip()->version()) {
+    // IP address versions are different.
+    return true;
+  }
+  if (addr->ip()->version() == Network::Address::IpVersion::v6) {
+    // Both are IPv6 but the addresses are different.
+    return addr->ip()->ipv6()->address() != prev_addr->ip()->ipv6()->address();
+  }
+  // Both are IPv4 but the addresses are different.
+  return addr->ip()->ipv4()->address() != prev_addr->ip()->ipv4()->address();
+}
+} // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
 
-envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
-
-InternalEngine::InternalEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
-                               envoy_event_tracker event_tracker)
-    : callbacks_(callbacks), logger_(logger), event_tracker_(event_tracker),
-      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
+                               std::unique_ptr<EnvoyLogger> logger,
+                               std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority,
+                               bool disable_dns_refresh_on_network_change,
+                               Thread::PosixThreadFactoryPtr thread_factory)
+    : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
+      logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
+      thread_priority_(thread_priority),
+      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
+      disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change) {
   ExtensionRegistry::registerFactories();
 
-  // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
-  // registry may lead to crashes at Engine shutdown. To be figured out as part of
-  // https://github.com/envoyproxy/envoy-mobile/issues/332
-  Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
-  // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
-  // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
-  // Google), so we force it back to true in Envoy Mobile.
-  // TODO(abeyad): Remove once this is no longer needed.
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
+  Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
 }
 
-envoy_status_t InternalEngine::run(const std::string& config, const std::string& log_level) {
-  // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
-  // std::thread, main_thread_ is the same object after this call, but its state is replaced with
-  // that of the temporary. The temporary object's state becomes the default state, which does
-  // nothing.
-  auto options = std::make_unique<Envoy::OptionsImplBase>();
-  options->setConfigYaml(config);
-  if (!log_level.empty()) {
-    ENVOY_BUG(options->setLogLevel(log_level).ok(), "invalid log level");
-  }
-  options->setConcurrency(1);
-  return run(std::move(options));
+InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
+                               std::unique_ptr<EnvoyLogger> logger,
+                               std::unique_ptr<EnvoyEventTracker> event_tracker,
+                               absl::optional<int> thread_priority,
+                               bool disable_dns_refresh_on_network_change)
+    : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
+                     thread_priority, disable_dns_refresh_on_network_change,
+                     Thread::PosixThreadFactory::create()) {}
+
+envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
+
+envoy_status_t InternalEngine::startStream(envoy_stream_t stream,
+                                           EnvoyStreamCallbacks&& stream_callbacks,
+                                           bool explicit_flow_control) {
+  return dispatcher_->post(
+      [&, stream, stream_callbacks = std::move(stream_callbacks), explicit_flow_control]() mutable {
+        http_client_->startStream(stream, std::move(stream_callbacks), explicit_flow_control);
+      });
 }
 
-envoy_status_t InternalEngine::run(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
-  main_thread_ = std::thread(&InternalEngine::main, this, std::move(options));
+envoy_status_t InternalEngine::sendHeaders(envoy_stream_t stream, Http::RequestHeaderMapPtr headers,
+                                           bool end_stream, bool idempotent) {
+  return dispatcher_->post(
+      [this, stream, headers = std::move(headers), end_stream, idempotent]() mutable {
+        http_client_->sendHeaders(stream, std::move(headers), end_stream, idempotent);
+      });
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& options) {
+envoy_status_t InternalEngine::readData(envoy_stream_t stream, size_t bytes_to_read) {
+  return dispatcher_->post(
+      [&, stream, bytes_to_read]() { http_client_->readData(stream, bytes_to_read); });
+}
+
+envoy_status_t InternalEngine::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer,
+                                        bool end_stream) {
+  return dispatcher_->post([&, stream, buffer = std::move(buffer), end_stream]() mutable {
+    http_client_->sendData(stream, std::move(buffer), end_stream);
+  });
+}
+
+envoy_status_t InternalEngine::sendTrailers(envoy_stream_t stream,
+                                            Http::RequestTrailerMapPtr trailers) {
+  return dispatcher_->post([&, stream, trailers = std::move(trailers)]() mutable {
+    http_client_->sendTrailers(stream, std::move(trailers));
+  });
+}
+
+envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
+  return dispatcher_->post([&, stream]() { http_client_->cancelStream(stream); });
+}
+
+// This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
+// copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
+// `std::function`.
+envoy_status_t InternalEngine::run(std::shared_ptr<OptionsImplBase> options) {
+  initOnceMobileProcessWide(*options);
+  Thread::Options thread_options;
+  thread_options.priority_ = thread_priority_;
+  main_thread_ = thread_factory_->createThread([this, options]() mutable -> void { main(options); },
+                                               thread_options, /* crash_on_failure= */ false);
+  return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
+}
+
+envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
     Thread::LockGuard lock(mutex_);
     TRY_NEEDS_AUDIT {
-      if (event_tracker_.track != nullptr) {
+      if (event_tracker_ != nullptr) {
         assert_handler_registration_ =
             Assert::addDebugAssertionFailureRecordAction([this](const char* location) {
-              const auto event = Bridge::Utility::makeEnvoyMap(
-                  {{"name", "assertion"}, {"location", std::string(location)}});
-              event_tracker_.track(event, event_tracker_.context);
+              absl::flat_hash_map<std::string, std::string> event{
+                  {{"name", "assertion"}, {"location", std::string(location)}}};
+              event_tracker_->on_track_(event);
             });
         bug_handler_registration_ =
             Assert::addEnvoyBugFailureRecordAction([this](const char* location) {
-              const auto event = Bridge::Utility::makeEnvoyMap(
-                  {{"name", "bug"}, {"location", std::string(location)}});
-              event_tracker_.track(event, event_tracker_.context);
+              absl::flat_hash_map<std::string, std::string> event{
+                  {{"name", "bug"}, {"location", std::string(location)}}};
+              event_tracker_->on_track_(event);
             });
       }
 
       // We let the thread clean up this log delegate pointer
-      if (logger_.log) {
-        log_delegate_ptr_ =
-            std::make_unique<Logger::LambdaDelegate>(logger_, Logger::Registry::getSink());
+      if (logger_ != nullptr) {
+        log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger_),
+                                                                     Logger::Registry::getSink());
       } else {
         log_delegate_ptr_ =
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(std::move(options));
+      main_common = std::make_unique<EngineCommon>(options);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
+
+      // If proxy resolution APIs are configured on the Engine, set the main thread's dispatcher
+      // on the proxy resolver for handling callbacks.
+      auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
+          Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
+      if (proxy_resolver != nullptr) {
+        proxy_resolver->resolver->setDispatcher(event_dispatcher_);
+      }
 
       cv_.notifyAll();
     }
@@ -105,6 +216,13 @@ envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& op
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+            if (probeAndGetLocalAddr(AF_INET6) == nullptr) {
+              connectivity_manager_->dnsCache()->setIpVersionToRemove(
+                  {Network::Address::IpVersion::v6});
+            }
+          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
@@ -121,9 +239,8 @@ envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& op
                                                         server_->serverFactoryContext().scope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
-          if (callbacks_.on_engine_running != nullptr) {
-            callbacks_.on_engine_running(callbacks_.context);
-          }
+          engine_running_.Notify();
+          callbacks_->on_engine_running_();
         });
   } // mutex_
 
@@ -140,7 +257,10 @@ envoy_status_t InternalEngine::main(std::unique_ptr<Envoy::OptionsImplBase>&& op
   bug_handler_registration_.reset(nullptr);
   assert_handler_registration_.reset(nullptr);
 
-  callbacks_.on_exit(callbacks_.context);
+  if (event_tracker_ != nullptr) {
+    event_tracker_->on_exit_();
+  }
+  callbacks_->on_exit_();
 
   return run_success ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
@@ -150,10 +270,18 @@ envoy_status_t InternalEngine::terminate() {
     IS_ENVOY_BUG("attempted to double terminate engine");
     return ENVOY_FAILURE;
   }
-  // If main_thread_ has finished (or hasn't started), there's nothing more to do.
-  if (!main_thread_.joinable()) {
+  // The Engine could not be created.
+  if (main_thread_ == nullptr) {
     return ENVOY_FAILURE;
   }
+  // If main_thread_ has finished (or hasn't started), there's nothing more to do.
+  if (!main_thread_->joinable()) {
+    return ENVOY_FAILURE;
+  }
+
+  // Wait until the Engine is ready before calling terminate to avoid assertion failures.
+  // TODO(fredyw): Fix this without having to wait.
+  ASSERT(engine_running_.WaitForNotificationWithTimeout(ENGINE_RUNNING_TIMEOUT));
 
   // We need to be sure that MainCommon is finished being constructed so we can dispatch shutdown.
   {
@@ -170,7 +298,7 @@ envoy_status_t InternalEngine::terminate() {
     dispatcher_->post([this]() { http_client_->shutdownApiListener(); });
 
     // Exit the event loop and finish up in Engine::run(...)
-    if (std::this_thread::get_id() == main_thread_.get_id()) {
+    if (thread_factory_->currentPthreadId() == main_thread_->pthreadId()) {
       // TODO(goaway): figure out some way to support this.
       PANIC("Terminating the engine from its own main thread is currently unsupported.");
     } else {
@@ -178,8 +306,8 @@ envoy_status_t InternalEngine::terminate() {
     }
   } // lock(_mutex)
 
-  if (std::this_thread::get_id() != main_thread_.get_id()) {
-    main_thread_.join();
+  if (thread_factory_->currentPthreadId() != main_thread_->pthreadId()) {
+    main_thread_->join();
   }
   terminated_ = true;
   return ENVOY_SUCCESS;
@@ -203,12 +331,85 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-envoy_status_t InternalEngine::setPreferredNetwork(envoy_network_t network) {
-  return dispatcher_->post([&, network]() -> void {
-    envoy_netconf_t configuration_key =
-        Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
-    connectivity_manager_->refreshDns(configuration_key, true);
+void InternalEngine::onDefaultNetworkAvailable() {
+  ENVOY_LOG_MISC(trace, "Calling the default network available callback");
+  // TODO(abeyad): Add a call to re-add DNS records for refreshing based on their TTL.
+}
+
+void InternalEngine::onDefaultNetworkChangeEvent(const int network_type) {
+  ENVOY_LOG_MISC(trace, "Calling the default network change event callback");
+
+  dispatcher_->post([&, network_type]() -> void {
+    Network::Address::InstanceConstSharedPtr local_addr = probeAndGetLocalAddr(AF_INET6);
+    const bool has_ipv6_connectivity = local_addr != nullptr;
+    if (local_addr == nullptr) {
+      // If there's no IPv6 connectivity, get the IPv4 local address.
+      local_addr = probeAndGetLocalAddr(AF_INET);
+    }
+
+    if (hasNetworkChanged(network_type, prev_network_type_) ||
+        areIpAddressesDifferent(local_addr, prev_local_addr_)) {
+      // If the IP addresses are not the same between network change events, or the network type
+      // changed and it's not just a cellular subtype change (e.g. 4g to 5g), then assume there was
+      // an actual network change.
+      handleNetworkChange(network_type, has_ipv6_connectivity);
+    }
+
+    prev_network_type_ = network_type;
+    prev_local_addr_ = local_addr;
+
+    ENVOY_LOG_MISC(trace, "Finished the network changed callback");
   });
+}
+
+// TODO(abeyad): Delete this function after onDefaultNetworkChangeEvent() is tested and becomes the
+// default.
+void InternalEngine::onDefaultNetworkChanged(int network) {
+  ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
+  dispatcher_->post([&, network]() -> void {
+    handleNetworkChange(network, probeAndGetLocalAddr(AF_INET6) != nullptr);
+  });
+}
+
+void InternalEngine::onDefaultNetworkUnavailable() {
+  ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
+  dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
+}
+
+void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
+  envoy_netconf_t configuration =
+      Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+    // The IP version to remove flag must be set first before refreshing the DNS cache so that
+    // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
+    // removed.
+    if (!has_ipv6_connectivity) {
+      connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
+    } else {
+      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+    }
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
+    Http::HttpServerPropertiesCacheManager& cache_manager =
+        server_->httpServerPropertiesCacheManager();
+
+    Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+        [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+    cache_manager.forEachThreadLocalCache(clear_brokenness);
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
+    Http::HttpServerPropertiesCacheManager& cache_manager =
+        server_->httpServerPropertiesCacheManager();
+
+    Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
+        [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
+    cache_manager.forEachThreadLocalCache(reset_status);
+  }
+  if (!disable_dns_refresh_on_network_change_) {
+    connectivity_manager_->refreshDns(configuration, true);
+  }
 }
 
 envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
@@ -223,7 +424,9 @@ envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envo
       });
 }
 
-Event::ProvisionalDispatcher& InternalEngine::dispatcher() { return *dispatcher_; }
+Event::ProvisionalDispatcher& InternalEngine::dispatcher() const { return *dispatcher_; }
+
+Thread::PosixThreadFactory& InternalEngine::threadFactory() const { return *thread_factory_; }
 
 void statsAsText(const std::map<std::string, uint64_t>& all_stats,
                  const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
@@ -265,7 +468,7 @@ void handlerStats(Stats::Store& stats, Buffer::Instance& response) {
 }
 
 std::string InternalEngine::dumpStats() {
-  if (!main_thread_.joinable()) {
+  if (!main_thread_->joinable()) {
     return "";
   }
 
@@ -296,17 +499,51 @@ Stats::Store& InternalEngine::getStatsStore() {
 
 void InternalEngine::logInterfaces(absl::string_view event,
                                    std::vector<Network::InterfacePair>& interfaces) {
-  std::vector<std::string> names;
-  names.resize(interfaces.size());
-  std::transform(interfaces.begin(), interfaces.end(), names.begin(),
-                 [](Network::InterfacePair& pair) { return std::get<0>(pair); });
+  auto all_names_printer = [](std::vector<Network::InterfacePair>& interfaces) -> std::string {
+    std::vector<std::string> names;
+    names.resize(interfaces.size());
+    std::transform(interfaces.begin(), interfaces.end(), names.begin(),
+                   [](Network::InterfacePair& pair) { return std::get<0>(pair); });
 
-  auto unique_end = std::unique(names.begin(), names.end());
-  std::string all_names = std::accumulate(names.begin(), unique_end, std::string{},
-                                          [](std::string acc, std::string next) {
-                                            return acc.empty() ? next : std::move(acc) + "," + next;
-                                          });
-  ENVOY_LOG_EVENT(debug, event, all_names);
+    auto unique_end = std::unique(names.begin(), names.end());
+    std::string all_names = std::accumulate(
+        names.begin(), unique_end, std::string{}, [](std::string acc, std::string next) {
+          return acc.empty() ? next : std::move(acc) + "," + next;
+        });
+    return all_names;
+  };
+  ENVOY_LOG_EVENT(debug, event, "{}", all_names_printer(interfaces));
+}
+
+Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(int domain) {
+  // This probing logic is borrowed from Chromium.
+  // -
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=154-157;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
+  // -
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/dns/host_resolver_manager.cc;l=1467-1488;drc=7b232da0f22e8cdf555d43c52b6491baeb87f729
+  ENVOY_LOG(trace, "Checking for {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");
+  const Api::SysCallSocketResult socket_result =
+      Api::OsSysCallsSingleton::get().socket(domain, SOCK_DGRAM, /* protocol= */ 0);
+  if (!SOCKET_VALID(socket_result.return_value_)) {
+    ENVOY_LOG(trace, "Unable to create a datagram socket with errno: {}.", socket_result.errno_);
+    return nullptr;
+  }
+  Network::IoSocketHandleImpl socket_handle(socket_result.return_value_,
+                                            /* socket_v6only= */ domain == AF_INET6, {domain});
+  Api::SysCallIntResult connect_result =
+      socket_handle.connect(domain == AF_INET6 ? ipv6ProbeAddr() : ipv4ProbeAddr());
+  if (connect_result.return_value_ == 0) {
+    auto address_or_error = socket_handle.localAddress();
+    if (!address_or_error.status().ok()) {
+      ENVOY_LOG(trace, "Local address error: {}", address_or_error.status().message());
+      return nullptr;
+    }
+    ENVOY_LOG(trace, "Found {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");
+    return *address_or_error;
+  }
+  ENVOY_LOG(trace, "No {} connectivity found with errno: {}.", domain == AF_INET6 ? "IPv6" : "IPv4",
+            connect_result.errno_);
+  return nullptr;
 }
 
 } // namespace Envoy

@@ -175,7 +175,8 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::config::core::v3::GrpcService& config, Api::Api& api,
+                        const envoy::config::core::v3::GrpcService& config,
+                        Server::Configuration::CommonFactoryContext& context,
                         const StatNames& stat_names);
   ~GoogleAsyncClientImpl() override;
 
@@ -235,6 +236,11 @@ public:
     return bytes_in_write_pending_queue_ > parent_.perStreamBufferLimitBytes();
   }
   const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return unused_stream_info_; }
+
+  // Google-gRPC code doesn't use Envoy watermark buffers, so the functions below are not used.
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks&) override {}
+  void removeWatermarkCallbacks() override {}
 
 protected:
   bool callFailed() const { return call_failed_; }
@@ -313,6 +319,7 @@ private:
   // freed.
   uint32_t inflight_tags_{};
 
+  Tracing::SpanPtr current_span_;
   // This is unused.
   StreamInfo::StreamInfoImpl unused_stream_info_;
 
@@ -339,8 +346,12 @@ public:
 
   // Grpc::AsyncRequest
   void cancel() override;
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    return GoogleAsyncStreamImpl::streamInfo();
+  }
 
 private:
+  using GoogleAsyncStreamImpl::streamInfo;
   // Grpc::RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;

@@ -45,6 +45,8 @@ const static bool should_log = true;
   FUNCTION(config)                                                                                 \
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
+  FUNCTION(compression)                                                                            \
+  FUNCTION(credential_injector)                                                                    \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
@@ -69,6 +71,7 @@ const static bool should_log = true;
   FUNCTION(kafka)                                                                                  \
   FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
+  FUNCTION(local_rate_limit)                                                                       \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
@@ -94,7 +97,9 @@ const static bool should_log = true;
   FUNCTION(udp)                                                                                    \
   FUNCTION(wasm)                                                                                   \
   FUNCTION(websocket)                                                                              \
-  FUNCTION(golang)
+  FUNCTION(golang)                                                                                 \
+  FUNCTION(stats_sinks)                                                                            \
+  FUNCTION(dynamic_modules)
 
 // clang-format off
 enum class Id {
@@ -204,19 +209,8 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
-  template <class FmtStr, class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
-                         absl::string_view component, FmtStr fmt_str, Args... msg) {
-    auto tls_sink = tlsDelegate();
-    if (tls_sink != nullptr) {
-      tls_sink->logWithStableName(stable_name, level, component,
-                                  fmt::format(fmt::runtime(fmt_str), msg...));
-      return;
-    }
-    absl::ReaderMutexLock sink_lock(&sink_mutex_);
-    sink_->logWithStableName(stable_name, level, component,
-                             fmt::format(fmt::runtime(fmt_str), msg...));
-  }
+                         absl::string_view component, absl::string_view message);
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override;
@@ -511,9 +505,19 @@ public:
 
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level())
 
-// Compare levels before invoking logger. This is an optimization to avoid
-// executing expressions computing log contents when they would be suppressed.
-// The same filtering will also occur in spdlog::logger.
+/**
+ * Compare levels and use the fine grain logger if fine grain logging is enabled.
+ */
+#define ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)                                          \
+  (Envoy::Logger::Context::useFineGrainLogger()                                                    \
+       ? (ENVOY_SPDLOG_LEVEL(LEVEL) >= (*FINE_GRAIN_LOGGER()).level())                             \
+       : (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level()))
+
+/**
+ * Compare levels before invoking logger. This is an optimization to avoid
+ * executing expressions computing log contents when they would be suppressed.
+ * The same filtering will also occur in spdlog::logger.
+ */
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (Envoy::Logger::should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                        \
@@ -559,9 +563,8 @@ public:
 #define ENVOY_TAGGED_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, FORMAT, ...)                               \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL,                                                           \
-                          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(TAGS) + FORMAT), \
-                          ##__VA_ARGS__);                                                          \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS), ##__VA_ARGS__);        \
     }                                                                                              \
   } while (0)
 
@@ -570,10 +573,8 @@ public:
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       std::map<std::string, std::string> log_tags = TAGS;                                          \
       log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
-      ENVOY_LOG_TO_LOGGER(                                                                         \
-          LOGGER, LEVEL,                                                                           \
-          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
-          ##__VA_ARGS__);                                                                          \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
     }                                                                                              \
   } while (0)
 
@@ -584,36 +585,30 @@ public:
       log_tags.emplace("ConnectionId",                                                             \
                        (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
       log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
-      ENVOY_LOG_TO_LOGGER(                                                                         \
-          LOGGER, LEVEL,                                                                           \
-          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
-          ##__VA_ARGS__);                                                                          \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
     }                                                                                              \
   } while (0)
 
 #define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       std::map<std::string, std::string> log_tags;                                                 \
       log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
-      ENVOY_LOG_TO_LOGGER(                                                                         \
-          LOGGER, LEVEL,                                                                           \
-          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
-          ##__VA_ARGS__);                                                                          \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
     }                                                                                              \
   } while (0)
 
 #define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       std::map<std::string, std::string> log_tags;                                                 \
       log_tags.emplace("ConnectionId",                                                             \
                        (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
       log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
-      ENVOY_LOG_TO_LOGGER(                                                                         \
-          LOGGER, LEVEL,                                                                           \
-          fmt::runtime(::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT),             \
-          ##__VA_ARGS__);                                                                          \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
     }                                                                                              \
   } while (0)
 
@@ -663,21 +658,23 @@ public:
 #define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
     ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
-                                                              ##__VA_ARGS__);                      \
+                                                              fmt::format(__VA_ARGS__));           \
     }                                                                                              \
   } while (0)
 
 #define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)) {                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(ENVOY_LOGGER(), LEVEL)) {                               \
       std::map<std::string, std::string> log_tags;                                                 \
       log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
-      const auto combined_format = ::Envoy::Logger::Utility::serializeLogTags(log_tags) + FORMAT;  \
-      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, fmt::runtime(combined_format), ##__VA_ARGS__);    \
+      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, "{}" FORMAT,                                      \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(                                     \
-          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(), combined_format, ##__VA_ARGS__);            \
+          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(),                                             \
+          fmt::format("{}" FORMAT, ::Envoy::Logger::Utility::serializeLogTags(log_tags),           \
+                      ##__VA_ARGS__));                                                             \
     }                                                                                              \
   } while (0)
 

@@ -72,10 +72,10 @@ public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
                      const CNameMap& cnames, const std::chrono::seconds& record_ttl,
                      const std::chrono::seconds& cname_ttl_, bool refused, bool error_on_a,
-                     bool error_on_aaaa)
+                     bool error_on_aaaa, bool no_response)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
         cnames_(cnames), record_ttl_(record_ttl), cname_ttl_(cname_ttl_), refused_(refused),
-        error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa) {
+        error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa), no_response_(no_response) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -164,7 +164,9 @@ private:
           const auto addrs = getAddrs(q_type, lookup_name);
           auto buf = createAddrResolutionBuffer(q_type, addrs, request, name_len, encoded_cname,
                                                 encoded_name);
-          parent_.connection_->write(buf, false);
+          if (!parent_.no_response_) {
+            parent_.connection_->write(buf, false);
+          }
 
           // Reset query state, time for the next one.
           buffer_.drain(size_);
@@ -335,20 +337,23 @@ private:
   const bool refused_;
   const bool error_on_a_;
   const bool error_on_aaaa_;
+  const bool no_response_{false};
 };
 
 class TestDnsServer : public TcpListenerCallbacks {
 public:
-  TestDnsServer(Event::Dispatcher& dispatcher)
+  TestDnsServer(Event::Dispatcher& dispatcher, bool no_response)
       : dispatcher_(dispatcher), record_ttl_(0), cname_ttl_(0),
-        stream_info_(dispatcher.timeSource(), nullptr) {}
+        stream_info_(dispatcher.timeSource(), nullptr,
+                     StreamInfo::FilterState::LifeSpan::Connection),
+        no_response_(no_response) {}
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
-    TestDnsServerQuery* query =
-        new TestDnsServerQuery(std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_,
-                               record_ttl_, cname_ttl_, refused_, error_on_a_, error_on_aaaa_);
+    TestDnsServerQuery* query = new TestDnsServerQuery(
+        std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_, record_ttl_, cname_ttl_,
+        refused_, error_on_a_, error_on_aaaa_, no_response_);
     queries_.emplace_back(query);
   }
 
@@ -388,6 +393,7 @@ private:
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
   StreamInfo::StreamInfoImpl stream_info_;
+  const bool no_response_{false};
 };
 
 } // namespace
@@ -434,9 +440,9 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -458,7 +464,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
 
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
@@ -476,7 +483,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 
 TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
-  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
+  auto addr4 = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
   // First, create a resolver with no fallback. Check to see if cares default is
   // the only nameserver.
@@ -491,7 +498,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     auto resolver =
-        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+            .value();
     auto peer =
         std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
     only_has_default = peer->isCaresDefaultTheOnlyNameserver();
@@ -513,7 +521,8 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
 
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
@@ -535,11 +544,11 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
-  auto addr4_a = Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
-  auto addr4_b = Network::Utility::parseInternetAddressAndPort("5.6.7.8:81");
+  auto addr4_a = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80");
+  auto addr4_b = Network::Utility::parseInternetAddressAndPortNoThrow("5.6.7.8:81");
   char addr6str[INET6_ADDRSTRLEN];
-  auto addr6_a = Network::Utility::parseInternetAddressAndPort("[::2]:90");
-  auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
+  auto addr6_a = Network::Utility::parseInternetAddressAndPortNoThrow("[::2]:90");
+  auto addr6_b = Network::Utility::parseInternetAddressAndPortNoThrow("[::3]:91");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -574,7 +583,8 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -657,7 +667,8 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -680,14 +691,12 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        Network::DnsResolverFactory& dns_resolver_factory =
-            createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-        auto resolver =
-            dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
-      },
-      EnvoyException, "DNS resolver 'foo' is not an IP address");
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  EXPECT_EQ(dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+                .status()
+                .message(),
+            "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -713,6 +722,8 @@ public:
     }
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
+    cares.set_allocated_udp_max_queries(udpMaxQueries());
+    cares.set_rotate_nameservers(setRotateNameservers());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -725,7 +736,7 @@ public:
 
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
-    server_ = std::make_unique<TestDnsServer>(*dispatcher_);
+    server_ = std::make_unique<TestDnsServer>(*dispatcher_, queryTimeout());
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     NiceMock<Network::MockListenerConfig> listener_config;
@@ -733,6 +744,7 @@ public:
     listener_ = std::make_unique<Network::TcpListenerImpl>(
         *dispatcher_, api_->randomGenerator(), runtime_, socket_, *server_,
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     updateDnsResolverOptions();
 
@@ -748,7 +760,8 @@ public:
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     resolver_ =
-        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+            .value();
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
     resetChannel();
@@ -756,7 +769,7 @@ public:
 
   void resetChannel() {
     if (tcpOnly()) {
-      peer_->resetChannelTcpOnly(zeroTimeout());
+      peer_->resetChannelTcpOnly(queryTimeout());
     }
     ares_set_servers_ports_csv(
         peer_->channel(), socket_->connectionInfoProvider().localAddress()->asString().c_str());
@@ -794,7 +807,8 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                  std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -825,14 +839,15 @@ public:
 
   ActiveDnsQuery* resolveWithNoRecordsExpectation(const std::string& address,
                                                   const DnsLookupFamily lookup_family) {
-    return resolver_->resolve(
-        address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-          EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          std::list<std::string> address_as_string_list = getAddressAsStringList(results);
-          EXPECT_EQ(0, address_as_string_list.size());
-          dispatcher_->exit();
-        });
+    return resolver_->resolve(address, lookup_family,
+                              [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                        std::list<DnsResponse>&& results) -> void {
+                                EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
+                                std::list<std::string> address_as_string_list =
+                                    getAddressAsStringList(results);
+                                EXPECT_EQ(0, address_as_string_list.size());
+                                dispatcher_->exit();
+                              });
   }
 
   ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
@@ -840,6 +855,7 @@ public:
                                                     bool expected_to_execute) {
     return resolver_->resolve(address, lookup_family,
                               [expected_to_execute](DnsResolver::ResolutionStatus status,
+                                                    absl::string_view,
                                                     std::list<DnsResponse>&& results) -> void {
                                 EXPECT_TRUE(expected_to_execute);
                                 UNREFERENCED_PARAMETER(status);
@@ -852,6 +868,7 @@ public:
                                        const DnsLookupFamily lookup_family, T exception_object) {
     return resolver_->resolve(address, lookup_family,
                               [exception_object](DnsResolver::ResolutionStatus status,
+                                                 absl::string_view,
                                                  std::list<DnsResponse>&& results) -> void {
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
@@ -863,7 +880,7 @@ public:
                            const DnsLookupFamily lookup_family,
                            const std::list<std::string>& expected_addresses,
                            const DnsResolver::ResolutionStatus resolution_status =
-                               DnsResolver::ResolutionStatus::Success,
+                               DnsResolver::ResolutionStatus::Completed,
                            const bool getifaddrs_supported = true,
                            const bool getifaddrs_success = true) {
     server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
@@ -879,7 +896,7 @@ public:
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
             .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
               for (uint32_t i = 0; i < ifaddrs.size(); i++) {
-                auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+                auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                 vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
               }
               return {0, 0};
@@ -940,12 +957,14 @@ public:
   }
 
 protected:
-  // Should the DnsResolverImpl use a zero timeout for c-ares queries?
-  virtual bool zeroTimeout() const { return false; }
+  // Should the TestDnsServer cause c-ares queries to timeout, by not responding?
+  virtual bool queryTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
+  virtual bool setRotateNameservers() const { return false; }
+  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return nullptr; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -968,7 +987,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
 // development, where segfaults were encountered due to callback invocations on
 // destruction.
 TEST_P(DnsImplTest, DestructPending) {
-  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::V4Only, false);
+  ActiveDnsQuery* query =
+      resolveWithUnreferencedParameters("foo.bar.baz", DnsLookupFamily::V4Only, false);
   ASSERT_NE(nullptr, query);
   query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   // Also validate that pending events are around to exercise the resource
@@ -987,7 +1007,8 @@ TEST_P(DnsImplTest, DestructPending) {
 //    just via UDP.
 // Either way, we have no tests today that cover parallel queries. We can do this is a follow up.
 TEST_P(DnsImplTest, DestructPendingAllQuery) {
-  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::All, true);
+  ActiveDnsQuery* query =
+      resolveWithUnreferencedParameters("foo.bar.baz", DnsLookupFamily::All, true);
   ASSERT_NE(nullptr, query);
 }
 
@@ -1007,17 +1028,17 @@ TEST_P(DnsImplTest, DestructCallback) {
              1 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
-// Validate basic success/fail lookup behavior. The empty request will connect
+// Validate basic success/fail lookup behavior. The "foo.bar.baz" request will connect
 // to TestDnsServer, but localhost should resolve via the hosts file with no
 // asynchronous behavior or network events.
 TEST_P(DnsImplTest, LocalLookup) {
   std::list<Address::InstanceConstSharedPtr> address_list;
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("", DnsLookupFamily::V4Only));
+  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("foo.bar.baz", DnsLookupFamily::V4Only));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   if (GetParam() == Address::IpVersion::v4) {
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V4Only,
-                                               DnsResolver::ResolutionStatus::Success,
+                                               DnsResolver::ResolutionStatus::Completed,
                                                {"127.0.0.1"}, {"::1"}, absl::nullopt));
   }
 
@@ -1026,12 +1047,12 @@ TEST_P(DnsImplTest, LocalLookup) {
         "Synchronous DNS IPv6 localhost resolution failed. Please verify localhost resolves to ::1 "
         "in /etc/hosts, since this misconfiguration is a common cause of these failures.";
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V6Only,
-                                               DnsResolver::ResolutionStatus::Success, {"::1"},
+                                               DnsResolver::ResolutionStatus::Completed, {"::1"},
                                                {"127.0.0.1"}, absl::nullopt))
         << error_msg;
 
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
-                                               DnsResolver::ResolutionStatus::Success, {"::1"},
+                                               DnsResolver::ResolutionStatus::Completed, {"::1"},
                                                {"127.0.0.1"}, absl::nullopt))
         << error_msg;
   }
@@ -1040,14 +1061,14 @@ TEST_P(DnsImplTest, LocalLookup) {
 TEST_P(DnsImplTest, DnsIpAddressVersion) {
   server_->addHosts("some.good.domain", {"1.2.3.4"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, {"1.2.3.4"},
+                                             DnsResolver::ResolutionStatus::Completed, {"1.2.3.4"},
                                              {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success, {"1.2.3.4"},
+                                             DnsResolver::ResolutionStatus::Completed, {"1.2.3.4"},
                                              {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
@@ -1062,7 +1083,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersion) {
 TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1074,7 +1095,7 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
@@ -1092,18 +1113,11 @@ TEST_P(DnsImplTest, CallbackException) {
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
-  EXPECT_EQ(nullptr, resolveWithException<std::runtime_error>("1.2.3.4", DnsLookupFamily::V4Only,
-                                                              std::runtime_error("runtime error")));
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
-                            "runtime error");
-  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 0 /*timeouts*/);
-
   EXPECT_EQ(nullptr,
             resolveWithException<std::string>("1.2.3.4", DnsLookupFamily::V4Only, std::string()));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "unknown");
-  checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
@@ -1112,7 +1126,7 @@ TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
   ASSERT_FALSE(peer_->isChannelDirty());
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
@@ -1123,7 +1137,7 @@ TEST_P(DnsImplTest, DestroyChannelOnResetNetworking) {
   resetChannel();
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
@@ -1141,7 +1155,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   server_->setRefused(true);
 
   EXPECT_NE(nullptr,
-            resolveWithExpectations("", DnsLookupFamily::V4Only,
+            resolveWithExpectations("unresolvable.name", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1172,7 +1186,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
              1 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(peer_->isChannelDirty());
@@ -1180,7 +1194,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
              1 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
-// Validate success/fail lookup behavior via TestDnsServer. This exercises the
+// Validate completed/fail lookup behavior via TestDnsServer. This exercises the
 // network event handling in DnsResolverImpl.
 TEST_P(DnsImplTest, RemoteAsyncLookup) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
@@ -1191,7 +1205,7 @@ TEST_P(DnsImplTest, RemoteAsyncLookup) {
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
@@ -1204,7 +1218,7 @@ TEST_P(DnsImplTest, MultiARecordLookup) {
 
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                    DnsResolver::ResolutionStatus::Success,
+                                    DnsResolver::ResolutionStatus::Completed,
                                     {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
@@ -1218,7 +1232,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4) {
   server_->setCnameTtl(std::chrono::seconds(60));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, std::chrono::seconds(60)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1232,7 +1246,7 @@ TEST_P(DnsImplTest, CNameARecordLookupWithV6) {
   server_->setCnameTtl(std::chrono::seconds(60));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, std::chrono::seconds(60)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
@@ -1249,7 +1263,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
   server_->setCnameTtl(std::chrono::seconds(60));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, std::chrono::seconds(0)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -1258,7 +1272,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
   server_->setCnameTtl(std::chrono::seconds(2147483648));
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, std::chrono::seconds(0)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -1268,7 +1282,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
 
   EXPECT_NE(nullptr,
             resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
-                                    DnsResolver::ResolutionStatus::Success, {"201.134.56.7"}, {},
+                                    DnsResolver::ResolutionStatus::Completed, {"201.134.56.7"}, {},
                                     std::chrono::seconds(2147483647)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1281,21 +1295,21 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
 
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-                                    DnsResolver::ResolutionStatus::Success,
+                                    DnsResolver::ResolutionStatus::Completed,
                                     {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"1::2", "1::2:3", "1::2:3:4"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"1::2", "1::2:3", "1::2:3:4"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1307,8 +1321,8 @@ TEST_P(DnsImplTest, AutoOnlyV6IfBothV6andV4) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1318,8 +1332,8 @@ TEST_P(DnsImplTest, AutoV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1328,7 +1342,7 @@ TEST_P(DnsImplTest, AutoV6IfOnlyV6) {
 TEST_P(DnsImplTest, AutoV4IfOnlyV4) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"201.134.56.7"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
@@ -1340,7 +1354,7 @@ TEST_P(DnsImplTest, V4PreferredOnlyV4IfBothV6andV4) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"201.134.56.7"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1351,8 +1365,8 @@ TEST_P(DnsImplTest, V4PreferredV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1361,7 +1375,7 @@ TEST_P(DnsImplTest, V4PreferredV6IfOnlyV6) {
 TEST_P(DnsImplTest, V4PreferredV4IfOnlyV4) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"201.134.56.7"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1373,7 +1387,7 @@ TEST_P(DnsImplTest, AllIfBothV6andV4) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"201.134.56.7"}, {"1::2"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1384,8 +1398,8 @@ TEST_P(DnsImplTest, AllV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1394,7 +1408,7 @@ TEST_P(DnsImplTest, AllV6IfOnlyV6) {
 TEST_P(DnsImplTest, AllV4IfOnlyV4) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"201.134.56.7"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1409,13 +1423,18 @@ TEST_P(DnsImplTest, Cancel) {
       resolveWithUnreferencedParameters("some.domain", DnsLookupFamily::Auto, false);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
 
   ASSERT_NE(nullptr, query);
   query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+  if (stats_store_.counter("dns.cares.resolve_total").value() < 4) {
+    // if c-ares did not read both responses at once, run another loop iteration
+    // to make it read the second response.
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
@@ -1425,7 +1444,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
   uint64_t resolve_total = 0;
   if (GetParam() == Address::IpVersion::v4) {
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V4Only,
-                                               DnsResolver::ResolutionStatus::Success,
+                                               DnsResolver::ResolutionStatus::Completed,
                                                {"127.0.0.1"}, {}, std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1435,16 +1454,16 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
   if (GetParam() == Address::IpVersion::v6) {
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V6Only,
-                                               DnsResolver::ResolutionStatus::Success, {"::1"}, {},
-                                               std::chrono::seconds(0)));
+                                               DnsResolver::ResolutionStatus::Completed, {"::1"},
+                                               {}, std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);
     resolve_total++;
 
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
-                                               DnsResolver::ResolutionStatus::Success, {"::1"}, {},
-                                               std::chrono::seconds(0)));
+                                               DnsResolver::ResolutionStatus::Completed, {"::1"},
+                                               {}, std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1457,7 +1476,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-                                    DnsResolver::ResolutionStatus::Success,
+                                    DnsResolver::ResolutionStatus::Completed,
                                     {"201.134.56.7", "123.4.5.6", "6.5.4.3"},
                                     {"1::2", "1::2:3", "1::2:3:4"}, std::chrono::seconds(300)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1467,7 +1486,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
   EXPECT_NE(nullptr, resolveWithExpectations(
                          "some.good.domain", DnsLookupFamily::Auto,
-                         DnsResolver::ResolutionStatus::Success, {"1::2", "1::2:3", "1::2:3:4"},
+                         DnsResolver::ResolutionStatus::Completed, {"1::2", "1::2:3", "1::2:3:4"},
                          {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, std::chrono::seconds(300)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1476,7 +1495,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
   EXPECT_NE(nullptr, resolveWithExpectations(
                          "some.good.domain", DnsLookupFamily::V6Only,
-                         DnsResolver::ResolutionStatus::Success, {"1::2", "1::2:3", "1::2:3:4"},
+                         DnsResolver::ResolutionStatus::Completed, {"1::2", "1::2:3", "1::2:3:4"},
                          {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, std::chrono::seconds(300)));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1504,11 +1523,10 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 TEST_P(DnsImplTest, PendingTimerEnable) {
   InSequence s;
   const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig config;
-  std::vector<Network::Address::InstanceConstSharedPtr> vec{};
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, vec, *stats_store_.rootScope());
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "", *stats_store_.rootScope());
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
@@ -1522,7 +1540,7 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
 TEST_P(DnsImplTest, PendingResolutions) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {{"201.134.56.7"}}, {}, absl::nullopt));
 
   checkStats(0 /*resolve_total*/, 1 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1563,7 +1581,7 @@ TEST_P(DnsImplTest, WithNoRecord) {
 TEST_P(DnsImplTest, WithARecord) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1575,21 +1593,21 @@ TEST_P(DnsImplTest, WithARecord) {
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(5 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(6 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
@@ -1604,28 +1622,28 @@ TEST_P(DnsImplTest, WithAAAARecord) {
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(5 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(6 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
@@ -1636,35 +1654,35 @@ TEST_P(DnsImplTest, WithBothAAndAAAARecord) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, {"1::2"}, {},
+                                             DnsResolver::ResolutionStatus::Completed, {"1::2"}, {},
                                              absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7", "1::2"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(5 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
@@ -1856,14 +1874,14 @@ TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterAllV6) {
 
 TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfGetifaddrsIsNotSupported) {
   testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
-                      DnsResolver::ResolutionStatus::Success, false /* getifaddrs_supported */);
+                      DnsResolver::ResolutionStatus::Completed, false /* getifaddrs_supported */);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
 }
 
 TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterIfThereIsAGetifaddrsFailure) {
   testFilterAddresses({}, DnsLookupFamily::All, {"201.134.56.7", "1::2"},
-                      DnsResolver::ResolutionStatus::Success, true /* getifaddrs_supported */,
+                      DnsResolver::ResolutionStatus::Completed, true /* getifaddrs_supported */,
                       false /* getifaddrs_success */);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1922,7 +1940,7 @@ TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAllV6) {
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
-  bool zeroTimeout() const override { return true; }
+  bool queryTimeout() const override { return true; }
 };
 
 // Parameterize the DNS test server socket address.
@@ -2083,10 +2101,192 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
   // server's address was passed as a custom resolver on construction, the new channel should still
   // point to the test dns server, and the query should succeed.
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success,
+                                             DnsResolver::ResolutionStatus::Completed,
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(peer_->isChannelDirty());
+}
+
+TEST_F(DnsImplConstructor, VerifyDefaultTimeoutAndTries) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 5000);
+  EXPECT_TRUE(opts.tries == 4);
+  ares_free_data(resolvers);
+  ares_destroy_options(&opts);
+}
+
+TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+  query_timeout_seconds->set_value(9);
+  cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
+  auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+  query_tries->set_value(7);
+  cares.set_allocated_query_tries(query_tries.release());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 9000);
+  EXPECT_TRUE(opts.tries == 7);
+  ares_free_data(resolvers);
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  ProtobufWkt::UInt32Value* udpMaxQueries() const override {
+    auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
+    udp_max_queries->set_value(100);
+    return dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release());
+  }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForMaxUdpQueriesinTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_OPT_UDP_MAX_QUERIES` is set when UInt32 property
+// `udp_max_queries` is set.
+TEST_P(DnsImplAresFlagsForMaxUdpQueriesinTest, UdpMaxQueriesIsSet) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_UDP_MAX_QUERIES) == ARES_OPT_UDP_MAX_QUERIES);
+  EXPECT_TRUE(opts.udp_max_queries == 100);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForNameserverRotationTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  bool setRotateNameservers() const override { return true; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForNameserverRotationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplAresFlagsForNameserverRotationTest, NameserverRotationEnabled) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_ROTATE) == ARES_OPT_ROTATE);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForNoNameserverRotationTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  bool setRotateNameservers() const override { return false; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForNoNameserverRotationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplAresFlagsForNoNameserverRotationTest, NameserverRotationDisabled) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_NOROTATE) == ARES_OPT_NOROTATE);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
 }
 
 } // namespace Network

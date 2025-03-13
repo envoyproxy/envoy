@@ -10,7 +10,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/bit_array.h"
-#include "source/common/upstream/thread_aware_lb_impl.h"
+#include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -135,7 +135,7 @@ public:
   ~OriginalMaglevTable() override = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
@@ -159,7 +159,7 @@ public:
   ~CompactMaglevTable() override = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,

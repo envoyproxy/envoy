@@ -18,7 +18,10 @@ final class ViewController: UITableViewController {
     super.viewDidLoad()
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .addPlatformFilter(DemoFilter.init)
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
@@ -29,19 +32,13 @@ final class ViewController: UITableViewController {
       .enablePlatformCertificateValidation(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
-        typedConfig: """
-          {
-            "@type": "type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer",
-            "max_request_bytes": 5242880
-          }
-          """
+        // swiftlint:disable:next line_length
+        typedConfig: "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"
       )
       .setOnEngineRunning { NSLog("Envoy async internal setup completed") }
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
-      .forceIPv6(true)
-      .enableSwiftBootstrap(true)
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()

@@ -31,7 +31,7 @@ public:
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
   MOCK_METHOD(void, startHttpListener,
-              (std::list<AccessLog::InstanceSharedPtr> access_logs,
+              (AccessLog::InstanceSharedPtrVector access_logs,
                Network::Address::InstanceConstSharedPtr address,
                Network::Socket::OptionsSharedPtr socket_options));
   MOCK_METHOD(Http::Code, request,
@@ -40,6 +40,7 @@ public:
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(void, closeSocket, ());
+  MOCK_METHOD(RequestPtr, makeRequest, (AdminStream & admin_stream), (const));
 
   NiceMock<MockConfigTracker> config_tracker_;
   NiceMock<Network::MockSocket> socket_;

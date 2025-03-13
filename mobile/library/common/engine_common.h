@@ -16,13 +16,17 @@
 
 namespace Envoy {
 
+// If Envoy is built with lite protos, this will register Envoy-Mobile specific
+// descriptors for reflection.
+void registerMobileProtoDescriptors();
+
 /**
  * This class is used instead of Envoy::MainCommon to customize logic for the Envoy Mobile setting.
  * It largely leverages Envoy::StrippedMainBase.
  */
 class EngineCommon {
 public:
-  EngineCommon(std::unique_ptr<Envoy::OptionsImplBase>&& options);
+  EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options);
   bool run() {
     base_->runServer();
     return true;
@@ -41,11 +45,11 @@ private:
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
-  std::unique_ptr<Envoy::OptionsImplBase> options_;
+  std::shared_ptr<Envoy::OptionsImplBase> options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
   DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
-  std::unique_ptr<StrippedMainBase> base_;
+  std::shared_ptr<StrippedMainBase> base_;
 };
 
 } // namespace Envoy

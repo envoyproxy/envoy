@@ -80,11 +80,13 @@ Network::FilterStatus Filter::onNewConnection() {
     absl::optional<std::chrono::milliseconds> duration = config_->delay();
     if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
       delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                            "over_connection_limit");
       });
       delay_timer_->enableTimer(duration.value());
     } else {
-      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                          "over_connection_limit");
     }
     return Network::FilterStatus::StopIteration;
   }

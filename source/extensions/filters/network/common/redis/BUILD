@@ -37,9 +37,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "supported_commands_lib",
+    srcs = ["supported_commands.cc"],
     hdrs = ["supported_commands.h"],
     deps = [
         "//source/common/common:macros",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 
@@ -69,7 +71,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],

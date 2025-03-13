@@ -8,7 +8,6 @@ load(
     "envoy_select_enable_http_datagrams",
     "envoy_select_enable_yaml",
     "envoy_select_envoy_mobile_listener",
-    "envoy_select_envoy_mobile_xds",
     "envoy_select_google_grpc",
 )
 
@@ -21,5 +20,4 @@ def envoy_mobile_defines(repository):
            envoy_select_disable_exceptions(["ENVOY_DISABLE_EXCEPTIONS"], repository) + \
            envoy_select_enable_http_datagrams(["ENVOY_ENABLE_HTTP_DATAGRAMS"], repository) + \
            envoy_select_envoy_mobile_listener(["ENVOY_MOBILE_ENABLE_LISTENER"], repository) + \
-           envoy_select_envoy_mobile_xds(["ENVOY_MOBILE_XDS"], repository) + \
            envoy_select_google_grpc(["ENVOY_GOOGLE_GRPC"], repository)

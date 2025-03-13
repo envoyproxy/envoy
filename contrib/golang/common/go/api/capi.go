@@ -20,26 +20,32 @@ package api
 import "unsafe"
 
 type HttpCAPI interface {
-	HttpContinue(r unsafe.Pointer, status uint64)
-	HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
+	/* These APIs are related to the decode/encode phase, use the pointer of processState. */
+	HttpContinue(s unsafe.Pointer, status uint64)
+	HttpSendLocalReply(s unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
+	HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool)
+	HttpInjectData(s unsafe.Pointer, data []byte)
 
 	// Send a specialized reply that indicates that the filter has failed on the go side. Internally this is used for
 	// when unhandled panics are detected.
-	HttpSendPanicReply(r unsafe.Pointer, details string)
+	HttpSendPanicReply(s unsafe.Pointer, details string)
 	// experience api, memory unsafe
-	HttpGetHeader(r unsafe.Pointer, key string) string
-	HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
-	HttpSetHeader(r unsafe.Pointer, key string, value string, add bool)
-	HttpRemoveHeader(r unsafe.Pointer, key string)
+	HttpGetHeader(s unsafe.Pointer, key string) string
+	HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	HttpSetHeader(s unsafe.Pointer, key string, value string, add bool)
+	HttpRemoveHeader(s unsafe.Pointer, key string)
 
-	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte
-	HttpDrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64)
-	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
-	HttpSetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	HttpGetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	HttpDrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
+	HttpSetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	HttpSetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
 
-	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string
-	HttpSetTrailer(r unsafe.Pointer, key string, value string, add bool)
-	HttpRemoveTrailer(r unsafe.Pointer, key string)
+	HttpCopyTrailers(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	HttpSetTrailer(s unsafe.Pointer, key string, value string, add bool)
+	HttpRemoveTrailer(s unsafe.Pointer, key string)
+
+	/* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
+	ClearRouteCache(r unsafe.Pointer, refresh bool)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)
@@ -47,21 +53,23 @@ type HttpCAPI interface {
 	HttpGetDynamicMetadata(r unsafe.Pointer, filterName string) map[string]interface{}
 	HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{})
 
-	HttpLog(level LogType, message string)
-	HttpLogLevel() LogType
-
-	HttpFinalize(r unsafe.Pointer, reason int)
-	HttpConfigFinalize(c unsafe.Pointer)
-
 	HttpSetStringFilterState(r unsafe.Pointer, key string, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	HttpGetStringFilterState(r unsafe.Pointer, key string) string
 
 	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
 
+	HttpFinalize(r unsafe.Pointer, reason int)
+
+	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
 	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)
 	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
 	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
+	HttpConfigFinalize(c unsafe.Pointer)
+
+	/* These APIs have nothing to do with request */
+	HttpLog(level LogType, message string)
+	HttpLogLevel() LogType
 }
 
 type NetworkCAPI interface {
@@ -80,6 +88,8 @@ type NetworkCAPI interface {
 
 	// UpstreamConnect creates an envoy upstream connection to address
 	UpstreamConnect(libraryID string, addr string, connID uint64) unsafe.Pointer
+	// UpstreamConnEnableHalfClose upstream conn EnableHalfClose
+	UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int)
 	// UpstreamWrite writes buffer data into upstream connection.
 	UpstreamWrite(f unsafe.Pointer, bufferPtr unsafe.Pointer, bufferLen int, endStream int)
 	// UpstreamClose closes the upstream connection
@@ -88,6 +98,22 @@ type NetworkCAPI interface {
 	UpstreamFinalize(f unsafe.Pointer, reason int)
 	// UpstreamInfo gets the upstream connection info of infoType
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
+}
+
+type TcpUpstreamCAPI interface {
+	// Header related
+	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	SetRespHeader(s unsafe.Pointer, key string, value string, add bool)
+	RemoveRespHeader(s unsafe.Pointer, key string)
+	// Buffer related
+	GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
+	SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	// Get the specified value by key
+	GetStringValue(r unsafe.Pointer, id int) (string, bool)
+
+	SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int)
 }
 
 type CommonCAPI interface {

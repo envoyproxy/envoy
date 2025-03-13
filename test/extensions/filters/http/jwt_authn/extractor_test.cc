@@ -1,9 +1,11 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
@@ -143,6 +145,30 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
+TEST_F(ExtractorTest, TestDuplicatedHeadersWithDuplicatedTokenPrefixes) {
+  auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat("Bearer ", GoodToken)},
+                                          {"Authorization", absl::StrCat("Bearer ", GoodToken)}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 2);
+
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+  EXPECT_EQ(tokens[1]->token(), GoodToken);
+  EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer1"));
+}
+
+TEST_F(ExtractorTest, TestDuplicatedHeadersWithUniqueTokenPrefixes) {
+  auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat("Bearer ", GoodToken)},
+                                          {"Authorization", absl::StrCat("Basic ", "basic")}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+}
+
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
 // using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken +
 // chars_after_space expected to get all token include characters after the space:
@@ -178,7 +204,27 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
-  tokens[0]->removeJwt(headers);
+  // Test token remove from the query parameter
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "false"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), true);
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "true"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("access_token").has_value(), false);
+  }
 }
 
 // Test extracting token from the custom header: "token-header"
@@ -203,12 +249,13 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
   EXPECT_FALSE(headers.has(Http::LowerCaseString("token-header")));
 }
 
-// Make sure a double custom header concatenates the token
+// Make sure a double custom header does not concatenate the token
 TEST_F(ExtractorTest, TestDoubleCustomHeaderToken) {
   auto headers = TestRequestHeaderMapImpl{{"token-header", "jwt_token"}, {"token-header", "foo"}};
   auto tokens = extractor_->extract(headers);
-  EXPECT_EQ(tokens.size(), 1);
-  EXPECT_EQ(tokens[0]->token(), "jwt_token,foo");
+  EXPECT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+  EXPECT_EQ(tokens[1]->token(), "foo");
 }
 
 // Test extracting token from the custom header: "prefix-header"
@@ -294,7 +341,26 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
-  tokens[0]->removeJwt(headers);
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "false"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), true);
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params", "true"}});
+
+    tokens[0]->removeJwt(headers);
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+    EXPECT_EQ(query_params.getFirstValue("token_param").has_value(), false);
+  }
 }
 
 // Test extracting token from a cookie

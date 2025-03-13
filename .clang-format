@@ -1,5 +1,5 @@
 ---
-Language:        Cpp
+Language: Cpp
 AccessModifierOffset: -2
 ColumnLimit: 100
 DerivePointerAlignment: false

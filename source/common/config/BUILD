@@ -53,6 +53,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
@@ -206,6 +207,7 @@ envoy_cc_library(
     hdrs = ["xds_resource.h"],
     deps = [
         "//source/common/http:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
     ],
 )
@@ -214,7 +216,6 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
@@ -226,18 +227,14 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
-        "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
-        "//source/common/stats:histogram_lib",
-        "//source/common/stats:stats_lib",
-        "//source/common/stats:stats_matcher_lib",
-        "//source/common/stats:tag_producer_lib",
         "//source/common/version:api_version_lib",
         "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
         "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -300,5 +297,18 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:regex_lib",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "xds_manager_lib",
+    srcs = ["xds_manager_impl.cc"],
+    hdrs = ["xds_manager_impl.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/config:xds_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:thread_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -93,5 +93,34 @@ Http::Code TcmallocProfilingHandler::handlerHeapDump(Http::ResponseHeaderMap&,
   return Http::Code::NotImplemented;
 }
 
+Http::Code TcmallocProfilingHandler::handlerAllocationProfiler(Http::ResponseHeaderMap&,
+                                                               Buffer::Instance& response,
+                                                               AdminStream& admin_stream) {
+  Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
+  const auto enableVal = query_params.getFirstValue("enable");
+  if (query_params.data().size() != 1 || !enableVal.has_value() ||
+      (enableVal.value() != "y" && enableVal.value() != "n")) {
+    response.add("?enable=<y|n>\n");
+    return Http::Code::BadRequest;
+  }
+  const bool enable = enableVal.value() == "y";
+  if (enable) {
+    const auto started = Profiler::TcmallocProfiler::startAllocationProfile();
+    if (!started.ok()) {
+      response.add(started.message());
+      return Http::Code::BadRequest;
+    }
+    response.add("OK\n");
+    return Http::Code::OK;
+  }
+  const auto profile = Profiler::TcmallocProfiler::stopAllocationProfile();
+  if (!profile.ok()) {
+    response.add(profile.status().message());
+    return Http::Code::BadRequest;
+  }
+  response.add(profile.value());
+  return Http::Code::OK;
+}
+
 } // namespace Server
 } // namespace Envoy

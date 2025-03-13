@@ -178,9 +178,10 @@ public:
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
    * @param seed seeds pseudo-random number generator (default = 0).
+   * @param n_slice number of slices (default = 1).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
-                                             uint64_t seed = 0);
+                                             uint64_t seed = 0, uint64_t n_slice = 1);
 
   /**
    * Finds a stat in a vector with the given name.
@@ -703,7 +704,12 @@ public:
   decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
-    return Config::DecodedResourcesWrapper(resource_decoder, resources, version);
+    std::unique_ptr<Config::DecodedResourcesWrapper> tmp_wrapper =
+        *Config::DecodedResourcesWrapper::create(resource_decoder, resources, version);
+    Config::DecodedResourcesWrapper ret;
+    ret.owned_resources_ = std::move(tmp_wrapper->owned_resources_);
+    ret.refvec_ = std::move(tmp_wrapper->refvec_);
+    return ret;
   }
 
   template <class MessageType>
@@ -801,7 +807,8 @@ public:
   }
 
   static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
-    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+    THROW_IF_NOT_OK(MessageUtil::loadFromFile(path, message,
+                                              ProtobufMessage::getStrictValidationVisitor(), api));
   }
 
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
@@ -925,6 +932,39 @@ public:
   std::string context_path_;
   std::string context_method_;
   absl::flat_hash_map<std::string, std::string> context_map_;
+};
+
+class TestRequestHeaderTraceContextImpl : public Tracing::TraceContext {
+public:
+  TestRequestHeaderTraceContextImpl(Http::RequestHeaderMap& request_headers)
+      : request_headers_(request_headers) {}
+
+  absl::string_view protocol() const override { return request_headers_.getProtocolValue(); }
+  absl::string_view host() const override { return request_headers_.getHostValue(); }
+  absl::string_view path() const override { return request_headers_.getPathValue(); }
+  absl::string_view method() const override { return request_headers_.getMethodValue(); }
+  void forEach(IterateCallback callback) const override {
+    request_headers_.iterate([cb = std::move(callback)](const Http::HeaderEntry& entry) {
+      if (cb(entry.key().getStringView(), entry.value().getStringView())) {
+        return Http::HeaderMap::Iterate::Continue;
+      }
+      return Http::HeaderMap::Iterate::Break;
+    });
+  }
+  absl::optional<absl::string_view> get(absl::string_view key) const override {
+    Http::LowerCaseString lower_key{std::string(key)};
+    const auto entry = request_headers_.get(lower_key);
+    if (!entry.empty()) {
+      return entry[0]->value().getStringView();
+    }
+    return absl::nullopt;
+  }
+  void set(absl::string_view, absl::string_view) override {}
+  void remove(absl::string_view) override {}
+  OptRef<const Http::RequestHeaderMap> requestHeaders() const override { return request_headers_; };
+  OptRef<Http::RequestHeaderMap> requestHeaders() override { return request_headers_; };
+
+  Http::RequestHeaderMap& request_headers_;
 };
 
 } // namespace Tracing
@@ -1211,10 +1251,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system
 class MessageTrackedObject : public ScopeTrackedObject {
 public:
   MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  MessageTrackedObject(absl::string_view sv, const StreamInfo::StreamInfo& tracked_stream)
+      : sv_(sv), tracked_stream_(tracked_stream) {}
+
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override { return tracked_stream_; }
+
   void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
 
 private:
   absl::string_view sv_;
+  OptRef<const StreamInfo::StreamInfo> tracked_stream_;
 };
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {

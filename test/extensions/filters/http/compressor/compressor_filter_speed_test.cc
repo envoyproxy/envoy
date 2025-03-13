@@ -353,7 +353,8 @@ static void compressFullWithGzip(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -369,7 +370,8 @@ static void compressChunks16384WithGzip(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -385,7 +387,8 @@ static void compressChunks8192WithGzip(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -401,7 +404,8 @@ static void compressChunks4096WithGzip(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -417,7 +421,8 @@ static void compressChunks1024WithGzip(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = gzip_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
     compressWith(CompressorLibs::Gzip, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -500,7 +505,8 @@ static void compressFullWithZstd(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -516,7 +522,8 @@ static void compressChunks16384WithZstd(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -532,7 +539,8 @@ static void compressChunks8192WithZstd(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -548,7 +556,8 @@ static void compressChunks4096WithZstd(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -564,7 +573,8 @@ static void compressChunks1024WithZstd(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = zstd_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
     compressWith(CompressorLibs::Zstd, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -614,7 +624,8 @@ static void compressFullWithBrotli(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = brotli_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
     compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -630,7 +641,8 @@ static void compressChunks16384WithBrotli(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = brotli_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(7, 16384);
     compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -646,7 +658,8 @@ static void compressChunks8192WithBrotli(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = brotli_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
     compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -662,7 +675,8 @@ static void compressChunks4096WithBrotli(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = brotli_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
     compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
   }
@@ -678,7 +692,8 @@ static void compressChunks1024WithBrotli(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = brotli_compression_params[idx];
 
-  for (auto _ : state) { // NOLINT
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
     compressWith(CompressorLibs::Brotli, std::move(chunks), params, decoder_callbacks, state);
   }

@@ -43,16 +43,17 @@ public:
     // The existence of an admin layer is required for mergeValues() to work.
     config.add_layers()->mutable_admin_layer();
 
-    Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
     // This will ignore values set in test, but just use flag defaults!
-    runtime_ = std::move(runtime_ptr);
+    runtime_ = std::move(loader.value());
   }
 
   Runtime::Loader& loader() { return *runtime_; }
 
   void mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
-    loader().mergeValues(values);
+    THROW_IF_NOT_OK(loader().mergeValues(values));
   }
 
 protected:
@@ -85,10 +86,11 @@ public:
     }
     runtime->mutable_static_layer()->MergeFrom(envoy_layer);
 
-    Runtime::LoaderPtr runtime_ptr = std::make_unique<Runtime::LoaderImpl>(
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
+    THROW_IF_NOT_OK(loader.status());
     // This will ignore values set in test, but just use flag defaults!
-    runtime_ = std::move(runtime_ptr);
+    runtime_ = std::move(loader.value());
   }
 
 protected:
@@ -107,10 +109,10 @@ class TestDeprecatedV2Api : public TestScopedRuntime {
 public:
   TestDeprecatedV2Api() { allowDeprecatedV2(); }
   void allowDeprecatedV2() {
-    loader().mergeValues({
+    THROW_IF_NOT_OK(loader().mergeValues({
         {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
         {"envoy.features.enable_all_deprecated_features", "true"},
-    });
+    }));
   }
 };
 

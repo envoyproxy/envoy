@@ -9,11 +9,21 @@ final class EngineApiTest: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testEngineApis() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 
     let engine = EngineBuilder()
-      .addLogLevel(.debug)
+      .setLogLevel(.debug)
+      .setLogger { _, msg in
+        print(msg, terminator: "")
+      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }

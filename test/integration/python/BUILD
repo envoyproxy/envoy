@@ -7,7 +7,9 @@ envoy_package()
 
 envoy_py_test(
     name = "hotrestart_handoff_test",
-    size = "medium",
+    # This is not actually large, but setting large makes the test skip for
+    # asan and tsan.
+    size = "large",
     srcs = select({
         "//bazel:disable_hot_restart_or_admin": ["null_test.py"],
         "//conditions:default": ["hotrestart_handoff_test.py"],
@@ -24,6 +26,10 @@ envoy_py_test(
         "//test/integration:hotrestart_main",
         "//tools/h3_request",
     ],
+    exec_properties = select({
+        "//bazel:engflow_rbe": {"Pool": "2core"},
+        "//conditions:default": {},
+    }),
     main = select({
         "//bazel:disable_hot_restart_or_admin": "null_test.py",
         "//conditions:default": "hotrestart_handoff_test.py",

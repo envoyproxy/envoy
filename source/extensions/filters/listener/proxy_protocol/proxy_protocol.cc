@@ -10,9 +10,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
@@ -24,8 +26,11 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
@@ -47,10 +52,65 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
 
+constexpr absl::string_view kProxyProtoStatsPrefix = "proxy_proto.";
+constexpr absl::string_view kVersionStatsPrefix = "versions.";
+
+ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, absl::string_view stat_prefix) {
+  std::string filter_stat_prefix = std::string(kProxyProtoStatsPrefix);
+  if (!stat_prefix.empty()) {
+    filter_stat_prefix = absl::StrCat(kProxyProtoStatsPrefix, stat_prefix, ".");
+  }
+
+  return {
+      /*legacy_=*/{LEGACY_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
+      /*general_=*/
+      {GENERAL_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(scope, filter_stat_prefix))},
+      /*v1_=*/
+      {VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(
+          scope, absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v1.")))},
+      /*v2_=*/
+      {VERSIONED_PROXY_PROTOCOL_STATS(POOL_COUNTER_PREFIX(
+          scope, absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v2.")))},
+  };
+}
+
+void GeneralProxyProtocolStats::increment(ReadOrParseState decision) {
+  switch (decision) {
+  case ReadOrParseState::Done:
+    not_found_allowed_.inc();
+    break;
+  case ReadOrParseState::TryAgainLater:
+    break; // Do nothing.
+  case ReadOrParseState::Error:
+    not_found_disallowed_.inc();
+    break;
+  case ReadOrParseState::Denied:
+    IS_ENVOY_BUG("ReadOrParseState can never be Denied when proxy protocol is not found");
+    break;
+  }
+}
+
+void VersionedProxyProtocolStats::increment(ReadOrParseState decision) {
+  switch (decision) {
+  case ReadOrParseState::Done:
+    found_.inc();
+    break;
+  case ReadOrParseState::TryAgainLater:
+    break; // Do nothing.
+  case ReadOrParseState::Error:
+    error_.inc();
+    break;
+  case ReadOrParseState::Denied:
+    found_.inc();
+    disallowed_.inc();
+    break;
+  }
+}
+
 Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
-    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
+    : stats_(ProxyProtocolStats::create(scope, proto_config.stat_prefix())),
       allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()),
       pass_all_tlvs_(proto_config.has_pass_through_tlvs()
                          ? proto_config.pass_through_tlvs().match_type() ==
@@ -65,6 +125,24 @@ Config::Config(
     for (const auto& tlv_type : proto_config.pass_through_tlvs().tlv_type()) {
       pass_through_tlvs_.insert(0xFF & tlv_type);
     }
+  }
+
+  for (const auto& version : proto_config.disallowed_versions()) {
+    switch (version) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case ProxyProtocolConfig::V1:
+      allow_v1_ = false;
+      break;
+    case ProxyProtocolConfig::V2:
+      allow_v2_ = false;
+      break;
+    }
+  }
+
+  // Remove this check if PROXY protocol v3 is ever introduced.
+  if (!allow_v1_ && !allow_v2_) {
+    throw ProtoValidationException(
+        "Proxy Protocol filter is misconfigured: all proxy protocol versions are disallowed.");
   }
 }
 
@@ -90,6 +168,10 @@ bool Config::allowRequestsWithoutProxyProtocol() const {
   return allow_requests_without_proxy_protocol_;
 }
 
+bool Config::isVersionV1Allowed() const { return allow_v1_; }
+
+bool Config::isVersionV2Allowed() const { return allow_v2_; }
+
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   cb_ = &cb;
@@ -98,16 +180,31 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
-  const ReadOrParseState read_state = parseBuffer(buffer);
+  const ReadOrParseState read_state = parseBuffer(buffer); // Implicitly updates header_version_
+
+  switch (header_version_) {
+  case ProxyProtocolVersion::V1:
+    config_->stats_.v1_.increment(read_state);
+    break;
+  case ProxyProtocolVersion::V2:
+    config_->stats_.v2_.increment(read_state);
+    break;
+  case ProxyProtocolVersion::NotFound:
+    config_->stats_.general_.increment(read_state);
+    break;
+  }
+
   switch (read_state) {
+  case ReadOrParseState::Denied:
+    cb_->socket().ioHandle().close();
+    return Network::FilterStatus::StopIteration;
   case ReadOrParseState::Error:
-    config_->stats_.downstream_cx_proxy_proto_error_.inc();
+    config_->stats_.legacy_.downstream_cx_proxy_proto_error_
+        .inc(); // Keep for backwards-compatibility
     cb_->socket().ioHandle().close();
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::TryAgainLater:
     return Network::FilterStatus::StopIteration;
-  case ReadOrParseState::SkipFilter:
-    return Network::FilterStatus::Continue;
   case ReadOrParseState::Done:
     return Network::FilterStatus::Continue;
   }
@@ -123,6 +220,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
     const ReadOrParseState read_header_state = readProxyHeader(buffer);
     if (read_header_state != ReadOrParseState::Done) {
       return read_header_state;
+    }
+    if (header_version_ == ProxyProtocolVersion::NotFound) {
+      // Filter is skipped and request is allowed through.
+      return ReadOrParseState::Done;
     }
   }
 
@@ -144,24 +245,39 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   if (proxy_protocol_header_.has_value() &&
       !cb_->filterState().hasData<Network::ProxyProtocolFilterState>(
           Network::ProxyProtocolFilterState::key())) {
-    if (!proxy_protocol_header_.value().local_command_) {
-      auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
+    auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
+    if (proxy_protocol_header_.value().local_command_) {
+      ENVOY_LOG(trace, "Parsed proxy protocol header, cmd: LOCAL, length: {}, buffer: {}",
+                proxy_protocol_header_.value().wholeHeaderLength(),
+                Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()));
+
+      cb_->filterState().setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {socket.connectionInfoProvider().remoteAddress(),
+               socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
+              absl::make_optional(header_version_)}),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    } else {
       ENVOY_LOG(
           trace,
-          "Parsed proxy protocol header, length: {}, buffer: {}, TLV length: {}, TLV buffer: {}",
+          "Parsed proxy protocol header, cmd: PROXY, length: {}, buffer: {}, TLV length: {}, TLV "
+          "buffer: {}",
           proxy_protocol_header_.value().wholeHeaderLength(),
           Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()),
           proxy_protocol_header_.value().extensions_length_,
           Envoy::Hex::encode(buf + proxy_protocol_header_.value().headerLengthWithoutExtension(),
                              proxy_protocol_header_.value().extensions_length_));
+      cb_->filterState().setData(
+          Network::ProxyProtocolFilterState::key(),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {proxy_protocol_header_.value().remote_address_,
+               proxy_protocol_header_.value().local_address_, parsed_tlvs_},
+              absl::make_optional(header_version_)}),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
     }
-
-    cb_->filterState().setData(
-        Network::ProxyProtocolFilterState::key(),
-        std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-            proxy_protocol_header_.value().remote_address_,
-            proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   if (proxy_protocol_header_.has_value() && !proxy_protocol_header_.value().local_command_) {
@@ -263,11 +379,27 @@ bool Filter::parseV2Header(const char* buf) {
         la4.sin_family = AF_INET;
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
+
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
+                &ra4);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
+                &la4);
+        if (!remote_address_status.ok() || !local_address_status.ok()) {
+          // TODO(ggreenway): make this work without requiring operating system support for an
+          // address family.
+          ENVOY_LOG(debug, "Proxy protocol failure: {}",
+                    !remote_address_status.ok() ? remote_address_status.status()
+                                                : local_address_status.status());
+          return false;
+        }
+
         proxy_protocol_header_.emplace(
             WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
                        hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
-                       std::make_shared<Network::Address::Ipv4Instance>(&ra4),
-                       std::make_shared<Network::Address::Ipv4Instance>(&la4)});
+                       *remote_address_status, *local_address_status});
+
         return true;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
         PACKED_STRUCT(struct pp_ipv6_addr {
@@ -289,11 +421,25 @@ bool Filter::parseV2Header(const char* buf) {
         la6.sin6_port = v6->dst_port;
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
+                ra6);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
+                la6);
+        if (!remote_address_status.ok() || !local_address_status.ok()) {
+          // TODO(ggreenway): make this work without requiring operating system support for an
+          // address family.
+          ENVOY_LOG(debug, "Proxy protocol failure: {}",
+                    !remote_address_status.ok() ? remote_address_status.status()
+                                                : local_address_status.status());
+          return false;
+        }
+
         proxy_protocol_header_.emplace(WireHeader{
             PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
-            std::make_shared<Network::Address::Ipv6Instance>(ra6),
-            std::make_shared<Network::Address::Ipv6Instance>(la6)});
+            *remote_address_status, *local_address_status});
         return true;
       }
     }
@@ -408,13 +554,38 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     absl::string_view tlv_value(reinterpret_cast<char const*>(buf + idx), tlv_value_length);
     auto key_value_pair = config_->isTlvTypeNeeded(tlv_type);
     if (nullptr != key_value_pair) {
-      ProtobufWkt::Value metadata_value;
-      metadata_value.set_string_value(tlv_value.data(), tlv_value.size());
-
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"
                                      : key_value_pair->metadata_namespace();
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener")) {
+        auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
 
+        const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
+        envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+        auto status = absl::OkStatus();
+        if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
+          status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
+        }
+        if (!status.ok()) {
+          ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
+                             "proxy_protocol: Failed to unpack typed metadata for TLV type ",
+                             tlv_type);
+        } else {
+          Protobuf::BytesValue tlv_byte_value;
+          tlv_byte_value.set_value(tlv_value.data(), tlv_value.size());
+          tlvs_metadata.mutable_typed_metadata()->insert(
+              {key_value_pair->key(), tlv_byte_value.value()});
+          ProtobufWkt::Any typed_metadata;
+          typed_metadata.PackFrom(tlvs_metadata);
+          cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
+        }
+      }
+      // Always populate untyped metadata for backwards compatibility.
+      ProtobufWkt::Value metadata_value;
+      // Sanitize any non utf8 characters.
+      auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
+      metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
       ProtobufWkt::Struct metadata(
           (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
@@ -441,6 +612,10 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
   // waiting for more data if there is no enough data for extensions.
   if (raw_slice.len_ < (proxy_protocol_header_.value().wholeHeaderLength())) {
+    ENVOY_LOG(
+        trace,
+        "waiting for more data to read extensions. Buffer length: {}, extension header length {}",
+        raw_slice.len_, proxy_protocol_header_.value().wholeHeaderLength());
     return ReadOrParseState::TryAgainLater;
   }
 
@@ -463,23 +638,25 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   auto raw_slice = buffer.rawSlice();
   const char* buf = static_cast<const char*>(raw_slice.mem_);
 
-  if (config_.get()->allowRequestsWithoutProxyProtocol()) {
-    auto matchv2 = !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
+  if (config_->allowRequestsWithoutProxyProtocol()) {
+    auto matchv2 = config_->isVersionV2Allowed() &&
+                   !memcmp(buf, PROXY_PROTO_V2_SIGNATURE,
                            std::min<size_t>(PROXY_PROTO_V2_SIGNATURE_LEN, raw_slice.len_));
-    auto matchv1 = !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
+    auto matchv1 = config_->isVersionV1Allowed() &&
+                   !memcmp(buf, PROXY_PROTO_V1_SIGNATURE,
                            std::min<size_t>(PROXY_PROTO_V1_SIGNATURE_LEN, raw_slice.len_));
     if (!matchv2 && !matchv1) {
       // The bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
       // short-circuit
       ENVOY_LOG(trace, "request does not use v1 or v2 proxy protocol, forwarding as is");
-      return ReadOrParseState::SkipFilter;
+      return ReadOrParseState::Done;
     }
   }
 
   if (raw_slice.len_ >= PROXY_PROTO_V2_HEADER_LEN) {
     const char* sig = PROXY_PROTO_V2_SIGNATURE;
     if (!memcmp(buf, sig, PROXY_PROTO_V2_SIGNATURE_LEN)) {
-      header_version_ = V2;
+      header_version_ = ProxyProtocolVersion::V2;
     } else if (memcmp(buf, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
       // It is not v2, and can't be v1, so no sense hanging around: it is invalid
       ENVOY_LOG(debug, "failed to read proxy protocol (exceed max v1 header len)");
@@ -487,7 +664,11 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     }
   }
 
-  if (header_version_ == V2) {
+  if (header_version_ == ProxyProtocolVersion::V2) {
+    if (!config_->isVersionV2Allowed()) {
+      ENVOY_LOG(trace, "Filter is not configured to allow v2 proxy protocol requests");
+      return ReadOrParseState::Denied;
+    }
     const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
     if (((ver_cmd & 0xf0) >> 4) != PROXY_PROTO_V2_VERSION) {
       ENVOY_LOG(debug, "Unsupported V2 proxy protocol version");
@@ -526,7 +707,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
           // for more data.
           break;
         } else {
-          header_version_ = V1;
+          header_version_ = ProxyProtocolVersion::V1;
           search_index_++;
         }
         break;
@@ -537,7 +718,11 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
       return ReadOrParseState::Error;
     }
 
-    if (header_version_ == V1) {
+    if (header_version_ == ProxyProtocolVersion::V1) {
+      if (!config_->isVersionV1Allowed()) {
+        ENVOY_LOG(trace, "Filter is not configured to allow v1 proxy protocol requests");
+        return ReadOrParseState::Denied;
+      }
       if (parseV1Header(buf, search_index_)) {
         return ReadOrParseState::Done;
       } else {

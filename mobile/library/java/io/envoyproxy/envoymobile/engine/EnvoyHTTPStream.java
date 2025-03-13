@@ -2,9 +2,7 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -12,13 +10,13 @@ public class EnvoyHTTPStream {
   private final long engineHandle;
   private final long streamHandle;
   private final boolean explicitFlowControl;
-  private final JvmCallbackContext callbacksContext;
+  private final EnvoyHTTPCallbacks callbacks;
 
   /**
    * Start the stream via the JNI library.
    */
   void start() {
-    JniLibrary.startStream(engineHandle, streamHandle, callbacksContext, explicitFlowControl);
+    JniLibrary.startStream(engineHandle, streamHandle, callbacks, explicitFlowControl);
   }
 
   /**
@@ -33,19 +31,21 @@ public class EnvoyHTTPStream {
     this.engineHandle = engineHandle;
     this.streamHandle = streamHandle;
     this.explicitFlowControl = explicitFlowControl;
-    callbacksContext = new JvmCallbackContext(callbacks);
+    this.callbacks = callbacks;
   }
 
   /**
    * Send headers over an open HTTP streamHandle. This method can be invoked once
    * and needs to be called before send_data.
    *
-   * @param headers,   the headers to send.
-   * @param endStream, supplies whether this is headers only.
+   * @param headers    the headers to send.
+   * @param endStream  supplies whether this is headers only.
+   * @param idempotent indicates that the request is idempotent. When idempotent is set to true
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
    */
-  public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
-    JniLibrary.sendHeaders(engineHandle, streamHandle, JniBridgeUtility.toJniHeaders(headers),
-                           endStream);
+  public void sendHeaders(Map<String, List<String>> headers, boolean endStream,
+                          boolean idempotent) {
+    JniLibrary.sendHeaders(engineHandle, streamHandle, headers, endStream, idempotent);
   }
 
   /**
@@ -69,21 +69,12 @@ public class EnvoyHTTPStream {
    * @param data,      the data to send.
    * @param length,    number of bytes to send: 0 <= length <= ByteBuffer.capacity()
    * @param endStream, supplies whether this is the last data in the streamHandle.
-   * @throws UnsupportedOperationException - if the provided buffer is neither a
-   *                                       direct ByteBuffer nor backed by an
-   *                                       on-heap byte array.
    */
   public void sendData(ByteBuffer data, int length, boolean endStream) {
     if (length < 0 || length > data.capacity()) {
       throw new IllegalArgumentException("Length out of bound");
     }
-    if (data.isDirect()) {
-      JniLibrary.sendData(engineHandle, streamHandle, data, length, endStream);
-    } else if (data.hasArray()) {
-      JniLibrary.sendDataByteArray(engineHandle, streamHandle, data.array(), length, endStream);
-    } else {
-      throw new UnsupportedOperationException("Unsupported ByteBuffer implementation.");
-    }
+    JniLibrary.sendData(engineHandle, streamHandle, data, length, endStream);
   }
 
   /**
@@ -107,7 +98,7 @@ public class EnvoyHTTPStream {
    * @param trailers, the trailers to send.
    */
   public void sendTrailers(Map<String, List<String>> trailers) {
-    JniLibrary.sendTrailers(engineHandle, streamHandle, JniBridgeUtility.toJniHeaders(trailers));
+    JniLibrary.sendTrailers(engineHandle, streamHandle, trailers);
   }
 
   /**

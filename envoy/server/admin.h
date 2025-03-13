@@ -236,7 +236,7 @@ public:
    * @param address network address to bind and listen on.
    * @param socket_options socket options to apply to the listening socket.
    */
-  virtual void startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
+  virtual void startHttpListener(AccessLog::InstanceSharedPtrVector access_logs,
                                  Network::Address::InstanceConstSharedPtr address,
                                  Network::Socket::OptionsSharedPtr socket_options) PURE;
 
@@ -281,6 +281,11 @@ public:
    * Closes the listening socket for the admin.
    */
   virtual void closeSocket() PURE;
+
+  /**
+   * Creates a streaming request context from the url path in the admin stream.
+   */
+  virtual RequestPtr makeRequest(AdminStream& admin_stream) const PURE;
 };
 
 } // namespace Server

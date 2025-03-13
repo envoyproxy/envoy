@@ -39,96 +39,18 @@ index 30d64be2..ae7ec875 100644
  TARGET_AR= $(CROSS)ar rcus
 -TARGET_STRIP= $(CROSS)strip
 +TARGET_STRIP?= $(CROSS)strip
- 
+
  TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
  TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
 @@ -598,7 +598,7 @@ endif
- 
+
  Q= @
  E= @echo
 -#Q=
 +Q=
  #E= @:
- 
+
  ##############################################################################
-diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
-index d323d8d4..2e08a3a1 100644
---- a/src/msvcbuild.bat
-+++ b/src/msvcbuild.bat
-@@ -13,9 +13,7 @@
- @if not defined INCLUDE goto :FAIL
- 
- @setlocal
--@rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_APICHECK
--@set DEBUGCFLAGS=
--@set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
-+@set LJCOMPILE=cl /nologo /c /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline /DLUAJIT_ENABLE_LUA52COMPAT
- @set LJLINK=link /nologo
- @set LJMT=mt /nologo
- @set LJLIB=lib /nologo /nodefaultlib
-@@ -24,10 +22,9 @@
- @set DASC=vm_x64.dasc
- @set LJDLLNAME=lua51.dll
- @set LJLIBNAME=lua51.lib
--@set BUILDTYPE=release
- @set ALL_LIB=lib_base.c lib_math.c lib_bit.c lib_string.c lib_table.c lib_io.c lib_os.c lib_package.c lib_debug.c lib_jit.c lib_ffi.c lib_buffer.c
- 
--%LJCOMPILE% host\minilua.c
-+%LJCOMPILE% /O2 host\minilua.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /out:minilua.exe minilua.obj
- @if errorlevel 1 goto :BAD
-@@ -51,7 +48,7 @@ if exist minilua.exe.manifest^
- minilua %DASM% -LN %DASMFLAGS% -o host\buildvm_arch.h %DASC%
- @if errorlevel 1 goto :BAD
- 
--%LJCOMPILE% /I "." /I %DASMDIR% host\buildvm*.c
-+%LJCOMPILE% /O2 /I "." /I %DASMDIR% host\buildvm*.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /out:buildvm.exe buildvm*.obj
- @if errorlevel 1 goto :BAD
-@@ -75,26 +72,35 @@ buildvm -m folddef -o lj_folddef.h lj_opt_fold.c
- 
- @if "%1" neq "debug" goto :NODEBUG
- @shift
--@set BUILDTYPE=debug
--@set LJCOMPILE=%LJCOMPILE% /Zi %DEBUGCFLAGS%
--@set LJLINK=%LJLINK% /opt:ref /opt:icf /incremental:no
-+@set LJCOMPILE=%LJCOMPILE% /O0 /Z7
-+@set LJLINK=%LJLINK% /debug /opt:ref /opt:icf /incremental:no
-+@set LJCRTDBG=d
-+@goto :ENDDEBUG
- :NODEBUG
--@set LJLINK=%LJLINK% /%BUILDTYPE%
-+@set LJCOMPILE=%LJCOMPILE% /O2 /Z7
-+@set LJLINK=%LJLINK% /release /incremental:no
-+@set LJCRTDBG=
-+:ENDDEBUG
- @if "%1"=="amalg" goto :AMALGDLL
- @if "%1"=="static" goto :STATIC
--%LJCOMPILE% /MD /DLUA_BUILD_AS_DLL lj_*.c lib_*.c
-+@set LJCOMPILE=%LJCOMPILE% /MD%LJCRTDBG% 
-+%LJCOMPILE% /DLUA_BUILD_AS_DLL lj_*.c lib_*.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /DLL /out:%LJDLLNAME% lj_*.obj lib_*.obj
- @if errorlevel 1 goto :BAD
- @goto :MTDLL
- :STATIC
-+@shift
-+@set LJCOMPILE=%LJCOMPILE% /MT%LJCRTDBG%
- %LJCOMPILE% lj_*.c lib_*.c
- @if errorlevel 1 goto :BAD
- %LJLIB% /OUT:%LJLIBNAME% lj_*.obj lib_*.obj
- @if errorlevel 1 goto :BAD
- @goto :MTDLL
- :AMALGDLL
--%LJCOMPILE% /MD /DLUA_BUILD_AS_DLL ljamalg.c
-+@shift
-+@set LJCOMPILE=%LJCOMPILE% /MD%LJCRTDBG% 
-+%LJCOMPILE% /DLUA_BUILD_AS_DLL ljamalg.c
- @if errorlevel 1 goto :BAD
- %LJLINK% /DLL /out:%LJDLLNAME% ljamalg.obj lj_vm.obj
- @if errorlevel 1 goto :BAD
 diff --git a/build.py b/build.py
 new file mode 100755
 index 00000000..1201542c

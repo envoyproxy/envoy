@@ -70,6 +70,7 @@ envoy_cc_extension(
         "//source/common/memory:utils_lib",
         "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
         "//source/extensions/config_subscription/grpc:grpc_mux_context_lib",
+        "//source/extensions/config_subscription/grpc:grpc_mux_failover_lib",
         "//source/extensions/config_subscription/grpc:grpc_stream_lib",
         "//source/extensions/config_subscription/grpc:pausable_ack_queue_lib",
         "//source/extensions/config_subscription/grpc:watch_map_lib",

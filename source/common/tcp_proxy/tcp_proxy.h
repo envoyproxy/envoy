@@ -10,6 +10,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -22,6 +23,8 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
@@ -31,12 +34,25 @@
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace TcpProxy {
+
+constexpr absl::string_view PerConnectionIdleTimeoutMs =
+    "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+/**
+ * ReceiveBeforeConnectKey is the key for the receive_before_connect filter state. The
+ * filter state value is a ``StreamInfo::BoolAccessor`` indicating whether the
+ * receive_before_connect functionality should be enabled. Network filters setting this filter
+ * state should return `StopIteration` in their `onNewConnection` and `onData` methods until they
+ * have read the data they need before the upstream connection establishment, and only then allow
+ * the filter chain to proceed to the TCP_PROXY filter.
+ */
+constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
 
 /**
  * All tcp proxy stats. @see stats_macros.h
@@ -48,6 +64,7 @@ namespace TcpProxy {
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(early_data_received_count_total)                                                         \
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
@@ -114,18 +131,9 @@ using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 /**
- * Base class for both tunnel response headers and trailers.
- */
-class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
-public:
-  ProtobufTypes::MessagePtr serializeAsProto() const override;
-  virtual const Http::HeaderMap& value() const PURE;
-};
-
-/**
  * Response headers for the tunneling connections.
  */
-class TunnelResponseHeaders : public TunnelResponseHeadersOrTrailers {
+class TunnelResponseHeaders : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
@@ -139,7 +147,7 @@ private:
 /**
  * Response trailers for the tunneling connections.
  */
-class TunnelResponseTrailers : public TunnelResponseHeadersOrTrailers {
+class TunnelResponseTrailers : public Http::TunnelResponseHeadersOrTrailersImpl {
 public:
   TunnelResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers)
       : response_trailers_(std::move(response_trailers)) {}
@@ -149,24 +157,29 @@ public:
 private:
   const Http::ResponseTrailerMapPtr response_trailers_;
 };
-
+class Config;
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
 public:
   TunnelingConfigHelperImpl(
-      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
-          config_message,
+      Stats::Scope& scope,
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
+
+  const Envoy::Router::FilterConfig& routerFilterConfig() const override { return router_config_; }
   void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
+    return server_factory_context_;
+  }
 
 private:
   const bool use_post_;
@@ -175,6 +188,9 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
+  Stats::StatNameManagedStorage route_stat_name_storage_;
+  const Router::FilterConfig router_config_;
+  Server::Configuration::ServerFactoryContext& server_factory_context_;
 };
 
 /**
@@ -184,13 +200,7 @@ class OnDemandConfig {
 public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
-                 Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
-            context.messageValidationVisitor())),
-        lookup_timeout_(std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
-        stats_(generateStats(scope)) {}
+                 Server::Configuration::FactoryContext& context, Stats::Scope& scope);
   Upstream::OdCdsApiHandle& onDemandCds() const { return *odcds_; }
   std::chrono::milliseconds timeout() const { return lookup_timeout_; }
   const OnDemandStats& stats() const { return stats_; }
@@ -243,9 +253,16 @@ public:
         return {};
       }
     }
+    const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
+    const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
+      return proxy_protocol_tlvs_;
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
+
+    static Network::ProxyProtocolTLVVector
+    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
@@ -258,6 +275,8 @@ public:
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
+    BackOffStrategyPtr backoff_strategy_;
+    Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -277,7 +296,7 @@ public:
   RouteConstSharedPtr getRegularRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
@@ -311,6 +330,11 @@ public:
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
+  Regex::Engine& regexEngine() const { return regex_engine_; }
+  const BackOffStrategyPtr& backoffStrategy() const { return shared_config_->backoffStrategy(); };
+  const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
+    return shared_config_->proxyProtocolTLVs();
+  }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -356,13 +380,14 @@ private:
   RouteConstSharedPtr default_route_;
   std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
   Random::RandomGenerator& random_generator_;
   std::unique_ptr<const Network::HashPolicyImpl> hash_policy_;
+  Regex::Engine& regex_engine_; // Static lifetime object, safe to store as a reference
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -423,7 +448,7 @@ public:
     return &read_callbacks_->connection();
   }
 
-  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+  StreamInfo::StreamInfo* requestStreamInfo() const override {
     return &read_callbacks_->connection().streamInfo();
   }
 
@@ -467,6 +492,111 @@ public:
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
+  class HttpStreamDecoderFilterCallbacks : public Http::StreamDecoderFilterCallbacks,
+                                           public ScopeTrackedObject {
+  public:
+    HttpStreamDecoderFilterCallbacks(Filter* parent);
+    // Http::StreamDecoderFilterCallbacks
+    OptRef<const Network::Connection> connection() override {
+      return parent_->read_callbacks_->connection();
+    }
+    StreamInfo::StreamInfo& streamInfo() override { return parent_->getStreamInfo(); }
+    const ScopeTrackedObject& scope() override { return *this; }
+    Event::Dispatcher& dispatcher() override {
+      return parent_->read_callbacks_->connection().dispatcher();
+    }
+    void resetStream(Http::StreamResetReason, absl::string_view) override {
+      IS_ENVOY_BUG("Not implemented. Unexpected call to resetStream()");
+    };
+    Router::RouteConstSharedPtr route() override { return route_; }
+    Upstream::ClusterInfoConstSharedPtr clusterInfo() override {
+      return parent_->cluster_manager_.getThreadLocalCluster(parent_->route_->clusterName())
+          ->info();
+    }
+    uint64_t streamId() const override {
+      auto sip = parent_->getStreamInfo().getStreamIdProvider();
+      if (sip) {
+        return sip->toInteger().value();
+      }
+      return 0;
+    }
+    Tracing::Span& activeSpan() override { return parent_->active_span_; }
+    OptRef<const Tracing::Config> tracingConfig() const override {
+      return makeOptRef<const Tracing::Config>(parent_->tracing_config_);
+    }
+    void continueDecoding() override {}
+    void addDecodedData(Buffer::Instance&, bool) override {}
+    void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
+    Http::RequestTrailerMap& addDecodedTrailers() override { return *request_trailer_map_; }
+    Http::MetadataMapVector& addDecodedMetadata() override {
+      static Http::MetadataMapVector metadata_map_vector;
+      return metadata_map_vector;
+    }
+    const Buffer::Instance* decodingBuffer() override { return nullptr; }
+    void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
+    void sendLocalReply(Http::Code, absl::string_view,
+                        std::function<void(Http::ResponseHeaderMap& headers)>,
+                        const absl::optional<Grpc::Status::GrpcStatus>,
+                        absl::string_view) override {}
+    void sendGoAwayAndClose() override {}
+    void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
+    Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
+    void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
+    Http::ResponseHeaderMapOptRef responseHeaders() override { return {}; }
+    void encodeData(Buffer::Instance&, bool) override {}
+    Http::RequestHeaderMapOptRef requestHeaders() override { return {}; }
+    Http::RequestTrailerMapOptRef requestTrailers() override { return {}; }
+    void encodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
+    Http::ResponseTrailerMapOptRef responseTrailers() override { return {}; }
+    void encodeMetadata(Http::MetadataMapPtr&&) override {}
+    void onDecoderFilterAboveWriteBufferHighWatermark() override {
+      parent_->upstream_callbacks_->onAboveWriteBufferHighWatermark();
+    }
+    void onDecoderFilterBelowWriteBufferLowWatermark() override {
+      parent_->upstream_callbacks_->onBelowWriteBufferLowWatermark();
+    }
+    void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
+    void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
+    void setDecoderBufferLimit(uint32_t) override {}
+    uint32_t decoderBufferLimit() override { return 0; }
+    bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }
+    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
+    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return nullptr; }
+    const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
+      return nullptr;
+    }
+    Router::RouteSpecificFilterConfigs perFilterConfigs() const override { return {}; }
+    Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
+    void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
+    absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+    upstreamOverrideHost() const override {
+      return absl::nullopt;
+    }
+    bool shouldLoadShed() const override { return false; }
+    void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
+      tracked_object_stack.add(*this);
+    }
+    Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
+    OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
+    OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
+    void resetIdleTimer() override {}
+    // absl::optional<absl::string_view> upstreamOverrideHost() const override {
+    //   return absl::nullopt;
+    // }
+    absl::string_view filterConfigName() const override { return ""; }
+
+    // ScopeTrackedObject
+    void dumpState(std::ostream& os, int indent_level) const override {
+      const char* spaces = spacesForLevel(indent_level);
+      os << spaces << "TcpProxy " << this << DUMP_MEMBER(streamId()) << "\n";
+      DUMP_DETAILS(parent_->getStreamInfo().upstreamInfo());
+    }
+    Filter* parent_{};
+    Http::RequestTrailerMapPtr request_trailer_map_;
+    std::shared_ptr<Http::NullRouteImpl> route_;
+  };
+  Tracing::NullSpan active_span_;
+  const Tracing::Config& tracing_config_;
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
@@ -504,6 +634,7 @@ protected:
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
 
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
+  void onConnectMaxAttempts();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -517,6 +648,9 @@ protected:
   void resetAccessLogFlushTimer();
   void flushAccessLog(AccessLog::AccessLogType access_log_type);
   void disableAccessLogFlushTimer();
+  void onRetryTimer();
+  void enableRetryTimer();
+  void disableRetryTimer();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -526,6 +660,7 @@ protected:
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr access_log_flush_timer_;
+  Event::TimerPtr retry_timer_;
 
   // A pointer to the on demand cluster lookup when lookup is in flight.
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
@@ -547,9 +682,19 @@ protected:
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
+  // Stores the ReceiveBeforeConnect filter state value which can be set by preceding
+  // filters in the filter chain. When the filter state is set, TCP_PROXY doesn't disable
+  // downstream read during initialization. This feature can hence be used by preceding filters
+  // in the filter chain to read data from the downstream connection (for eg: to parse SNI) before
+  // the upstream connection is established.
+  bool receive_before_connect_{false};
+  bool early_data_end_stream_{false};
+  Buffer::OwnedImpl early_data_buffer_{};
+  HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
@@ -560,6 +705,7 @@ public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
           Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
+          absl::optional<std::chrono::milliseconds> idle_timeout,
           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
   void onEvent(Network::ConnectionEvent event);
@@ -573,7 +719,8 @@ private:
   UpstreamDrainManager& parent_;
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  Event::TimerPtr timer_;
+  Event::TimerPtr idle_timer_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
 };
@@ -586,7 +733,7 @@ public:
   void add(const Config::SharedConfigSharedPtr& config,
            Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-           Event::TimerPtr&& idle_timer,
+           Event::TimerPtr&& idle_timer, absl::optional<std::chrono::milliseconds> idle_timeout,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 

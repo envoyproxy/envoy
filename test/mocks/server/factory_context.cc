@@ -11,7 +11,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-using ::testing::Return;
 using ::testing::ReturnRef;
 
 MockFactoryContext::MockFactoryContext() {

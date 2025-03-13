@@ -9,10 +9,11 @@
 #include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
+#include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/spdy/core/http2_header_block.h"
 
 namespace Envoy {
 namespace Quic {
@@ -23,6 +24,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
     : quic::QuicSpdyClientStream(id, client_session, type),
       EnvoyQuicStream(
+          *this, *client_session,
           // Flow control receive window should be larger than 8k so that the send buffer can fully
           // utilize congestion control window before it reaches the high watermark.
           static_cast<uint32_t>(GetReceiveWindow().value()), *filterManagerConnection(),
@@ -30,6 +32,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
           stats, http3_options) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
+  RegisterMetadataVisitor(this);
 }
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
@@ -52,11 +55,10 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
 #ifndef ENVOY_ENABLE_UHV
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isUpgrade(headers)) {
+  if (Http::Utility::isUpgrade(headers)) {
     // In Envoy, both upgrade requests and extended CONNECT requests are
     // represented as their HTTP/1 forms, regardless of the HTTP version used.
     // Therefore, these need to be transformed into their HTTP/3 form, before
@@ -89,9 +91,8 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_connect_udp_support") &&
-      (Http::HeaderUtility::isCapsuleProtocol(headers) ||
-       Http::HeaderUtility::isConnectUdpRequest(headers))) {
+  if (Http::HeaderUtility::isCapsuleProtocol(headers) ||
+      Http::HeaderUtility::isConnectUdpRequest(headers)) {
     useCapsuleProtocol();
     if (Http::HeaderUtility::isConnectUdpRequest(headers)) {
       // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it
@@ -115,103 +116,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   return Http::okStatus();
 }
 
-void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "encodeData (end_stream={}) of {} bytes.", *this, end_stream,
-                   data.length());
-  const bool has_data = data.length() > 0;
-  if (!has_data && !end_stream) {
-    return;
-  }
-  if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
-    return;
-  }
-  ASSERT(!local_end_stream_);
-  local_end_stream_ = end_stream;
-  SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (http_datagram_handler_) {
-    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-    if (!http_datagram_handler_->encodeCapsuleFragment(data.toString(), end_stream)) {
-      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-      return;
-    }
-  } else {
-#endif
-    Buffer::RawSliceVector raw_slices = data.getRawSlices();
-    absl::InlinedVector<quiche::QuicheMemSlice, 4> quic_slices;
-    quic_slices.reserve(raw_slices.size());
-    for (auto& slice : raw_slices) {
-      ASSERT(slice.len_ != 0);
-      // Move each slice into a stand-alone buffer.
-      // TODO(danzh): investigate the cost of allocating one buffer per slice.
-      // If it turns out to be expensive, add a new function to free data in the middle in buffer
-      // interface and re-design QuicheMemSliceImpl.
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.quiche_use_mem_slice_releasor_api")) {
-        quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
-      } else {
-        auto single_slice_buffer = std::make_unique<Buffer::OwnedImpl>();
-        single_slice_buffer->move(data, slice.len_);
-        quic_slices.emplace_back(
-            reinterpret_cast<char*>(slice.mem_), slice.len_,
-            [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
-              // Free this memory explicitly when the callback is invoked.
-              single_slice_buffer = nullptr;
-            });
-      }
-    }
-    quic::QuicConsumedData result{0, false};
-    absl::Span<quiche::QuicheMemSlice> span(quic_slices);
-    {
-      IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
-      result = WriteBodySlices(span, end_stream);
-    }
-    // QUIC stream must take all.
-    if (result.bytes_consumed == 0 && has_data) {
-      IS_ENVOY_BUG(fmt::format("Send buffer didn't take all the data. Stream is write {} with {} "
-                               "bytes in send buffer. Current write was rejected.",
-                               write_side_closed() ? "closed" : "open", BufferedDataBytes()));
-      Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
-      return;
-    }
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  }
-#endif
-  if (local_end_stream_) {
-    if (codec_callbacks_) {
-      codec_callbacks_->onCodecEncodeComplete();
-    }
-    onLocalEndStream();
-  }
-}
-
 void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeTrailers is called on write-closed stream.");
-    return;
-  }
-  ASSERT(!local_end_stream_);
-  local_end_stream_ = true;
-  ScopedWatermarkBufferUpdater updater(this, this);
-
-  {
-    IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
-    ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers");
-  }
-
-  if (codec_callbacks_) {
-    codec_callbacks_->onCodecEncodeComplete();
-  }
-  onLocalEndStream();
-}
-
-void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
-  // Metadata Frame is not supported in QUICHE.
-  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
-  stats_.metadata_not_supported_error_.inc();
+  encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
@@ -280,8 +187,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      !upgrade_protocol_.empty()) {
+  if (!upgrade_protocol_.empty()) {
     Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
   }
 #else
@@ -336,7 +242,8 @@ void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
 
 bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   // Only called in IETF Quic to close write side.
-  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this,
+                   static_cast<int>(error.internal_code()));
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
   if (!quic::QuicSpdyClientStream::OnStopSending(error)) {
@@ -348,7 +255,12 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   if (read_side_closed() && !end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()));
+    runResetCallbacks(
+        quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
+                           "|FROM_PEER")
+            : absl::string_view());
   }
   return true;
 }
@@ -439,36 +351,49 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
 }
 
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, static_cast<int>(frame.error_code));
   stats_.rx_reset_.inc();
   bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
   // This closes read side in IETF Quic, but doesn't close write side.
   quic::QuicSpdyClientStream::OnStreamReset(frame);
   ASSERT(read_side_closed());
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+    runResetCallbacks(
+        quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
+            : absl::string_view());
   }
 }
 
 void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
-  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, static_cast<int>(error.internal_code()));
   stats_.tx_reset_.inc();
+  filterManagerConnection()->incrementSentQuicResetStreamErrorStats(error, /*from_self*/ true,
+                                                                    /*is_upstream*/ true);
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()));
+  runResetCallbacks(
+      quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
+          ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF")
+          : absl::string_view());
   if (session()->connection()->connected()) {
     quic::QuicSpdyClientStream::ResetWithError(error);
   }
 }
 
-void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,
+void EnvoyQuicClientStream::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                quic::ConnectionCloseSource source) {
   if (!end_stream_decoded_) {
-    runResetCallbacks(
-        source == quic::ConnectionCloseSource::FROM_SELF
-            ? quicErrorCodeToEnvoyLocalResetReason(error, session()->OneRttKeysAvailable())
-            : quicErrorCodeToEnvoyRemoteResetReason(error));
+    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
+                          ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                                 session()->OneRttKeysAvailable())
+                          : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+                      absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|",
+                                   quic::ConnectionCloseSourceToString(source), "|",
+                                   frame.error_details));
   }
-  quic::QuicSpdyClientStream::OnConnectionClosed(error, source);
+  quic::QuicSpdyClientStream::OnConnectionClosed(frame, source);
 }
 
 void EnvoyQuicClientStream::OnClose() {
@@ -502,6 +427,17 @@ Network::Connection* EnvoyQuicClientStream::connection() { return filterManagerC
 
 QuicFilterManagerConnectionImpl* EnvoyQuicClientStream::filterManagerConnection() {
   return dynamic_cast<QuicFilterManagerConnectionImpl*>(session());
+}
+
+void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
+                                               const quic::QuicHeaderList& header_list) {
+  if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
+    onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
+    return;
+  }
+  if (!header_list.empty()) {
+    response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+  }
 }
 
 void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_connection,

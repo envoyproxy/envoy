@@ -176,7 +176,7 @@ public:
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
     helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, overload_manager_,
+                                          init_manager_, overload_manager_, null_overload_manager_,
                                           [this] { start_workers_.ready(); });
   }
 
@@ -186,6 +186,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
+  NiceMock<MockOverloadManager> null_overload_manager_;
   Init::ManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
@@ -364,8 +365,9 @@ private:
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CustomStatsSink>(server.scope());
   }
 
@@ -495,7 +497,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -591,10 +593,12 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
-      shutdown = true;
-      shutdown_begin.Notify();
-    });
+    ServerLifecycleNotifier::HandlePtr handle3 =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+          shutdown = true;
+          shutdown_begin.Notify();
+          handle3 = nullptr;
+        });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
@@ -612,7 +616,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
-    handle3 = nullptr;
+    // handle3 is nulled out in the callback itself, to test that works as well
     handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
@@ -668,7 +672,7 @@ protected:
     EXPECT_CALL(restart_, drainParentListeners);
   }
 
-  ~ServerInstanceImplWorkersTest() {
+  ~ServerInstanceImplWorkersTest() override {
     server_->dispatcher().post([&] { server_->shutdown(); });
     server_thread_->join();
   }
@@ -699,18 +703,20 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
   // infinite drainClose spin-loop (mimicing high traffic) is running before we
   // initiate the drain sequence.
   auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
-    bool closed = drain_manager.drainClose();
+    bool closed = drain_manager.drainClose(Network::DrainDirection::All);
     drain_closes_started.Notify();
     while (!closed) {
-      closed = drain_manager.drainClose();
+      closed = drain_manager.drainClose(Network::DrainDirection::All);
     }
   });
   drain_closes_started.WaitForNotification();
 
   // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
   // wait for that to complete.
-  server_->dispatcher().post(
-      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+  server_->dispatcher().post([&] {
+    drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                     [&drain_complete]() { drain_complete.Notify(); });
+  });
 
   drain_complete.WaitForNotification();
   drain_thread->join();
@@ -958,12 +964,12 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
-      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
+      "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -973,11 +979,11 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   options_.service_node_name_ = "some_node_name";
   options_.allow_unknown_static_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -988,13 +994,15 @@ TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   options_.reject_unknown_dynamic_fields_ = true;
   options_.ignore_unknown_dynamic_fields_ = true; // reject takes precedence over ignore
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
-      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
+      "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
-      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(server_->messageValidationContext()
+                .dynamicValidationVisitor()
+                .onUnknownField("bar")
+                .message(),
+            "Protobuf message (bar) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1005,12 +1013,14 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   options_.allow_unknown_static_fields_ = true;
   options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
-      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(server_->messageValidationContext()
+                .dynamicValidationVisitor()
+                .onUnknownField("bar")
+                .message(),
+            "Protobuf message (bar) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1194,14 +1204,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
                             EnvoyException, "cluster manager: duplicate cluster 'service_google'");
 }
 
-// Regression tests for SdsApi throwing exceptions in initialize().
-TEST_P(ServerInstanceImplTest, BadSdsConfigSource) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/bad_sds_config_source.yaml"), EnvoyException,
-      "envoy.config.core.v3.ApiConfigSource must have a statically defined non-EDS cluster: "
-      "'sds-grpc' does not exist, was added via api, or is an EDS cluster");
-}
-
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
@@ -1345,16 +1347,30 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
-  server_.reset(new InstanceImpl(
+  server_ = std::make_unique<InstanceImpl>(
       *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
       std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
-      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr));
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
   EXPECT_THROW_WITH_MESSAGE(
       server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                           component_factory_),
       EnvoyException,
       "At least one of --config-path or --config-yaml or Options::configProto() should be "
       "non-empty");
+}
+
+TEST_P(ServerInstanceImplTest, ServerContextSingleton) {
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+
+  EXPECT_EQ(&server_->serverFactoryContext(),
+            Configuration::ServerFactoryContextInstance::getExisting());
+  server_ = nullptr;
+  EXPECT_EQ(nullptr, Configuration::ServerFactoryContextInstance::getExisting());
 }
 
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
@@ -1457,6 +1473,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));
+            EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
             return mock_extension;
           }));
 
@@ -1643,8 +1660,9 @@ private:
 class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CallbacksStatsSink>(server);
   }
 
@@ -1672,7 +1690,7 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
 
 // Validate that disabled extension is reflected in the list of Node extensions.
 TEST_P(ServerInstanceImplTest, DisabledExtension) {
-  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
+  OptionsImplBase::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   bool disabled_filter_found = false;
   for (const auto& extension : server_->localInfo().node().extensions()) {
@@ -1717,7 +1735,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
   }));

@@ -71,9 +71,6 @@ private:
 };
 
 DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
-  // Regex matcher requires this engine init.
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
-
   try {
     TestUtility::validate(input);
   } catch (const EnvoyException& e) {
@@ -85,7 +82,7 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
   // Test the expired token.
-  // The jwt token in the corpus files expired at 2001001001 (at year 2033).
+  // The JWT in the corpus files expired at 2001001001 (at year 2033).
   if (input.force_jwt_expired()) {
     // 20 years == 615168000 seconds.
     mock_factory_ctx.server_factory_context_.time_system_.advanceTimeWait(

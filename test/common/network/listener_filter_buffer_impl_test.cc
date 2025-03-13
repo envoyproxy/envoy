@@ -36,7 +36,7 @@ public:
             on_data_cb_(filter_buffer);
           }
         },
-        buffer_size_);
+        buffer_size_ == 0, buffer_size_);
   }
   std::unique_ptr<ListenerFilterBufferImpl> listener_buffer_;
   Network::MockIoHandle io_handle_;
@@ -68,7 +68,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
       EXPECT_EQ(buf[i], 'a');
     }
   };
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
   // Peek another 256 bytes data.
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
@@ -92,7 +92,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
       EXPECT_EQ(buf[i], 'b');
     }
   };
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
   // On socket failure
   bool is_closed = false;
@@ -100,7 +100,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(
           Return(ByMove(Api::IoCallUint64Result(-1, IoSocketError::create(SOCKET_ERROR_INTR)))));
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   EXPECT_TRUE(is_closed);
 
   // On remote closed
@@ -108,7 +108,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   on_close_cb_ = [&](bool) { is_closed = true; };
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   EXPECT_TRUE(is_closed);
 
   // On socket again.
@@ -116,8 +116,49 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(
           Return(ByMove(Api::IoCallUint64Result(0, IoSocketError::getIoSocketEagainError()))));
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   EXPECT_FALSE(is_closed);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ZeroBuffer) {
+  buffer_size_ = 0;
+  initialize();
+
+  EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
+    EXPECT_EQ(MSG_PEEK, flags);
+    // No matter how much data is ready, only 1 byte will be peeked into buffer
+    EXPECT_EQ(length, 1);
+    char* buf = static_cast<char*>(buffer);
+    buf[0] = 'a';
+    return Api::IoCallUint64Result(1, Api::IoError::none());
+  });
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  listener_buffer_->resetCapacity(1024);
+
+  EXPECT_EQ(1024, listener_buffer_->capacity());
+  EXPECT_EQ(0, listener_buffer_->rawSlice().len_);
+
+  // Peek 1024 bytes data for next listener filter with buffer size of 1024.
+  EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
+    EXPECT_EQ(MSG_PEEK, flags);
+    EXPECT_EQ(1024, length);
+    char* buf = static_cast<char*>(buffer);
+    for (size_t i = 0; i < length; i++) {
+      buf[i] = 'a';
+    }
+    return Api::IoCallUint64Result(length, Api::IoError::none());
+  });
+
+  on_data_cb_ = [&](ListenerFilterBuffer& filter_buffer) {
+    auto raw_buffer = filter_buffer.rawSlice();
+    EXPECT_EQ(1024, raw_buffer.len_);
+    const char* buf = static_cast<const char*>(raw_buffer.mem_);
+    for (uint64_t i = 0; i < raw_buffer.len_; i++) {
+      EXPECT_EQ(buf[i], 'a');
+    }
+  };
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 }
 
 TEST_F(ListenerFilterBufferImplTest, DrainData) {
@@ -141,7 +182,7 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
       EXPECT_EQ(buf[i], 'a');
     }
   };
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
   // Drain the 128 bytes data
   uint64_t drained_size = 128;
@@ -191,7 +232,7 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
       EXPECT_EQ(buf[i], 'b');
     }
   };
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 }
 
 TEST_F(ListenerFilterBufferImplTest, ResetCapacity) {
@@ -215,7 +256,7 @@ TEST_F(ListenerFilterBufferImplTest, ResetCapacity) {
       EXPECT_EQ(buf[i], 'a');
     }
   };
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
   listener_buffer_->resetCapacity(1024);
 
@@ -241,7 +282,7 @@ TEST_F(ListenerFilterBufferImplTest, ResetCapacity) {
       EXPECT_EQ(buf[i], 'b');
     }
   };
-  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 }
 
 } // namespace

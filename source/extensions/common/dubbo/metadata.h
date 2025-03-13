@@ -7,6 +7,7 @@
 #include "source/extensions/common/dubbo/message.h"
 
 #include "absl/types/optional.h"
+#include "hessian2/object.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,9 +19,6 @@ namespace Dubbo {
  */
 class Context {
 public:
-  void setSerializeType(SerializeType type) { serialize_type_ = type; }
-  SerializeType serializeType() const { return serialize_type_; }
-
   void setMessageType(MessageType type) { message_type_ = type; }
   MessageType messageType() const { return message_type_; }
 
@@ -47,12 +45,10 @@ public:
   }
 
 private:
-  SerializeType serialize_type_{SerializeType::Hessian2};
   MessageType message_type_{MessageType::Request};
   absl::optional<ResponseStatus> response_status_{};
 
   int64_t request_id_{};
-
   size_t body_size_{};
 };
 

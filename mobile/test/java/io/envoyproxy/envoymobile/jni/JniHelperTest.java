@@ -1,11 +1,14 @@
 package io.envoyproxy.envoymobile.jni;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 @RunWith(RobolectricTestRunner.class)
 public class JniHelperTest {
@@ -14,12 +17,42 @@ public class JniHelperTest {
   //================================================================================
   // Native methods for testing.
   //================================================================================
+  public static native void getFieldId(Class<?> clazz, String name, String signature);
+  public static native void getFieldIdFromCache(String className, String fieldName,
+                                                String signature);
+  public static native void getStaticFieldId(Class<?> clazz, String name, String signature);
+  public static native void getStaticFieldIdFromCache(String className, String fieldName,
+                                                      String signature);
+  public static native byte getByteField(Class<?> clazz, Object instance, String name,
+                                         String signature);
+  public static native char getCharField(Class<?> clazz, Object instance, String name,
+                                         String signature);
+  public static native short getShortField(Class<?> clazz, Object instance, String name,
+                                           String signature);
+  public static native int getIntField(Class<?> clazz, Object instance, String name,
+                                       String signature);
+  public static native long getLongField(Class<?> clazz, Object instance, String name,
+                                         String signature);
+  public static native float getFloatField(Class<?> clazz, Object instance, String name,
+                                           String signature);
+  public static native double getDoubleField(Class<?> clazz, Object instance, String name,
+                                             String signature);
+  public static native boolean getBooleanField(Class<?> clazz, Object instance, String name,
+                                               String signature);
+  public static native Object getObjectField(Class<?> clazz, Object instance, String name,
+                                             String signature);
   public static native void getMethodId(Class<?> clazz, String name, String signature);
+  public static native void getMethodIdFromCache(String className, String methodName,
+                                                 String signature);
   public static native void getStaticMethodId(Class<?> clazz, String name, String signature);
-  public static native Class<?> findClass(String className);
+  public static native void getStaticMethodIdFromCache(String className, String methodName,
+                                                       String signature);
+  public static native Class<?> findClassFromCache(String className);
   public static native Class<?> getObjectClass(Object object);
   public static native Object newObject(Class<?> clazz, String name, String signature);
   public static native void throwNew(String className, String message);
+  public static native boolean exceptionOccurred(Class<?> clazz, String name, String signature);
+  public static native boolean exceptionClear(Class<?> clazz, String name, String signature);
   public static native int getArrayLength(int[] array);
   public static native byte[] newByteArray(int length);
   public static native char[] newCharArray(int length);
@@ -84,6 +117,20 @@ public class JniHelperTest {
                                                        String signature);
   public static native void callStaticVoidMethod(Class<?> clazz, String name, String signature);
   public static native Object callStaticObjectMethod(Class<?> clazz, String name, String signature);
+  public static native Object newDirectByteBuffer();
+
+  //================================================================================
+  // Fields used for Get<Type>Field tests.
+  //================================================================================
+  private final byte byteField = 1;
+  private final char charField = 'a';
+  private final short shortField = 1;
+  private final int intField = 1;
+  private final long longField = 1;
+  private final float floatField = 3.14f;
+  private final double doubleField = 3.14;
+  private final boolean booleanField = true;
+  private final String objectField = "Hello";
 
   //================================================================================
   // Object methods used for Call<Type>Method tests.
@@ -113,21 +160,123 @@ public class JniHelperTest {
   public static void staticVoidMethod() {}
   public static String staticObjectMethod() { return "Hello"; }
 
-  static class Foo {}
+  //================================================================================
+  // Methods used for Exception* tests.
+  //================================================================================
+  public static void alwaysThrow() { throw new RuntimeException("Test"); }
+
+  static class Foo {
+    private final int field = 1;
+    private static int staticField = 2;
+    private static void staticMethod() {}
+  }
 
   @Test
-  public void testMethodId() {
+  public void testGetFieldId() {
+    getFieldId(Foo.class, "field", "I");
+  }
+
+  @Test
+  public void testGetFieldIdFromCache() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getFieldIdFromCache("io/envoyproxy/envoymobile/jni/JniHelperTest$Foo", "field", "I");
+    }
+  }
+
+  @Test
+  public void testGetStaticFieldId() {
+    getStaticFieldId(Foo.class, "staticField", "I");
+  }
+
+  @Test
+  public void testGetStaticFieldIdFromCache() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getStaticFieldIdFromCache("io/envoyproxy/envoymobile/jni/JniHelperTest$Foo", "staticField",
+                                "I");
+    }
+  }
+
+  @Test
+  public void testGetByteField() {
+    assertThat(getByteField(JniHelperTest.class, this, "byteField", "B")).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetCharField() {
+    assertThat(getCharField(JniHelperTest.class, this, "charField", "C")).isEqualTo('a');
+  }
+
+  @Test
+  public void testGetShortField() {
+    assertThat(getShortField(JniHelperTest.class, this, "shortField", "S")).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetIntField() {
+    assertThat(getIntField(JniHelperTest.class, this, "intField", "I")).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetLongField() {
+    assertThat(getLongField(JniHelperTest.class, this, "longField", "J")).isEqualTo(1L);
+  }
+
+  @Test
+  public void testGetFloatField() {
+    assertThat(getFloatField(JniHelperTest.class, this, "floatField", "F")).isEqualTo(3.14f);
+  }
+
+  @Test
+  public void testGetDoubleField() {
+    assertThat(getDoubleField(JniHelperTest.class, this, "doubleField", "D")).isEqualTo(3.14);
+  }
+
+  @Test
+  public void testGetBooleanField() {
+    assertThat(getBooleanField(JniHelperTest.class, this, "booleanField", "Z")).isEqualTo(true);
+  }
+
+  @Test
+  public void testGetObjectField() {
+    assertThat(getObjectField(JniHelperTest.class, this, "objectField", "Ljava/lang/String;"))
+        .isEqualTo("Hello");
+  }
+
+  @Test
+  public void testGetMethodId() {
     getMethodId(Foo.class, "<init>", "()V");
   }
 
   @Test
-  public void testStaticMethodId() {
-    getStaticMethodId(JniHelperTest.class, "staticVoidMethod", "()V");
+  public void testGetMethodIdFromCache() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getMethodIdFromCache("io/envoyproxy/envoymobile/jni/JniHelperTest$Foo", "<init>", "()V");
+    }
   }
 
   @Test
-  public void testFindClass() {
-    assertThat(findClass("java/lang/Exception")).isEqualTo(Exception.class);
+  public void testGetStaticMethodId() {
+    getStaticMethodId(Foo.class, "staticMethod", "()V");
+  }
+
+  @Test
+  public void testGetStaticMethodIdFromCache() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      getStaticMethodIdFromCache("io/envoyproxy/envoymobile/jni/JniHelperTest$Foo", "staticMethod",
+                                 "()V");
+    }
+  }
+
+  @Test
+  public void testFindClassFromCache() {
+    // Do it in a loop to test the cache.
+    for (int i = 0; i < 10; i++) {
+      assertThat(findClassFromCache("java/lang/Exception")).isEqualTo(Exception.class);
+    }
   }
 
   @Test
@@ -143,9 +292,21 @@ public class JniHelperTest {
 
   @Test
   public void testThrowNew() {
-    assertThatThrownBy(() -> throwNew("java/lang/RuntimeException", "Test"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessageContaining("Test");
+    RuntimeException exception =
+        assertThrows(RuntimeException.class, () -> throwNew("java/lang/RuntimeException", "Test"));
+    assertThat(exception).hasMessageThat().contains("Test");
+  }
+
+  @Test
+  public void testExceptionOccurred() {
+    RuntimeException exception = assertThrows(
+        RuntimeException.class, () -> exceptionOccurred(JniHelperTest.class, "alwaysThrow", "()V"));
+    assertThat(exception).hasMessageThat().contains("Test");
+  }
+
+  @Test
+  public void testExceptionClear() {
+    assertThat(exceptionClear(JniHelperTest.class, "alwaysThrow", "()V")).isTrue();
   }
 
   @Test
@@ -423,5 +584,14 @@ public class JniHelperTest {
     assertThat(
         callStaticObjectMethod(JniHelperTest.class, "staticObjectMethod", "()Ljava/lang/String;"))
         .isEqualTo("Hello");
+  }
+
+  @Test
+  public void testNewDirectByteBuffer() {
+    ByteBuffer byteBuffer = ((ByteBuffer)newDirectByteBuffer()).order(ByteOrder.LITTLE_ENDIAN);
+    assertThat(byteBuffer.capacity()).isEqualTo(3);
+    assertThat(byteBuffer.get(0)).isEqualTo(1);
+    assertThat(byteBuffer.get(1)).isEqualTo(2);
+    assertThat(byteBuffer.get(2)).isEqualTo(3);
   }
 }

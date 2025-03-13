@@ -15,6 +15,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
@@ -73,7 +74,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kOrFilter:
     return FilterPtr{new OrFilter(config.or_filter(), context)};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kHeaderFilter:
-    return FilterPtr{new HeaderFilter(config.header_filter())};
+    return FilterPtr{new HeaderFilter(config.header_filter(), context.serverFactoryContext())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kResponseFlagFilter:
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
@@ -81,7 +82,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kMetadataFilter:
-    return FilterPtr{new MetadataFilter(config.metadata_filter())};
+    return FilterPtr{new MetadataFilter(config.metadata_filter(), context.serverFactoryContext())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogTypeFilter:
     return FilterPtr{new LogTypeFilter(config.log_type_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
@@ -206,12 +207,13 @@ bool NotHealthCheckFilter::evaluate(const Formatter::HttpFormatterContext&,
   return !info.healthCheck();
 }
 
-HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config)
-    : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header())) {}
+HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config,
+                           Server::Configuration::CommonFactoryContext& context)
+    : header_data_(Http::HeaderUtility::createHeaderData(config.header(), context)) {}
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {
-  return Http::HeaderUtility::matchHeaders(context.requestHeaders(), *header_data_);
+  return header_data_->matchesHeaders(context.requestHeaders());
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
@@ -288,7 +290,8 @@ bool LogTypeFilter::evaluate(const Formatter::HttpFormatterContext& context,
   return exclude_ ? !found : found;
 }
 
-MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
+MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
+                               Server::Configuration::CommonFactoryContext& context)
     : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
       filter_(filter_config.matcher().filter()) {
 
@@ -301,13 +304,13 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
 
     // Matches if the value equals the configured 'MetadataMatcher' value.
     const auto& val = matcher_config.value();
-    value_matcher_ = Matchers::ValueMatcher::create(val);
+    value_matcher_ = Matchers::ValueMatcher::create(val, context);
   }
 
   // Matches if the value is present in dynamic metadata
   auto present_val = envoy::type::matcher::v3::ValueMatcher();
   present_val.set_present_match(true);
-  present_matcher_ = Matchers::ValueMatcher::create(present_val);
+  present_matcher_ = Matchers::ValueMatcher::create(present_val, context);
 }
 
 bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
@@ -325,8 +328,10 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   return default_match_;
 }
 
-InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                                              Server::Configuration::FactoryContext& context) {
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::FactoryContext& context,
+                            std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context);
@@ -336,7 +341,8 @@ InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       config, context.messageValidationVisitor(), factory);
 
-  return factory.createAccessLogInstance(*message, std::move(filter), context);
+  return factory.createAccessLogInstance(*message, std::move(filter), context,
+                                         std::move(command_parsers));
 }
 
 } // namespace AccessLog

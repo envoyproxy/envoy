@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/stream_info/mocks.h"
@@ -15,7 +14,7 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace SessionFilters {
 
-class MockReadFilterCallbacks : public ReadFilterCallbacks {
+class MockReadFilterCallbacks : public Network::UdpSessionReadFilterCallbacks {
 public:
   MockReadFilterCallbacks();
   ~MockReadFilterCallbacks() override;
@@ -29,7 +28,7 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-class MockWriteFilterCallbacks : public WriteFilterCallbacks {
+class MockWriteFilterCallbacks : public Network::UdpSessionWriteFilterCallbacks {
 public:
   MockWriteFilterCallbacks();
   ~MockWriteFilterCallbacks() override;
@@ -55,6 +54,7 @@ public:
   MOCK_METHOD(const std::string&, postPath, (), (const));
   MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const));
   MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const));
+  MOCK_METHOD(const BackOffStrategyPtr&, backoffStrategy, (), (const));
   MOCK_METHOD(bool, bufferEnabled, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
   MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
@@ -93,18 +93,27 @@ public:
   MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
 };
 
+class MockHttpUpstream : public HttpUpstream {
+public:
+  ~MockHttpUpstream() override;
+
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data));
+  MOCK_METHOD(void, onDownstreamEvent, (Network::ConnectionEvent event));
+};
+
 class MockHttpStreamCallbacks : public HttpStreamCallbacks {
 public:
   ~MockHttpStreamCallbacks() override;
 
   MOCK_METHOD(void, onStreamReady,
               (StreamInfo::StreamInfo * info, std::unique_ptr<HttpUpstream>&& upstream,
-               Upstream::HostDescriptionConstSharedPtr& host,
+               const Upstream::HostDescription& host,
                const Network::ConnectionInfoProvider& address_provider,
                Ssl::ConnectionInfoConstSharedPtr ssl_info));
   MOCK_METHOD(void, onStreamFailure,
               (ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
+               const Upstream::HostDescription& host));
+  MOCK_METHOD(void, resetIdleTimer, ());
 };
 
 } // namespace SessionFilters

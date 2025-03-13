@@ -1,9 +1,7 @@
 load("@envoy_repo//:path.bzl", "PATH")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 sh_binary(
     name = "replace",

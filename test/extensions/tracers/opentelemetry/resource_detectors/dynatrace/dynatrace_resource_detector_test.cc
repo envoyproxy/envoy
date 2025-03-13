@@ -27,8 +27,6 @@ public:
 };
 
 TEST(DynatraceResourceDetectorTest, DynatraceNotDeployed) {
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-
   auto dt_file_reader = std::make_unique<NiceMock<MockDynatraceFileReader>>();
   EXPECT_CALL(*dt_file_reader, readEnrichmentFile(_)).WillRepeatedly(Return(""));
 
@@ -43,7 +41,6 @@ TEST(DynatraceResourceDetectorTest, DynatraceNotDeployed) {
 }
 
 TEST(DynatraceResourceDetectorTest, OnlyOneAgentInstalled) {
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   ResourceAttributes expected_attributes = {
       {"dt.entity.host", "HOST-abc"},
       {"dt.entity.process_group_instance", "PROCESS_GROUP_INSTANCE-abc"}};
@@ -88,7 +85,6 @@ dt.entity.process_group_instance=PROCESS_GROUP_INSTANCE-abc
 }
 
 TEST(DynatraceResourceDetectorTest, Dynatracek8sOperator) {
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   ResourceAttributes expected_attributes = {{"k8s.pod.uid", "123"}, {"k8s.pod.name", "envoy"}};
 
   auto dt_file_reader = std::make_unique<NiceMock<MockDynatraceFileReader>>();
@@ -122,6 +118,53 @@ k8s.pod.name=envoy
 
     EXPECT_TRUE(expected != expected_attributes.end());
     EXPECT_EQ(expected->second, actual.second);
+  }
+}
+
+TEST(DynatraceResourceDetectorTest, TestFailureDetectionLog) {
+  // No enrichment file found, should log a line
+  {
+    auto dt_file_reader = std::make_unique<NiceMock<MockDynatraceFileReader>>();
+
+    EXPECT_CALL(*dt_file_reader, readEnrichmentFile(_)).WillRepeatedly(Return(""));
+
+    envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+        DynatraceResourceDetectorConfig config;
+
+    auto detector = std::make_shared<DynatraceResourceDetector>(config, std::move(dt_file_reader));
+    EXPECT_LOG_CONTAINS(
+        "warn",
+        "Dynatrace OpenTelemetry resource detector is configured but could not detect attributes.",
+        detector->detect());
+  }
+
+  // At least one enrichment file found, should NOT log a line
+  {
+    auto dt_file_reader = std::make_unique<NiceMock<MockDynatraceFileReader>>();
+
+    std::string k8s_attrs = fmt::format(R"EOF(
+    k8s.pod.uid=123
+    k8s.pod.name=envoy
+    )EOF");
+
+    EXPECT_CALL(*dt_file_reader,
+                readEnrichmentFile("dt_metadata_e617c525669e072eebe3d0f08212e8f2.properties"))
+        .WillRepeatedly(Return(""));
+    EXPECT_CALL(*dt_file_reader,
+                readEnrichmentFile("/var/lib/dynatrace/enrichment/dt_host_metadata.properties"))
+        .WillRepeatedly(Return(""));
+    EXPECT_CALL(*dt_file_reader,
+                readEnrichmentFile("/var/lib/dynatrace/enrichment/dt_metadata.properties"))
+        .WillRepeatedly(Return(k8s_attrs));
+
+    envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+        DynatraceResourceDetectorConfig config;
+
+    auto detector = std::make_shared<DynatraceResourceDetector>(config, std::move(dt_file_reader));
+    EXPECT_LOG_NOT_CONTAINS(
+        "warn",
+        "Dynatrace OpenTelemetry resource detector is configured but could not detect attributes.",
+        detector->detect());
   }
 }
 

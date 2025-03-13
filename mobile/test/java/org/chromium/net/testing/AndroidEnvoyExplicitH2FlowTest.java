@@ -1,13 +1,12 @@
 package org.chromium.net.testing;
 
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED;
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 import static org.chromium.net.testing.CronetTestRule.SERVER_CERT_PEM;
 import static org.chromium.net.testing.CronetTestRule.SERVER_KEY_PKCS8_PEM;
 
 import android.content.Context;
 import androidx.test.core.app.ApplicationProvider;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.LogLevel;
@@ -15,7 +14,8 @@ import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.Stream;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
+
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CountDownLatch;
@@ -26,15 +26,16 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class AndroidEnvoyExplicitH2FlowTest {
 
   private Engine engine;
 
   @BeforeClass
   public static void loadJniLibrary() {
-    AndroidJniLibrary.loadTestLibrary();
+    JniLibrary.loadTestLibrary();
   }
 
   @Before
@@ -43,7 +44,11 @@ public class AndroidEnvoyExplicitH2FlowTest {
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
                  .setTrustChainVerification(ACCEPT_UNTRUSTED)
-                 .addLogLevel(LogLevel.DEBUG)
+                 .setLogLevel(LogLevel.DEBUG)
+                 .setLogger((level, message) -> {
+                   System.out.print(message);
+                   return null;
+                 })
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;
@@ -100,7 +105,7 @@ public class AndroidEnvoyExplicitH2FlowTest {
               return null;
             })
             .start(Runnable::run) // direct executor - all the logic runs on the EM Network Thread.
-            .sendHeaders(requestHeaders, false));
+            .sendHeaders(requestHeaders, /* endStream= */ false, /* idempotent= */ false));
     ByteBuffer bf = ByteBuffer.allocateDirect(1);
     bf.put((byte)'a');
     stream.get().sendData(bf);

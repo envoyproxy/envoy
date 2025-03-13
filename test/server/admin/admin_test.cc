@@ -17,6 +17,7 @@
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/server/admin/stats_request.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/null_overload_manager.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -54,6 +55,7 @@ TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(nullptr, admin_.tracer());
   EXPECT_FALSE(admin_.streamErrorOnInvalidHttpMessaging());
   EXPECT_FALSE(admin_.schemeToSet().has_value());
+  EXPECT_FALSE(admin_.shouldSchemeMatchUpstream());
   EXPECT_EQ(admin_.pathWithEscapedSlashesAction(),
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED);
@@ -77,10 +79,10 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminAddress) {
   server_.options_.admin_address_path_ = TestEnvironment::temporaryPath("admin.address");
   AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "info", "admin address:",
@@ -92,10 +94,10 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   server_.options_.admin_address_path_ =
       TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical",
@@ -140,6 +142,8 @@ TEST_P(AdminInstanceTest, Help) {
   EXPECT_EQ(Http::Code::OK, getCallback("/help", header_map, response));
   const std::string expected = R"EOF(admin commands are:
   /: Admin home page
+  /allocprofiler (POST): enable/disable the allocation profiler (if supported)
+      enable: enable/disable the allocation profiler; One of (y, n)
   /certs: print certs on machine
   /clusters: upstream cluster status
   /config_dump: dump current Envoy configs (experimental)
@@ -166,8 +170,8 @@ TEST_P(AdminInstanceTest, Help) {
   /listeners: print listener info
       format: File format to use; One of (text, json)
   /logging (POST): query/change logging levels
-      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>.
-      level: desired logging level; One of (, trace, debug, info, warning, error, critical, off)
+      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>. If fine grain logging is enabled, use __FILE__ or a glob experision as the logger name. For example, source/common*:warning
+      level: desired logging level, this will change all loggers's level; One of (, trace, debug, info, warning, error, critical, off)
   /memory: print current allocation/heap usage
   /quitquitquit (POST): exit the server
   /ready: print server state, return 200 if LIVE, otherwise return 503
@@ -181,11 +185,12 @@ TEST_P(AdminInstanceTest, Help) {
       filter: Regular expression (Google re2) for filtering stats
       format: Format to use; One of (html, active-html, text, json)
       type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
-      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, none)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, detailed, summary)
   /stats/prometheus: print server stats in prometheus format
       usedonly: Only include stats that have been written by system since restart
       text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
       filter: Regular expression (Google re2) for filtering stats
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, summary)
   /stats/recentlookups: Show recent stat-name lookups
   /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
   /stats/recentlookups/disable (POST): disable recording of reset stat-name lookup names
@@ -303,7 +308,7 @@ public:
   AdminImpl::NullScopedRouteConfigProvider& scopedRouteConfigProvider() {
     return scoped_route_config_provider_;
   }
-  NullOverloadManager& overloadManager() { return admin_.null_overload_manager_; }
+  OverloadManager& overloadManager() { return admin_.null_overload_manager_; }
   NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }
@@ -335,8 +340,6 @@ TEST_P(AdminInstanceTest, Overrides) {
   ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
-  peer.scopedRouteConfigProvider().getConfigProto();
-  peer.scopedRouteConfigProvider().getConfigVersion();
   peer.scopedRouteConfigProvider().getConfig();
   peer.scopedRouteConfigProvider().apiType();
   peer.scopedRouteConfigProvider().getConfigProtos();
@@ -351,7 +354,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  peer.socketFactory().doFinalPreWorkerInit();
+  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

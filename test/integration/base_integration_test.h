@@ -9,7 +9,7 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -167,7 +167,7 @@ public:
   envoy::config::core::v3::Node last_node_;
 
   // Functions for testing reloadable config (xDS)
-  void createXdsUpstream();
+  virtual void createXdsUpstream();
   void createXdsConnection();
   void cleanUpXdsConnection();
 
@@ -185,19 +185,23 @@ public:
       const std::vector<std::string>& expected_resource_names_added,
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", FakeStream* stream = nullptr,
+      OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
+          absl::nullopt);
 
   template <class T>
   void
   sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                         const std::vector<T>& added_or_updated,
                         const std::vector<std::string>& removed, const std::string& version,
-                        const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {}) {
+                        const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata = {},
+                        FakeStream* stream = nullptr) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
         sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, nullptr, metadata);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, stream, metadata);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, metadata);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, {},
+                                 metadata);
     }
   }
 
@@ -208,16 +212,18 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", bool expect_node = true) {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
-                                        expected_resource_unsubscriptions, xds_stream_,
+                                        expected_resource_unsubscriptions, xds_stream_.get(),
                                         expected_error_code, expected_error_message, expect_node);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
-      const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
+      const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "", bool expect_node = true);
+      const std::string& expected_error_message = "", bool expect_node = true,
+      OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
+          absl::nullopt);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -265,14 +271,15 @@ public:
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {}, {});
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_.get(), {},
+                               {});
   }
 
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+                             FakeStream* stream, const std::vector<std::string>& aliases = {}) {
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream, aliases, {});
   }
 
@@ -289,10 +296,13 @@ public:
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases,
+                             FakeStream* stream, const std::vector<std::string>& aliases,
                              const absl::flat_hash_map<std::string, ProtobufWkt::Any>& metadata) {
     auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
                                                     aliases, metadata);
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
     stream->sendGrpcMessage(response);
   }
 
@@ -523,8 +533,10 @@ protected:
 
   Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 
   // The fake upstreams_ are created using the context_manager, so make sure
   // they are destroyed before it is.

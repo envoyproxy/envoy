@@ -16,11 +16,14 @@ namespace Envoy {
 namespace Http {
 
 using DownstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
+
+using FiltersList = Protobuf::RepeatedPtrField<
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
 // Allows graceful handling of missing configuration for ECDS.
 class MissingConfigFilter : public Http::PassThroughDecoderFilter {
@@ -42,19 +45,21 @@ static Http::FilterFactoryCb MissingConfigFilterFactory =
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
   struct FilterFactoryProvider {
-    Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb> provider;
+    Filter::FilterConfigProviderPtr<Filter::HttpFilterFactoryCb> provider;
     // If true, this filter is disabled by default and must be explicitly enabled by
     // route configuration.
     bool disabled{};
   };
 
-  using FilterFactoriesList = std::list<FilterFactoryProvider>;
+  using FilterFactoriesList = std::vector<FilterFactoryProvider>;
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
   static void createFilterChainForFactories(Http::FilterChainManager& manager,
                                             const FilterChainOptions& options,
                                             const FilterFactoriesList& filter_factories);
+
+  static absl::Status checkUpstreamHttpFiltersList(const FiltersList& filters);
 
   static std::shared_ptr<DownstreamFilterConfigProviderManager>
   createSingletonDownstreamFilterConfigProviderManager(
@@ -70,7 +75,7 @@ class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
 public:
   using FilterFactoriesList = FilterChainUtility::FilterFactoriesList;
   using FilterConfigProviderManager =
-      Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb, FilterCtx>;
+      Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb, FilterCtx>;
 
   FilterChainHelper(FilterConfigProviderManager& filter_config_provider_manager,
                     Server::Configuration::ServerFactoryContext& server_context,
@@ -80,15 +85,13 @@ public:
         server_context_(server_context), cluster_manager_(cluster_manager),
         factory_context_(factory_context), stats_prefix_(stats_prefix) {}
 
-  using FiltersList = Protobuf::RepeatedPtrField<
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
-
   // Process the filters in this filter chain.
   absl::Status processFilters(const FiltersList& filters, const std::string& prefix,
                               const std::string& filter_chain_type,
                               FilterFactoriesList& filter_factories) {
 
     DependencyManager dependency_manager;
+    filter_factories.reserve(filters.size());
     for (int i = 0; i < filters.size(); i++) {
       absl::Status status =
           processFilter(filters[i], i, prefix, filter_chain_type, i == filters.size() - 1,
@@ -146,14 +149,13 @@ private:
     if (!callback_or_error.status().ok()) {
       return callback_or_error.status();
     }
-    Http::FilterFactoryCb callback = callback_or_error.value();
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
     const bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
-    Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
-                                             filter_chain_type, is_terminal,
-                                             last_filter_in_current_config);
+    RETURN_IF_NOT_OK(Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
+                                                              filter_chain_type, is_terminal,
+                                                              last_filter_in_current_config));
     auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-        {factory->name(), callback}, proto_config.name());
+        callback_or_error.value(), proto_config.name());
 #ifdef ENVOY_ENABLE_YAML
     ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
     ENVOY_LOG(debug, "    config: {}",

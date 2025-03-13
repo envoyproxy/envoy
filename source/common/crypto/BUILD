@@ -19,9 +19,7 @@ envoy_cc_library(
         "utility.h",
         "utility_impl.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/common/crypto:crypto_interface",

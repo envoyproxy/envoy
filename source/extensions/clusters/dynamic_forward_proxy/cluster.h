@@ -34,7 +34,7 @@ public:
   void startPreInit() override;
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
-  void onDnsHostAddOrUpdate(
+  absl::Status onDnsHostAddOrUpdate(
       const std::string& host,
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
   void onDnsHostRemove(const std::string& host) override;
@@ -44,23 +44,29 @@ public:
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
   bool enableSubCluster() const override { return enable_sub_cluster_; }
-  Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
-                                          Upstream::LoadBalancerContext* context) const;
+  Upstream::HostSelectionResponse chooseHost(absl::string_view host,
+                                             Upstream::LoadBalancerContext* context) const;
+
+  // Extensions::Common::DynamicForwardProxy::DfpCluster
   std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                          const int port) override;
   bool touch(const std::string& cluster_name) override;
   void checkIdleSubCluster();
+  Upstream::HostConstSharedPtr findHostByName(const std::string& host) const;
+
+protected:
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
+          const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
+          Upstream::ClusterFactoryContext& context,
+          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
+          absl::Status& creation_status);
 
 private:
   friend class ClusterFactory;
   friend class ClusterTest;
 
-  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
-          Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cacahe,
-          const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
-          Upstream::ClusterFactoryContext& context,
-          Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager);
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, Cluster& parent);
     void touch();
@@ -85,12 +91,15 @@ private:
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
 
   class LoadBalancer : public Upstream::LoadBalancer,
+                       public Extensions::Common::DynamicForwardProxy::DfpLb,
                        public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
     LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
+    // DfpLb
+    Upstream::HostConstSharedPtr findHostByName(const std::string& host) const override;
     // Upstream::LoadBalancer
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not implemented.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -132,6 +141,44 @@ private:
     const Cluster& cluster_;
   };
 
+  // This acts as the bridge for asynchronous host lookup. If the host is not
+  // present in the DFP cluster, the DFPHostSelectionHandle will receive a onLoadDnsCacheComplete
+  // call unless the LoadDnsCacheEntryHandlePtr is destroyed. Destruction of the
+  // LoadDnsCacheEntryHandlePtr ensures that no callback will occur, at which
+  // point it is safe to delete the DFPHostSelectionHandle.
+  class DFPHostSelectionHandle
+      : public Upstream::AsyncHostSelectionHandle,
+        public Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
+  public:
+    DFPHostSelectionHandle(Upstream::LoadBalancerContext* context, const Cluster& cluster,
+                           std::string hostname)
+        : context_(context), cluster_(cluster), hostname_(hostname){};
+
+    virtual void cancel() {
+      // Cancels the DNS callback.
+      handle_.reset();
+    }
+
+    virtual void
+    onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
+      Upstream::HostConstSharedPtr host = cluster_.findHostByName(hostname_);
+      std::string details = info->details();
+      context_->onAsyncHostSelection(std::move(host), std::move(details));
+    }
+
+    void setHandle(Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr&& handle) {
+      handle_ = std::move(handle);
+    }
+    void setAutoDec(Upstream::ResourceAutoIncDecPtr&& dec) { auto_dec_ = std::move(dec); }
+
+  private:
+    Upstream::LoadBalancerContext* context_;
+    Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr handle_;
+    Upstream::ResourceAutoIncDecPtr auto_dec_;
+    const Cluster& cluster_;
+    std::string hostname_;
+  };
+
   class LoadBalancerFactory : public Upstream::LoadBalancerFactory {
   public:
     LoadBalancerFactory(Cluster& cluster) : cluster_(cluster) {}
@@ -153,15 +200,16 @@ private:
     Upstream::LoadBalancerFactorySharedPtr factory() override {
       return std::make_shared<LoadBalancerFactory>(cluster_);
     }
-    void initialize() override {}
+    absl::Status initialize() override { return absl::OkStatus(); }
 
   private:
     Cluster& cluster_;
   };
 
-  void
+  absl::Status
   addOrUpdateHost(absl::string_view host,
-                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info)
+                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+                  std::unique_ptr<Upstream::HostVector>& hosts_added)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

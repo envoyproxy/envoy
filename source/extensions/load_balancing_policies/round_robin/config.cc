@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,11 +27,6 @@ Upstream::LoadBalancerPtr RoundRobinCreator::operator()(
       Common::ActiveOrLegacy<TypedRoundRobinLbConfig, LegacyRoundRobinLbConfig>::get(
           lb_config.ptr());
 
-  // The load balancing policy configuration will be loaded and validated in the main thread when we
-  // load the cluster configuration. So we can assume the configuration is valid here.
-  ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive(),
-         "Invalid load balancing policy configuration for least request load balancer");
-
   if (active_or_legacy.hasActive()) {
     return std::make_unique<Upstream::RoundRobinLoadBalancer>(
         params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
@@ -41,7 +36,9 @@ Upstream::LoadBalancerPtr RoundRobinCreator::operator()(
   } else {
     return std::make_unique<Upstream::RoundRobinLoadBalancer>(
         params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
-        cluster_info.lbConfig(), active_or_legacy.legacy()->lbConfig(), time_source);
+        cluster_info.lbConfig(),
+        active_or_legacy.hasLegacy() ? active_or_legacy.legacy()->lbConfig() : absl::nullopt,
+        time_source);
   }
 }
 

@@ -1,6 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -16,6 +18,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
@@ -30,6 +33,7 @@ envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
@@ -58,13 +62,15 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    shard_count = 2,
+    rbe_pool = "6gig",
+    shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
+        "//source/extensions/filters/http/header_to_metadata:config",
         "//source/extensions/filters/http/rbac:config",
         "//source/extensions/key_value/file_based:config_lib",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
@@ -86,6 +92,32 @@ envoy_extension_cc_mock(
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "rbac_filter_fuzz_proto",
+    srcs = ["rbac_filter_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "rbac_filter_fuzz_test",
+    srcs = ["rbac_filter_fuzz_test.cc"],
+    corpus = "rbac_filter_corpus",
+    rbe_pool = "6gig",
+    deps = [
+        ":rbac_filter_fuzz_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

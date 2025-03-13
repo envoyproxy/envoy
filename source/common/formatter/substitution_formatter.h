@@ -3,6 +3,7 @@
 #include <bitset>
 #include <functional>
 #include <list>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -12,120 +13,68 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
-#include "source/common/formatter/http_specific_formatter.h"
-#include "source/common/formatter/stream_info_formatter.h"
+#include "source/common/formatter/http_formatter_context.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/json/json_streamer.h"
+#include "source/common/json/json_utility.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Formatter {
+
+/**
+ * FormatterProvider for string literals. It ignores headers and stream info and returns string by
+ * which it was initialized.
+ */
+class PlainStringFormatter : public FormatterProvider {
+public:
+  PlainStringFormatter(absl::string_view str) { str_.set_string_value(str); }
+
+  // FormatterProvider
+  absl::optional<std::string> formatWithContext(const Context&,
+                                                const StreamInfo::StreamInfo&) const override {
+    return str_.string_value();
+  }
+  ProtobufWkt::Value formatValueWithContext(const Context&,
+                                            const StreamInfo::StreamInfo&) const override {
+    return str_;
+  }
+
+private:
+  ProtobufWkt::Value str_;
+};
+
+/**
+ * FormatterProvider for numbers.
+ */
+class PlainNumberFormatter : public FormatterProvider {
+public:
+  PlainNumberFormatter(double num) { num_.set_number_value(num); }
+
+  // FormatterProvider
+  absl::optional<std::string> formatWithContext(const Context&,
+                                                const StreamInfo::StreamInfo&) const override {
+    std::string str = absl::StrFormat("%g", num_.number_value());
+    return str;
+  }
+  ProtobufWkt::Value formatValueWithContext(const Context&,
+                                            const StreamInfo::StreamInfo&) const override {
+    return num_;
+  }
+
+private:
+  ProtobufWkt::Value num_;
+};
 
 /**
  * Access log format parser.
  */
 class SubstitutionFormatParser {
 public:
-  template <class FormatterContext = HttpFormatterContext>
-  static std::vector<FormatterProviderBasePtr<FormatterContext>>
-  parse(const std::string& format,
-        const std::vector<CommandParserBasePtr<FormatterContext>>& command_parsers = {}) {
-    std::string current_token;
-    std::vector<FormatterProviderBasePtr<FormatterContext>> formatters;
-
-    for (size_t pos = 0; pos < format.size(); ++pos) {
-      if (format[pos] != '%') {
-        current_token += format[pos];
-        continue;
-      }
-
-      // escape '%%'
-      if (format.size() > pos + 1) {
-        if (format[pos + 1] == '%') {
-          current_token += '%';
-          pos++;
-          continue;
-        }
-      }
-
-      if (!current_token.empty()) {
-        formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{
-            new PlainStringFormatterBase<FormatterContext>(current_token)});
-        current_token = "";
-      }
-
-      std::smatch m;
-      const std::string search_space = std::string(format.substr(pos));
-      if (!std::regex_search(search_space, m, commandWithArgsRegex())) {
-        throwEnvoyExceptionOrPanic(
-            fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
-                        format, pos));
-      }
-
-      const std::string match = m.str(0);
-      // command is at at index 1.
-      const std::string command = m.str(1);
-      // subcommand is at index 2.
-      const std::string subcommand = m.str(2);
-      // optional length is at index 3. If present, validate that it is valid integer.
-      absl::optional<size_t> max_length;
-      if (m.str(3).length() != 0) {
-        size_t length_value;
-        if (!absl::SimpleAtoi(m.str(3), &length_value)) {
-          throwEnvoyExceptionOrPanic(absl::StrCat("Length must be an integer, given: ", m.str(3)));
-        }
-        max_length = length_value;
-      }
-      std::vector<std::string> path;
-
-      const size_t command_end_position = pos + m.str(0).length() - 1;
-
-      bool added = false;
-
-      // First, try the built-in command parsers.
-      for (const auto& cmd : BuiltInCommandParsersBase<FormatterContext>::commandParsers()) {
-        auto formatter = cmd->parse(command, subcommand, max_length);
-        if (formatter) {
-          formatters.push_back(std::move(formatter));
-          added = true;
-          break;
-        }
-      }
-
-      // Next, try the command parsers provided by the user.
-      if (!added) {
-        for (const auto& cmd : command_parsers) {
-          auto formatter = cmd->parse(command, subcommand, max_length);
-          if (formatter) {
-            formatters.push_back(std::move(formatter));
-            added = true;
-            break;
-          }
-        }
-      }
-
-      if (!added) {
-        // Finally, try the context independent formatters.
-        formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{
-            new StreamInfoFormatterBase<FormatterContext>(command, subcommand, max_length)});
-      }
-
-      pos = command_end_position;
-    }
-
-    if (!current_token.empty() || format.empty()) {
-      // Create a PlainStringFormatter with the final string literal. If the format string
-      // was empty, this creates a PlainStringFormatter with an empty string.
-      formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{
-          new PlainStringFormatterBase<FormatterContext>(current_token)});
-    }
-
-    return formatters;
-  }
-
-private:
-  static const std::regex& commandWithArgsRegex();
+  static absl::StatusOr<std::vector<FormatterProviderPtr>>
+  parse(absl::string_view format, const std::vector<CommandParserPtr>& command_parsers = {});
 };
 
 inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
@@ -133,79 +82,81 @@ inline constexpr absl::string_view DefaultUnspecifiedValueStringView = "-";
 /**
  * Composite formatter implementation.
  */
-template <class FormatterContext>
-class CommonFormatterBaseImpl : public FormatterBase<FormatterContext> {
+class FormatterImpl : public Formatter {
 public:
-  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
+  using CommandParsers = std::vector<CommandParserPtr>;
 
-  CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values = false)
-      : empty_value_string_(omit_empty_values ? absl::string_view{}
-                                              : DefaultUnspecifiedValueStringView) {
-    providers_ = SubstitutionFormatParser::parse<FormatterContext>(format);
-  }
-  CommonFormatterBaseImpl(const std::string& format, bool omit_empty_values,
-                          const CommandParsers& command_parsers)
-      : empty_value_string_(omit_empty_values ? absl::string_view{}
-                                              : DefaultUnspecifiedValueStringView) {
-    providers_ = SubstitutionFormatParser::parse<FormatterContext>(format, command_parsers);
-  }
+  static absl::StatusOr<std::unique_ptr<FormatterImpl>>
+  create(absl::string_view format, bool omit_empty_values = false,
+         const CommandParsers& command_parsers = {});
 
-  // FormatterBase
-  std::string formatWithContext(const FormatterContext& context,
-                                const StreamInfo::StreamInfo& stream_info) const override {
-    std::string log_line;
-    log_line.reserve(256);
+  // Formatter
+  std::string formatWithContext(const Context& context,
+                                const StreamInfo::StreamInfo& stream_info) const override;
 
-    for (const auto& provider : providers_) {
-      const auto bit = provider->formatWithContext(context, stream_info);
-      log_line += bit.value_or(empty_value_string_);
-    }
-
-    return log_line;
+protected:
+  FormatterImpl(absl::Status& creation_status, absl::string_view format,
+                bool omit_empty_values = false, const CommandParsers& command_parsers = {})
+      : omit_empty_values_(omit_empty_values) {
+    auto providers_or_error = SubstitutionFormatParser::parse(format, command_parsers);
+    SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+    providers_ = std::move(*providers_or_error);
   }
 
 private:
-  const std::string empty_value_string_;
-  std::vector<FormatterProviderBasePtr<FormatterContext>> providers_;
+  const bool omit_empty_values_;
+  std::vector<FormatterProviderPtr> providers_;
 };
 
-template <class FormatterContext>
-class FormatterBaseImpl : public CommonFormatterBaseImpl<FormatterContext> {
+class JsonFormatterImpl : public Formatter {
 public:
-  using CommonFormatterBaseImpl<FormatterContext>::CommonFormatterBaseImpl;
+  using CommandParsers = std::vector<CommandParserPtr>;
+  using Formatter = FormatterProviderPtr;
+  using Formatters = std::vector<Formatter>;
+
+  JsonFormatterImpl(const ProtobufWkt::Struct& struct_format, bool omit_empty_values,
+                    const CommandParsers& commands = {});
+
+  // Formatter
+  std::string formatWithContext(const Context& context,
+                                const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const bool omit_empty_values_;
+  using ParsedFormatElement = absl::variant<std::string, Formatters>;
+  std::vector<ParsedFormatElement> parsed_elements_;
 };
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
 template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
+#ifndef ENVOY_DISABLE_EXCEPTIONS
 /**
  * An formatter for structured log formats, which returns a Struct proto that
  * can be converted easily into multiple formats.
  */
-template <class FormatterContext> class StructFormatterBase {
+class StructFormatter {
 public:
-  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
-  using PlainNumber = PlainNumberFormatterBase<FormatterContext>;
-  using PlainString = PlainStringFormatterBase<FormatterContext>;
+  using CommandParsers = std::vector<CommandParserPtr>;
+  using PlainNumber = PlainNumberFormatter;
+  using PlainString = PlainStringFormatter;
 
-  StructFormatterBase(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                      bool omit_empty_values, const CommandParsers& commands = {})
+  StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                  bool omit_empty_values, const CommandParsers& commands = {})
       : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
-        empty_value_(omit_empty_values_ ? std::string()
-                                        : std::string(DefaultUnspecifiedValueStringView)),
         struct_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
 
-  ProtobufWkt::Struct formatWithContext(const FormatterContext& context,
+  ProtobufWkt::Struct formatWithContext(const Context& context,
                                         const StreamInfo::StreamInfo& info) const {
     StructFormatMapVisitor visitor{
-        [&](const std::vector<FormatterProviderBasePtr<FormatterContext>>& providers) {
+        [&](const std::vector<FormatterProviderPtr>& providers) {
           return providersCallback(providers, context, info);
         },
-        [&, this](const StructFormatterBase::StructFormatMapWrapper& format_map) {
+        [&, this](const StructFormatter::StructFormatMapWrapper& format_map) {
           return structFormatMapCallback(format_map, visitor);
         },
-        [&, this](const StructFormatterBase::StructFormatListWrapper& format_list) {
+        [&, this](const StructFormatter::StructFormatListWrapper& format_list) {
           return structFormatListCallback(format_list, visitor);
         },
     };
@@ -216,8 +167,8 @@ private:
   struct StructFormatMapWrapper;
   struct StructFormatListWrapper;
   using StructFormatValue =
-      absl::variant<const std::vector<FormatterProviderBasePtr<FormatterContext>>,
-                    const StructFormatMapWrapper, const StructFormatListWrapper>;
+      absl::variant<const std::vector<FormatterProviderPtr>, const StructFormatMapWrapper,
+                    const StructFormatListWrapper>;
   // Although not required for Struct/JSON, it is nice to have the order of
   // properties preserved between the format and the log entry, thus std::map.
   using StructFormatMap = std::map<std::string, StructFormatValue>;
@@ -233,23 +184,21 @@ private:
   };
 
   using StructFormatMapVisitor = StructFormatMapVisitorHelper<
-      const std::function<ProtobufWkt::Value(
-          const std::vector<FormatterProviderBasePtr<FormatterContext>>&)>,
-      const std::function<ProtobufWkt::Value(const StructFormatterBase::StructFormatMapWrapper&)>,
-      const std::function<ProtobufWkt::Value(const StructFormatterBase::StructFormatListWrapper&)>>;
+      const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
+      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
+      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
   class FormatBuilder {
   public:
     explicit FormatBuilder(const CommandParsers& commands) : commands_(commands) {}
-    std::vector<FormatterProviderBasePtr<FormatterContext>>
+    absl::StatusOr<std::vector<FormatterProviderPtr>>
     toFormatStringValue(const std::string& string_format) const {
-      return SubstitutionFormatParser::parse<FormatterContext>(string_format, commands_);
+      return SubstitutionFormatParser::parse(string_format, commands_);
     }
-    std::vector<FormatterProviderBasePtr<FormatterContext>>
-    toFormatNumberValue(double value) const {
-      std::vector<FormatterProviderBasePtr<FormatterContext>> formatters;
-      formatters.emplace_back(FormatterProviderBasePtr<FormatterContext>{new PlainNumber(value)});
+    std::vector<FormatterProviderPtr> toFormatNumberValue(double value) const {
+      std::vector<FormatterProviderPtr> formatters;
+      formatters.emplace_back(FormatterProviderPtr{new PlainNumber(value)});
       return formatters;
     }
     StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
@@ -257,7 +206,9 @@ private:
       for (const auto& pair : struct_format.fields()) {
         switch (pair.second.kind_case()) {
         case ProtobufWkt::Value::kStringValue:
-          output->emplace(pair.first, toFormatStringValue(pair.second.string_value()));
+          output->emplace(pair.first,
+                          THROW_OR_RETURN_VALUE(toFormatStringValue(pair.second.string_value()),
+                                                std::vector<FormatterProviderPtr>));
           break;
 
         case ProtobufWkt::Value::kStructValue:
@@ -272,7 +223,7 @@ private:
           output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
           break;
         default:
-          throwEnvoyExceptionOrPanic(
+          throw EnvoyException(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -285,7 +236,8 @@ private:
       for (const auto& value : list_value_format.values()) {
         switch (value.kind_case()) {
         case ProtobufWkt::Value::kStringValue:
-          output->emplace_back(toFormatStringValue(value.string_value()));
+          output->emplace_back(THROW_OR_RETURN_VALUE(toFormatStringValue(value.string_value()),
+                                                     std::vector<FormatterProviderPtr>));
           break;
 
         case ProtobufWkt::Value::kStructValue:
@@ -301,7 +253,7 @@ private:
           break;
 
         default:
-          throwEnvoyExceptionOrPanic(
+          throw EnvoyException(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -314,10 +266,9 @@ private:
   };
 
   // Methods for doing the actual formatting.
-  ProtobufWkt::Value
-  providersCallback(const std::vector<FormatterProviderBasePtr<FormatterContext>>& providers,
-                    const FormatterContext& context,
-                    const StreamInfo::StreamInfo& stream_info) const {
+  ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
+                                       const Context& context,
+                                       const StreamInfo::StreamInfo& stream_info) const {
     ASSERT(!providers.empty());
     if (providers.size() == 1) {
       const auto& provider = providers.front();
@@ -330,18 +281,30 @@ private:
       }
 
       const auto str = provider->formatWithContext(context, stream_info);
-      return ValueUtil::stringValue(str.value_or(empty_value_));
+      if (str.has_value()) {
+        return ValueUtil::stringValue(*str);
+      }
+      // Returning an "empty string" (depending on omit_empty_values_) in case
+      // of a formatting error.
+      return ValueUtil::stringValue(omit_empty_values_ ? EMPTY_STRING
+                                                       : DefaultUnspecifiedValueStringView);
     }
     // Multiple providers forces string output.
     std::string str;
     for (const auto& provider : providers) {
       const auto bit = provider->formatWithContext(context, stream_info);
-      str += bit.value_or(empty_value_);
+      // Add the formatted value if there is one. Otherwise add a default value
+      // of "-" if omit_empty_values_ is not set.
+      if (bit.has_value()) {
+        str += bit.value();
+      } else if (!omit_empty_values_) {
+        str += DefaultUnspecifiedValueStringView;
+      }
     }
     return ValueUtil::stringValue(str);
   }
   ProtobufWkt::Value
-  structFormatMapCallback(const StructFormatterBase::StructFormatMapWrapper& format_map,
+  structFormatMapCallback(const StructFormatter::StructFormatMapWrapper& format_map,
                           const StructFormatMapVisitor& visitor) const {
     ProtobufWkt::Struct output;
     auto* fields = output.mutable_fields();
@@ -358,7 +321,7 @@ private:
     return ValueUtil::structValue(output);
   }
   ProtobufWkt::Value
-  structFormatListCallback(const StructFormatterBase::StructFormatListWrapper& format_list,
+  structFormatListCallback(const StructFormatter::StructFormatListWrapper& format_list,
                            const StructFormatMapVisitor& visitor) const {
     std::vector<ProtobufWkt::Value> output;
     for (const auto& val : *format_list.value_) {
@@ -373,27 +336,24 @@ private:
 
   const bool omit_empty_values_;
   const bool preserve_types_;
-  const std::string empty_value_;
 
   const StructFormatMapWrapper struct_output_format_;
 };
 
-template <class FormatterContext>
-using StructFormatterBasePtr = std::unique_ptr<StructFormatterBase<FormatterContext>>;
+using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 
-template <class FormatterContext>
-class CommonJsonFormatterBaseImpl : public FormatterBase<FormatterContext> {
+class LegacyJsonFormatterImpl : public Formatter {
 public:
-  using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
+  using CommandParsers = std::vector<CommandParserPtr>;
 
-  CommonJsonFormatterBaseImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
-                              bool omit_empty_values, bool sort_properties,
-                              const CommandParsers& commands = {})
+  LegacyJsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                          bool omit_empty_values, bool sort_properties,
+                          const CommandParsers& commands = {})
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands),
         sort_properties_(sort_properties) {}
 
-  // FormatterBase
-  std::string formatWithContext(const FormatterContext& context,
+  // Formatter
+  std::string formatWithContext(const Context& context,
                                 const StreamInfo::StreamInfo& info) const override {
     const ProtobufWkt::Struct output_struct = struct_formatter_.formatWithContext(context, info);
 
@@ -412,22 +372,11 @@ public:
   }
 
 private:
-  const StructFormatterBase<FormatterContext> struct_formatter_;
+  const StructFormatter struct_formatter_;
   const bool sort_properties_;
 };
 
-template <class FormatterContext>
-class JsonFormatterBaseImpl : public CommonJsonFormatterBaseImpl<FormatterContext> {
-public:
-  using CommonJsonFormatterBaseImpl<FormatterContext>::CommonJsonFormatterBaseImpl;
-};
-
-using StructFormatter = StructFormatterBase<HttpFormatterContext>;
-using StructFormatterPtr = std::unique_ptr<StructFormatter>;
-
-// Aliases for backwards compatibility.
-using FormatterImpl = FormatterBaseImpl<HttpFormatterContext>;
-using JsonFormatterImpl = JsonFormatterBaseImpl<HttpFormatterContext>;
+#endif // ENVOY_DISABLE_EXCEPTIONS
 
 } // namespace Formatter
 } // namespace Envoy

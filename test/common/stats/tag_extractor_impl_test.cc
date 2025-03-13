@@ -74,26 +74,30 @@ TEST(TagExtractorTest, noSubstrMismatch) {
 }
 
 TEST(TagExtractorTest, EmptyName) {
-  EXPECT_THROW_WITH_MESSAGE(
-      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"), EnvoyException,
+  EXPECT_EQ(
+      TagExtractorStdRegexImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)").status().message(),
       "tag_name cannot be empty");
 }
 
 TEST(TagExtractorTest, BadRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid"),
-                          EnvoyException, "Invalid regex '\\+invalid':");
+  EXPECT_THROW_WITH_REGEX(
+      TagExtractorStdRegexImpl::createTagExtractor("cluster_name", "+invalid").IgnoreError(),
+      EnvoyException, "Invalid regex '\\+invalid':");
 }
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3::StatsConfig()) {}
+  DefaultTagRegexTester()
+      : tag_extractors_(std::move(
+            TagProducerImpl::createTagProducer(envoy::config::metrics::v3::StatsConfig(), tags_)
+                .value())) {}
 
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
                  const TagVector& expected_tags) {
 
     // Test forward iteration through the regexes
     TagVector tags;
-    const std::string tag_extracted_name = tag_extractors_.produceTags(stat_name, tags);
+    const std::string tag_extracted_name = tag_extractors_->produceTags(stat_name, tags);
 
     auto cmp = [](const Tag& lhs, const Tag& rhs) {
       return lhs.name_ == rhs.name_ && lhs.value_ == rhs.value_;
@@ -137,10 +141,11 @@ public:
     // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
     // for this test, however.
     std::list<const TagExtractor*> extractors; // Note push-front is used to reverse order.
-    tag_extractors_.forEachExtractorMatching(metric_name,
-                                             [&extractors](const TagExtractorPtr& tag_extractor) {
-                                               extractors.push_front(tag_extractor.get());
-                                             });
+    reinterpret_cast<const TagProducerImpl*>(tag_extractors_.get())
+        ->forEachExtractorMatching(metric_name,
+                                   [&extractors](const TagExtractorPtr& tag_extractor) {
+                                     extractors.push_front(tag_extractor.get());
+                                   });
 
     IntervalSetImpl<size_t> remove_characters;
     TagExtractionContext tag_extraction_context(metric_name);
@@ -150,8 +155,9 @@ public:
     return StringUtil::removeCharacters(metric_name, remove_characters);
   }
 
+  const Stats::TagVector tags_;
   SymbolTableImpl symbol_table_;
-  TagProducerImpl tag_extractors_;
+  TagProducerPtr tag_extractors_;
 };
 
 TEST(TagExtractorTest, DefaultTagExtractors) {
@@ -387,16 +393,31 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
 
+  // HTTP Connection Manager and Route
   Tag rds_hcm;
   rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
   rds_hcm.value_ = "rds_connection_manager";
 
   Tag rds_route_config;
   rds_route_config.name_ = tag_names.RDS_ROUTE_CONFIG;
-  rds_route_config.value_ = "route_config.123";
+  rds_route_config.value_ = "agg/route_config.1-23";
 
-  regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
+  regex_tester.testRegex("http.rds_connection_manager.rds.agg/route_config.1-23.update_success",
                          "http.rds.update_success", {rds_hcm, rds_route_config});
+
+  // SRDS.
+  Tag scoped_rds_hcm;
+
+  scoped_rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  scoped_rds_hcm.value_ = "scoped_rds_connection_manager";
+
+  Tag scoped_rds_route_config;
+  scoped_rds_route_config.name_ = tag_names.SCOPED_RDS_CONFIG;
+  scoped_rds_route_config.value_ = "scoped_route_config.123";
+
+  regex_tester.testRegex(
+      "http.scoped_rds_connection_manager.scoped_rds.scoped_route_config.123.update_success",
+      "http.scoped_rds.update_success", {scoped_rds_hcm, scoped_rds_route_config});
 
   // Listener manager worker id
   Tag worker_id;
@@ -450,6 +471,51 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   rbac_prefix.name_ = tag_names.RBAC_PREFIX;
   rbac_prefix.value_ = "my_rbac_prefix";
   regex_tester.testRegex("my_rbac_prefix.rbac.allowed", "rbac.allowed", {rbac_prefix});
+
+  // RBAC HTTP Filter Prefix
+  Tag rbac_http_hcm_prefix;
+  rbac_http_hcm_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  rbac_http_hcm_prefix.value_ = "hcm_prefix";
+
+  Tag rbac_http_prefix;
+  rbac_http_prefix.name_ = tag_names.RBAC_HTTP_PREFIX;
+  rbac_http_prefix.value_ = "prefix";
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.allowed", "http.rbac.allowed",
+                         {rbac_http_hcm_prefix, rbac_http_prefix});
+
+  // RBAC HTTP Filter Per-Policy Prefix
+  Tag rbac_policy_name;
+  rbac_policy_name.name_ = tag_names.RBAC_POLICY_NAME;
+  rbac_policy_name.value_ = "my_rbac_policy";
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.allowed",
+                         "http.rbac.policy.allowed", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.policy.my_rbac_policy.denied",
+                         "http.rbac.policy.denied", {rbac_http_hcm_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_"
+                         "policy.shadow_allowed",
+                         "http.rbac.policy.shadow_allowed",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
+  regex_tester.testRegex("http.hcm_prefix.rbac.prefix.policy.my_rbac_policy.shadow_denied",
+                         "http.rbac.policy.shadow_denied",
+                         {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
+
+  // Proxy Protocol stat prefix
+  Tag proxy_protocol_prefix;
+  proxy_protocol_prefix.name_ = tag_names.PROXY_PROTOCOL_PREFIX;
+  proxy_protocol_prefix.value_ = "test_stat_prefix";
+  regex_tester.testRegex("proxy_proto.not_found_disallowed", "proxy_proto.not_found_disallowed",
+                         {});
+  regex_tester.testRegex("proxy_proto.test_stat_prefix.not_found_disallowed",
+                         "proxy_proto.not_found_disallowed", {proxy_protocol_prefix});
+
+  // Proxy Protocol version prefix
+  Tag proxy_protocol_version;
+  proxy_protocol_version.name_ = tag_names.PROXY_PROTOCOL_VERSION;
+  proxy_protocol_version.value_ = "2";
+  regex_tester.testRegex("proxy_proto.versions.v2.error", "proxy_proto.error",
+                         {proxy_protocol_version});
+  regex_tester.testRegex("proxy_proto.test_stat_prefix.versions.v2.error", "proxy_proto.error",
+                         {proxy_protocol_prefix, proxy_protocol_version});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
@@ -478,7 +544,7 @@ TEST(TagExtractorTest, ExtAuthzTagExtractors) {
 TEST(TagExtractorTest, ExtractRegexPrefix) {
   TagExtractorPtr tag_extractor; // Keep tag_extractor in this scope to prolong prefix lifetime.
   auto extractRegexPrefix = [&tag_extractor](const std::string& regex) -> absl::string_view {
-    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex);
+    tag_extractor = TagExtractorStdRegexImpl::createTagExtractor("foo", regex).value();
     return tag_extractor->prefixToken();
   };
 
@@ -493,8 +559,9 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 }
 
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
-  EXPECT_THROW_WITH_REGEX(TagExtractorStdRegexImpl::createTagExtractor("no such default tag", ""),
-                          EnvoyException, "^No regex specified for tag specifier and no default");
+  EXPECT_THAT(
+      TagExtractorStdRegexImpl::createTagExtractor("no such default tag", "").status().message(),
+      testing::ContainsRegex("^No regex specified for tag specifier and no default"));
 }
 
 class TagExtractorTokensTest : public testing::Test {

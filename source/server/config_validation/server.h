@@ -15,6 +15,7 @@
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/config/xds_manager_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -23,11 +24,11 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
-#include "source/server/config_validation/dns.h"
 #include "source/server/hot_restart_nop_impl.h"
 #include "source/server/server.h"
 
@@ -77,17 +78,16 @@ public:
   }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return *xds_manager_; }
   const Upstream::ClusterManager& clusterManager() const override {
     return *config_.clusterManager();
   }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return *http_server_properties_cache_manager_;
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
-  Network::DnsResolverSharedPtr dnsResolver() override {
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::DnsResolverFactory& dns_resolver_factory =
-        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
-  }
+  Network::DnsResolverSharedPtr dnsResolver() override;
   void drainListeners(OptRef<const Network::ExtraShutdownListenerOptions>) override {}
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
@@ -101,8 +101,9 @@ public:
   void shutdown() override;
   bool isShutdown() override { return false; }
   void shutdownAdmin() override {}
-  Singleton::Manager& singletonManager() override { return *singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
+  OverloadManager& nullOverloadManager() override { return *null_overload_manager_; }
   bool healthCheckFailed() override { return false; }
   const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { PANIC("not implemented"); }
@@ -123,6 +124,7 @@ public:
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
@@ -134,7 +136,8 @@ public:
   void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(uint32_t, OverloadManager&, const std::string&) override {
+  WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&,
+                         const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -175,15 +178,18 @@ private:
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
-  Singleton::ManagerPtr singleton_manager_;
+  Singleton::ManagerImpl singleton_manager_;
   std::unique_ptr<Runtime::Loader> runtime_;
   Random::RandomGeneratorImpl random_generator_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
+  Config::XdsManagerPtr xds_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
+  std::unique_ptr<OverloadManager> null_overload_manager_;
   MutexTracer* mutex_tracer_{nullptr};
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
@@ -194,6 +200,7 @@ private:
   Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
   Server::DrainManagerPtr drain_manager_;
   HotRestartNopImpl nop_hot_restart_;
+  Regex::EnginePtr regex_engine_;
 };
 
 } // namespace Server

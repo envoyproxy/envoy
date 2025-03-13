@@ -8,10 +8,14 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "jwt_verify_lib/check_audience.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
@@ -36,7 +40,8 @@ public:
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
       // proto validation annotation. It has to be validated by the code.
       if (jwt_provider_.remote_jwks().has_retry_policy()) {
-        Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy());
+        THROW_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
       }
       if (jwt_provider_.remote_jwks().has_cache_duration()) {
         // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
@@ -56,14 +61,31 @@ public:
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
+
+    if (jwt_provider_.has_subjects()) {
+      sub_matcher_.emplace(jwt_provider_.subjects(), context.serverFactoryContext());
+    }
+
+    if (jwt_provider_.require_expiration()) {
+      max_exp_ = absl::InfiniteDuration();
+    }
+
+    if (jwt_provider_.has_max_lifetime()) {
+      // Intentionally overwrite previous max_exp_. max_lifetime takes precedence.
+      max_exp_ = absl::Seconds(jwt_provider_.max_lifetime().seconds()) +
+                 absl::Nanoseconds(jwt_provider_.max_lifetime().nanos());
+    }
+
     bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
     const auto& config = jwt_provider_.jwt_cache_config();
     tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
     });
 
-    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true,
-                                                      context.serverFactoryContext().api());
+    const auto inline_jwks =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(jwt_provider_.local_jwks(), true,
+                                                       context.serverFactoryContext().api()),
+                              std::string);
     if (!inline_jwks.empty()) {
       auto jwks =
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);
@@ -87,6 +109,35 @@ public:
 
   bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
     return audiences_->areAudiencesAllowed(jwt_audiences);
+  }
+
+  bool isSubjectAllowed(const absl::string_view jwt_subject) const override {
+    if (!sub_matcher_.has_value()) {
+      return true;
+    }
+
+    return sub_matcher_->match(jwt_subject);
+  }
+
+  bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const override {
+    // This function takes the current time and calculates the remaining lifetime of the JWT.
+    // Then it compares that with the max lifetime in the config. Using issue time or not before
+    // claims would be better, but optional according to the spec.
+
+    // Without a max lifetime, any exp is allowed.
+    if (!max_exp_.has_value()) {
+      return true;
+    }
+
+    // If there's no exp field and we have a max set, then this isn't allowed.
+    if (exp == nullptr) {
+      return false;
+    }
+
+    // Take the remaining credential lifetime and return if it's less
+    // than the max.
+    absl::Duration lifetime = *exp - now;
+    return lifetime < *max_exp_;
   }
 
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
@@ -138,6 +189,8 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
+  absl::optional<Matchers::StringMatcherImpl> sub_matcher_;
+  absl::optional<absl::Duration> max_exp_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;

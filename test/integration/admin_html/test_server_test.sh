@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 tmp="${TEST_TMPDIR}/test/integration/admin_html/tempfiles"
 export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/admin_html/test_server"

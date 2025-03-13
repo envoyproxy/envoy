@@ -1,9 +1,7 @@
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace LoadBalancingPolices {
-namespace Common {
+namespace Upstream {
 
 BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight,
                        bool attach_metadata) {
@@ -38,7 +36,5 @@ BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uin
       random_.random(), absl::nullopt);
 }
 
-} // namespace Common
-} // namespace LoadBalancingPolices
-} // namespace Extensions
+} // namespace Upstream
 } // namespace Envoy

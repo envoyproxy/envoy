@@ -10,9 +10,9 @@ envoy_cc_library(
     hdrs = ["logger_delegate.h"],
     repository = "@envoy",
     deps = [
+        "//library/common:engine_types_lib",
         "//library/common/api:external_api_lib",
         "//library/common/bridge:utility_lib",
-        "//library/common/data:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//source/common/common:macros",
         "@envoy//source/common/common:minimal_logger_lib",

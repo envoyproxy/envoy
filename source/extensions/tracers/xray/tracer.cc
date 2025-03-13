@@ -109,8 +109,7 @@ const Tracing::TraceContextHandler& xForwardedForHeader() {
   CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-forwarded-for");
 }
 
-void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr&) {
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
   xRayTraceHeader().setRefKey(trace_context, xray_header_value);

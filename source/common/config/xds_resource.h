@@ -60,7 +60,7 @@ public:
    * @return xds::core::v3::ResourceLocator resource name message for resource_url.
    * @throws EnvoyException when parsing fails.
    */
-  static xds::core::v3::ResourceLocator decodeUrl(absl::string_view resource_url);
+  static absl::StatusOr<xds::core::v3::ResourceLocator> decodeUrl(absl::string_view resource_url);
 
   /**
    * @param resource_name resource name.

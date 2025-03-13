@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_package",
 )
 
@@ -11,7 +11,7 @@ envoy_package()
 # HTTP L7 filter that decorates request with geolocation data
 # Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/geoip_filter
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "geoip_provider_driver_interface",
     hdrs = [
         "geoip_provider_driver.h",

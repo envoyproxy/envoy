@@ -24,10 +24,10 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/extensions/common/matcher/trie_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/listener_manager/config.pb.h"
 #include "test/common/listener_manager/config.pb.validate.h"
@@ -153,7 +153,8 @@ public:
     }
     EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _, _));
-    EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_CALL(*old_listener_handle->drain_manager_,
+                startDrainSequence(Network::DrainDirection::All, _));
 
     EXPECT_TRUE(addOrUpdateListener(new_listener_proto));
 
@@ -170,7 +171,8 @@ public:
 
     EXPECT_CALL(*worker_, stopListener(_, _, _));
     EXPECT_CALL(socket, close());
-    EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_CALL(*listener_handle->drain_manager_,
+                startDrainSequence(Network::DrainDirection::All, _));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
 
     EXPECT_CALL(*worker_, removeListener(_, _));
@@ -249,7 +251,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener, "
+      "to check if the listener has duplicated addresses with other listeners or "
+      "'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, DuplicateNonIPAddressNotAllowed) {
@@ -276,7 +280,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '/path' as existing listener");
+      "error adding listener: 'bar' has duplicate address '/path' as existing listener, to check "
+      "if the listener has duplicated addresses with other listeners or 'enable_reuse_port' is set "
+      "to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleAddressesDuplicatePortNotAllowed) {
@@ -316,7 +322,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
                             "error adding listener: 'bar' has duplicate address "
-                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener");
+                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener, to check if the "
+                            "listener has duplicated addresses with other listeners or "
+                            "'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -356,9 +364,11 @@ filter_chains:
   )EOF";
 
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-                            "error adding listener: 'bar' has duplicate address "
-                            "'127.0.0.1:0,127.0.0.3:0' as existing listener");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+      "error adding listener: 'bar' has duplicate address "
+      "'127.0.0.1:0,127.0.0.3:0' as existing listener, to check if the listener has duplicated "
+      "addresses with other listeners or 'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowCreateListenerWithMutipleZeroPorts) {
@@ -400,6 +410,98 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, AllowAddressesUpdatePartially) {
+  // Update one of the addresses from '127.0.0.2:1000' to '127.0.0.3:2000'.
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1000
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 2000
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       AllowUpdateSocketOptionsIfNotDuplicatedEvenReusePortIsDisabled) {
+  // All addresses are different, so it should be allowed to update socket options even
+  // reuse port is disabled.
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1000
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.4
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 2000
+enable_reuse_port: false
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:
@@ -433,12 +535,12 @@ filter_chains:
       common_tls_context:
         tls_certificates:
         - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
           private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
         validation_context:
           trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
           match_subject_alt_names:
             exact: localhost
             exact: 127.0.0.1
@@ -476,7 +578,7 @@ filter_chains:
 TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   // Validate that there are no active listeners and workers are started.
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.total_active_listeners",
@@ -503,11 +605,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Socket::Type::Datagram, _,
                                  ListenerComponentFactory::BindType::ReusePort, _, 0))
-      .WillOnce(Invoke(
-          [this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
-                 const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
-                 const Network::SocketCreationOptions&,
-                 uint32_t) -> Network::SocketSharedPtr { return listener_factory_.socket_; }));
+      .WillOnce(
+          Invoke([this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
+                        const Network::Socket::OptionsSharedPtr&,
+                        ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
+                        uint32_t) { return listener_factory_.socket_; }));
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   addOrUpdateListener(listener_proto);
@@ -591,7 +693,7 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
@@ -671,7 +773,7 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProto(
       const Protobuf::Message&,
       Configuration::FactoryContext& filter_chain_factory_context) override {
     return commonFilterFactory(filter_chain_factory_context);
@@ -1008,11 +1110,12 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
   for (const auto& f : listener_mutators) {
     auto new_listener = listener;
     f(new_listener);
-    EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
-                                               false, /*hash=*/static_cast<uint64_t>(0)),
-                              EnvoyException,
-                              "error adding listener named 'foo': has "
-                              "unsupported tcp listener feature");
+    EXPECT_EQ(ListenerImpl::create(new_listener, "version", *manager_, "foo", true, false,
+                                   /*hash=*/static_cast<uint64_t>(0))
+                  .status()
+                  .message(),
+              "error adding listener named 'foo': has "
+              "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
@@ -1154,7 +1257,7 @@ dynamic_listeners:
 
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   worker_->callAddCompletion();
 
   time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
@@ -1474,7 +1577,7 @@ static_listeners:
 )EOF");
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
   // initialized, as no target will be added to it.
@@ -1549,7 +1652,7 @@ filter_chains: {}
       .RetiresOnSaturation();
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_create_success").value());
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -1700,7 +1803,7 @@ dynamic_listeners:
 )EOF",
                   mock_matcher);
 
-  // Validate that workers_started stat is zero before calling startWorkers.
+  // Validate that workers_started stat is zero before calling startWorkers.ok()
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -1708,7 +1811,7 @@ dynamic_listeners:
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
   EXPECT_EQ(0, server_.stats_store_
@@ -1734,7 +1837,8 @@ dynamic_listeners:
   EXPECT_CALL(*duplicated_socket, duplicate());
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
@@ -1925,7 +2029,7 @@ TEST_P(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add and initialize foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -1986,7 +2090,7 @@ TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add and initialize foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -2294,7 +2398,9 @@ filter_chains:
   )EOF";
 
   const std::string expected_error_message =
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener, "
+      "to check if the listener has duplicated addresses with other listeners or "
+      "'enable_reuse_port' is set to 'false' for the listener";
   testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
                                                     expected_error_message);
 }
@@ -2303,7 +2409,7 @@ TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add and initialize foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -2375,7 +2481,7 @@ TEST_P(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2408,7 +2514,7 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2436,7 +2542,7 @@ TEST_P(ListenerManagerImplTest, AddReusableDrainingListenerWithMultiAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2470,7 +2576,7 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2498,7 +2604,7 @@ TEST_P(ListenerManagerImplTest, AddClosedDrainingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2525,7 +2631,7 @@ filter_chains:
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2551,7 +2657,7 @@ TEST_P(ListenerManagerImplTest, AddClosedDrainingListenerWithMultiAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2579,7 +2685,7 @@ filter_chains:
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(2);
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2604,11 +2710,12 @@ TEST_P(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
-  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2624,12 +2731,11 @@ filter_chains:
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke(
-          [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
-                                         Network::Socket::Type socket_type,
-                                         const Network::Socket::OptionsSharedPtr& options,
-                                         ListenerComponentFactory::BindType bind_type,
-                                         const Network::SocketCreationOptions& creation_options,
-                                         uint32_t worker_index) -> Network::SocketSharedPtr {
+          [this, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
             // When bind_to_port is equal to false, the BSD socket is not created at main thread.
             EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
             return real_listener_factory.createListenSocket(
@@ -2644,11 +2750,12 @@ TEST_P(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
   InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
-  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2664,12 +2771,11 @@ filter_chains:
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke(
-          [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
-                                         Network::Socket::Type socket_type,
-                                         const Network::Socket::OptionsSharedPtr& options,
-                                         ListenerComponentFactory::BindType bind_type,
-                                         const Network::SocketCreationOptions& creation_options,
-                                         uint32_t worker_index) -> Network::SocketSharedPtr {
+          [this, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
             // When bind_to_port is equal to false, the BSD socket is not created at main thread.
             EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
             return real_listener_factory.createListenSocket(
@@ -2680,12 +2786,14 @@ filter_chains:
 
   worker_->callAddCompletion();
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
 
   EXPECT_TRUE(manager_->removeListener("foo"));
 
@@ -2700,7 +2808,7 @@ TEST_P(ListenerManagerImplTest, DEPRECATED_FEATURE_TEST(DeprecatedBindToPortEqua
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2719,20 +2827,19 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
-      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Socket::Type socket_type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           ListenerComponentFactory::BindType bind_type,
-                           const Network::SocketCreationOptions& creation_options,
-                           uint32_t worker_index) -> Network::SocketSharedPtr {
-        EXPECT_CALL(server_, hotRestart).Times(0);
-        // When bind_to_port is equal to false, create socket fd directly, and do not get socket
-        // fd through hot restart.
-        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
-        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
-                                                        creation_options, worker_index);
-      }));
+      .WillOnce(Invoke(
+          [this, &syscall_result, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            EXPECT_CALL(server_, hotRestart).Times(0);
+            // When bind_to_port is equal to false, create socket fd directly, and do not get socket
+            // fd through hot restart.
+            ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -2742,7 +2849,7 @@ TEST_P(ListenerManagerImplTest, ReusePortEqualToTrue) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2768,17 +2875,16 @@ filter_chains:
           }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
-      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Socket::Type socket_type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           ListenerComponentFactory::BindType bind_type,
-                           const Network::SocketCreationOptions& creation_options,
-                           uint32_t worker_index) -> Network::SocketSharedPtr {
-        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
-        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
-                                                        creation_options, worker_index);
-      }));
+      .WillOnce(Invoke(
+          [this, &syscall_result, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -2786,18 +2892,20 @@ filter_chains:
 
 TEST_P(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
-                                std::make_shared<Network::Address::PipeInstance>("/foo"),
-                                Network::Socket::Type::Datagram, nullptr, default_bind_type, {}, 0),
-                            EnvoyException,
-                            "socket type SocketType::Datagram not supported for pipes");
+  EXPECT_EQ(real_listener_factory
+                .createListenSocket(*Network::Address::PipeInstance::create("/foo"),
+                                    Network::Socket::Type::Datagram, nullptr, default_bind_type, {},
+                                    0)
+                .status()
+                .message(),
+            "socket type SocketType::Datagram not supported for pipes");
 }
 
 TEST_P(ListenerManagerImplTest, CantListen) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -2829,7 +2937,7 @@ TEST_P(ListenerManagerImplTest, CantBindSocket) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -2887,7 +2995,7 @@ TEST_P(ListenerManagerImplTest, ConfigDumpWithExternalError) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Make sure the config dump is empty by default.
   ListenerManager::FailureStates empty_failure_state;
@@ -2923,7 +3031,7 @@ TEST_P(ListenerManagerImplTest, ListenerDraining) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -2942,26 +3050,31 @@ filter_chains:
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
@@ -2973,7 +3086,7 @@ TEST_P(ListenerManagerImplTest, RemoveListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Remove an unknown listener.
   EXPECT_FALSE(manager_->removeListener("unknown"));
@@ -3037,7 +3150,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 2, 1, 2, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -3055,7 +3168,7 @@ TEST_P(ListenerManagerImplTest, StopListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener in inbound direction.
   const std::string listener_foo_yaml = R"EOF(
@@ -3158,7 +3271,7 @@ TEST_P(ListenerManagerImplTest, StopAllListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -3206,7 +3319,7 @@ TEST_P(ListenerManagerImplTest, StopWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -3296,7 +3409,7 @@ TEST_P(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -3332,7 +3445,9 @@ filter_chains:
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener, to "
+      "check if the listener has duplicated addresses with other listeners or 'enable_reuse_port' "
+      "is set to 'false' for the listener");
 
   // Move foo to active and then try to add again. This should still fail.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
@@ -3343,7 +3458,9 @@ filter_chains:
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener, to "
+      "check if the listener has duplicated addresses with other listeners or 'enable_reuse_port' "
+      "is set to 'false' for the listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -3374,8 +3491,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3440,8 +3557,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3512,8 +3629,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3585,8 +3702,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_ip_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_ip_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_ip_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3662,8 +3779,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3734,8 +3851,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3863,8 +3980,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -3930,8 +4047,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4011,8 +4128,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4097,8 +4214,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4162,8 +4279,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4228,8 +4345,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSourceTyp
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         application_protocols: "http/1.1"
         source_type: EXTERNAL
@@ -4240,8 +4357,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSourceTyp
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         source_type: ANY
       name: baz
@@ -4251,8 +4368,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSourceTyp
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4375,8 +4492,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         destination_port: 8080
       name: bar
@@ -4386,8 +4503,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         destination_port: 8081
       name: baz
@@ -4397,8 +4514,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4495,8 +4612,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         prefix_ranges: { address_prefix: 192.168.0.1, prefix_len: 32 }
       name: bar
@@ -4506,8 +4623,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         prefix_ranges: { address_prefix: 192.168.0.0, prefix_len: 16 }
       name: baz
@@ -4517,8 +4634,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4633,8 +4750,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
     - filter_chain_match:
         direct_source_prefix_ranges: { address_prefix: 192.168.0.1, prefix_len: 32 }
       name: bar
@@ -4644,8 +4761,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
     - filter_chain_match:
         direct_source_prefix_ranges: { address_prefix: 192.168.0.0, prefix_len: 16 }
       name: baz
@@ -4655,8 +4772,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -4764,11 +4881,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "server1.example.com"
       transport_socket:
@@ -4777,11 +4894,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "*.com"
       transport_socket:
@@ -4790,11 +4907,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4868,8 +4985,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -5016,8 +5133,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                  Network::Address::IpVersion::v4);
   if (use_matcher_) {
@@ -5094,8 +5211,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5156,11 +5273,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "www.example.com"
       name: bar
@@ -5170,11 +5287,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_b"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5203,11 +5320,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
     - filter_chain_match:
         server_names: "www.example.com"
       name: bar
@@ -5217,8 +5334,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5318,7 +5435,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
   }
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
                             "error adding listener '127.0.0.1:1234': filter chain 'bar' has "
-                            "the same matching rules defined as 'foo'");
+                            "the same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+                            ". duplicate matcher is: {\"transport_protocol\":\"tls\"}"
+#endif
+  );
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -5442,11 +5563,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MatcherFilterChainWithDuplicateNa
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
   const std::string cert = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"));
-  const std::string pkey = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"));
-  const std::string ca = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"));
+  const std::string pkey = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"));
+  const std::string ca = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
   const std::string yaml = absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -5475,7 +5596,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateKeyFilename) {
   const std::string cert = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem"));
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -5487,7 +5608,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateK
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+              - private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem" }
                 certificate_chain: { inline_string: ")EOF",
                                                                     absl::CEscape(cert), R"EOF(" }
   )EOF"),
@@ -5511,7 +5632,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateIncomplete) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5532,7 +5653,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateC
           common_tls_context:
             tls_certificates:
               - certificate_chain: { inline_string: "invalid" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5541,8 +5662,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidCertificateC
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediateCA) {
-  const std::string leaf = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem"));
+  const std::string leaf = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns3_cert.pem"));
   const std::string yaml = TestEnvironment::substitute(
       absl::StrCat(
           R"EOF(
@@ -5559,7 +5680,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidIntermediate
               - certificate_chain: { inline_string: ")EOF",
           absl::CEscape(leaf),
           R"EOF(\n-----BEGIN CERTIFICATE-----\nDEFINITELY_INVALID_CERTIFICATE\n-----END CERTIFICATE-----" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem" }
   )EOF"),
       Network::Address::IpVersion::v4);
 
@@ -5579,7 +5700,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidPrivateKey) 
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem" }
                 private_key: { inline_string: "invalid" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
@@ -5601,8 +5722,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateInvalidTrustedCA) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem" }
             validation_context:
               trusted_ca: { inline_string: "invalid" }
   )EOF",
@@ -5624,8 +5745,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TlsCertificateCertPrivateKeyMisma
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_chain.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns2_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns2_key.pem" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -5673,7 +5794,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
                      Configuration::ListenerFactoryContext& context)
                      -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+            return *ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                 filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
@@ -5756,7 +5877,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
                      Configuration::ListenerFactoryContext& context)
                      -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+            return *ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                 filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
 
@@ -6103,13 +6224,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
-      .WillOnce(Invoke(
-          [&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
-              const Network::Socket::OptionsSharedPtr& options, ListenerComponentFactory::BindType,
-              const Network::SocketCreationOptions&, uint32_t) -> Network::SocketSharedPtr {
-            EXPECT_EQ(options, nullptr);
-            return listener_factory_.socket_;
-          }));
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           ListenerComponentFactory::BindType,
+                           const Network::SocketCreationOptions&, uint32_t) {
+        EXPECT_EQ(options, nullptr);
+        return listener_factory_.socket_;
+      }));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -6396,6 +6517,52 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithSocketOptOnAdditionalAddressOnly) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [
+          # The socket goes through socket() and bind() but never listen(), so if we
+          # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+          { level: 11, name: 12, int_value: 13, state: STATE_PREBIND },
+          { level: 14, name: 15, int_value: 16, state: STATE_BOUND },
+          { level: 17, name: 18, int_value: 19, state: STATE_LISTENING },
+        ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // Second address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 11,
+      /* expected_sockopt_name */ 12,
+      /* expected_value */ 13);
+  // Second address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 14,
+      /* expected_sockopt_name */ 15,
+      /* expected_value */ 16);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 // This test relies on linux-only code, and a linux-only name IPPROTO_MPTCP
 #if defined(__linux__)
 TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {
@@ -6432,13 +6599,12 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {
 
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, default_bind_type, creation_options, 0))
-      .WillOnce(
-          Invoke([&real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
-                                          Network::Socket::Type socket_type,
-                                          const Network::Socket::OptionsSharedPtr& options,
-                                          ListenerComponentFactory::BindType bind_type,
-                                          const Network::SocketCreationOptions& creation_options,
-                                          uint32_t worker_index) -> Network::SocketSharedPtr {
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
             return real_listener_factory.createListenSocket(
                 address, socket_type, options, bind_type, creation_options, worker_index);
           }));
@@ -6515,7 +6681,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
   NiceMock<Network::MockAddressResolver> mock_resolver;
   EXPECT_CALL(mock_resolver, resolve(_))
       .Times(2)
-      .WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
+      .WillRepeatedly(
+          Return(Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 1111, false)));
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
@@ -6535,11 +6702,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
             validation_context:
-              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
-              crl: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl" }
+              trusted_ca: { filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem" }
+              crl: { filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -6550,8 +6717,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, CRLInline) {
-  const std::string crl = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"));
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
@@ -6563,10 +6730,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, CRLInline) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
             validation_context:
-              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              trusted_ca: { filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem" }
               crl: { inline_string: ")EOF",
                                                                     absl::CEscape(crl), R"EOF(" }
   )EOF"),
@@ -6590,10 +6757,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidCRLInline) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
             validation_context:
-              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              trusted_ca: { filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem" }
               crl: { inline_string: "-----BEGIN X509 CRL-----\nTOTALLY_NOT_A_CRL_HERE\n-----END X509 CRL-----\n" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
@@ -6614,10 +6781,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
             validation_context:
-              crl: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl" }
+              crl: { filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl" }
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -6637,8 +6804,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
             validation_context:
               match_subject_alt_names:
                  exact: "spiffe://lyft.com/testclient"
@@ -6663,8 +6830,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithNoCA) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
             validation_context:
               allow_expired_certificate: true
   )EOF",
@@ -6687,11 +6854,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem" }
 
             validation_context:
-              trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+              trusted_ca: { filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem" }
               allow_expired_certificate: true
   )EOF",
                                                        Network::Address::IpVersion::v4);
@@ -6703,7 +6870,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 TEST_P(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(*worker_, initializeStats(_));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, ApiListener) {
@@ -6920,7 +7087,7 @@ per_connection_buffer_limit_bytes: 10
           nanos: 2000000
   )EOF");
 
-  // Validate that workers_started stat is zero before calling startWorkers.
+  // Validate that workers_started stat is zero before calling startWorkers.ok()
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -6928,7 +7095,7 @@ per_connection_buffer_limit_bytes: 10
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
   EXPECT_EQ(0, server_.stats_store_
@@ -6953,7 +7120,8 @@ per_connection_buffer_limit_bytes: 10
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
@@ -7117,7 +7285,7 @@ TEST_P(ListenerManagerImplTest, StopInplaceWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7179,7 +7347,7 @@ TEST_P(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7232,7 +7400,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -7248,7 +7416,7 @@ TEST_P(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7311,7 +7479,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdat
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7397,7 +7565,7 @@ TEST_P(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7467,7 +7635,7 @@ TEST_P(ListenerManagerImplTest, SharedListenerInfoInInplaceUpdate) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7529,7 +7697,7 @@ TEST_P(ListenerManagerImplTest, ListenSocketFactoryIsClonedFromListenerDrainingF
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -7594,7 +7762,8 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -7624,7 +7793,7 @@ TEST_P(ListenerManagerImplTest,
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -7699,7 +7868,8 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -7805,6 +7975,24 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquival
   EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
 }
 
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, InvalidAddress) {
+  // Worker is not started yet.
+  envoy::config::listener::v3::Listener listener_proto;
+  Protobuf::TextFormat::ParseFromString(R"EOF(
+    name: "foo"
+    address: {
+      socket_address: {
+        address: "127.0.0.1.0"
+        port_value: 1234
+      }
+    }
+    filter_chains: {}
+  )EOF",
+                                        &listener_proto);
+  EXPECT_EQ(manager_->addOrUpdateListener(listener_proto, "", true).status().message(),
+            "malformed IP address: 127.0.0.1.0");
+}
+
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWorkerNotStarted) {
   // Worker is not started yet.
   auto listener_proto = createDefaultListener();
@@ -7832,7 +8020,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
 // do not share a listener.
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDifferentSocketType) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7858,7 +8046,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDi
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        DEPRECATED_FEATURE_TEST(TraditionalUpdateIfImplicitProxyProtocolChanges)) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7879,7 +8067,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZeroFilterChain) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7902,7 +8090,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7969,7 +8157,7 @@ TEST_P(ListenerManagerImplTest, WorkersStartedCallbackCalled) {
 
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(callback_, Call());
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 }
 
 TEST(ListenerEnableReusePortTest, All) {
@@ -8030,15 +8218,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   extend_balance_config->mutable_typed_config()->set_type_url(
       "type.googleapis.com/google.protobuf.test");
 
-  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(
-      listener_impl.addSocketFactory(std::move(socket_factory)), EnvoyException,
-      "Didn't find a registered implementation for type: 'google.protobuf.test'");
+  EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
+            "Didn't find a registered implementation for type: 'google.protobuf.test'");
 #endif
 }
 
@@ -8048,14 +8235,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   auto listener = createIPv4Listener("TCPListener");
   listener.mutable_connection_balance_config();
 
-  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(listener_impl.addSocketFactory(std::move(socket_factory)),
-                            EnvoyException, "No valid balance type for connection balance");
+  EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
+            "No valid balance type for connection balance");
 #endif
 }
 

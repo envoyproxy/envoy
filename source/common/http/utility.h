@@ -2,8 +2,10 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -17,6 +19,7 @@
 #include "envoy/http/query_params.h"
 
 #include "source/common/http/exception.h"
+#include "source/common/http/http_option_limits.h"
 #include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
@@ -46,53 +49,6 @@ using AlpnNames = ConstSingleton<AlpnNameValues>;
 namespace Http2 {
 namespace Utility {
 
-// Limits and defaults for `envoy::config::core::v3::Http2ProtocolOptions` protos.
-struct OptionsLimits {
-  // disable HPACK compression
-  static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
-  // initial value from HTTP/2 spec, same as NGHTTP2_DEFAULT_HEADER_TABLE_SIZE from nghttp2
-  static const uint32_t DEFAULT_HPACK_TABLE_SIZE = (1 << 12);
-  // no maximum from HTTP/2 spec, use unsigned 32-bit maximum
-  static const uint32_t MAX_HPACK_TABLE_SIZE = std::numeric_limits<uint32_t>::max();
-  // TODO(jwfang): make this 0, the HTTP/2 spec minimum
-  static const uint32_t MIN_MAX_CONCURRENT_STREAMS = 1;
-  // defaults to maximum, same as nghttp2
-  static const uint32_t DEFAULT_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
-  // no maximum from HTTP/2 spec, total streams is unsigned 32-bit maximum,
-  // one-side (client/server) is half that, and we need to exclude stream 0.
-  // same as NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS from nghttp2
-  static const uint32_t MAX_MAX_CONCURRENT_STREAMS = (1U << 31) - 1;
-
-  // initial value from HTTP/2 spec, same as NGHTTP2_INITIAL_WINDOW_SIZE from nghttp2
-  // NOTE: we only support increasing window size now, so this is also the minimum
-  // TODO(jwfang): make this 0 to support decrease window size
-  static const uint32_t MIN_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
-  // initial value from HTTP/2 spec is 65535, but we want more (256MiB)
-  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 256 * 1024 * 1024;
-  // maximum from HTTP/2 spec, same as NGHTTP2_MAX_WINDOW_SIZE from nghttp2
-  static const uint32_t MAX_INITIAL_STREAM_WINDOW_SIZE = (1U << 31) - 1;
-
-  // CONNECTION_WINDOW_SIZE is similar to STREAM_WINDOW_SIZE, but for connection-level window
-  // TODO(jwfang): make this 0 to support decrease window size
-  static const uint32_t MIN_INITIAL_CONNECTION_WINDOW_SIZE = (1 << 16) - 1;
-  // nghttp2's default connection-level window equals to its stream-level,
-  // our default connection-level window also equals to our stream-level
-  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
-  static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
-
-  // Default limit on the number of outbound frames of all types.
-  static const uint32_t DEFAULT_MAX_OUTBOUND_FRAMES = 10000;
-  // Default limit on the number of outbound frames of types PING, SETTINGS and RST_STREAM.
-  static const uint32_t DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES = 1000;
-  // Default limit on the number of consecutive inbound frames with an empty payload
-  // and no end stream flag.
-  static const uint32_t DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD = 1;
-  // Default limit on the number of inbound frames of type PRIORITY (per stream).
-  static const uint32_t DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM = 100;
-  // Default limit on the number of inbound frames of type WINDOW_UPDATE (per DATA frame sent).
-  static const uint32_t DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT = 10;
-};
-
 /**
  * Validates settings/options already set in |options| and initializes any remaining fields with
  * defaults.
@@ -108,14 +64,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 } // namespace Http2
 namespace Http3 {
 namespace Utility {
-
-// Limits and defaults for `envoy::config::core::v3::Http3ProtocolOptions` protos.
-struct OptionsLimits {
-  // The same as kStreamReceiveWindowLimit in QUICHE which is the maximum supported by QUICHE.
-  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 16 * 1024 * 1024;
-  // The same as kSessionReceiveWindowLimit in QUICHE which is the maximum supported by QUICHE.
-  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 24 * 1024 * 1024;
-};
 
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
@@ -202,6 +150,12 @@ public:
    * NOTE: the space character is encoded as %20, NOT as the + character
    */
   static std::string urlEncodeQueryParameter(absl::string_view value);
+
+  /**
+   * Exactly the same as above, but returns false when it finds a character that should be %-encoded
+   * but is not.
+   */
+  static bool queryParameterIsUrlEncoded(absl::string_view value);
 
   /**
    * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
@@ -438,6 +392,26 @@ struct GetLastAddressFromXffInfo {
 };
 
 /**
+ * Checks if the remote address is contained by one of the trusted proxy CIDRs.
+ * @param remote the remote address
+ * @param trusted_cidrs the list of CIDRs which are considered trusted proxies
+ * @return whether the remote address is a trusted proxy
+ */
+bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::Instance& remote,
+                                 absl::Span<const Network::Address::CidrRange> trusted_cidrs);
+
+/**
+ * Retrieves the last address in the x-forwarded-header after removing all trusted proxy addresses.
+ * @param request_headers supplies the request headers
+ * @param trusted_cidrs the list of CIDRs which are considered trusted proxies
+ * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
+ *         @see GetLastAddressFromXffInfo for more information.
+ */
+GetLastAddressFromXffInfo
+getLastNonTrustedAddressFromXFF(const Http::RequestHeaderMap& request_headers,
+                                absl::Span<const Network::Address::CidrRange> trusted_cidrs);
+
+/**
  * Retrieves the last IPv4/IPv6 address in the x-forwarded-for header.
  * @param request_headers supplies the request headers.
  * @param num_to_skip specifies the number of addresses at the end of the XFF header
@@ -474,9 +448,22 @@ std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
                              absl::optional<uint32_t> max_path_length);
 
 /**
+ * Extract scheme, host and path from a URI. The host may contain a port.
+ * This function doesn't validate if the URI is valid. It only parses the URI with following
+ * format: scheme://host/path.
+ * If parts of the URI are missing, the corresponding output string may be empty.
+ * @param the input URI string
+ * @param the output scheme string
+ * @param the output host string.
+ * @param the output path string.
+ */
+void extractSchemeHostPathFromUri(const absl::string_view& uri, absl::string_view& scheme,
+                                  absl::string_view& host, absl::string_view& path);
+/**
  * Extract host and path from a URI. The host may contain port.
  * This function doesn't validate if the URI is valid. It only parses the URI with following
  * format: scheme://host/path.
+ * If parts of the URI are missing, the corresponding output string may be empty.
  * @param the input URI string
  * @param the output host string.
  * @param the output path string.
@@ -494,8 +481,12 @@ std::string localPathFromFilePath(const absl::string_view& file_path);
 
 /**
  * Prepare headers for a HttpUri.
+ * @param the input URI
+ * @param flag whether the :scheme header shall be generated according to the input URI
+ * @return RequestMessage with headers set according to the input URI
  */
-RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
+RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
+                                 bool include_scheme = false);
 
 /**
  * Returns string representation of StreamResetReason.
@@ -567,7 +558,8 @@ void transformUpgradeResponseFromH3toH1(ResponseHeaderMap& headers, absl::string
  * order is:
  * - the routeEntry() (for config that's applied on weighted clusters)
  * - the route
- * - and finally from the virtual host object (routeEntry()->virtualhost()).
+ * - the virtual host object
+ * - the route configuration
  *
  * To use, simply:
  *
@@ -590,43 +582,6 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
 }
 
 /**
- * Merge all the available per route filter configs into one. To perform the merge,
- * the reduce function will be called on each two configs until a single merged config is left.
- *
- * @param reduce The first argument for this function will be the config from the previous level
- * and the second argument is the config from the current level (the more specific one). The
- * function should merge the second argument into the first argument.
- *
- * @return The merged config.
- */
-template <class ConfigType>
-absl::optional<ConfigType>
-getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
-                         std::function<void(ConfigType&, const ConfigType&)> reduce) {
-  static_assert(std::is_copy_constructible<ConfigType>::value,
-                "ConfigType must be copy constructible");
-  ASSERT(callbacks != nullptr);
-
-  absl::optional<ConfigType> merged;
-
-  callbacks->traversePerFilterConfig([&reduce,
-                                      &merged](const Router::RouteSpecificFilterConfig& cfg) {
-    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-    if (typed_cfg == nullptr) {
-      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
-    }
-    if (!merged) {
-      merged.emplace(*typed_cfg);
-    } else {
-      reduce(merged.value(), *typed_cfg);
-    }
-  });
-
-  return merged;
-}
-
-/**
  * Return all the available per route filter configs.
  *
  * @param callbacks The stream filter callbacks to check for route configs.
@@ -635,20 +590,20 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
  * and their lifetime is the same as the matched route.
  */
 template <class ConfigType>
-absl::InlinedVector<const ConfigType*, 3>
+absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4>
 getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   ASSERT(callbacks != nullptr);
 
-  absl::InlinedVector<const ConfigType*, 3> all_configs;
-  callbacks->traversePerFilterConfig([&all_configs](const Router::RouteSpecificFilterConfig& cfg) {
-    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-    if (typed_cfg == nullptr) {
-      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
-    }
+  absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4> all_configs;
 
-    all_configs.push_back(typed_cfg);
-  });
+  for (const auto* config : callbacks->perFilterConfigs()) {
+    const ConfigType* typed_config = dynamic_cast<const ConfigType*>(config);
+    if (typed_config == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      continue;
+    }
+    all_configs.push_back(*typed_config);
+  }
 
   return all_configs;
 }
@@ -674,11 +629,10 @@ struct AuthorityAttributes {
 AuthorityAttributes parseAuthority(absl::string_view host);
 
 /**
- * It validates RetryPolicy defined in core api. It should be called at the main thread as
- * it may throw exception.
+ * It validates RetryPolicy defined in core api. It will return an error status if invalid.
  * @param retry_policy core retry policy
  */
-void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
+absl::Status validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
 
 /**
  * It returns RetryPolicy defined in core api to route api.

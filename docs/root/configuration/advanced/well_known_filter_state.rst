@@ -22,6 +22,10 @@ The following lists the filter state object keys used by the Envoy extensions:
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
   a cluster name as a constructor.
 
+``envoy.udp_proxy.cluster``
+  :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>` dynamic cluster name selection on a per-session basis. Accepts
+  a cluster name as a constructor.
+
 ``envoy.network.transport_socket.original_dst_address``
   :ref:`Original destination cluster <arch_overview_load_balancing_types_original_destination>` dynamic address
   selection. Accepts an `IP:PORT` string as a constructor. Fields:
@@ -62,6 +66,16 @@ The following lists the filter state object keys used by the Envoy extensions:
 ``envoy.string``
   A special generic string object factory, to be used as a :ref:`factory lookup key
   <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
+
+``envoy.tcp_proxy.per_connection_idle_timeout_ms``
+  :ref:`TCP proxy idle timeout duration
+  <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.idle_timeout>` override on a per-connection
+  basis. Accepts a count of milliseconds number string as a constructor.
+
+``envoy.ratelimit.hits_addend``
+  :ref:`Rate Limit Hits Addend
+  <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
+  Accepts a number string as a constructor.
 
 Filter state object fields
 --------------------------

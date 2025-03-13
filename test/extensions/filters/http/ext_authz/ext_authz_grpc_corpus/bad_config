@@ -1,0 +1,35 @@
+base {
+  config {
+    status_on_error {
+      code: Continue
+    }
+    metadata_context_namespaces: "="
+    stat_prefix: "r"
+    filter_enabled_metadata {
+      filter: "\177\177\177\177\177\177\177\177"
+      path {
+        key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+      value {
+        string_match {
+          safe_regex {
+            google_re2 {
+            }
+            regex: "z"
+          }
+          ignore_case: true
+        }
+      }
+    }
+    bootstrap_metadata_labels_key: "r"
+  }
+  request_data {
+  }
+  filter_metadata {
+    typed_filter_metadata {
+      key: ":="
+      value {
+      }
+    }
+  }
+}

@@ -75,7 +75,13 @@ TEST_P(MultiplexedUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRespo
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
   testRouterUpstreamResponseBeforeRequestComplete();
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(400);
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, Retry) { testRetry(); }
@@ -355,25 +361,22 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+// TODO(kbaichoo): fix this test to work with deferred processing.
+// We've augmented the pause filter to lower the watermark when the filter has raised above
+// watermark but will follow up with getting the timing correct in another PR.
+TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequestWithRandomBackup) {
   // random-pause-filter does not support HTTP3.
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
 
-  if (GetParam().defer_processing_backedup_streams) {
-    // TODO(kbaichoo): fix this test to work with deferred processing by using a
-    // timer to lower the watermark when the filter has raised above watermark.
-    // Since we deferred processing data, when the filter raises watermark
-    // with deferred processing we won't invoke it again which could lower
-    // the watermark.
-    return;
-  }
   config_helper_.prependFilter(R"EOF(
   name: random-pause-filter
 )EOF");
 
-  manySimultaneousRequests(1024 * 20, 1024 * 20);
+  // TODO(kbaichoo): either change the ordering of how the responses wait on end stream or increase
+  // the timeout since there will be delays added by the pause filter.
+  manySimultaneousRequests(1024 * 20, 1024 * 20, 50);
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
@@ -783,6 +786,40 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DisableUpstreamEarlyData) {
 
   EXPECT_EQ(upstreamProtocol() == Http::CodecType::HTTP3 ? 1u : 0u,
             test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ClientDisableUpstreamEarlyData) {
+#ifdef WIN32
+  // TODO: debug why waiting on the 2nd upstream connection times out on Windows.
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_disable_client_early_data",
+                                    "true");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  upstream_request_.reset();
+
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
+
+  default_request_headers_.addCopy("second_request", "1");
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_cx_connect_with_0_rtt")->value());
   EXPECT_EQ(0u, test_server_->counter("cluster.cluster_0.upstream_rq_0rtt")->value());
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());

@@ -106,7 +106,9 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       ASSERT(inner_descriptor != nullptr);
       std::unique_ptr<Protobuf::Message> inner_message;
       inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
-      MessageUtil::unpackTo(any_message, *inner_message);
+      if (!MessageUtil::unpackTo(any_message, *inner_message).ok()) {
+        return false;
+      }
       // Trim message.
       if (!checkFieldMaskAndTrimMessage(inner_field_mask, *inner_message)) {
         return false;
@@ -125,7 +127,7 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParamsMulti& params) {
 }
 
 absl::StatusOr<Matchers::StringMatcherPtr>
-buildNameMatcher(const Http::Utility::QueryParamsMulti& params) {
+buildNameMatcher(const Http::Utility::QueryParamsMulti& params, Regex::Engine& engine) {
   const auto name_regex = params.getFirstValue("name_regex");
   if (!name_regex.has_value() || name_regex->empty()) {
     return std::make_unique<Matchers::UniversalStringMatcher>();
@@ -133,13 +135,13 @@ buildNameMatcher(const Http::Utility::QueryParamsMulti& params) {
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
   matcher.set_regex(*name_regex);
-  TRY_ASSERT_MAIN_THREAD
-  return Regex::Utility::parseRegex(matcher);
-  END_TRY
-  catch (EnvoyException& e) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Error while parsing name_regex from ", *name_regex, ": ", e.what()));
+  auto regex_or_error = Regex::Utility::parseRegex(matcher, engine);
+  if (regex_or_error.status().ok()) {
+    return std::move(*regex_or_error);
   }
+  return absl::InvalidArgumentError(absl::StrCat("Error while parsing name_regex from ",
+                                                 *name_regex, ": ",
+                                                 regex_or_error.status().message()));
 }
 
 } // namespace
@@ -151,10 +153,12 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) const {
   Http::Utility::QueryParamsMulti query_params = admin_stream.queryParams();
-  const auto resource = query_params.getFirstValue("resource");
-  const auto mask = query_params.getFirstValue("mask");
+  const absl::optional<std::string> resource =
+      Utility::nonEmptyQueryParam(query_params, "resource");
+  const absl::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
   const bool include_eds = shouldIncludeEdsInDump(query_params);
-  const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher = buildNameMatcher(query_params);
+  const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher =
+      buildNameMatcher(query_params, server_.regexEngine());
   if (!name_matcher.ok()) {
     response.add(name_matcher.status().ToString());
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
@@ -305,7 +309,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     float value = cluster.dropOverload().value() * 1000000;
     if (value > 0) {
       auto* drop_overload = policy.add_drop_overloads();
-      drop_overload->set_category("drop_overload");
+      drop_overload->set_category(cluster.dropCategory());
       auto* percent = drop_overload->mutable_drop_percentage();
       percent->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
       percent->set_numerator(uint32_t(value));
@@ -379,6 +383,16 @@ void ConfigDumpHandler::addLbEndpoint(
   auto& endpoint = *lb_endpoint.mutable_endpoint();
   endpoint.set_hostname(host->hostname());
   Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
+  if (host->addressListOrNull() != nullptr) {
+    const auto& address_list = *host->addressListOrNull();
+    if (address_list.size() > 1) {
+      // skip first address of the list as the default address is not an additional one.
+      for (auto it = std::next(address_list.begin()); it != address_list.end(); ++it) {
+        auto& new_address = *endpoint.mutable_additional_addresses()->Add();
+        Network::Utility::addressToProtobufAddress(**it, *new_address.mutable_address());
+      }
+    }
+  }
   auto& health_check_config = *endpoint.mutable_health_check_config();
   health_check_config.set_hostname(host->hostnameForHealthChecks());
   if (host->healthCheckAddress()->asString() != host->address()->asString()) {

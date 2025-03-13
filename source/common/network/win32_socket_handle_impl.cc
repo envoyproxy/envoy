@@ -62,18 +62,22 @@ Api::IoCallUint64Result Win32SocketHandleImpl::sendmsg(const Buffer::RawSlice* s
   return result;
 }
 
-Api::IoCallUint64Result Win32SocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
-                                                       const uint64_t num_slice, uint32_t self_port,
-                                                       RecvMsgOutput& output) {
+Api::IoCallUint64Result Win32SocketHandleImpl::recvmsg(
+    Buffer::RawSlice* slices, const uint64_t num_slice, uint32_t self_port,
+    const IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config, RecvMsgOutput& output) {
   Api::IoCallUint64Result result =
-      IoSocketHandleImpl::recvmsg(slices, num_slice, self_port, output);
+      IoSocketHandleImpl::recvmsg(slices, num_slice, self_port, udp_save_cmsg_config, output);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
   return result;
 }
 
-Api::IoCallUint64Result Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
-                                                        RecvMsgOutput& output) {
-  Api::IoCallUint64Result result = IoSocketHandleImpl::recvmmsg(slices, self_port, output);
+Api::IoCallUint64Result
+Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+
+                                const IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config,
+                                RecvMsgOutput& output) {
+  Api::IoCallUint64Result result =
+      IoSocketHandleImpl::recvmmsg(slices, self_port, udp_save_cmsg_config, output);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
   return result;
 }

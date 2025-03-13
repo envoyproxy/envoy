@@ -11,6 +11,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/route_provider_manager.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"

@@ -9,11 +9,14 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/stl_helpers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace ThreadLocal {
 
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
+
+InstanceImpl::InstanceImpl() = default;
 
 InstanceImpl::~InstanceImpl() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -40,6 +43,32 @@ SlotPtr InstanceImpl::allocateSlot() {
 
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
+
+InstanceImpl::SlotImpl::~SlotImpl() {
+  // Do nothing if the parent is already shutdown. Return early here to avoid accessing the main
+  // thread dispatcher because it may have been destroyed.
+  if (isShutdownImpl()) {
+    return;
+  }
+
+  auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
+  // Main thread dispatcher may be nullptr if the slot is being created and destroyed during
+  // server initialization.
+  if (main_thread_dispatcher == nullptr || main_thread_dispatcher->isThreadSafe()) {
+    // If the slot is being destroyed on the main thread, we can remove it immediately.
+    parent_.removeSlot(index_);
+  } else {
+    // If the slot is being destroyed on a worker thread, we need to post the removal to the
+    // main thread. There are two possible cases here:
+    // 1. The removal is executed on the main thread as expected if the main dispatcher is still
+    //    active. This is the common case and the clean up will be done as expected because the
+    //    the worker dispatchers must be active before the main dispatcher is exited.
+    // 2. The removal is not executed if the main dispatcher has already exited. This is fine
+    //    because the removal has no side effect and will be ignored. The shutdown process will
+    //    clean up all the slots anyway.
+    main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
+  }
+}
 
 std::function<void()> InstanceImpl::SlotImpl::wrapCallback(const std::function<void()>& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the

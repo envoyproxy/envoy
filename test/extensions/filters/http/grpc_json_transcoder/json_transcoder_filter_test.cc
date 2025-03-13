@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
@@ -21,6 +22,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -32,6 +34,7 @@ using Envoy::Protobuf::util::MessageDifferencer;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
 
 namespace Envoy {
 namespace Extensions {
@@ -47,6 +50,9 @@ protected:
   }
 
   Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  GrpcJsonTranscoderFilterStatsSharedPtr stats_ = std::make_shared<GrpcJsonTranscoderFilterStats>(
+      GrpcJsonTranscoderFilterStats::generateStats("prefix", context_.scope()));
 };
 
 class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
@@ -229,8 +235,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -250,8 +257,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -269,8 +277,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"foo\" in the type \"google.protobuf.Empty\".",
@@ -294,8 +303,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, DecodedQueryParameterWithEncodedJsonName) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"search[encoded]\" in the type \"bookstore.Shelf\".",
@@ -314,11 +324,39 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
+  EXPECT_TRUE(unknown_variable_bindings.key().empty());
+}
+
+TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsCaptured) {
+  auto proto_config = getProtoConfig(
+      TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), "bookstore.Bookstore");
+  proto_config.set_capture_unknown_query_parameters(true);
+  JsonTranscoderConfig config(proto_config, *api_);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/shelves?foo=bar+dsa&eep=baz&foo=asd&foo.bar=baz"}};
+
+  TranscoderInputStreamImpl request_in, response_in;
+  TranscoderPtr transcoder;
+  MethodInfoSharedPtr method_info;
+  UnknownQueryParams unknown_query_params;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_query_params);
+
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(transcoder);
+  ASSERT_TRUE(unknown_query_params.key().contains("foo"));
+  ASSERT_TRUE(unknown_query_params.key().contains("eep"));
+  ASSERT_TRUE(unknown_query_params.key().contains("foo.bar"));
+  EXPECT_THAT(unknown_query_params.key().at("foo").values(), ElementsAre("bar+dsa", "asd"));
+  EXPECT_THAT(unknown_query_params.key().at("eep").values(), ElementsAre("baz"));
+  EXPECT_THAT(unknown_query_params.key().at("foo.bar").values(), ElementsAre("baz"));
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
@@ -333,8 +371,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -355,8 +394,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(StatusCode::kInvalidArgument, status.code());
   EXPECT_EQ("Could not find field \"b\" in the type \"bookstore.GetBookRequest\".",
@@ -381,8 +421,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(transcoder);
@@ -404,8 +445,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(status.code(), StatusCode::kNotFound);
   EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:verb to a method.");
@@ -429,8 +471,9 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
   MethodInfoSharedPtr method_info;
-  const auto status =
-      config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
+  UnknownQueryParams unknown_variable_bindings;
+  const auto status = config.createTranscoder(headers, request_in, response_in, transcoder,
+                                              method_info, unknown_variable_bindings);
 
   EXPECT_EQ(status.code(), StatusCode::kNotFound);
   EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unknown to a method.");
@@ -442,7 +485,8 @@ protected:
   GrpcJsonTranscoderFilterTest(
       envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
           bookstoreProtoConfig())
-      : config_(proto_config, *api_), filter_(config_) {
+      : config_(std::make_shared<JsonTranscoderConfig>(proto_config, *api_)),
+        filter_(config_, stats_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -469,7 +513,7 @@ protected:
   }
 
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
-  JsonTranscoderConfig config_;
+  JsonTranscoderConfigSharedPtr config_;
   JsonTranscoderFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -570,7 +614,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -642,7 +686,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -704,7 +748,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(*request_data, frames);
+  std::ignore = decoder.decode(*request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -737,7 +781,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, true));
 
   frames.clear();
-  decoder.decode(*response_data, frames);
+  std::ignore = decoder.decode(*response_data, frames);
 
   EXPECT_EQ(1, frames.size());
 
@@ -1089,7 +1133,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   // decodeData with EOS will output the grpc frame.
   std::vector<Grpc::Frame> frames;
   Grpc::Decoder decoder;
-  decoder.decode(buffer, frames);
+  std::ignore = decoder.decode(buffer, frames);
   ASSERT_EQ(frames.size(), 1);
 
   bookstore::EchoBodyRequest expected_request;
@@ -1197,7 +1241,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
 
     Grpc::Decoder decoder;
     std::vector<Grpc::Frame> frames;
-    decoder.decode(buffer, frames);
+    std::ignore = decoder.decode(buffer, frames);
     EXPECT_EQ(frames.size(), 1);
 
     bookstore::EchoBodyRequest expected_request;
@@ -1667,8 +1711,8 @@ protected:
   GrpcJsonTranscoderFilterPrintTest() {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
-    config_ = new JsonTranscoderConfig(proto_config, *api_);
-    filter_ = new JsonTranscoderFilter(*config_);
+    config_ = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+    filter_ = std::make_unique<JsonTranscoderFilter>(config_, stats_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1677,13 +1721,8 @@ protected:
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
-  ~GrpcJsonTranscoderFilterPrintTest() override {
-    delete filter_;
-    delete config_;
-  }
-
-  JsonTranscoderConfig* config_;
-  JsonTranscoderFilter* filter_;
+  std::shared_ptr<JsonTranscoderConfig> config_;
+  std::unique_ptr<JsonTranscoderFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
@@ -1802,8 +1841,8 @@ protected:
   GrpcJsonTranscoderFilterUnescapeTest() {
     envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
-    config_ = std::make_unique<JsonTranscoderConfig>(proto_config, *api_);
-    filter_ = std::make_unique<JsonTranscoderFilter>(*config_);
+    config_ = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+    filter_ = std::make_unique<JsonTranscoderFilter>(config_, stats_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -1812,7 +1851,7 @@ protected:
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
-  std::unique_ptr<JsonTranscoderConfig> config_;
+  std::shared_ptr<JsonTranscoderConfig> config_;
   std::unique_ptr<JsonTranscoderFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -1828,7 +1867,7 @@ TEST_P(GrpcJsonTranscoderFilterUnescapeTest, UnescapeSpec) {
 
   Grpc::Decoder decoder;
   std::vector<Grpc::Frame> frames;
-  decoder.decode(request_data, frames);
+  std::ignore = decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
 

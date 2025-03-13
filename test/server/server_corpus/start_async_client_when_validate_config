@@ -173,7 +173,6 @@ dynamic_resources {
       }
     }
     set_node_on_first_message_only: true
-    transport_api_version: V3
   }
 }
 flags_path: "+"
@@ -224,6 +223,5 @@ stats_sinks {
 }
 config_sources {
   path: "+"
-  resource_api_version: V3
 }
 

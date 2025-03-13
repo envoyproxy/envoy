@@ -33,7 +33,7 @@ package http
 import "C"
 import (
 	"fmt"
-	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -64,6 +64,7 @@ type panicInfo struct {
 	paniced bool
 	details string
 }
+
 type httpRequest struct {
 	req             *C.httpRequest
 	httpFilter      api.StreamFilter
@@ -76,6 +77,114 @@ type httpRequest struct {
 	// 1. protect req_->strValue in the C++ side from being used concurrently.
 	// 2. protect waitingCallback from being modified in markMayWaitingCallback concurrently.
 	mutex sync.Mutex
+
+	// decodingState and encodingState are part of httpRequest, not another GC object.
+	// So, no cycle reference, GC finalizer could work well.
+	decodingState processState
+	encodingState processState
+	streamInfo    streamInfo
+}
+
+// processState implements the FilterCallbacks interface.
+type processState struct {
+	request      *httpRequest
+	processState *C.processState
+}
+
+const (
+	// Values align with "enum class FilterState" in C++
+	ProcessingHeader  = 1
+	ProcessingData    = 4
+	ProcessingTrailer = 6
+)
+
+func (s *processState) Phase() api.EnvoyRequestPhase {
+	if s.processState.is_encoding == 0 {
+		switch int(s.processState.state) {
+		case ProcessingHeader:
+			return api.DecodeHeaderPhase
+		case ProcessingData:
+			return api.DecodeDataPhase
+		case ProcessingTrailer:
+			return api.DecodeTrailerPhase
+		}
+	}
+	// s.processState.is_encoding == 1
+	switch int(s.processState.state) {
+	case ProcessingHeader:
+		return api.EncodeHeaderPhase
+	case ProcessingData:
+		return api.EncodeDataPhase
+	case ProcessingTrailer:
+		return api.EncodeTrailerPhase
+	}
+	panic(fmt.Errorf("unexpected state, is_encoding: %d, state: %d", s.processState.is_encoding, s.processState.state))
+}
+
+func (s *processState) Continue(status api.StatusType) {
+	cAPI.HttpContinue(unsafe.Pointer(s), uint64(status))
+}
+
+func (s *processState) SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
+	cAPI.HttpSendLocalReply(unsafe.Pointer(s), responseCode, bodyText, headers, grpcStatus, details)
+}
+
+func (s *processState) sendPanicReply(details string) {
+	defer s.RecoverPanic()
+	cAPI.HttpSendPanicReply(unsafe.Pointer(s), details)
+}
+
+func (s *processState) RecoverPanic() {
+	if e := recover(); e != nil {
+		buf := debug.Stack()
+
+		if e == errRequestFinished || e == errFilterDestroyed {
+			api.LogInfof("http: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
+		} else {
+			api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+		}
+
+		switch e {
+		case errRequestFinished, errFilterDestroyed:
+			// do nothing
+
+		case errNotInGo:
+			// We can not send local reply now, since not in go now,
+			// will delay to the next time entering Go.
+			s.request.pInfo = panicInfo{
+				paniced: true,
+				details: fmt.Sprint(e),
+			}
+
+		default:
+			// The following safeReplyPanic should only may get errRequestFinished,
+			// errFilterDestroyed or errNotInGo, won't hit this branch, so, won't dead loop here.
+
+			// errInvalidPhase, or other panic, not from not-ok C return status.
+			// It's safe to try send a local reply with 500 status.
+			s.sendPanicReply(fmt.Sprint(e))
+		}
+	}
+}
+
+func (s *processState) AddData(data []byte, isStreaming bool) {
+	cAPI.HttpAddData(unsafe.Pointer(s), data, isStreaming)
+}
+
+func (s *processState) InjectData(data []byte) {
+	cAPI.HttpInjectData(unsafe.Pointer(s), data)
+}
+
+func (r *httpRequest) StreamInfo() api.StreamInfo {
+	return &r.streamInfo
+}
+
+func (r *httpRequest) DecoderFilterCallbacks() api.DecoderFilterCallbacks {
+	return &r.decodingState
+}
+
+func (r *httpRequest) EncoderFilterCallbacks() api.EncoderFilterCallbacks {
+	return &r.encodingState
 }
 
 // markWaitingOnEnvoy marks the request may be waiting a callback from envoy.
@@ -122,39 +231,25 @@ func (r *httpRequest) pluginName() string {
 	return C.GoStringN(r.req.plugin_name.data, C.int(r.req.plugin_name.len))
 }
 
-func (r *httpRequest) sendPanicReply(details string) {
-	defer r.RecoverPanic()
-	cAPI.HttpSendPanicReply(unsafe.Pointer(r.req), details)
-}
-
-func (r *httpRequest) RecoverPanic() {
+// recover goroutine to stop Envoy process crashing when panic happens
+func (r *httpRequest) recoverPanic() {
 	if e := recover(); e != nil {
-		const size = 64 << 10
-		buf := make([]byte, size)
-		buf = buf[:runtime.Stack(buf, false)]
-		api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+		buf := debug.Stack()
 
-		switch e {
-		case errRequestFinished, errFilterDestroyed:
-			// do nothing
-
-		case errNotInGo:
-			// We can not send local reply now, since not in go now,
-			// will delay to the next time entering Go.
-			r.pInfo = panicInfo{
-				paniced: true,
-				details: fmt.Sprint(e),
-			}
-
-		default:
-			// The following safeReplyPanic should only may get errRequestFinished,
-			// errFilterDestroyed or errNotInGo, won't hit this branch, so, won't dead loop here.
-
-			// errInvalidPhase, or other panic, not from not-ok C return status.
-			// It's safe to try send a local reply with 500 status.
-			r.sendPanicReply(fmt.Sprint(e))
+		if e == errRequestFinished || e == errFilterDestroyed {
+			api.LogInfof("http: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
+		} else {
+			api.LogErrorf("http: panic serving: %v\n%s", e, buf)
 		}
 	}
+}
+
+func (r *httpRequest) ClearRouteCache() {
+	cAPI.ClearRouteCache(unsafe.Pointer(r), false)
+}
+
+func (r *httpRequest) RefreshRouteCache() {
+	cAPI.ClearRouteCache(unsafe.Pointer(r), true)
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {
@@ -185,14 +280,8 @@ func (r *httpRequest) GetProperty(key string) (string, error) {
 	return cAPI.HttpGetStringProperty(unsafe.Pointer(r), key)
 }
 
-func (r *httpRequest) StreamInfo() api.StreamInfo {
-	return &streamInfo{
-		request: r,
-	}
-}
-
 func (r *httpRequest) Finalize(reason int) {
-	cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
+	cAPI.HttpFinalize(unsafe.Pointer(r), reason)
 }
 
 type streamInfo struct {
@@ -210,7 +299,7 @@ func (s *streamInfo) FilterChainName() string {
 }
 
 func (s *streamInfo) Protocol() (string, bool) {
-	if protocol, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueProtocol); ok {
+	if protocol, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueProtocol); ok {
 		if name, ok := protocolsIdToName[protocol]; ok {
 			return name, true
 		}
@@ -220,7 +309,7 @@ func (s *streamInfo) Protocol() (string, bool) {
 }
 
 func (s *streamInfo) ResponseCode() (uint32, bool) {
-	if code, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueResponseCode); ok {
+	if code, ok := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueResponseCode); ok {
 		return uint32(code), true
 	}
 	return 0, false
@@ -231,7 +320,7 @@ func (s *streamInfo) ResponseCodeDetails() (string, bool) {
 }
 
 func (s *streamInfo) AttemptCount() uint32 {
-	count, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request.req), ValueAttemptCount)
+	count, _ := cAPI.HttpGetIntegerValue(unsafe.Pointer(s.request), ValueAttemptCount)
 	return uint32(count)
 }
 
@@ -250,7 +339,7 @@ func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
 }
 
 func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
-	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request.req), filterName, key, value)
+	cAPI.HttpSetDynamicMetadata(unsafe.Pointer(d.request), filterName, key, value)
 }
 
 func (s *streamInfo) DownstreamLocalAddress() string {
@@ -296,7 +385,7 @@ func (s *streamInfo) FilterState() api.FilterState {
 }
 
 func (f *filterState) SetString(key, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
-	cAPI.HttpSetStringFilterState(unsafe.Pointer(f.request.req), key, value, stateType, lifeSpan, streamSharing)
+	cAPI.HttpSetStringFilterState(unsafe.Pointer(f.request), key, value, stateType, lifeSpan, streamSharing)
 }
 
 func (f *filterState) GetString(key string) string {

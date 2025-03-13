@@ -134,6 +134,27 @@ public:
 };
 
 /**
+ * Filter with on_data_cb disabled buffer returns `Network::FilterStatus::StopIteration`
+ * from `onAccept`, then is recovered and returns success.
+ */
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithoutInspectData) {
+  initializeWithFilter();
+
+  // The filter stops iteration and waits for recovering execution.
+  EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
+
+  // get the ActiveTcpSocket pointer before unlink() removed from the link-list.
+  ActiveTcpSocket* tcp_socket = generic_active_listener_->sockets().front().get();
+
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
+
+  tcp_socket->continueFilterChain(true);
+}
+
+/**
  * Execute peek data two times, then filter return successful.
  */
 TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
@@ -156,14 +177,14 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(inspect_size_ / 2, Api::IoError::none()))));
   // the filter is looking for more data.
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(inspect_size_, Api::IoError::none()))));
   // the filter get enough data, then return Network::FilterStatus::Continue
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(io_handle_, resetFileEvents());
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 }
 
 /**
@@ -194,7 +215,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
       .WillOnce(Return(
           ByMove(Api::IoCallUint64Result(0, Network::IoSocketError::create(SOCKET_ERROR_INTR)))));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
   EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_error_.value(), 1);
 }
 
@@ -278,19 +299,19 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
   EXPECT_CALL(*inspect_data_filter2, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(*inspect_data_filter2, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(*inspect_data_filter3, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 }
 
 /**
@@ -371,25 +392,130 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(*inspect_data_filter2, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*inspect_data_filter3, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+}
+
+/**
+ * Similar to above test, but with no inspect data filter recovered by actively calling
+ * continueFilterChain().
+ */
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters3) {
+  initialize();
+
+  auto inspect_size1 = 128;
+  auto* inspect_data_filter1 = new NiceMock<Network::MockListenerFilter>(inspect_size1);
+  EXPECT_CALL(*inspect_data_filter1, destroy_());
+
+  auto inspect_size2 = 512;
+  auto* inspect_data_filter2 = new NiceMock<Network::MockListenerFilter>(inspect_size2);
+  EXPECT_CALL(*inspect_data_filter2, destroy_());
+
+  auto inspect_size3 = 256;
+  auto* inspect_data_filter3 = new NiceMock<Network::MockListenerFilter>(inspect_size3);
+  EXPECT_CALL(*inspect_data_filter3, destroy_());
+
+  auto* no_inspect_data_filter1 = new NiceMock<Network::MockListenerFilter>();
+  EXPECT_CALL(*no_inspect_data_filter1, destroy_());
+
+  auto* no_inspect_data_filter2 = new NiceMock<Network::MockListenerFilter>();
+  EXPECT_CALL(*no_inspect_data_filter2, destroy_());
+
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{no_inspect_data_filter1});
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{inspect_data_filter1});
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{inspect_data_filter2});
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{no_inspect_data_filter2});
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{inspect_data_filter3});
+        return true;
+      }));
+
+  auto listener = std::make_unique<NiceMock<Network::MockListener>>();
+  EXPECT_CALL(*listener, onDestroy());
+  Network::NopConnectionBalancerImpl balancer;
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  auto active_listener = std::make_unique<ActiveTcpListener>(
+      conn_handler_, std::move(listener), address, listener_config_, balancer, runtime_);
+  auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle_));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce([&](void*, size_t size, int) {
+        EXPECT_EQ(128, size);
+        return Api::IoCallUint64Result(128, Api::IoError::none());
+      })
+      .WillOnce([&](void*, size_t size, int) {
+        EXPECT_EQ(512, size);
+        return Api::IoCallUint64Result(512, Api::IoError::none());
+      })
+      .WillOnce([&](void*, size_t size, int) {
+        EXPECT_EQ(512, size);
+        return Api::IoCallUint64Result(512, Api::IoError::none());
+      });
+
+  EXPECT_CALL(*no_inspect_data_filter1, onAccept(_))
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+
+  active_listener->incNumConnections();
+  // Calling the onAcceptWorker() to create the ActiveTcpSocket.
+  active_listener->onAcceptWorker(std::move(accepted_socket), false, true);
+
+  EXPECT_CALL(*inspect_data_filter1, onAccept(_))
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+
+  ActiveTcpSocket* tcp_socket1 = active_listener->sockets().front().get();
+  tcp_socket1->continueFilterChain(true);
+
+  EXPECT_CALL(*inspect_data_filter1, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(*inspect_data_filter2, onAccept(_))
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(*inspect_data_filter2, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(*no_inspect_data_filter2, onAccept(_))
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(*inspect_data_filter3, onAccept(_))
+      .WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+
+  tcp_socket1->continueFilterChain(true);
+
+  EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
+
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 }
 
 /**
  * Trigger the file closed event.
  */
-TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose1) {
   initializeWithInspectFilter();
 
   // The filter stop the filter iteration and waiting for the data.
@@ -410,15 +536,45 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   // the filter is looking for more data
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   EXPECT_CALL(io_handle_, close)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   // emit the read event
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
   EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_remote_close_.value(), 1);
+}
+
+/**
+ * Trigger the file closed event for listener filter with on_data_cb disabled.
+ */
+TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose2) {
+  initializeWithFilter();
+
+  // The filter stop the filter iteration and waiting for the data.
+  EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+  // ensure the listener filter buffer will register the file event.
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
+
+  // buffer is set to 1 for filter with on_data_cb disabled
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(1, Api::IoError::none()))));
+
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 }
 
 TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
@@ -446,7 +602,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
 
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
   // emit the read event
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
   EXPECT_EQ(0, generic_active_listener_->sockets().size());
 }
 
@@ -475,7 +631,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   // the filter is looking for more data.
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  file_event_callback(Event::FileReadyType::Read);
+  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
 
   // get the ActiveTcpSocket pointer before unlink() removed from the link-list.
   ActiveTcpSocket* tcp_socket = generic_active_listener_->sockets().front().get();
@@ -491,6 +647,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
 TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
+  // Prepare Listener1.
   NiceMock<Network::MockListenerConfig> listener_config1;
   NiceMock<Network::MockConnectionBalancer> balancer1;
   EXPECT_CALL(balancer1, registerHandler(_));
@@ -513,6 +670,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       std::make_unique<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved1),
                                           normal_address, listener_config1, balancer1, runtime_);
 
+  // Prepare Listener2.
   NiceMock<Network::MockListenerConfig> listener_config2;
   Network::MockConnectionBalancer balancer2;
   EXPECT_CALL(balancer2, registerHandler(_));
@@ -534,6 +692,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       std::make_shared<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved2),
                                           alt_address, listener_config2, balancer2, runtime_);
 
+  // Prepare listener filter for Listener1.
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
@@ -548,8 +707,10 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(listener_config1, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
 
-  // Listener1 has a listener filter in the listener filter chain.
+  // Both Listener1 and Listener2 will create listener filter chain. But only Listener1 has a
+  // listener filter in the listener filter chain.
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .Times(2)
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         if (!redirected) {
@@ -563,8 +724,6 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
         cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
-  // Verify that listener1 hands off the connection by not creating network filter chain.
-  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
 
   // 2. Redirect to Listener2.
   EXPECT_CALL(conn_handler_, getBalancedHandlerByAddress(_))
@@ -576,21 +735,24 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
           testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
           ReturnRef(*active_listener2)));
 
+  EXPECT_CALL(listener_config2, filterChainFactory())
+      .WillRepeatedly(ReturnRef(filter_chain_factory_));
+
+  // Prepare the network filter chain for Listener2.
   auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
 
-  EXPECT_CALL(conn_handler_, incNumConnections());
+  // 4. Listener2 creates the active TCP connection and network filter chain.
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
-  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
-  EXPECT_CALL(listener_config2, filterChainFactory())
-      .WillRepeatedly(ReturnRef(filter_chain_factory_));
-
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(conn_handler_, incNumConnections());
+
   active_listener1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   // Verify per-listener connection stats.
@@ -603,6 +765,89 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   active_listener1.reset();
   EXPECT_CALL(listener2, onDestroy());
   active_listener2.reset();
+}
+
+// Verify that the redirect decision could be overridden by the listener filter.
+TEST_F(ActiveTcpListenerTest, SkipRedirection) {
+  // Prepare Listener1.
+  NiceMock<Network::MockListenerConfig> listener_config1;
+  NiceMock<Network::MockConnectionBalancer> balancer1;
+  EXPECT_CALL(balancer1, registerHandler(_));
+  EXPECT_CALL(balancer1, unregisterHandler(_));
+
+  Network::Address::InstanceConstSharedPtr normal_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
+  EXPECT_CALL(listener_config1, listenerScope).Times(testing::AnyNumber());
+  EXPECT_CALL(listener_config1, listenerFiltersTimeout());
+  EXPECT_CALL(listener_config1, continueOnListenerFiltersTimeout());
+  EXPECT_CALL(listener_config1, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
+  EXPECT_CALL(listener_config1, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
+  EXPECT_CALL(listener_config1, handOffRestoredDestinationConnections())
+      .WillRepeatedly(Return(true));
+
+  auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
+  auto& listener1 = *mock_listener_will_be_moved1;
+  auto active_listener1 =
+      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(mock_listener_will_be_moved1),
+                                          normal_address, listener_config1, balancer1, runtime_);
+
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.2", 20002));
+
+  // Prepare listener filter for Listener1.
+  auto* test_filter = new NiceMock<Network::MockListenerFilter>();
+  EXPECT_CALL(*test_filter, destroy_());
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
+  EXPECT_CALL(balancer1, pickTargetHandler(_))
+      .WillOnce(testing::DoAll(
+          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
+          ReturnRef(*active_listener1)));
+
+  EXPECT_CALL(listener_config1, filterChainFactory())
+      .WillRepeatedly(ReturnRef(filter_chain_factory_));
+
+  // Listener1 has a listener filter in the listener filter chain.
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        // Insert the Mock filter.
+        manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{test_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
+        cb.useOriginalDst(false); // Skip the redirection.
+        return Network::FilterStatus::Continue;
+      }));
+
+  // Prepare the network filter chain for Listener1.
+  auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
+  auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
+  filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
+
+  // 2. Listener1 creates the active TCP connection and network filter chain.
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(*filter_chain_, transportSocketFactory)
+      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
+  EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(conn_handler_, incNumConnections());
+
+  active_listener1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+
+  // Verify per-listener connection stats.
+  EXPECT_EQ(1UL, conn_handler_.numConnections());
+
+  EXPECT_CALL(conn_handler_, decNumConnections());
+  connection->close(Network::ConnectionCloseType::NoFlush);
+
+  EXPECT_CALL(listener1, onDestroy());
+  active_listener1.reset();
 }
 
 TEST_F(ActiveTcpListenerTest, Rebalance) {

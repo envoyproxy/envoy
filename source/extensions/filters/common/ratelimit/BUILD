@@ -33,12 +33,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ratelimit_client_interface",
     hdrs = ["ratelimit.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/ratelimit:ratelimit_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/tracing:tracer_interface",
         "//source/common/stats:symbol_table_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
     ],
 )

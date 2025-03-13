@@ -11,17 +11,15 @@ namespace TestEventTracker {
 TestEventTrackerFilterConfig::TestEventTrackerFilterConfig(
     const envoymobile::extensions::filters::http::test_event_tracker::TestEventTracker&
         proto_config)
-    : event_tracker_(static_cast<envoy_event_tracker*>(
-          Api::External::retrieveApi(envoy_event_tracker_api_name))) {
-  auto attributes = std::vector<std::pair<std::string, std::string>>();
-  for (auto& pair : proto_config.attributes()) {
-    attributes.push_back({std::string(pair.first), std::string(pair.second)});
+    : event_tracker_(static_cast<std::unique_ptr<EnvoyEventTracker>*>(
+          Api::External::retrieveApi(ENVOY_EVENT_TRACKER_API_NAME))) {
+  for (auto& [key, value] : proto_config.attributes()) {
+    attributes_.emplace(std::string(key), std::string(value));
   }
-  attributes_ = attributes;
 }
 
 Http::FilterHeadersStatus TestEventTrackerFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  config_->track(Bridge::Utility::makeEnvoyMap(config_->attributes()));
+  config_->track(config_->attributes());
   return Http::FilterHeadersStatus::Continue;
 }
 

@@ -7,6 +7,7 @@ import static org.chromium.net.testing.CronetTestRule.getTestStorage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -16,7 +17,6 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import java.io.BufferedReader;
 import java.io.File;
@@ -46,11 +46,12 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 
 /**
  * Test CronetEngine.
  */
-@RunWith(AndroidJUnit4.class)
+@RunWith(RobolectricTestRunner.class)
 public class CronetUrlRequestContextTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
@@ -224,7 +225,7 @@ public class CronetUrlRequestContextTest {
       }
     };
     // Ensure that test is not running on the main thread.
-    assertTrue(Looper.getMainLooper() != Looper.myLooper());
+    assertNotSame(Looper.getMainLooper(), Looper.myLooper());
     new Handler(Looper.getMainLooper()).post(blockingTask);
 
     // Create new request context, but its initialization on the main thread
@@ -350,7 +351,7 @@ public class CronetUrlRequestContextTest {
     assertTrue(hasDebugInNetLog(file));
     assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
-    assertTrue(!file.exists());
+    assertFalse(file.exists());
   }
 
   @Test
@@ -407,7 +408,7 @@ public class CronetUrlRequestContextTest {
     assertTrue(hasDebugInNetLog(file));
     assertFalse(hasTraceInNetLog(file));
     assertTrue(file.delete());
-    assertTrue(!file.exists());
+    assertFalse(file.exists());
   }
 
   @Test

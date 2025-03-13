@@ -3,21 +3,39 @@
 // NOLINT(namespace-envoy)
 
 #ifdef __cplusplus
+#include <atomic>
+
+#define _Atomic(X) std::atomic<X>
+
 extern "C" {
+#else
+#include <stdatomic.h> // NOLINT(modernize-deprecated-headers)
 #endif
 
-#include <stdint.h> // NOLINT(modernize-deprecated-headers)
+#include <stdbool.h> // NOLINT(modernize-deprecated-headers)
+#include <stdint.h>  // NOLINT(modernize-deprecated-headers)
 
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
   uint64_t len;
 } Cstring;
 
+struct httpRequest;
+
 typedef struct { // NOLINT(modernize-use-using)
+  struct httpRequest* req;
+  int is_encoding;
+  int state;
+} processState;
+
+typedef struct httpRequest { // NOLINT(modernize-use-using)
   Cstring plugin_name;
   uint64_t configId;
-  int phase;
+  // The ID of the worker that is processing this request, this enables the go filter to dedicate
+  // memory to each worker and not require locks
   uint32_t worker_id;
+  // This flag will be read & written by different threads, so it need to be atomic
+  _Atomic(int) is_golang_processing_log;
 } httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)
@@ -51,32 +69,38 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPIYield = -6,
   CAPIInternalFailure = -7,
   CAPISerializationFailure = -8,
+  CAPIInvalidScene = -9,
 } CAPIStatus;
 
-CAPIStatus envoyGoFilterHttpContinue(void* r, int status);
-CAPIStatus envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* body_text_data,
+/* These APIs are related to the decode/encode phase, use the pointer of processState. */
+CAPIStatus envoyGoFilterHttpContinue(void* s, int status);
+CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* body_text_data,
                                            int body_text_len, void* headers, int headers_num,
                                            long long int grpc_status, void* details_data,
                                            int details_len);
-CAPIStatus envoyGoFilterHttpSendPanicReply(void* r, void* details_data, int details_len);
+CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int details_len);
+CAPIStatus envoyGoFilterHttpAddData(void* s, void* data, int data_len, bool is_streaming);
+CAPIStatus envoyGoFilterHttpInjectData(void* s, void* data, int data_len);
 
-CAPIStatus envoyGoFilterHttpGetHeader(void* r, void* key_data, int key_len, uint64_t* value_data,
+CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len);
-CAPIStatus envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf);
-CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* r, void* key_data, int key_len, void* value_data,
+CAPIStatus envoyGoFilterHttpCopyHeaders(void* s, void* strs, void* buf);
+CAPIStatus envoyGoFilterHttpSetHeaderHelper(void* s, void* key_data, int key_len, void* value_data,
                                             int value_len, headerAction action);
-CAPIStatus envoyGoFilterHttpRemoveHeader(void* r, void* key_data, int key_len);
+CAPIStatus envoyGoFilterHttpRemoveHeader(void* s, void* key_data, int key_len);
 
-CAPIStatus envoyGoFilterHttpGetBuffer(void* r, uint64_t buffer, void* value);
-CAPIStatus envoyGoFilterHttpDrainBuffer(void* r, uint64_t buffer, uint64_t length);
-CAPIStatus envoyGoFilterHttpSetBufferHelper(void* r, uint64_t buffer, void* data, int length,
+CAPIStatus envoyGoFilterHttpGetBuffer(void* s, uint64_t buffer, void* value);
+CAPIStatus envoyGoFilterHttpDrainBuffer(void* s, uint64_t buffer, uint64_t length);
+CAPIStatus envoyGoFilterHttpSetBufferHelper(void* s, uint64_t buffer, void* data, int length,
                                             bufferAction action);
 
-CAPIStatus envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf);
-CAPIStatus envoyGoFilterHttpSetTrailer(void* r, void* key_data, int key_len, void* value,
+CAPIStatus envoyGoFilterHttpCopyTrailers(void* s, void* strs, void* buf);
+CAPIStatus envoyGoFilterHttpSetTrailer(void* s, void* key_data, int key_len, void* value,
                                        int value_len, headerAction action);
-CAPIStatus envoyGoFilterHttpRemoveTrailer(void* r, void* key_data, int key_len);
+CAPIStatus envoyGoFilterHttpRemoveTrailer(void* s, void* key_data, int key_len);
 
+/* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
+CAPIStatus envoyGoFilterHttpClearRouteCache(void* r, bool refresh);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value);
 
@@ -85,12 +109,7 @@ CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name_data, int nam
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name_data, int name_len,
                                                void* key_data, int key_len, void* buf_data,
                                                int buf_len);
-
-void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);
-uint32_t envoyGoFilterLogLevel();
-
 void envoyGoFilterHttpFinalize(void* r, int reason);
-void envoyGoConfigHttpFinalize(void* c);
 
 CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key_data, int key_len,
                                                  void* value_data, int value_len, int state_type,
@@ -100,6 +119,12 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key_data, int ke
 CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_len,
                                               uint64_t* value_data, int* value_len, int* rc);
 
+/* These APIs have nothing to do with request */
+void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);
+uint32_t envoyGoFilterLogLevel();
+
+/* These APIs are related to config, use the pointer of config. */
+void envoyGoConfigHttpFinalize(void* c);
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,
                                          int name_len, uint32_t* metric_id);
 CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset);
@@ -113,6 +138,7 @@ void envoyGoFilterDownstreamFinalize(void* wrapper, int reason);
 CAPIStatus envoyGoFilterDownstreamInfo(void* wrapper, int t, void* ret);
 
 void* envoyGoFilterUpstreamConnect(void* library_id, void* addr, uint64_t conn_id);
+CAPIStatus envoyGoFilterUpstreamConnEnableHalfClose(void* u, int enable_half_close);
 CAPIStatus envoyGoFilterUpstreamWrite(void* u, void* buffer_ptr, int buffer_len, int end_stream);
 CAPIStatus envoyGoFilterUpstreamClose(void* wrapper, int close_type);
 void envoyGoFilterUpstreamFinalize(void* wrapper, int reason);
@@ -122,6 +148,19 @@ CAPIStatus envoyGoFilterUpstreamInfo(void* wrapper, int t, void* ret);
 CAPIStatus envoyGoFilterSetFilterState(void* wrapper, void* key, void* value, int state_type,
                                        int life_span, int stream_sharing);
 CAPIStatus envoyGoFilterGetFilterState(void* wrapper, void* key, void* value);
+
+// tcp upstream
+CAPIStatus envoyGoHttpTcpBridgeCopyHeaders(void* s, void* strs, void* buf);
+CAPIStatus envoyGoHttpTcpBridgeSetRespHeader(void* s, void* key_data, int key_len, void* value_data,
+                                             int value_len, headerAction action);
+CAPIStatus envoyGoHttpTcpBridgeRemoveRespHeader(void* s, void* key_data, int key_len);
+CAPIStatus envoyGoHttpTcpBridgeGetBuffer(void* s, uint64_t buffer, void* value);
+CAPIStatus envoyGoHttpTcpBridgeDrainBuffer(void* s, uint64_t buffer, uint64_t length);
+CAPIStatus envoyGoHttpTcpBridgeSetBufferHelper(void* s, uint64_t buffer, void* data, int length,
+                                               bufferAction action);
+CAPIStatus envoyGoHttpTcpBridgeGetStringValue(void* r, int id, uint64_t* value_data,
+                                              int* value_len);
+CAPIStatus envoyGoHttpTcpBridgeSetSelfHalfCloseForUpstreamConn(void* r, int enabled);
 
 #ifdef __cplusplus
 } // extern "C"

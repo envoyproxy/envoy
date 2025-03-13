@@ -7,8 +7,10 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -30,11 +32,31 @@ public:
     Timeout
   };
 
+  /** Store the trace information. */
+  struct Trace {
+    /**
+     * An identifier to store the trace information. The trace is `uint8_t` because the value can
+     * vary depending on the DNS resolver implementation.
+     */
+    uint8_t trace_;
+    /** Store the current time of this trace. */
+    MonotonicTime time_;
+  };
+
   /**
    * Cancel an outstanding DNS request.
    * @param reason supplies the cancel reason.
    */
   virtual void cancel(CancelReason reason) PURE;
+
+  /**
+   * Add a trace for the DNS query. The trace lifetime is tied to the lifetime of `ActiveQuery` and
+   * `ActiveQuery` will be destroyed upon query completion or cancellation.
+   */
+  virtual void addTrace(uint8_t trace) PURE;
+
+  /** Return the DNS query traces. */
+  virtual std::string getTraces() PURE;
 };
 
 /**
@@ -86,15 +108,20 @@ public:
 
   /**
    * Final status for a DNS resolution.
+   * DNS resolution can return result statuses like NODATA、SERVFAIL and NONAME,
+   * which indicate successful completion of the query but
+   * no results, and `Completed` is a more accurate way of reflecting that.
    */
-  enum class ResolutionStatus { Success, Failure };
+  enum class ResolutionStatus { Completed, Failure };
 
   /**
    * Called when a resolution attempt is complete.
    * @param status supplies the final status of the resolution.
+   * @param details supplies the details for the current address' resolution.
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
-  using ResolveCb = std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
+  using ResolveCb = std::function<void(ResolutionStatus status, absl::string_view details,
+                                       std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.

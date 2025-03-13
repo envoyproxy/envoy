@@ -11,8 +11,10 @@ envoy_package()
 envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
     ],
@@ -21,6 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "trie_matcher_test",
     srcs = ["trie_matcher_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",

@@ -40,7 +40,7 @@ void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
 std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
 void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
-                               const Upstream::HostDescriptionConstSharedPtr&) {
+                               const Tracing::UpstreamContext&) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
   ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, span_.traceIdAsHexString());
   ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, span_.idAsHexString());
@@ -77,10 +77,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.zipkin",
-                                                       zipkin_config.collector_cluster(), cm_,
-                                                       /* allow_added_via_api */ true),
-                         throw);
+  THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.zipkin",
+                                                    zipkin_config.collector_cluster(), cm_,
+                                                    /* allow_added_via_api */ true)
+                          .status());
   cluster_ = zipkin_config.collector_cluster();
   hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
                                                           : zipkin_config.collector_cluster();

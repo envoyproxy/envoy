@@ -24,6 +24,14 @@
 namespace Envoy {
 namespace Network {
 
+// Trace information for Apple DNS.
+enum class AppleDnsTrace : uint8_t {
+  Starting = 1,
+  Success = 2,
+  Failed = 3,
+  NoResult = 4,
+};
+
 // This abstraction allows for finer control in tests by using a mocked API. Production code simply
 // forwards the function calls to Apple's API.
 class DnsService {
@@ -100,11 +108,17 @@ private:
 
     // Network::ActiveDnsQuery
     void cancel(Network::ActiveDnsQuery::CancelReason reason) override;
+    void addTrace(uint8_t) override;
+    std::string getTraces() override;
 
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
 
     void onEventCallback(uint32_t events);
-    void finishResolve();
+    void finishResolve(AppleDnsTrace trace);
+
+    // Returns true if at least one DNS response has been processed (even if empty) for the provided
+    // `protocol`, or if no response is expected for the given protocol. Returns false otherwise.
+    bool isAddressFamilyProcessed(DNSServiceProtocol protocol);
 
     // Wrappers for the API calls.
     DNSServiceErrorType dnsServiceGetAddrInfo(bool include_unroutable_families);
@@ -118,10 +132,25 @@ private:
     // Small wrapping struct to accumulate addresses from firings of the
     // onDNSServiceGetAddrInfoReply callback.
     struct PendingResponse {
-      ResolutionStatus status_;
-      std::list<DnsResponse> v4_responses_;
-      std::list<DnsResponse> v6_responses_;
-      std::list<DnsResponse> all_responses_;
+      ResolutionStatus status_ = ResolutionStatus::Completed;
+      std::string details_ = "not_set";
+      // `v4_response_received_` and `v6_response_received_` denote whether a callback from the
+      // `DNSServiceGetAddrInfo` call has been received for the IPv4 address family and IPv6
+      // address family, respectively. If the query protocol is set to kDNSServiceProtocol_IPv4 or
+      // set to 0, at least one callback with the address family (`sa_family`) set to IPv4
+      // (AF_INET) will be received. If the query protocol is set to kDNSServiceProtocol_IPv6 or
+      // set to 0, at least one callback with the address family (`sa_family`) set to IPv6 will
+      // be received.
+      //
+      // If the query protocol is set to (kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6),
+      // or it is set to 0, then at least two callbacks will be received: at least one for the
+      // IPv4 family and at least one for the IPv6 family. This is true even if the domain doesn't
+      // exist (NXDOMAIN).
+      bool v4_response_received_{false};
+      bool v6_response_received_{false};
+      std::list<DnsResponse> v4_responses_{};
+      std::list<DnsResponse> v6_responses_{};
+      std::list<DnsResponse> all_responses_{};
     };
 
     AppleDnsResolverImpl& parent_;
@@ -131,6 +160,7 @@ private:
     Event::Dispatcher& dispatcher_;
     Event::FileEventPtr sd_ref_event_;
     DNSServiceRef sd_ref_{};
+    DNSServiceProtocol query_protocol_;
     const std::string dns_name_;
     bool synchronously_completed_{};
     bool owned_{};
@@ -139,6 +169,7 @@ private:
     // be accumulated before firing callback_.
     PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
+    std::vector<Trace> traces_;
   };
 
   Event::Dispatcher& dispatcher_;

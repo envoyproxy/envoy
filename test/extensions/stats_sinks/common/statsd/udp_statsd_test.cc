@@ -47,8 +47,9 @@ public:
 #ifndef WIN32
 // Regression test for https://github.com/envoyproxy/envoy/issues/8911
 TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
-  auto uds_address = std::make_shared<Network::Address::PipeInstance>(
-      TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
+  std::shared_ptr<Network::Address::PipeInstance> uds_address =
+      *Network::Address::PipeInstance::create(
+          TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   UdpStatsdSink sink(tls_, uds_address, false);

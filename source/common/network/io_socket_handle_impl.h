@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
@@ -11,8 +14,12 @@
 #include "source/common/network/io_socket_handle_base_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "quiche/quic/platform/api/quic_socket_address.h"
+
 namespace Envoy {
 namespace Network {
+
+using QuicEnvoyAddressPair = std::pair<quic::QuicSocketAddress, Address::InstanceConstSharedPtr>;
 
 /**
  * IoHandle derivative for sockets.
@@ -20,10 +27,13 @@ namespace Network {
 class IoSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                              absl::optional<int> domain = absl::nullopt)
+                              absl::optional<int> domain = absl::nullopt,
+                              size_t address_cache_max_capacity = 0)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
-        udp_read_normalize_addresses_(
-            Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")) {
+        address_cache_max_capacity_(address_cache_max_capacity) {
+    if (address_cache_max_capacity > 0) {
+      recent_received_addresses_ = std::vector<QuicEnvoyAddressPair>();
+    }
   }
 
   // Close underlying socket if close() hasn't been call yet.
@@ -45,9 +55,11 @@ public:
                                   const Address::Instance& peer_address) override;
 
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port, const UdpSaveCmsgConfig& save_cmsg_config,
+                                  RecvMsgOutput& output) override;
 
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& save_cmsg_config,
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
@@ -93,7 +105,29 @@ protected:
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
 
-  const bool udp_read_normalize_addresses_;
+  size_t addressCacheMaxSize() const { return address_cache_max_capacity_; }
+
+private:
+  // Returns the destination address if the control message carries it.
+  // Otherwise returns nullptr.
+  Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
+                                                               uint32_t self_port);
+
+  Address::InstanceConstSharedPtr getOrCreateEnvoyAddressInstance(sockaddr_storage ss,
+                                                                  socklen_t ss_len);
+
+  // Caches the address instances of the most recently received packets on this socket.
+  // Should only be used by QUIC client sockets to avoid creating multiple address instances for
+  // the same address in each read operation. Since the QUIC client sockets are typically connected
+  // via a connect() call (when envoy.reloadable_features.quic_connect_client_udp_sockets is set),
+  // the total number of expected addresses are 2 (source and destination address), and the cache
+  // size defaults to 4.
+  size_t address_cache_max_capacity_;
+  // Only non-null if address_cache_max_capacity_ is greater than 0.
+  absl::optional<std::vector<QuicEnvoyAddressPair>> recent_received_addresses_ = absl::nullopt;
+
+  // For testing and benchmarking non-public methods.
+  friend class IoSocketHandleImplTestWrapper;
 };
 } // namespace Network
 } // namespace Envoy

@@ -24,7 +24,7 @@ namespace GrpcHttp1Bridge {
 // query params here.
 void Http1BridgeFilter::ignoreQueryParams(Http::RequestHeaderMap& headers) {
   absl::string_view path = headers.getPathValue();
-  size_t pos = path.find("?");
+  size_t pos = path.find('?');
   if (pos != absl::string_view::npos) {
     absl::string_view new_path = path.substr(0, pos);
     headers.setPath(new_path);

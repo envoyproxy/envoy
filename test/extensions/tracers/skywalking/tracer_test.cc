@@ -85,11 +85,13 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
   {
     EXPECT_TRUE(span->spanEntity()->spanType() == skywalking::v3::SpanType::Entry);
+    EXPECT_TRUE(span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::Http);
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
     span->setBaggage("FakeStringAndNothingToDo", "FakeStringAndNothingToDo");
+    ASSERT_EQ(span->getTraceId(), segment_context->traceId());
     // This method is unimplemented and a noop.
-    ASSERT_EQ(span->getTraceIdAsHex(), "");
+    ASSERT_EQ(span->getSpanId(), "");
     // Test whether the basic functions of Span are normal.
     EXPECT_FALSE(span->spanEntity()->skipAnalysis());
     span->setSampled(false);
@@ -102,38 +104,47 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // Test whether the tag can be set correctly.
     span->setTag("TestTagKeyA", "TestTagValueA");
     span->setTag("TestTagKeyB", "TestTagValueB");
-    EXPECT_EQ("TestTagValueA", span->spanEntity()->tags().at(0).second);
-    EXPECT_EQ("TestTagValueB", span->spanEntity()->tags().at(1).second);
 
     // When setting the status code tag, the corresponding tag name will be rewritten as
     // 'status_code'.
     span->setTag(Tracing::Tags::get().HttpStatusCode, "200");
-    EXPECT_EQ("status_code", span->spanEntity()->tags().at(2).first);
-    EXPECT_EQ("200", span->spanEntity()->tags().at(2).second);
 
     // When setting the error tag, the spanEntity object will also mark itself as an error.
     span->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-    EXPECT_EQ(Tracing::Tags::get().Error, span->spanEntity()->tags().at(3).first);
-    EXPECT_EQ(Tracing::Tags::get().True, span->spanEntity()->tags().at(3).second);
     EXPECT_EQ(true, span->spanEntity()->errorStatus());
 
     // When setting http url tag, the corresponding tag name will be rewritten as 'url'.
     span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
-    EXPECT_EQ("url", span->spanEntity()->tags().at(4).first);
 
     // When setting peer address tag, the peer will be set.
     span->setTag(Tracing::Tags::get().PeerAddress, "1.2.3.4:8080");
     EXPECT_EQ("1.2.3.4:8080", span->spanEntity()->peer());
 
-    span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "abc");
-    EXPECT_EQ(1, span->spanEntity()->logs().size());
-    EXPECT_LT(0, span->spanEntity()->logs().at(0).time());
-    EXPECT_EQ("abc", span->spanEntity()->logs().at(0).data().at(0).value());
-
     absl::string_view sample{"GETxx"};
     sample.remove_suffix(2);
     span->setTag(Tracing::Tags::get().HttpMethod, sample);
-    EXPECT_EQ("GET", span->spanEntity()->tags().at(5).second);
+
+    span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "abc");
+
+    // Evaluate tag values and log values at last.
+    auto span_object = span->spanEntity()->createSpanObject();
+    EXPECT_EQ("TestTagValueA", span_object.tags().at(0).value());
+    EXPECT_EQ("TestTagValueB", span_object.tags().at(1).value());
+
+    EXPECT_EQ("status_code", span_object.tags().at(2).key());
+    EXPECT_EQ("200", span_object.tags().at(2).value());
+
+    EXPECT_EQ(Tracing::Tags::get().Error, span_object.tags().at(3).key());
+    EXPECT_EQ(Tracing::Tags::get().True, span_object.tags().at(3).value());
+
+    EXPECT_EQ("url", span_object.tags().at(4).key());
+    EXPECT_EQ("http://test.com/test/path", span_object.tags().at(4).value());
+
+    EXPECT_EQ("GET", span_object.tags().at(5).value());
+
+    EXPECT_EQ(1, span_object.logs().size());
+    EXPECT_LT(0, span_object.logs().at(0).time());
+    EXPECT_EQ("abc", span_object.logs().at(0).data().at(0).value());
   }
 
   {
@@ -156,8 +167,11 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
                                                       {":path", "/upstream/path"}};
     Upstream::HostDescriptionConstSharedPtr host{
         new testing::NiceMock<Upstream::MockHostDescription>()};
+    Upstream::ClusterInfoConstSharedPtr cluster{new testing::NiceMock<Upstream::MockClusterInfo>()};
+    Tracing::UpstreamContext upstream_context(host.get(), cluster.get(), Tracing::ServiceType::Http,
+                                              false);
 
-    first_child_span->injectContext(first_child_headers, host);
+    first_child_span->injectContext(first_child_headers, upstream_context);
     // Operation name of child span (EXIT span) will be override by the latest path of upstream
     // request.
     EXPECT_EQ("/upstream/path", first_child_span->spanEntity()->operationName());
@@ -191,7 +205,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     Tracing::TestTraceContextImpl second_child_headers{{":authority", "test.com"}};
 
-    second_child_span->injectContext(second_child_headers, nullptr);
+    second_child_span->injectContext(second_child_headers, Tracing::UpstreamContext());
     auto sp = createSpanContext(std::string(second_child_headers.get("sw8").value()));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());

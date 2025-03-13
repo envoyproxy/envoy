@@ -4,7 +4,7 @@
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
 
 #include "library/common/api/external.h"
-#include "library/common/data/utility.h"
+#include "library/common/bridge//utility.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
 
 namespace Envoy {
@@ -25,16 +25,16 @@ public:
   ~PlatformInterfaceImpl() override {}
 
   std::string read(const std::string& key) const override {
-    envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
+    envoy_data bridged_key = Bridge::Utility::copyToBridgeData(key);
     envoy_data bridged_value = bridged_store_.read(bridged_key, bridged_store_.context);
-    std::string result = Data::Utility::copyToString(bridged_value);
+    std::string result = Bridge::Utility::copyToString(bridged_value);
     release_envoy_data(bridged_value);
     return result;
   }
 
   void save(const std::string& key, const std::string& contents) override {
-    envoy_data bridged_key = Data::Utility::copyToBridgeData(key);
-    envoy_data bridged_value = Data::Utility::copyToBridgeData(contents);
+    envoy_data bridged_key = Bridge::Utility::copyToBridgeData(key);
+    envoy_data bridged_value = Bridge::Utility::copyToBridgeData(contents);
     bridged_store_.save(bridged_key, bridged_value, bridged_store_.context);
   }
 

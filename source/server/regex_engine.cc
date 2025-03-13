@@ -20,9 +20,6 @@ Regex::EnginePtr createRegexEngine(const envoy::config::bootstrap::v3::Bootstrap
   } else {
     regex_engine = std::make_shared<Regex::GoogleReEngine>();
   }
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine.get());
-
   return regex_engine;
 }
 

@@ -19,6 +19,7 @@
 #include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -137,8 +138,8 @@ public:
   const std::string v2_empty_fault_config_yaml = "{}";
 
   void setUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
-    config_ = std::make_shared<FaultFilterConfig>(fault, runtime_, "prefix.", *stats_.rootScope(),
-                                                  time_system_);
+    ON_CALL(context_, timeSource()).WillByDefault(ReturnRef(time_system_));
+    config_ = std::make_shared<FaultFilterConfig>(fault, "prefix.", *stats_.rootScope(), context_);
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -156,6 +157,7 @@ public:
     EXPECT_CALL(*timer_, disableTimer());
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -166,7 +168,7 @@ public:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   Buffer::OwnedImpl data_;
-  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockLoader>& runtime_{context_.runtime_loader_};
   Event::MockTimer* timer_{};
   Event::SimulatedTimeSystem time_system_;
 };
@@ -1226,7 +1228,8 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 
 TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   setUpTest(v2_empty_fault_config_yaml);
-  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
+  Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml),
+                                   context_);
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&delay_fault));
@@ -1479,7 +1482,7 @@ class FaultFilterSettingsTest : public FaultFilterTest {};
 TEST_F(FaultFilterSettingsTest, CheckDefaultRuntimeKeys) {
   envoy::extensions::filters::http::fault::v3::HTTPFault fault;
 
-  Fault::FaultSettings settings(fault);
+  Fault::FaultSettings settings(fault, context_);
 
   EXPECT_EQ("fault.http.delay.fixed_delay_percent", settings.delayPercentRuntime());
   EXPECT_EQ("fault.http.abort.abort_percent", settings.abortPercentRuntime());
@@ -1501,7 +1504,7 @@ TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
   fault.set_response_rate_limit_percent_runtime(
       std::string("fault.response_rate_limit_percent_runtime"));
 
-  Fault::FaultSettings settings(fault);
+  Fault::FaultSettings settings(fault, context_);
 
   EXPECT_EQ("fault.delay_percent_runtime", settings.delayPercentRuntime());
   EXPECT_EQ("fault.abort_percent_runtime", settings.abortPercentRuntime());

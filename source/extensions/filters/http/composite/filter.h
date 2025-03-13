@@ -39,7 +39,7 @@ public:
   ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
 
   absl::optional<std::string> serializeAsString() const override {
-    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct().get())->asJsonString();
+    return Json::Factory::loadFromProtobufStruct(*buildProtoStruct())->asJsonString();
   }
 
   void setFilterAction(const std::string& filter, const std::string& action) {
@@ -56,8 +56,9 @@ class Filter : public Http::StreamFilter,
                public AccessLog::Instance,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterStats& stats, Event::Dispatcher& dispatcher)
-      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats) {}
+  Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream)
+      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats), is_upstream_(is_upstream) {
+  }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -109,6 +110,8 @@ public:
     }
   }
 
+  bool isUpstream() const { return is_upstream_; }
+
 private:
   friend FactoryCallbacksWrapper;
 
@@ -159,12 +162,14 @@ private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
     Http::StreamDecoderFilterSharedPtr decoder_filter_;
   };
-  std::vector<AccessLog::InstanceSharedPtr> access_loggers_;
+  AccessLog::InstanceSharedPtrVector access_loggers_;
 
   Http::StreamFilterSharedPtr delegated_filter_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   FilterStats& stats_;
+  // Filter in the upstream filter chain.
+  bool is_upstream_;
 };
 
 } // namespace Composite

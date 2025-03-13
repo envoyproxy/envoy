@@ -94,6 +94,11 @@ public:
   Event::SimulatedTimeSystem time_;
 };
 
+TEST_F(DatadogConfigTest, DefaultConfiguration) {
+  envoy::config::trace::v3::DatadogConfig datadog_config;
+  EXPECT_EQ(datadog_config.has_remote_config(), false);
+}
+
 TEST_F(DatadogConfigTest, ConfigureTracer) {
   {
     envoy::config::trace::v3::DatadogConfig datadog_config;
@@ -110,11 +115,16 @@ TEST_F(DatadogConfigTest, ConfigureTracer) {
   }
 
   {
-    auto datadog_config =
-        makeConfig<envoy::config::trace::v3::DatadogConfig>("collector_cluster: fake_cluster");
+    const std::string yaml_conf = R"EOF(
+      collector_cluster: fake_cluster
+      remote_config: {}
+    )EOF";
+
+    auto datadog_config = makeConfig<envoy::config::trace::v3::DatadogConfig>(yaml_conf);
+
     cm_.initializeClusters({"fake_cluster"}, {});
 
-    EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_));
+    EXPECT_CALL(tls_.dispatcher_, createTimer_(testing::_)).Times(2);
     Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
     Http::AsyncClient::Callbacks* callbacks;
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -155,6 +165,8 @@ TEST_F(DatadogConfigTest, ConfigureViaFactory) {
       "@type": type.googleapis.com/envoy.config.trace.v3.DatadogConfig
       collector_cluster: fake_cluster
       service_name: fake_file
+      remote_config:
+        polling_interval: "10s"
    )EOF");
 
   DatadogTracerFactory factory;
@@ -251,8 +263,8 @@ TEST_F(DatadogConfigTest, CollectorHostname) {
 
   timer_->invokeCallback();
 
-  msg.reset(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  msg = std::make_unique<Http::ResponseMessageImpl>(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
   msg->body().add("{}");
   callbacks->onSuccess(request, std::move(msg));
 

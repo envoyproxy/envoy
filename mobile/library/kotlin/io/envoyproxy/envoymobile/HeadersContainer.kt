@@ -42,7 +42,7 @@ open class HeadersContainer {
    *
    * @param headers The headers to start with.
    */
-  internal constructor(headers: Map<String, MutableList<String>>) {
+  constructor(headers: Map<String, MutableList<String>>) {
     var underlyingHeaders = mutableMapOf<String, Header>()
     /**
      * Dictionaries are unordered collections. Process headers with names that are the same when

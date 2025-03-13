@@ -50,8 +50,8 @@ void RestApiFetcher::onSuccess(const Http::AsyncClient::Request& request,
 
 void RestApiFetcher::onFailure(const Http::AsyncClient::Request&,
                                Http::AsyncClient::FailureReason reason) {
-  // Currently Http::AsyncClient::FailureReason only has one value: "Reset".
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
+         reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
   requestComplete();
 }

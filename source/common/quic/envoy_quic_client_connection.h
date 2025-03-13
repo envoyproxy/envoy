@@ -60,7 +60,7 @@ public:
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
                             const Network::ConnectionSocket::OptionsSharedPtr& options,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -69,22 +69,29 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::OwnedImpl saved_cmsg) override;
   uint64_t maxDatagramSize() const override;
   void onDatagramsDropped(uint32_t) override {
     // TODO(mattklein123): Emit a stat for this.
   }
   size_t numPacketsExpectedPerEventLoop() const override {
-    if (delegate_.has_value()) {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_upstream_reads_fixed_number_packets") &&
+        delegate_.has_value()) {
       return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
+  const Network::IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const override {
+    static const Network::IoHandle::UdpSaveCmsgConfig empty_config{};
+    return empty_config;
+  };
 
   // Register file event and apply socket options.
   void setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
@@ -114,6 +121,8 @@ public:
   probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
 
 private:
+  friend class EnvoyQuicClientConnectionPeer;
+
   // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:
@@ -133,13 +142,13 @@ private:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket,
-                            quic::ConnectionIdGeneratorInterface& generator);
+                            quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 
   void maybeMigratePort();
 
-  void probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+  void probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                         quic::PathValidationReason reason);
 
   OptRef<PacketsToReadDelegate> delegate_;
@@ -147,6 +156,9 @@ private:
   Event::Dispatcher& dispatcher_;
   bool migrate_port_on_path_degrading_{false};
   uint8_t num_socket_switches_{0};
+  size_t num_packets_with_unknown_dst_address_{0};
+  const bool prefer_gro_;
+  const bool disallow_mmsg_;
 };
 
 } // namespace Quic

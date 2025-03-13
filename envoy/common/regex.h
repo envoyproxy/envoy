@@ -22,6 +22,11 @@ public:
    */
   virtual std::string replaceAll(absl::string_view value,
                                  absl::string_view substitution) const PURE;
+
+  /**
+   * Returns the pattern of the Regex matcher.
+   */
+  virtual const std::string& pattern() const PURE;
 };
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;
@@ -37,7 +42,7 @@ public:
    * Create a @ref CompiledMatcher with the given regex expression.
    * @param regex the regex expression match string
    */
-  virtual CompiledMatcherPtr matcher(const std::string& regex) const PURE;
+  virtual absl::StatusOr<CompiledMatcherPtr> matcher(const std::string& regex) const PURE;
 };
 
 using EnginePtr = std::shared_ptr<Engine>;

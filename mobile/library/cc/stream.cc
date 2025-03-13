@@ -1,23 +1,22 @@
 #include "stream.h"
 
-#include "library/cc/bridge_utility.h"
+#include "library/common/bridge//utility.h"
+#include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Platform {
 
-Stream::Stream(Envoy::InternalEngine* engine, envoy_stream_t handle)
-    : engine_(engine), handle_(handle) {}
+Stream::Stream(InternalEngine* engine, envoy_stream_t handle) : engine_(engine), handle_(handle) {}
 
-Stream& Stream::sendHeaders(RequestHeadersSharedPtr headers, bool end_stream) {
-  envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(headers->allHeaders());
-  engine_->sendHeaders(handle_, raw_headers, end_stream);
+Stream& Stream::sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream, bool idempotent) {
+  engine_->sendHeaders(handle_, std::move(headers), end_stream, idempotent);
   return *this;
 }
 
-Stream& Stream::sendData(envoy_data data) {
-  engine_->sendData(handle_, data, false);
+Stream& Stream::sendData(Buffer::InstancePtr buffer) {
+  engine_->sendData(handle_, std::move(buffer), false);
   return *this;
 }
 
@@ -26,12 +25,13 @@ Stream& Stream::readData(size_t bytes_to_read) {
   return *this;
 }
 
-void Stream::close(RequestTrailersSharedPtr trailers) {
-  envoy_headers raw_headers = rawHeaderMapAsEnvoyHeaders(trailers->allHeaders());
-  engine_->sendTrailers(handle_, raw_headers);
+void Stream::close(Http::RequestTrailerMapPtr trailers) {
+  engine_->sendTrailers(handle_, std::move(trailers));
 }
 
-void Stream::close(envoy_data data) { engine_->sendData(handle_, data, true); }
+void Stream::close(Buffer::InstancePtr buffer) {
+  engine_->sendData(handle_, std::move(buffer), true);
+}
 
 void Stream::cancel() { engine_->cancelStream(handle_); }
 

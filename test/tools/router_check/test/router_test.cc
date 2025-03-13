@@ -14,7 +14,6 @@ namespace {
 constexpr char kDir[] = "test/tools/router_check/test/config/";
 
 TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string config_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
@@ -30,7 +29,6 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
 }
 
 TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string config_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
@@ -43,7 +41,6 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
 }
 
 TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string config_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =

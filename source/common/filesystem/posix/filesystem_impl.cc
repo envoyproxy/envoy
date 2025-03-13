@@ -46,7 +46,14 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
   if (isOpen()) {
     return resultSuccess(true);
   }
-
+  if (destinationType() == DestinationType::Stdout) {
+    fd_ = ::dup(fileno(stdout));
+    return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
+  }
+  if (destinationType() == DestinationType::Stderr) {
+    fd_ = ::dup(fileno(stderr));
+    return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
+  }
   const auto flags_and_mode = translateFlag(in);
   fd_ = ::open(path().c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
@@ -158,7 +165,7 @@ static Api::IoCallResult<FileInfo> infoFromStat(absl::string_view path, const st
 }
 
 static Api::IoCallResult<FileInfo> infoFromStat(absl::string_view path, const struct stat& s) {
-  return infoFromStat(path, s, typeFromStat(s));
+  return infoFromStat(path, s, typeFromStat(s)); // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 }
 
 Api::IoCallResult<FileInfo> FileImplPosix::info() {
@@ -180,6 +187,7 @@ Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
         // but the reference is broken as the target could not be stat()'ed.
         // After confirming this with an lstat, treat this file entity as
         // a regular file, which may be unlink()'ed.
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
         return infoFromStat(path, s, FileType::Regular);
       }
     }
@@ -338,9 +346,13 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path.return_value_, "/dev") ||
-      absl::StartsWith(canonical_path.return_value_, "/sys") ||
-      absl::StartsWith(canonical_path.return_value_, "/proc")) {
+  // It will allow the canonical path such as /sysroot/ which is not the
+  // default reserved directories (/dev, /sys, /proc)
+  if (absl::StartsWith(canonical_path.return_value_, "/dev/") ||
+      absl::StartsWith(canonical_path.return_value_, "/sys/") ||
+      absl::StartsWith(canonical_path.return_value_, "/proc/") ||
+      canonical_path.return_value_ == "/dev" || canonical_path.return_value_ == "/sys" ||
+      canonical_path.return_value_ == "/proc") {
     return true;
   }
   return false;

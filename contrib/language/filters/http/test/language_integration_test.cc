@@ -14,7 +14,7 @@ public:
   }
 
   void initializeConfig(std::string default_language, std::string supported_languages) {
-    const std::string yaml = R"EOF(
+    constexpr absl::string_view yaml = R"EOF(
 name: envoy.filters.http.language
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.language.v3alpha.Language

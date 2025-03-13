@@ -3,21 +3,156 @@
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/xff_extension.h"
+#include "test/extensions/filters/network/common/fuzz/utils/fakes.h"
 
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
+
+// This is a hack that allows getting a shared_ptr to the config, without the config
+// having a lifetime controlled by a shared_ptr.
+//
+// This is here to avoid an enormous change in the HCM tests to make
+// `HttpConnectionManagerImplMixin` be a separate object owned by a shared_ptr instead of a mixin.
+class ConnectionManagerConfigProxyObject : public ConnectionManagerConfig {
+public:
+  ConnectionManagerConfigProxyObject(ConnectionManagerConfig& parent) : parent_(parent) {}
+  const RequestIDExtensionSharedPtr& requestIDExtension() override {
+    return parent_.requestIDExtension();
+  }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return parent_.accessLogs(); }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+    return parent_.accessLogFlushInterval();
+  }
+  bool flushAccessLogOnNewRequest() override { return parent_.flushAccessLogOnNewRequest(); }
+  bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
+    return parent_.flushAccessLogOnTunnelSuccessfullyEstablished();
+  }
+  ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& data,
+                                  ServerConnectionCallbacks& callbacks,
+                                  Server::OverloadManager& overload_manager) override {
+    return parent_.createCodec(connection, data, callbacks, overload_manager);
+  }
+  DateProvider& dateProvider() override { return parent_.dateProvider(); }
+  std::chrono::milliseconds drainTimeout() const override { return parent_.drainTimeout(); }
+  FilterChainFactory& filterFactory() override { return parent_.filterFactory(); }
+  bool generateRequestId() const override { return parent_.generateRequestId(); }
+  bool preserveExternalRequestId() const override { return parent_.preserveExternalRequestId(); }
+  bool alwaysSetRequestIdInResponse() const override {
+    return parent_.alwaysSetRequestIdInResponse();
+  }
+  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+    return parent_.idleTimeout();
+  }
+  bool isRoutable() const override { return parent_.isRoutable(); }
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    return parent_.maxConnectionDuration();
+  }
+  bool http1SafeMaxConnectionDuration() const override {
+    return parent_.http1SafeMaxConnectionDuration();
+  }
+  uint32_t maxRequestHeadersKb() const override { return parent_.maxRequestHeadersKb(); }
+  uint32_t maxRequestHeadersCount() const override { return parent_.maxRequestHeadersCount(); }
+  std::chrono::milliseconds streamIdleTimeout() const override {
+    return parent_.streamIdleTimeout();
+  }
+  std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
+  std::chrono::milliseconds requestHeadersTimeout() const override {
+    return parent_.requestHeadersTimeout();
+  }
+  std::chrono::milliseconds delayedCloseTimeout() const override {
+    return parent_.delayedCloseTimeout();
+  }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return parent_.maxStreamDuration();
+  }
+  Router::RouteConfigProvider* routeConfigProvider() override {
+    return parent_.routeConfigProvider();
+  }
+  Config::ConfigProvider* scopedRouteConfigProvider() override {
+    return parent_.scopedRouteConfigProvider();
+  }
+  OptRef<const Router::ScopeKeyBuilder> scopeKeyBuilder() override {
+    return parent_.scopeKeyBuilder();
+  }
+  const std::string& serverName() const override { return parent_.serverName(); }
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
+    return parent_.serverHeaderTransformation();
+  }
+  const absl::optional<std::string>& schemeToSet() const override { return parent_.schemeToSet(); }
+  bool shouldSchemeMatchUpstream() const override { return parent_.shouldSchemeMatchUpstream(); }
+  ConnectionManagerStats& stats() override { return parent_.stats(); }
+  ConnectionManagerTracingStats& tracingStats() override { return parent_.tracingStats(); }
+  bool useRemoteAddress() const override { return parent_.useRemoteAddress(); }
+  const InternalAddressConfig& internalAddressConfig() const override {
+    return parent_.internalAddressConfig();
+  }
+  uint32_t xffNumTrustedHops() const override { return parent_.xffNumTrustedHops(); }
+  bool skipXffAppend() const override { return parent_.skipXffAppend(); }
+  const std::string& via() const override { return parent_.via(); }
+  ForwardClientCertType forwardClientCert() const override { return parent_.forwardClientCert(); }
+  const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const override {
+    return parent_.setCurrentClientCertDetails();
+  }
+  const Network::Address::Instance& localAddress() override { return parent_.localAddress(); }
+  const absl::optional<std::string>& userAgent() override { return parent_.userAgent(); }
+  Tracing::TracerSharedPtr tracer() override { return parent_.tracer(); }
+  const TracingConnectionManagerConfig* tracingConfig() override { return parent_.tracingConfig(); }
+  ConnectionManagerListenerStats& listenerStats() override { return parent_.listenerStats(); }
+  bool proxy100Continue() const override { return parent_.proxy100Continue(); }
+  bool streamErrorOnInvalidHttpMessaging() const override {
+    return parent_.streamErrorOnInvalidHttpMessaging();
+  }
+  const Http::Http1Settings& http1Settings() const override { return parent_.http1Settings(); }
+  bool shouldNormalizePath() const override { return parent_.shouldNormalizePath(); }
+  bool shouldMergeSlashes() const override { return parent_.shouldMergeSlashes(); }
+  StripPortType stripPortType() const override { return parent_.stripPortType(); }
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  headersWithUnderscoresAction() const override {
+    return parent_.headersWithUnderscoresAction();
+  }
+  const LocalReply::LocalReply& localReply() const override { return parent_.localReply(); }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return parent_.pathWithEscapedSlashesAction();
+  }
+  const std::vector<OriginalIPDetectionSharedPtr>& originalIpDetectionExtensions() const override {
+    return parent_.originalIpDetectionExtensions();
+  }
+  const std::vector<EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return parent_.earlyHeaderMutationExtensions();
+  }
+  bool shouldStripTrailingHostDot() const override { return parent_.shouldStripTrailingHostDot(); }
+  uint64_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
+  const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
+    return parent_.proxyStatusConfig();
+  }
+  ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
+    return parent_.makeHeaderValidator(protocol);
+  }
+  bool appendXForwardedPort() const override { return parent_.appendXForwardedPort(); }
+  bool appendLocalOverload() const override { return parent_.appendLocalOverload(); }
+  bool addProxyProtocolConnectionState() const override {
+    return parent_.addProxyProtocolConnectionState();
+  }
+
+private:
+  ConnectionManagerConfig& parent_;
+};
 
 HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
     : fake_stats_(*symbol_table_), http_context_(fake_stats_.symbolTable()),
       access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
@@ -37,7 +172,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
 
-  ip_detection_extensions_.push_back(getXFFExtension(0));
+  ip_detection_extensions_.push_back(getXFFExtension(0, false));
 }
 
 HttpConnectionManagerImplMixin::~HttpConnectionManagerImplMixin() {
@@ -51,20 +186,23 @@ HttpConnectionManagerImplMixin::requestHeaderCustomTag(const std::string& header
   return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
 }
 
-void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_name, bool tracing,
-                                           bool use_srds) {
-  use_srds_ = use_srds;
-  if (ssl) {
+void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
+  use_srds_ = opts.use_srds_;
+  http1_safe_max_connection_duration_ = opts.http1_safe_max_connection_duration_;
+  if (opts.ssl_) {
     ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
   }
 
-  server_name_ = server_name;
+  server_name_ = opts.server_name_;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_)
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
+
+  const Network::ListenerInfo& listener_info = Server::Configuration::FakeListenerInfo();
+  ON_CALL(factory_context_, listenerInfo()).WillByDefault(ReturnRef(listener_info));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -76,12 +214,13 @@ void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_n
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
       ssl_connection_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
-      *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
-      overload_manager_, test_time_.timeSystem());
+      std::make_shared<ConnectionManagerConfigProxyObject>(*this), drain_close_, random_,
+      http_context_, runtime_, local_info_, cluster_manager_, overload_manager_,
+      test_time_.timeSystem(), factory_context_.listenerInfo().direction());
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
-  if (tracing) {
+  if (opts.tracing_) {
     envoy::type::v3::FractionalPercent percent1;
     percent1.set_numerator(100);
     envoy::type::v3::FractionalPercent percent2;
@@ -124,14 +263,16 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
-            manager.applyFilterFactoryCb({}, factory);
+            std::string name = absl::StrCat(req * num_decoder_filters + i);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
 
           for (int i = 0; i < num_encoder_filters; i++) {
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
-            manager.applyFilterFactoryCb({}, factory);
+            std::string name = absl::StrCat(req * num_decoder_filters + i);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
           return applied_filters;
@@ -256,21 +397,15 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onStreamComplete());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onStreamComplete());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onStreamComplete());
   }
 
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onDestroy());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onDestroy());
   }
 
   if (deferred) {
@@ -288,7 +423,7 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
-  setup(false, "");
+  setup();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);

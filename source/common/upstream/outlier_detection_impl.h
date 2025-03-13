@@ -290,6 +290,7 @@ public:
   uint64_t consecutive5xx() const { return consecutive_5xx_; }
   uint64_t consecutiveGatewayFailure() const { return consecutive_gateway_failure_; }
   uint64_t maxEjectionPercent() const { return max_ejection_percent_; }
+  bool alwaysEjectOneHost() const { return always_eject_one_host_; }
   uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
@@ -323,6 +324,7 @@ private:
   const uint64_t consecutive_5xx_;
   const uint64_t consecutive_gateway_failure_;
   const uint64_t max_ejection_percent_;
+  const bool always_eject_one_host_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;
@@ -491,17 +493,24 @@ private:
 
 class EventLoggerImpl : public EventLogger {
 public:
-  EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  TimeSource& time_source)
-      : file_(log_manager.createAccessLog(
-            Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name})),
-        time_source_(time_source) {}
-
+  static absl::StatusOr<std::unique_ptr<EventLoggerImpl>>
+  create(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
+         TimeSource& time_source) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+    RETURN_IF_NOT_OK_REF(file_or_error.status());
+    return std::unique_ptr<EventLoggerImpl>(
+        new EventLoggerImpl(std::move(*file_or_error), time_source));
+  }
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                 envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) override;
 
   void logUneject(const HostDescriptionConstSharedPtr& host) override;
+
+protected:
+  EventLoggerImpl(AccessLog::AccessLogFileSharedPtr&& file, TimeSource& time_source)
+      : file_(std::move(file)), time_source_(time_source) {}
 
 private:
   void setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,

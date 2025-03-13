@@ -43,13 +43,14 @@ public:
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
-  Tracing::SpanPtr startSpan(const std::string& operation_name, SystemTime start_time,
-
+  Tracing::SpanPtr startSpan(const std::string& operation_name,
+                             const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                              Tracing::Decision tracing_decision,
                              OptRef<const Tracing::TraceContext> trace_context,
                              OTelSpanKind span_kind);
 
-  Tracing::SpanPtr startSpan(const std::string& operation_name, SystemTime start_time,
+  Tracing::SpanPtr startSpan(const std::string& operation_name,
+                             const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                              const SpanContext& previous_span_context,
                              OptRef<const Tracing::TraceContext> trace_context,
                              OTelSpanKind span_kind);
@@ -81,16 +82,16 @@ private:
  */
 class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
-  Span(const std::string& name, SystemTime start_time, Envoy::TimeSource& time_source,
-       Tracer& parent_tracer, OTelSpanKind span_kind);
+  Span(const std::string& name, const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
+       Envoy::TimeSource& time_source, Tracer& parent_tracer, OTelSpanKind span_kind);
 
   // Tracing::Span functions
-  void setOperation(absl::string_view /*operation*/) override{};
+  void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override{};
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
 
@@ -117,9 +118,16 @@ public:
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
 
-  std::string getTraceIdAsHex() const override { return absl::BytesToHexString(span_.trace_id()); };
+  std::string getTraceId() const override { return absl::BytesToHexString(span_.trace_id()); };
+
+  std::string getSpanId() const override { return absl::BytesToHexString(span_.span_id()); };
 
   OTelSpanKind spankind() const { return span_.kind(); }
+
+  /**
+   * @return the operation name set on the span
+   */
+  std::string name() const { return span_.name(); }
 
   /**
    * Sets the span's id.
@@ -147,12 +155,18 @@ public:
   }
 
   /**
+   * Sets a span attribute.
+   */
+  void setAttribute(absl::string_view name, const OTelAttribute& value);
+
+  /**
    * Method to access the span for testing.
    */
   const ::opentelemetry::proto::trace::v1::Span& spanForTest() const { return span_; }
 
 private:
   ::opentelemetry::proto::trace::v1::Span span_;
+  const StreamInfo::StreamInfo& stream_info_;
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
   bool sampled_;

@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -23,8 +24,9 @@ using AsyncStreamImplPtr = std::unique_ptr<AsyncStreamImpl>;
 
 class AsyncClientImpl final : public RawAsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
-                  TimeSource& time_source);
+  static absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
+  create(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
+         TimeSource& time_source);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -37,7 +39,17 @@ public:
                            const Http::AsyncClient::StreamOptions& options) override;
   absl::string_view destination() override { return remote_cluster_name_; }
 
+  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() {
+    return retry_policy_;
+  }
+
+protected:
+  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
+                  TimeSource& time_source, absl::Status& creation_status);
+
 private:
+  const uint32_t max_recv_message_length_;
+  const bool skip_envoy_headers_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
@@ -45,6 +57,8 @@ private:
   std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
   Router::HeaderParserPtr metadata_parser_;
+  // Default per service retry policy.
+  absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
 
   friend class AsyncRequestImpl;
   friend class AsyncStreamImpl;
@@ -78,6 +92,21 @@ public:
 
   bool hasResetStream() const { return http_reset_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() override { return stream_->streamInfo(); }
+
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) override {
+    stream_->setWatermarkCallbacks(callbacks);
+  }
+
+  void removeWatermarkCallbacks() override {
+    if (options_.sidestream_watermark_callbacks != nullptr) {
+      stream_->removeWatermarkCallbacks();
+      options_.sidestream_watermark_callbacks = nullptr;
+    }
+  }
+
+protected:
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
 
 private:
   void streamError(Status::GrpcStatus grpc_status, const std::string& message);
@@ -87,11 +116,16 @@ private:
   void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
+  // Deliver notification and update span when the connection closes.
+  void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
+
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
+  Tracing::SpanPtr current_span_;
+
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};
@@ -114,8 +148,10 @@ public:
 
   // Grpc::AsyncRequest
   void cancel() override;
+  const StreamInfo::StreamInfo& streamInfo() const override;
 
 private:
+  using AsyncStreamImpl::streamInfo;
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;

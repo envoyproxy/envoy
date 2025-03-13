@@ -100,7 +100,9 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
         host.healthFlagGet(Upstream::Host::HealthFlag::ACTIVE_HC_TIMEOUT));
     break;
   case Upstream::Host::HealthFlag::EDS_STATUS_DRAINING:
-    health_status.set_eds_health_status(envoy::config::core::v3::DRAINING);
+    if (host.healthFlagGet(Upstream::Host::HealthFlag::EDS_STATUS_DRAINING)) {
+      health_status.set_eds_health_status(envoy::config::core::v3::DRAINING);
+    }
     break;
   }
 }

@@ -19,7 +19,7 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -51,7 +51,7 @@ public:
         .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
   }
 
-  MOCK_METHOD(Network::DrainableFilterChainSharedPtr, buildFilterChain,
+  MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>, buildFilterChain,
               (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&),
               (const));
 };
@@ -79,10 +79,10 @@ public:
     sockets_.push_back(mock_socket);
 
     if (absl::StartsWith(destination_address, "/")) {
-      local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
+      local_address_ = *Network::Address::PipeInstance::create(destination_address);
     } else {
       local_address_ =
-          Network::Utility::parseInternetAddress(destination_address, destination_port);
+          Network::Utility::parseInternetAddressNoThrow(destination_address, destination_port);
     }
     mock_socket->connection_info_provider_->setLocalAddress(local_address_);
 
@@ -94,9 +94,9 @@ public:
         .WillByDefault(ReturnRef(application_protocols));
 
     if (absl::StartsWith(source_address, "/")) {
-      remote_address_ = std::make_shared<Network::Address::PipeInstance>(source_address);
+      remote_address_ = *Network::Address::PipeInstance::create(source_address);
     } else {
-      remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
+      remote_address_ = Network::Utility::parseInternetAddressNoThrow(source_address, source_port);
     }
     mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -106,10 +106,10 @@ public:
   void addSingleFilterChainHelper(
       const envoy::config::listener::v3::FilterChain& filter_chain,
       const envoy::config::listener::v3::FilterChain* fallback_filter_chain = nullptr) {
-    filter_chain_manager_->addFilterChains(
+    THROW_IF_NOT_OK(filter_chain_manager_->addFilterChains(
         GetParam() ? &matcher_ : nullptr,
         std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
-        fallback_filter_chain, filter_chain_factory_builder_, *filter_chain_manager_);
+        fallback_filter_chain, filter_chain_factory_builder_, *filter_chain_manager_));
   }
 
   // Intermediate states.
@@ -128,11 +128,11 @@ public:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+              - certificate_chain: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_key.pem" }
           session_ticket_keys:
             keys:
-            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+            - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
   )EOF";
   const std::string filter_chain_matcher = R"EOF(
      matcher_tree:
@@ -173,10 +173,12 @@ TEST_P(FilterChainManagerImplTest, FilterChainMatchNothing) {
 TEST_P(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
   envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
   new_filter_chain.mutable_filter_chain_match()->add_server_names("foo.EXAMPLE.com");
-  filter_chain_manager_->addFilterChains(
-      GetParam() ? &matcher_ : nullptr,
-      std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
-      filter_chain_factory_builder_, *filter_chain_manager_);
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &new_filter_chain},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
   auto filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
@@ -221,11 +223,12 @@ TEST_P(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
-  filter_chain_manager_->addFilterChains(
-      GetParam() ? &matcher_ : nullptr,
-      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
-                                                                   &filter_chain_messages[1]},
-      nullptr, filter_chain_factory_builder_, *filter_chain_manager_);
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &filter_chain_messages[0], &filter_chain_messages[1]},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
@@ -240,20 +243,24 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
   }
 
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _));
-  filter_chain_manager_->addFilterChains(
-      GetParam() ? &matcher_ : nullptr,
-      std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
-      nullptr, filter_chain_factory_builder_, *filter_chain_manager_);
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &filter_chain_messages[0]},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
   FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
                                                   *filter_chain_manager_};
   // The new filter chain manager maintains 3 filter chains, but only 2 filter chain context is
   // built because it reuse the filter chain context in the previous filter chain manager
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
-  new_filter_chain_manager.addFilterChains(
-      GetParam() ? &matcher_ : nullptr,
-      std::vector<const envoy::config::listener::v3::FilterChain*>{
-          &filter_chain_messages[0], &filter_chain_messages[1], &filter_chain_messages[2]},
-      nullptr, filter_chain_factory_builder_, new_filter_chain_manager);
+  EXPECT_TRUE(new_filter_chain_manager
+                  .addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                       &filter_chain_messages[0], &filter_chain_messages[1],
+                                       &filter_chain_messages[2]},
+                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
+                  .ok());
 }
 
 TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {
@@ -275,15 +282,35 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
   EXPECT_CALL(parent_context_, serverFactoryContext).WillRepeatedly(ReturnRef(mock_server_context));
 
-  EXPECT_FALSE(context0->drainDecision().drainClose());
-  EXPECT_FALSE(context1->drainDecision().drainClose());
+  EXPECT_FALSE(context0->drainDecision().drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
 
   // Drain filter chain 0
   auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
   context_impl_0->startDraining();
 
-  EXPECT_TRUE(context0->drainDecision().drainClose());
-  EXPECT_FALSE(context1->drainDecision().drainClose());
+  EXPECT_TRUE(context0->drainDecision().drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
+}
+
+TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
+  envoy::config::listener::v3::FilterChain new_filter_chain1 = filter_chain_template_;
+  new_filter_chain1.mutable_filter_chain_match()->add_server_names("example.com");
+  envoy::config::listener::v3::FilterChain new_filter_chain2 = new_filter_chain1;
+
+  EXPECT_EQ(filter_chain_manager_
+                ->addFilterChains(nullptr,
+                                  std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                      &new_filter_chain1, &new_filter_chain2},
+                                  nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                .message(),
+            "error adding listener '127.0.0.1:1234': filter chain 'foo' has the "
+            "same matching rules defined as 'foo'"
+#ifdef ENVOY_ENABLE_YAML
+            ". duplicate matcher is: "
+            "{\"destination_port\":10000,\"server_names\":[\"example.com\"]}"
+#endif
+  );
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, FilterChainManagerImplTest, ::testing::Values(true, false));

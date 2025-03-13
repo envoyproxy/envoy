@@ -34,6 +34,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
@@ -101,6 +102,14 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
 
 class HealthCheckerTestBase {
 public:
+  HealthCheckerTestBase() {
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
+    ON_CALL(context_.server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.server_context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(context_.server_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+  }
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -109,6 +118,7 @@ public:
   MockHealthCheckEventLogger& event_logger_{*event_logger_storage_};
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context_;
 };
 
 class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
@@ -145,17 +155,17 @@ public:
       absl::node_hash_map<std::string,
                           const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
-  HttpHealthCheckerImplTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+  HttpHealthCheckerImplTest() = default;
 
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestHttpHealthCheckerImpl>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), context_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -303,6 +313,25 @@ public:
         prefix: locations
       path: /healthcheck
     always_log_health_check_failures: true
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
+  void setupNoServiceValidationHCAlwaysLogSuccess() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 1
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+    always_log_health_check_success: true
     )EOF";
 
     allocHealthChecker(yaml);
@@ -846,7 +875,6 @@ public:
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
   const HostWithHealthCheckMap health_checker_map_{};
-  ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
@@ -1689,10 +1717,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(host);
-  auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto test_host = std::shared_ptr<Upstream::HostImpl>(
+      *HostImpl::create(cluster_->info_, "", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
+                        health_check_config, 0, envoy::config::core::v3::UNKNOWN, simTime()));
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
   // Requires non-empty `service_name` in config.
@@ -1734,10 +1762,10 @@ TEST_F(HttpHealthCheckerImplTest,
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(host);
-  auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto test_host = std::shared_ptr<Upstream::HostImpl>(
+      *HostImpl::create(cluster_->info_, "", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
+                        health_check_config, 0, envoy::config::core::v3::UNKNOWN, simTime()));
   const std::string path = "/healthcheck";
   // Setup health check config with a different host, to check that we still get the host configured
   // on the endpoint.
@@ -2348,6 +2376,42 @@ TEST_F(HttpHealthCheckerImplTest, HttpFailLogError) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
+TEST_F(HttpHealthCheckerImplTest, HttpAlwaysLogSuccess) {
+  setupNoServiceValidationHCAlwaysLogSuccess();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagSet(
+      Host::HealthFlag::PENDING_ACTIVE_HC);
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, true));
+  EXPECT_CALL(event_logger_, logSuccessfulHealthCheck(_, _)).Times(0);
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, _)).Times(0);
+  EXPECT_CALL(event_logger_, logSuccessfulHealthCheck(_, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
 TEST_F(HttpHealthCheckerImplTest, Disconnect) {
   setupNoServiceValidationHC();
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -2535,19 +2599,19 @@ TEST_F(HttpHealthCheckerImplTest, DynamicRemoveDisableHC) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_disable_active_health_check(false);
-  auto enable_host = std::make_shared<HostImpl>(
-      cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto enable_host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster_->info_, "test_host", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr,
+      nullptr, 1, envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN, simTime()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {enable_host};
   health_checker_->start();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   health_check_config.set_disable_active_health_check(true);
-  auto disable_host = std::make_shared<HostImpl>(
-      cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto disable_host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster_->info_, "test_host", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr,
+      nullptr, 1, envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN, simTime()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {disable_host};
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   cluster_->prioritySet().runUpdateCallbacks(0, {disable_host}, {enable_host});
@@ -2564,10 +2628,10 @@ TEST_F(HttpHealthCheckerImplTest, AddDisableHC) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_disable_active_health_check(true);
-  auto disable_host = std::make_shared<HostImpl>(
-      cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto disable_host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster_->info_, "test_host", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr,
+      nullptr, 1, envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN, simTime()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {disable_host};
   health_checker_->start();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(0);
@@ -3163,8 +3227,8 @@ TEST_F(HttpHealthCheckerImplTest, TransportSocketMatchCriteria) {
   // We expect resolve() to be called twice, once for endpoint socket matching (with no metadata in
   // this test) and once for health check socket matching. In the latter we expect metadata that
   // matches the above object.
-  EXPECT_CALL(*transport_socket_match, resolve(nullptr));
-  EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata)))
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr, nullptr));
+  EXPECT_CALL(*transport_socket_match, resolve(MetadataEq(metadata), nullptr))
       .WillOnce(Return(TransportSocketMatcher::MatchData(
           *health_check_only_socket_factory, health_transport_socket_stats, "health_check_only")));
   // The health_check_only_socket_factory should be used to create a transport socket for the health
@@ -3210,7 +3274,7 @@ TEST_F(HttpHealthCheckerImplTest, NoTransportSocketMatchCriteria) {
       std::make_unique<Upstream::MockTransportSocketMatcher>(std::move(default_socket_factory));
   // We expect resolve() to be called exactly once for endpoint socket matching. We should not
   // attempt to match again for health checks since there is not match criteria in the config.
-  EXPECT_CALL(*transport_socket_match, resolve(nullptr));
+  EXPECT_CALL(*transport_socket_match, resolve(nullptr, nullptr));
 
   cluster_->info_->transport_socket_matcher_ = std::move(transport_socket_match);
 
@@ -3471,13 +3535,13 @@ class ProdHttpHealthCheckerTest : public testing::Test, public HealthCheckerTest
 public:
   void allocHealthChecker(const std::string& yaml) {
     health_checker_ = std::make_shared<TestProdHttpHealthChecker>(
-        *cluster_, parseHealthCheckFromV3Yaml(yaml), dispatcher_, runtime_, random_,
+        *cluster_, parseHealthCheckFromV3Yaml(yaml), context_,
         HealthCheckEventLoggerPtr(event_logger_storage_.release()));
   }
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -3710,6 +3774,40 @@ TEST_F(HttpHealthCheckerImplTest, MethodConnectDisallowedValidation) {
 
   EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                           "Proto constraint validation failed.*")
+}
+
+TEST_F(HttpHealthCheckerImplTest, InvalidHost) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "\x07"
+      path: "/aaa"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed*")
+}
+
+TEST_F(HttpHealthCheckerImplTest, InvalidPath) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      host: "aaa"
+      path: "\x08"
+    )EOF";
+
+  EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
+                          "Proto constraint validation failed*")
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
@@ -4170,6 +4268,25 @@ public:
     healthy_threshold: 2
     reuse_connection: false
     tcp_health_check:
+      send:
+        text: "01"
+      receive:
+      - text: "02"
+    )EOF";
+
+    allocHealthChecker(yaml);
+  }
+
+  void setupDataProxyProtocol() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    reuse_connection: false
+    tcp_health_check:
+      proxy_protocol_config:
+        version: v2
       send:
         text: "01"
       receive:
@@ -4678,6 +4795,29 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
+TEST_F(TcpHealthCheckerImplTest, SuccessProxyProtocol) {
+  InSequence s;
+
+  setupDataProxyProtocol();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_, _));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  connection_->runHighWatermarkCallbacks();
+  connection_->runLowWatermarkCallbacks();
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  Buffer::OwnedImpl response;
+  addUint8(response, 2);
+  read_filter_->onData(response, false);
+}
+
 class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
 public:
   using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
@@ -4800,7 +4940,7 @@ public:
 
   void addCompletionCallback() {
     health_checker_->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+        [this](HostSharedPtr host, HealthTransition changed_state, HealthState) -> void {
           onHostStatus(host, changed_state);
         });
   }
@@ -5041,7 +5181,7 @@ public:
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
           std::vector<Grpc::Frame> decoded_frames;
           Grpc::Decoder decoder;
-          ASSERT_TRUE(decoder.decode(data, decoded_frames));
+          ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
           ASSERT_EQ(1U, decoded_frames.size());
           auto& frame = decoded_frames[0];
           Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
@@ -5098,10 +5238,10 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostname) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(expected_host);
-  auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto test_host = std::shared_ptr<Upstream::HostImpl>(
+      *HostImpl::create(cluster_->info_, "", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
+                        health_check_config, 0, envoy::config::core::v3::UNKNOWN, simTime()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   runHealthCheck(expected_host);
 }
@@ -5113,10 +5253,10 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostnameOverridesConfig) {
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_hostname(expected_host);
-  auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
-      simTime());
+  auto test_host = std::shared_ptr<Upstream::HostImpl>(
+      *HostImpl::create(cluster_->info_, "", *Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
+                        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
+                        health_check_config, 0, envoy::config::core::v3::UNKNOWN, simTime()));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   runHealthCheck(expected_host);
 }
@@ -5225,7 +5365,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
         std::vector<Grpc::Frame> decoded_frames;
         Grpc::Decoder decoder;
-        ASSERT_TRUE(decoder.decode(data, decoded_frames));
+        ASSERT_TRUE(decoder.decode(data, decoded_frames).ok());
         ASSERT_EQ(1U, decoded_frames.size());
         auto& frame = decoded_frames[0];
         Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
@@ -6404,7 +6544,8 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(health_check_config, context);
+  std::unique_ptr<HealthCheckEventLoggerImpl> event_logger =
+      *HealthCheckEventLoggerImpl::create(health_check_config, context);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6415,7 +6556,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
                          "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
                          "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
-  event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
+  event_logger->logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6427,7 +6568,20 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"metadata\":"
                          "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
                          "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
-  event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
+  event_logger->logAddHealthy(envoy::data::core::v3::HTTP, host, false);
+
+  EXPECT_CALL(*file, write(absl::string_view{
+                         "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,"
+                         "\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+                         "cluster\","
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+                         "\"metadata\":"
+                         "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+                         "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"},"
+                         "\"successful_health_check_event\":{}}\n"}));
+  event_logger->logSuccessfulHealthCheck(envoy::data::core::v3::HTTP, host);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6439,8 +6593,8 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"first_check\":false},"
                          "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
                          "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
-  event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
-                            false);
+  event_logger->logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
+                             false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6451,7 +6605,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"degraded_healthy_host\":{},"
                          "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
                          "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
-  event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
+  event_logger->logDegraded(envoy::data::core::v3::HTTP, host);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6462,7 +6616,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"no_longer_degraded_host\":{},"
                          "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
                          "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n"}));
-  event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
+  event_logger->logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
 }
 
 TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
@@ -6491,9 +6645,10 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
   // This is rendered as "2009-02-13T23:31:31.234Z".a
   time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(health_check_config, context);
+  std::unique_ptr<HealthCheckEventLoggerImpl> event_logger =
+      *HealthCheckEventLoggerImpl::create(health_check_config, context);
 
-  event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
+  event_logger->logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
   EXPECT_EQ(
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6504,7 +6659,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
       "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
       "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
-  event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
+  event_logger->logAddHealthy(envoy::data::core::v3::HTTP, host, false);
   EXPECT_EQ(
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6516,8 +6671,19 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
       "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
       "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
-  event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
-                            false);
+  event_logger->logSuccessfulHealthCheck(envoy::data::core::v3::HTTP, host);
+  EXPECT_EQ(
+      file_log_data.value(),
+      "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+      "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
+      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+      "cluster\",\"timestamp\":\"2009-02-13T23:31:31.234Z\","
+      "\"metadata\":"
+      "{\"filter_metadata\":{},\"typed_filter_metadata\":{}},\"locality\":"
+      "{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"},\"successful_health_check_event\":{}}\n");
+
+  event_logger->logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
+                             false);
   EXPECT_EQ(
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6529,7 +6695,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
       "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
       "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
-  event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
+  event_logger->logDegraded(envoy::data::core::v3::HTTP, host);
   EXPECT_EQ(
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -6540,7 +6706,7 @@ TEST(HealthCheckEventLoggerImplTest, OneEventLogger) {
       "\"metadata\":{\"filter_metadata\":{},\"typed_filter_metadata\":{}},"
       "\"locality\":{\"region\":\"\",\"zone\":\"\",\"sub_zone\":\"\"}}\n");
 
-  event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
+  event_logger->logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
   EXPECT_EQ(
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"

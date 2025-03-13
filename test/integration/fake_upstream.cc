@@ -111,7 +111,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
     }
   }
 
-  postToConnectionThread([this, headers_copy, end_stream]() -> void {
+  postToConnectionThread([this, headers_copy = std::move(headers_copy), end_stream]() -> void {
     {
       absl::MutexLock lock(&lock_);
       if (!parent_.connected() || saw_reset_) {
@@ -274,14 +274,20 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         absl::string_view data, milliseconds timeout) {
-  auto succeeded = waitForData(client_dispatcher, data.length(), timeout);
-  if (succeeded) {
-    Buffer::OwnedImpl buffer(data.data(), data.length());
-    if (!TestUtility::buffersEqual(body(), buffer)) {
-      return AssertionFailure() << body().toString() << " not equal to " << data;
-    }
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_,
+          [this, &data]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+            Buffer::OwnedImpl buffer(data.data(), data.length());
+            if (!TestUtility::buffersEqual(body_, buffer)) {
+              return AssertionFailure() << body_.toString() << " not equal to " << data;
+            }
+            return AssertionSuccess();
+          },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
   }
-  return succeeded;
+  return AssertionSuccess();
 }
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
@@ -314,6 +320,17 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   if (!time_system_.waitFor(lock_, absl::Condition(&saw_reset_), timeout)) {
     return AssertionFailure() << "Timed out waiting for reset.";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult FakeStream::waitForReset(Event::Dispatcher& client_dispatcher,
+                                         std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_, [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return saw_reset_; },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for reset of stream.";
   }
   return AssertionSuccess();
 }
@@ -579,7 +596,11 @@ void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
   ++pending_cbs_;
   dispatcher_.post([this, cb]() {
     cb();
-    --pending_cbs_;
+    {
+      // Snag this lock not because it's needed but so waitForNoPost doesn't stall
+      absl::MutexLock lock(&lock_);
+      --pending_cbs_;
+    }
   });
 }
 
@@ -602,7 +623,7 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
                            const std::string& uds_path, const FakeUpstreamConfig& config)
     : FakeUpstream(std::move(transport_socket_factory),
                    Network::SocketPtr{new Network::UdsListenSocket(
-                       std::make_shared<Network::Address::PipeInstance>(uds_path))},
+                       *Network::Address::PipeInstance::create(uds_path))},
                    config) {}
 
 static Network::SocketPtr
@@ -612,8 +633,8 @@ makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 
 static Network::Address::InstanceConstSharedPtr makeAddress(uint32_t port,
                                                             Network::Address::IpVersion version) {
-  return Network::Utility::parseInternetAddress(Network::Test::getLoopbackAddressString(version),
-                                                port);
+  return Network::Utility::parseInternetAddressNoThrow(
+      Network::Test::getLoopbackAddressString(version), port);
 }
 
 static Network::SocketPtr
@@ -688,7 +709,7 @@ void FakeUpstream::initializeServer() {
   }
 
   dispatcher_->post([this]() -> void {
-    socket_factories_[0]->doFinalPreWorkerInit();
+    EXPECT_TRUE(socket_factories_[0]->doFinalPreWorkerInit().ok());
     handler_->addListener(absl::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
@@ -804,22 +825,22 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
   });
 }
 
-AssertionResult
+absl::StatusOr<int>
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
   if (upstreams.empty()) {
-    return AssertionFailure() << "No upstreams configured.";
+    return absl::InternalError("No upstreams configured.");
   }
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    for (auto& it : upstreams) {
-      FakeUpstream& upstream = *it;
+    for (size_t i = 0; i < upstreams.size(); ++i) {
+      FakeUpstream& upstream = *upstreams[i];
       {
         absl::MutexLock lock(&upstream.lock_);
         if (!upstream.isInitialized()) {
-          return AssertionFailure()
-                 << "Must initialize the FakeUpstream first by calling initializeServer().";
+          return absl::InternalError(
+              "Must initialize the FakeUpstream first by calling initializeServer().");
         }
         if (!waitForWithDispatcherRun(
                 upstream.time_system_, upstream.lock_,
@@ -831,7 +852,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         }
       }
 
-      return upstream.runOnDispatcherThreadAndWait([&]() {
+      EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
         absl::MutexLock lock(&upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
             upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
@@ -839,10 +860,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
             envoy::config::core::v3::HttpProtocolOptions::ALLOW);
         connection->initialize();
         return AssertionSuccess();
-      });
+      }));
+      return i;
     }
   }
-  return AssertionFailure() << "Timed out waiting for HTTP connection.";
+  return absl::InternalError("Timed out waiting for HTTP connection.");
 }
 
 ABSL_MUST_USE_RESULT
@@ -958,7 +980,7 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
 
 void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
   ASSERT(!dispatcher_->isThreadSafe());
-  dispatcher_->post([&]() { cb(); });
+  dispatcher_->post([cb = std::move(cb)]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
@@ -990,14 +1012,15 @@ AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::stri
       timeout);
 }
 
-void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
+absl::Status FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
   if (socket_->socketType() == Network::Socket::Type::Stream) {
-    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
+    EXPECT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
   } else {
     ASSERT(socket_->socketType() == Network::Socket::Type::Datagram);
-    ASSERT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,
+    EXPECT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
   }
+  return absl::OkStatus();
 }
 
 FakeRawConnection::~FakeRawConnection() {
@@ -1031,7 +1054,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << fmt::format(
-               "Timed out waiting for data. Got '{}', waiting for {} bytes.", data_, num_bytes);
+               "Timed out waiting for data. Got '{}', expected {} bytes, waiting for {} bytes.",
+               data_, data_.size(), num_bytes);
   }
   if (data != nullptr) {
     *data = data_;
@@ -1076,7 +1100,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 }
 
 ABSL_MUST_USE_RESULT
-AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
+AssertionResult FakeHttpConnection::waitForInexactRawData(absl::string_view data, std::string& out,
                                                           std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -1090,12 +1114,13 @@ AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std:
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find(data);
+    const auto data_len = data.length();
     if (index != absl::string_view::npos) {
       Buffer::OwnedImpl buffer;
-      *out = std::string(peek_data.data(), index + 4);
+      out = std::string(peek_data.data(), index + data_len);
       auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
                         ->ioHandle()
-                        .recv(peek_buf, index + 4, 0);
+                        .recv(peek_buf, index + data_len, 0);
       return true;
     }
     return false;

@@ -48,9 +48,7 @@ envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::stri
 
 class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  AccessLogImplTest()
-      : stream_info_(time_source_), file_(new MockAccessLogFile()),
-        engine_(std::make_unique<Regex::GoogleReEngine>()) {
+  AccessLogImplTest() : stream_info_(time_source_), file_(new MockAccessLogFile()) {
     ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_.server_factory_context_, accessLogManager())
         .WillByDefault(ReturnRef(log_manager_));
@@ -73,7 +71,6 @@ protected:
   TestStreamInfo stream_info_;
   std::shared_ptr<MockAccessLogFile> file_;
   StringViewSaver output_;
-  ScopedInjectableLoader<Regex::Engine> engine_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -498,7 +495,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   Http::TestRequestHeaderMapImpl header_map{};
-  stream_info_.health_check_request_ = true;
+  stream_info_.healthCheck(true);
   EXPECT_CALL(*file_, write(_)).Times(0);
 
   log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
@@ -618,7 +615,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
 }
@@ -697,7 +694,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
 
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
@@ -1069,6 +1066,8 @@ filter:
       - OM
       - DF
       - DO
+      - DR
+      - UDO
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1118,47 +1117,6 @@ typed_config:
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                           ProtoValidationException, "Proto constraint validation failed");
-}
-
-TEST_F(AccessLogImplTest, Stdout) {
-  const std::string yaml = R"EOF(
-name: accesslog
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
-  )EOF";
-
-  ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(context_.server_factory_context_, accessLogManager())
-      .WillByDefault(ReturnRef(log_manager_));
-  EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info.path_, "");
-            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stdout);
-
-            return file_;
-          }));
-  EXPECT_NO_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_));
-}
-
-TEST_F(AccessLogImplTest, Stderr) {
-  const std::string yaml = R"EOF(
-name: accesslog
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StderrAccessLog
-  )EOF";
-
-  ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
-  ON_CALL(context_.server_factory_context_, accessLogManager())
-      .WillByDefault(ReturnRef(log_manager_));
-  EXPECT_CALL(log_manager_, createAccessLog(_))
-      .WillOnce(Invoke(
-          [this](const Envoy::Filesystem::FilePathAndType& file_info) -> AccessLogFileSharedPtr {
-            EXPECT_EQ(file_info.path_, "");
-            EXPECT_EQ(file_info.file_type_, Filesystem::DestinationType::Stderr);
-            return file_;
-          }));
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFormatterUnsupportedFormat) {
@@ -1651,7 +1609,7 @@ public:
     const auto& header_config =
         TestUtility::downcastAndValidate<const envoy::config::accesslog::v3::HeaderFilter&>(
             *factory_config);
-    return std::make_unique<HeaderFilter>(header_config);
+    return std::make_unique<HeaderFilter>(header_config, context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

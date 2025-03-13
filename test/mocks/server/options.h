@@ -17,6 +17,8 @@ public:
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
   MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(bool, skipHotRestartOnNoParent, (), (const));
+  MOCK_METHOD(bool, skipHotRestartParentStats, (), (const));
   MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
@@ -25,6 +27,7 @@ public:
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
+  MOCK_METHOD(bool, skipDeprecatedLogs, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));

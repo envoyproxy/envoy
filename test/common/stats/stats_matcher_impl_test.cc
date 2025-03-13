@@ -3,6 +3,7 @@
 
 #include "source/common/stats/stats_matcher_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -24,7 +25,8 @@ protected:
     stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
   }
   void initMatcher() {
-    stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_);
+    stats_matcher_impl_ =
+        std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_);
   }
   void expectAccepted(const std::vector<std::string>& expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
@@ -37,6 +39,7 @@ protected:
     }
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   SymbolTableImpl symbol_table_;
   StatNamePool pool_;
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;

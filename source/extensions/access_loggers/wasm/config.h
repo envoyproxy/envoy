@@ -2,7 +2,7 @@
 
 #include "envoy/access_log/access_log_config.h"
 
-#include "source/common/config/datasource.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +17,8 @@ class WasmAccessLogFactory : public AccessLog::AccessLogInstanceFactory,
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context) override;
+                          Server::Configuration::FactoryContext& context,
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
@@ -25,7 +26,6 @@ public:
 
 private:
   absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

@@ -4,10 +4,7 @@ import android.content.Context
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 
 /** The engine builder to use to create Envoy engine on Android. */
-class AndroidEngineBuilder
-@JvmOverloads
-constructor(context: Context, baseConfiguration: BaseConfiguration = Standard()) :
-  EngineBuilder(baseConfiguration) {
+class AndroidEngineBuilder(context: Context) : EngineBuilder() {
   init {
     addEngineType {
       AndroidEngineImpl(
@@ -15,7 +12,8 @@ constructor(context: Context, baseConfiguration: BaseConfiguration = Standard())
         onEngineRunning,
         { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
         eventTracker,
-        enableProxying
+        enableProxying,
+        false
       )
     }
   }

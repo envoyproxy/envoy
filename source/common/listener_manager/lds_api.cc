@@ -12,6 +12,7 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
@@ -31,11 +32,15 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
-    subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-        lds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
+                                              lds_config, Grpc::Common::typeUrl(resource_name),
+                                              *scope_, *this, resource_decoder_, {}),
+                                          Config::SubscriptionPtr);
   } else {
-    subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_);
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cm.subscriptionFactory().collectionSubscriptionFromUrl(
+            *lds_resources_locator, lds_config, resource_name, *scope_, *this, resource_decoder_),
+        Config::SubscriptionPtr);
   }
   init_manager.add(init_target_);
 }
@@ -70,23 +75,28 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
   std::string message;
 
   for (const auto& resource : added_resources) {
-    envoy::config::listener::v3::Listener listener;
+    // Holds a reference to the name of the currently parsed listener resource.
+    // This is needed for the onError clause below.
+    absl::string_view listener_name = EMPTY_STRING;
 
     auto onError = [&](std::string error_message) {
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();
       state->set_details(error_message);
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
       state->mutable_failed_configuration()->PackFrom(resource.get().resource());
-      absl::StrAppend(&message, listener.name(), ": ", error_message, "\n");
+#endif
+      absl::StrAppend(&message, listener_name, ": ", error_message, "\n");
     };
 
     TRY_ASSERT_MAIN_THREAD {
-      listener =
+      const envoy::config::listener::v3::Listener& listener =
           dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
+      listener_name = listener.name();
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully
         // applied.
-        onError(fmt::format("duplicate listener {} found", listener.name()));
+        onError(fmt::format("duplicate listener {} found", listener_name));
         continue;
       }
       absl::StatusOr<bool> update_or_error =
@@ -96,16 +106,14 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
         continue;
       }
       if (update_or_error.value()) {
-        ENVOY_LOG(info, "lds: add/update listener '{}'", listener.name());
+        ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
         any_applied = true;
       } else {
-        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
+        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
       }
     }
     END_TRY
-    catch (const EnvoyException& e) {
-      onError(e.what());
-    }
+    CATCH(EnvoyException & e, { onError(e.what()); })
   }
   listener_manager_.endListenerUpdate(std::move(failure_state));
 

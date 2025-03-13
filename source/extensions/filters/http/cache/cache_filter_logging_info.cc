@@ -44,8 +44,8 @@ absl::string_view insertStatusToString(InsertStatus status) {
     return "InsertAbortedByCache";
   case InsertStatus::InsertAbortedCacheCongested:
     return "InsertAbortedCacheCongested";
-  case InsertStatus::InsertAbortedResponseIncomplete:
-    return "InsertAbortedResponseIncomplete";
+  case InsertStatus::FilterAbortedBeforeInsertComplete:
+    return "FilterAbortedBeforeInsertComplete";
   case InsertStatus::HeaderUpdate:
     return "HeaderUpdate";
   case InsertStatus::NoInsertCacheHit:
@@ -67,10 +67,6 @@ absl::string_view insertStatusToString(InsertStatus status) {
   }
   IS_ENVOY_BUG(absl::StrCat("Unexpected InsertStatus: ", status));
   return "UnexpectedInsertStatus";
-}
-
-std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_status) {
-  return os << insertStatusToString(cache_insert_status);
 }
 
 } // namespace Cache

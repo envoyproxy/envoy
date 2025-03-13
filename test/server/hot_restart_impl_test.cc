@@ -30,23 +30,23 @@ namespace Server {
 
 struct TestAddresses {
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.5:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.5:12345");
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_different_ip_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.6:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.6:12345");
   Network::Address::InstanceConstSharedPtr ipv4_test_addr_different_port_ =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.5:12346");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.5:12346");
   Network::Address::InstanceConstSharedPtr ipv4_default_ =
-      Network::Utility::parseInternetAddressAndPort("0.0.0.0:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("0.0.0.0:12345");
   Network::Address::InstanceConstSharedPtr ipv6_test_addr_ =
-      Network::Utility::parseInternetAddressAndPort("[::1]:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:12345");
   Network::Address::InstanceConstSharedPtr ipv6_test_addr_different_ip_ =
-      Network::Utility::parseInternetAddressAndPort("[::2]:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::2]:12345");
   Network::Address::InstanceConstSharedPtr ipv6_test_addr_different_port_ =
-      Network::Utility::parseInternetAddressAndPort("[::1]:12346");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:12346");
   Network::Address::InstanceConstSharedPtr ipv6_default_ =
-      Network::Utility::parseInternetAddressAndPort("[::]:12345");
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::]:12345");
   Network::Address::InstanceConstSharedPtr ipv6_default_with_ipv4_support_ =
-      Network::Utility::parseInternetAddressAndPort("[::]:12345", false);
+      Network::Utility::parseInternetAddressAndPortNoThrow("[::]:12345", false);
 };
 
 class HotRestartImplTest : public testing::Test {
@@ -67,7 +67,7 @@ public:
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0);
+    hot_restart_ = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false);
     hot_restart_->drainParentListeners();
 
     // We close both sockets, both ends, totaling 4.
@@ -86,6 +86,14 @@ public:
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;
 };
+
+TEST_F(HotRestartImplTest, ParentDrainedCallbackRegistrarIsSetAndCanBeCalled) {
+  setup();
+  OptRef<Network::ParentDrainedCallbackRegistrar> registrar =
+      hot_restart_->parentDrainedCallbackRegistrar();
+  ASSERT_TRUE(registrar.has_value());
+  registrar->registerParentDrainedCallback(test_addresses_.ipv4_test_addr_, []() {});
+}
 
 TEST_F(HotRestartImplTest, VersionString) {
   // Tests that the version-string will be consistent and HOT_RESTART_VERSION,
@@ -125,7 +133,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketAlreadyInUse) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0),
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false),
                Server::HotRestartDomainSocketInUseException);
 }
 
@@ -141,7 +149,8 @@ TEST_P(DomainSocketErrorTest, DomainSocketError) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0), EnvoyException);
+  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false),
+               EnvoyException);
 }
 
 class HotRestartUdpForwardingContextTest : public HotRestartImplTest {

@@ -254,7 +254,7 @@ public:
   explicit DispenserFilterConfigFactory(const std::string& name) : name_(name) {}
 
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {

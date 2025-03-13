@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -205,10 +206,11 @@ public:
    * Create transport socket factory for Quic upstream transport socket.
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
-  static Network::UpstreamTransportSocketFactoryPtr
-  createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
-                                           Ssl::ContextManager& context_manager,
-                                           const std::string& san_to_match);
+  static Network::UpstreamTransportSocketFactoryPtr createQuicUpstreamTransportSocketFactory(
+      Api::Api& api, Stats::Store& store, Ssl::ContextManager& context_manager,
+      ThreadLocal::Instance& threadlocal, const std::string& san_to_match,
+      // Allow configuring TLS to talk to upstreams instead of Envoy
+      bool connect_to_fake_upstreams = false);
 
   static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(
       const ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
@@ -264,13 +266,14 @@ public:
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
 
+    length_to_wait_for_ = 0;
+    wait_for_length_ = false;
+
     if (timeout_timer->enabled()) {
       timeout_timer->disableTimer();
       return testing::AssertionSuccess();
     }
 
-    length_to_wait_for_ = 0;
-    wait_for_length_ = false;
     return testing::AssertionFailure() << "Timed out waiting for " << length << " bytes of data\n";
   }
 

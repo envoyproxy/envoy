@@ -9,20 +9,6 @@
 namespace Envoy {
 namespace Quic {
 
-class FixedServerPreferredAddressConfig : public Quic::EnvoyQuicServerPreferredAddressConfig {
-public:
-  FixedServerPreferredAddressConfig(const quic::QuicIpAddress& ipv4,
-                                    const quic::QuicIpAddress& ipv6)
-      : ip_v4_(ipv4), ip_v6_(ipv6) {}
-
-  std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> getServerPreferredAddresses(
-      const Network::Address::InstanceConstSharedPtr& local_address) override;
-
-private:
-  const quic::QuicIpAddress ip_v4_;
-  const quic::QuicIpAddress ip_v6_;
-};
-
 class FixedServerPreferredAddressConfigFactory
     : public Quic::EnvoyQuicServerPreferredAddressConfigFactory {
 public:
@@ -31,7 +17,7 @@ public:
   Quic::EnvoyQuicServerPreferredAddressConfigPtr
   createServerPreferredAddressConfig(const Protobuf::Message& message,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                     ProcessContextOptRef context) override;
+                                     Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new envoy::extensions::quic::server_preferred_address::v3::

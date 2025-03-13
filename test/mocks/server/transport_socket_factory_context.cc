@@ -11,9 +11,8 @@ namespace Configuration {
 
 using ::testing::ReturnRef;
 
-MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
-    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>(config_tracker_)),
-      singleton_manager_(Thread::threadFactoryForTest()) {
+MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {
+  resetSecretManager();
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_context_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, messageValidationVisitor())
@@ -26,9 +25,15 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
   ON_CALL(server_context_, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(server_context_, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(server_context_, singletonManager()).WillByDefault(ReturnRef(singleton_manager_));
+  ON_CALL(server_context_, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
 }
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
+
+void MockTransportSocketFactoryContext::resetSecretManager() {
+  config_tracker_.config_tracker_callbacks_.clear();
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(config_tracker_);
+}
 
 } // namespace Configuration
 } // namespace Server

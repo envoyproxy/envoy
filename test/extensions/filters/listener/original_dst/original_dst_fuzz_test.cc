@@ -12,8 +12,8 @@ namespace OriginalDst {
 DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "Exception: {}", e.what());
     return;
   }
 

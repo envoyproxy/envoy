@@ -167,7 +167,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
               setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
               setResponseCodeDetails("auth_digest_no_match"));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "auth_digest_no_match"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

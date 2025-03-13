@@ -88,7 +88,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     // Ideally we'd find a way to do this without slowing down
     // the non-Prometheus implementations.
     Buffer::OwnedImpl response;
-    prometheusFlushAndRender(params, response);
+    Http::Code code = prometheusFlushAndRender(params, response);
     return Admin::makeStaticTextRequest(response, code);
   }
 
@@ -131,16 +131,22 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
     server_.flushStats();
   }
 
-  prometheusFlushAndRender(params, response);
-  return Http::Code::OK;
+  return prometheusFlushAndRender(params, response);
 }
 
-void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
+Http::Code StatsHandler::prometheusFlushAndRender(const StatsParams& params,
+                                                  Buffer::Instance& response) {
+  absl::Status paramsStatus = PrometheusStatsFormatter::validateParams(params);
+  if (!paramsStatus.ok()) {
+    response.add(paramsStatus.message());
+    return Http::Code::BadRequest;
+  }
   if (server_.statsConfig().flushOnAdmin()) {
     server_.flushStats();
   }
   prometheusRender(server_.stats(), server_.api().customStatNamespaces(), server_.clusterManager(),
                    params, response);
+  return Http::Code::OK;
 }
 
 void StatsHandler::prometheusRender(Stats::Store& stats,
@@ -180,7 +186,7 @@ Admin::UrlHandler StatsHandler::statsHandler(bool active_mode) {
   Admin::ParamDescriptor histogram_buckets{Admin::ParamDescriptor::Type::Enum,
                                            "histogram_buckets",
                                            "Histogram bucket display mode",
-                                           {"cumulative", "disjoint", "detailed", "none"}};
+                                           {"cumulative", "disjoint", "detailed", "summary"}};
   Admin::ParamDescriptor format{Admin::ParamDescriptor::Type::Enum,
                                 "format",
                                 "Format to use",

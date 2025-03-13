@@ -13,9 +13,9 @@ namespace Helper {
 std::unique_ptr<Protobuf::Message> typeUrlToMessage(absl::string_view type_url);
 
 template <typename T>
-std::pair<std::unique_ptr<Protobuf::Message>, absl::string_view>
+absl::StatusOr<std::pair<std::unique_ptr<Protobuf::Message>, absl::string_view>>
 convertTypedStruct(const Protobuf::Message& message) {
-  auto* typed_struct = Protobuf::DynamicCastToGenerated<T>(&message);
+  auto* typed_struct = Protobuf::DynamicCastMessage<T>(&message);
   auto inner_message = typeUrlToMessage(typed_struct->type_url());
   absl::string_view target_type_url = typed_struct->type_url();
   // inner_message might be invalid as we did not previously check type_url during loading.
@@ -24,10 +24,10 @@ convertTypedStruct(const Protobuf::Message& message) {
     MessageUtil::jsonConvert(typed_struct->value(), ProtobufMessage::getNullValidationVisitor(),
                              *inner_message);
 #else
-    throwEnvoyExceptionOrPanic("JSON and YAML support compiled out.");
+    return absl::InvalidArgumentError("JSON and YAML support compiled out.");
 #endif
   }
-  return {std::move(inner_message), target_type_url};
+  return std::make_pair(std::move(inner_message), target_type_url);
 }
 
 /**

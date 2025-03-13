@@ -8,10 +8,12 @@ using ::testing::Return;
 using ::testing::ReturnRef;
 
 MockServerFactoryContext::MockServerFactoryContext()
-    : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      http_context_(store_.symbolTable()), grpc_context_(store_.symbolTable()),
-      router_context_(store_.symbolTable()) {
+    : singleton_manager_(new Singleton::ManagerImpl()), http_context_(store_.symbolTable()),
+      grpc_context_(store_.symbolTable()), router_context_(store_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, xdsManager()).WillByDefault(ReturnRef(xds_manager_));
+  ON_CALL(*this, httpServerPropertiesCacheManager())
+      .WillByDefault(ReturnRef(http_server_properties_cache_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
@@ -23,6 +25,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
+  ON_CALL(*this, timeSystem()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
@@ -34,6 +37,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, nullOverloadManager()).WillByDefault(ReturnRef(null_overload_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 

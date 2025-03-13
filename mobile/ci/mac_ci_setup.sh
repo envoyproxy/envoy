@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -12,7 +12,7 @@ set -e
 export HOMEBREW_NO_AUTO_UPDATE=1
 RETRY_ATTEMPTS=10
 RETRY_INTERVAL=3
-
+XCODE_VERSION=15.3
 
 function retry () {
     local returns=1 i=1
@@ -28,14 +28,10 @@ function retry () {
     return "$returns"
 }
 
-function is_installed {
-    brew ls --versions "$1" >/dev/null
-}
-
 function install {
-    echo "Installing $1"
+    echo "Installing brew package $1"
     if ! retry brew install --quiet "$1"; then
-        echo "Failed to install $1"
+        echo "Failed to install brew package $1"
         exit 1
     fi
 }
@@ -45,26 +41,24 @@ if ! retry brew update; then
   echo "Failed to update homebrew"
 fi
 
+# This is to save some disk space.
+# https://mac.install.guide/homebrew/8
+brew autoremove
+brew cleanup --prune=all
+# Remove broken symlinks.
+brew cleanup --prune-prefix
+
 DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
 do
-    is_installed "${DEP}" || install "${DEP}"
+    install "${DEP}"
 done
 
-# https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
-sudo xcode-select --switch /Applications/Xcode_14.1.app
+# https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
+sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
 
 retry ./bazelw version
 
-if [[ "${1:-}" == "--android" ]]; then
-  # Download and set up ndk 21 after GitHub update
-  # https://github.com/actions/virtual-environments/issues/5595
-  ANDROID_HOME=$ANDROID_SDK_ROOT
-  SDKMANAGER="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
-  "${SDKMANAGER}" --install "platform-tools" "platforms;android-30"
-  "${SDKMANAGER}" --uninstall "ndk-bundle"
-  "${SDKMANAGER}" --install "ndk;21.4.7075529"
-  "${SDKMANAGER}" --install "build-tools;30.0.2"
-  ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/21.4.7075529"
-  export ANDROID_NDK_HOME
-fi
+# Unset default variables so we don't have to install Android SDK/NDK.
+unset ANDROID_HOME
+unset ANDROID_NDK_HOME

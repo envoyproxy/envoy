@@ -8,7 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/crc16.h"
 #include "source/extensions/filters/network/common/redis/client.h"
@@ -113,6 +113,26 @@ private:
   const NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
 };
 
+class RedisSpecifyShardContextImpl : public RedisLoadBalancerContextImpl {
+public:
+  /**
+   * The redis specify Shard load balancer context for Redis requests.
+   * @param shard_index specify the shard index for the Redis request.
+   * @param request specify the Redis request.
+   * @param read_policy specify the read policy.
+   */
+  RedisSpecifyShardContextImpl(uint64_t shard_index,
+                               const NetworkFilters::Common::Redis::RespValue& request,
+                               NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
+                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+
+  // Upstream::LoadBalancerContextBase
+  absl::optional<uint64_t> computeHashKey() override { return shard_index_; }
+
+private:
+  const absl::optional<uint64_t> shard_index_;
+};
+
 class ClusterSlotUpdateCallBack {
 public:
   virtual ~ClusterSlotUpdateCallBack() = default;
@@ -199,7 +219,7 @@ private:
           random_(random) {}
 
     // Upstream::LoadBalancerBase
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext*) override;
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
@@ -235,7 +255,7 @@ public:
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
-  void initialize() override{};
+  absl::Status initialize() override { return absl::OkStatus(); }
 
 private:
   Upstream::LoadBalancerFactorySharedPtr factory_;

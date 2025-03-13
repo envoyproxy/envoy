@@ -9,10 +9,12 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/http_server_properties_cache.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -34,8 +36,14 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
+
+namespace Regex {
+class Engine;
+}
+
 namespace Server {
 namespace Configuration {
 
@@ -116,6 +124,16 @@ public:
   virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
+   * @return Config::XdsManager& singleton for use by the entire server.
+   */
+  virtual Config::XdsManager& xdsManager() PURE;
+
+  /**
+   * @return const Http::HttpServerPropertiesCacheManager& instance for use by the entire server.
+   */
+  virtual Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() PURE;
+
+  /**
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;
@@ -129,6 +147,11 @@ public:
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
    */
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
+   * @return the server regex engine.
+   */
+  virtual Regex::Engine& regexEngine() PURE;
 };
 
 /**
@@ -162,6 +185,11 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
@@ -192,10 +220,21 @@ public:
   virtual OverloadManager& overloadManager() PURE;
 
   /**
+   * @return NullOverloadManager& the dummy overload manager for the server for
+   * listeners that are bypassing a configured OverloadManager
+   */
+  virtual OverloadManager& nullOverloadManager() PURE;
+
+  /**
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() const PURE;
 };
+
+// ServerFactoryContextInstance is a thread local singleton that provides access to the
+// ServerFactoryContext. This will be initialized once the server is created at the start of the
+// main thread and will be available at the main thread for the lifetime of the server.
+using ServerFactoryContextInstance = ThreadLocalInjectableSingleton<ServerFactoryContext>;
 
 /**
  * Generic factory context for multiple scenarios. This context provides a server factory context

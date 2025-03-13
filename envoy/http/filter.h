@@ -15,6 +15,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
+#include "envoy/router/scopes.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/upstream/load_balancer.h"
@@ -25,6 +26,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Router {
+class RouteConfigProvider;
+}
 namespace Http {
 
 /**
@@ -237,6 +241,11 @@ public:
   virtual bool pausedForConnect() const PURE;
   virtual void setPausedForConnect(bool value) PURE;
 
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a WebSocket upgrade. These should only be used by the upstream codec filter.
+  virtual bool pausedForWebsocketUpgrade() const PURE;
+  virtual void setPausedForWebsocketUpgrade(bool value) PURE;
+
   // Return the upstreamStreamOptions for this stream.
   virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
 
@@ -267,6 +276,48 @@ public:
  */
 using RouteConfigUpdatedCallback = std::function<void(bool)>;
 using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
+
+// This class allows entities caching a route (e.g.) ActiveStream to delegate route clearing to xDS
+// components.
+class RouteCache {
+public:
+  virtual ~RouteCache() = default;
+
+  // Returns true if the route cache currently has a cached route.
+  virtual bool hasCachedRoute() const PURE;
+  // Forces the route cache to refresh the cached route.
+  virtual void refreshCachedRoute() PURE;
+};
+
+class RouteConfigUpdateRequester {
+public:
+  virtual ~RouteConfigUpdateRequester() = default;
+
+  virtual void
+  requestRouteConfigUpdate(RouteCache& route_cache,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                           absl::optional<Router::ConfigConstSharedPtr> route_config,
+                           Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
+  virtual void
+  requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void
+  requestSrdsUpdate(RouteCache& route_cache, Router::ScopeKeyPtr scope_key,
+                    Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+};
+
+class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {
+public:
+  // UntypedFactory
+  std::string category() const override { return "envoy.route_config_update_requester"; }
+
+  virtual std::unique_ptr<RouteConfigUpdateRequester>
+  createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) PURE;
+  virtual std::unique_ptr<RouteConfigUpdateRequester>
+  createRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                   OptRef<const Router::ScopeKeyBuilder> scope_key_builder) PURE;
+};
 
 class DownstreamStreamFilterCallbacks {
 public:
@@ -412,13 +463,11 @@ public:
   virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
 
   /**
-   * Find all the available per route filter configs, invoking the callback with each config (if
-   * it is present). Iteration of the configs is in order of specificity. That means that the
-   * callback will be called first for a config on a Virtual host, then a route, and finally a route
-   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
+   * Return all the available per route filter configs. The configs is in order of specificity.
+   * That means that the config from a route configuration will be first, then the config from a
+   * virtual host, then the config from a route.
    */
-  virtual void traversePerFilterConfig(
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+  virtual Router::RouteSpecificFilterConfigs perFilterConfigs() const PURE;
 
   /**
    * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
@@ -475,33 +524,12 @@ public:
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 };
 
-class DecoderFilterWatermarkCallbacks {
-public:
-  virtual ~DecoderFilterWatermarkCallbacks() = default;
-
-  /**
-   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
-   * their high watermark.
-   *
-   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
-   * the low watermark callbacks an equal number of times as the respective buffers are drained.
-   */
-  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when a decoder filter or any buffers the filter sends data to go from over its high
-   * watermark to under its low watermark.
-   */
-  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
-};
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a
  * decoding filter to restart decoding if they decide to hold data (e.g. for
  * buffering or rate limiting).
  */
-class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks,
-                                     public virtual DecoderFilterWatermarkCallbacks {
+class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
@@ -617,6 +645,11 @@ public:
                               absl::string_view details) PURE;
 
   /**
+   * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
+   */
+  virtual void sendGoAwayAndClose() PURE;
+
+  /**
    * Adds decoded metadata. This function can only be called in
    * StreamDecoderFilter::decodeHeaders/Data/Trailers(). Do not call in
    * StreamDecoderFilter::decodeMetadata().
@@ -675,6 +708,22 @@ public:
    * @param metadata_map supplies the unique_ptr of the metadata to be encoded.
    */
   virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
+
+  /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
 
   /**
    * This routine can be called by a filter to subscribe to watermark events on the downstream
@@ -766,6 +815,11 @@ public:
    */
   virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const PURE;
+
+  /**
+   * @return true if the filter should shed load based on the system pressure, typically memory.
+   */
+  virtual bool shouldLoadShed() const PURE;
 };
 
 /**
@@ -845,7 +899,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -1061,7 +1115,7 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public StreamFilterBase {
+class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with supported 1xx headers.
@@ -1147,6 +1201,11 @@ public:
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
+  const envoy::config::core::v3::Metadata& metadata() const {
+    return streamInfo().dynamicMetadata();
+  }
 
   const Network::Address::Instance& localAddress() const {
     return *connectionInfoProvider().localAddress();

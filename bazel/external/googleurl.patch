@@ -29,15 +29,37 @@ diff --git a/base/containers/checked_iterators.h b/base/containers/checked_itera
 index dc8d2ba..9306697 100644
 --- a/base/containers/checked_iterators.h
 +++ b/base/containers/checked_iterators.h
-@@ -237,9 +237,11 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
+@@ -237,9 +237,32 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
  // [3] https://wg21.link/pointer.traits.optmem
- namespace std {
+-namespace std {
 
 +#ifdef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
++#if defined(_LIBCPP_VERSION)
++
++// TODO(crbug.com/1284275): Remove when C++20 is on by default, as the use
++// of `iterator_concept` above should suffice.
++_LIBCPP_BEGIN_NAMESPACE_STD
++
++// TODO(crbug.com/1449299): https://reviews.llvm.org/D150801 renamed this from
++// `__is_cpp17_contiguous_iterator` to `__libcpp_is_contiguous_iterator`. Clean
++// up the old spelling after libc++ rolls.
++template <typename T>
++struct __is_cpp17_contiguous_iterator;
  template <typename T>
  struct __is_cpp17_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
      : true_type {};
++template <typename T>
++struct __libcpp_is_contiguous_iterator;
++template <typename T>
++struct __libcpp_is_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
++    : true_type {};
++
++_LIBCPP_END_NAMESPACE_STD
++
 +#endif
++#endif
++
++namespace std {
 
  template <typename T>
  struct pointer_traits<::gurl_base::CheckedContiguousIterator<T>> {

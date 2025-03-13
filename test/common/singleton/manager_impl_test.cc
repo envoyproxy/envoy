@@ -12,7 +12,7 @@ namespace {
 
 // Must be a dedicated function so that TID is within the death test.
 static void deathTestWorker() {
-  ManagerImpl manager(Thread::threadFactoryForTest());
+  ManagerImpl manager;
 
   manager.get(
       "foo", [] { return nullptr; }, false);
@@ -39,7 +39,7 @@ TEST(SingletonRegistration, category) {
 }
 
 TEST(SingletonManagerImplTest, Basic) {
-  ManagerImpl manager(Thread::threadFactoryForTest());
+  ManagerImpl manager;
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
   EXPECT_EQ(singleton, manager.get(
@@ -53,7 +53,7 @@ TEST(SingletonManagerImplTest, Basic) {
 }
 
 TEST(SingletonManagerImplTest, NonConstructingGetTyped) {
-  ManagerImpl manager(Thread::threadFactoryForTest());
+  ManagerImpl manager;
 
   // Access without first constructing should be null.
   EXPECT_EQ(nullptr, manager.getTyped<TestSingleton>("test_singleton"));
@@ -73,7 +73,7 @@ TEST(SingletonManagerImplTest, NonConstructingGetTyped) {
 TEST(SingletonManagerImplTest, PinnedSingleton) {
 
   {
-    ManagerImpl manager(Thread::threadFactoryForTest());
+    ManagerImpl manager;
     TestSingleton* singleton_ptr{};
 
     // Register a singleton and get it.
@@ -94,7 +94,7 @@ TEST(SingletonManagerImplTest, PinnedSingleton) {
   }
 
   {
-    ManagerImpl manager(Thread::threadFactoryForTest());
+    ManagerImpl manager;
     TestSingleton* singleton_ptr{};
 
     // Register a pinned singleton and get it.

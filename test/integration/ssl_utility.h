@@ -7,7 +7,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/common/tls/context_impl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -35,6 +35,11 @@ struct ClientSslTransportOptions {
 
   ClientSslTransportOptions& setSigningAlgorithms(const std::vector<std::string>& sigalgs) {
     sigalgs_ = sigalgs;
+    return *this;
+  }
+
+  ClientSslTransportOptions& setCurves(const std::vector<std::string>& curves) {
+    curves_ = curves;
     return *this;
   }
 
@@ -70,6 +75,7 @@ struct ClientSslTransportOptions {
   std::vector<std::string> cipher_suites_{};
   std::string san_;
   std::vector<std::string> sigalgs_;
+  std::vector<std::string> curves_;
   std::string sni_;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
@@ -81,7 +87,9 @@ struct ClientSslTransportOptions {
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context,
+    // By default, clients connect to Envoy. Allow configuring to connect to upstreams.
+    bool connect_to_upstream = false);
 
 Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,

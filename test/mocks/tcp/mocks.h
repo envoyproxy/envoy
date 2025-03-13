@@ -99,6 +99,22 @@ public:
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
 
+class MockAsyncTcpClient : public AsyncTcpClient {
+public:
+  MockAsyncTcpClient() = default;
+  ~MockAsyncTcpClient() override = default;
+
+  MOCK_METHOD(bool, connect, ());
+  MOCK_METHOD(void, close, (Network::ConnectionCloseType type));
+  MOCK_METHOD(Network::DetectedCloseType, detectedCloseType, (), (const));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, setAsyncTcpClientCallbacks, (AsyncTcpClientCallbacks & callbacks));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(bool, connected, ());
+  MOCK_METHOD(OptRef<StreamInfo::StreamInfo>, getStreamInfo, ());
+};
+
 } // namespace AsyncClient
 } // namespace Tcp
 } // namespace Envoy

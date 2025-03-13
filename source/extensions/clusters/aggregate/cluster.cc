@@ -14,8 +14,9 @@ namespace Aggregate {
 
 Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-                 Upstream::ClusterFactoryContext& context)
-    : Upstream::ClusterImplBase(cluster, context), cluster_manager_(context.clusterManager()),
+                 Upstream::ClusterFactoryContext& context, absl::Status& creation_status)
+    : Upstream::ClusterImplBase(cluster, context, creation_status),
+      cluster_manager_(context.clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       random_(context.serverFactoryContext().api().randomGenerator()),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
@@ -50,6 +51,7 @@ void AggregateClusterLoadBalancer::addMemberUpdateCallbackForCluster(
             ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'",
                       target_cluster_info->name(), parent_info_->name());
             refresh();
+            return absl::OkStatus();
           });
 }
 
@@ -148,7 +150,7 @@ absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToL
   }
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   const Upstream::HealthyAndDegradedLoad* priority_loads = nullptr;
   if (context != nullptr) {
@@ -172,12 +174,12 @@ AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalance
   return cluster->loadBalancer().chooseHost(&aggregate_context);
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (load_balancer_) {
     return load_balancer_->chooseHost(context);
   }
-  return nullptr;
+  return {nullptr};
 }
 
 Upstream::HostConstSharedPtr
@@ -211,7 +213,10 @@ ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
-  auto new_cluster = std::make_shared<Cluster>(cluster, proto_config, context);
+  absl::Status creation_status = absl::OkStatus();
+  auto new_cluster =
+      std::shared_ptr<Cluster>(new Cluster(cluster, proto_config, context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

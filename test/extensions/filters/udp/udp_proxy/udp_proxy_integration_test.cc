@@ -8,6 +8,8 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -63,7 +65,8 @@ public:
         registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
   void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
-             const std::string& session_filters_config = "") {
+             const std::string& session_filters_config = "",
+             const std::string& cluster = "cluster_0") {
     FakeUpstreamConfig::UdpConfig config;
     config.max_rx_datagram_size_ = max_rx_datagram_size;
     setUdpFakeUpstream(config);
@@ -104,7 +107,7 @@ public:
           });
     }
 
-    config_helper_.addListenerFilter(R"EOF(
+    const std::string listener_filter_config = fmt::format(R"EOF(
 name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
@@ -115,8 +118,12 @@ typed_config:
         name: route
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-          cluster: cluster_0
-)EOF" + max_datagram_config + session_filters_config);
+          cluster: {}
+)EOF",
+                                                           cluster) +
+                                               max_datagram_config + session_filters_config;
+
+    config_helper_.addListenerFilter(listener_filter_config);
 
     BaseIntegrationTest::initialize();
   }
@@ -309,7 +316,7 @@ TEST_P(UdpProxyIntegrationTest, NoReusePort) {
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   setup(1);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address);
 }
@@ -318,7 +325,7 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
 TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
   setup(1);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
   const uint64_t large_datagram_size =
@@ -333,9 +340,13 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
 
 // Verify upstream drops are handled correctly with stats.
 TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
+    return;
+  }
   setup(1);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
 
@@ -360,7 +371,7 @@ TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
       (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   setup(1, max_rx_datagram_size);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, std::string(max_rx_datagram_size, 'a'),
                                      std::string(max_rx_datagram_size, 'a'),
@@ -399,7 +410,7 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
 TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   setup(1);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::Test::UdpSyncPeer client1(version_);
@@ -442,7 +453,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
 TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::Test::UdpSyncPeer client(version_);
@@ -467,7 +478,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
 TEST_P(UdpProxyIntegrationTest, MultipleFilters) {
   setupMultiple();
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "olleh");
 }
@@ -475,7 +486,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleFilters) {
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilter) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "lo", "world1", "world1");
 }
@@ -483,7 +494,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilter) {
 TEST_P(UdpProxyIntegrationTest, TwoReadSessionFilters) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"read", 1, 0}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "o", "world1", "world1");
 }
@@ -491,7 +502,7 @@ TEST_P(UdpProxyIntegrationTest, TwoReadSessionFilters) {
 TEST_P(UdpProxyIntegrationTest, WriteSessionFilter) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "hello", "world1", "ld1");
 }
@@ -499,7 +510,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilter) {
 TEST_P(UdpProxyIntegrationTest, TwoWriteSessionFilters) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"write", 0, 3}, {"write", 0, 1}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "hello", "world1", "d1");
 }
@@ -507,7 +518,7 @@ TEST_P(UdpProxyIntegrationTest, TwoWriteSessionFilters) {
 TEST_P(UdpProxyIntegrationTest, ReadAndWriteSessionFilters) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 3, 0}, {"write", 0, 3}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "lo", "world1", "ld1");
 }
@@ -517,7 +528,7 @@ TEST_P(UdpProxyIntegrationTest, TwoReadAndWriteSessionFilters) {
         getDrainerSessionFilterConfig(
             {{"read", 3, 0}, {"write", 0, 3}, {"read", 1, 0}, {"write", 0, 1}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "o", "world1", "d1");
 }
@@ -525,7 +536,7 @@ TEST_P(UdpProxyIntegrationTest, TwoReadAndWriteSessionFilters) {
 TEST_P(UdpProxyIntegrationTest, BidirectionalSessionFilter) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read_write", 3, 3}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, "hello", "lo", "world1", "ld1");
 }
@@ -537,7 +548,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSession) {
             {{"read", 2, 0, true, false, true, false}, {"read", 0, 0, true, false, true, false}}));
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   std::string request = "hello";
@@ -565,7 +576,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
   setup(1, absl::nullopt,
         getDrainerSessionFilterConfig({{"read", 0, 0, false, true, false, false}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   std::string request = "hello";
@@ -593,7 +604,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnRead) {
 TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionButNotOnData) {
   setup(1, absl::nullopt, getDrainerSessionFilterConfig({{"read", 0, 0, true}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   // Filter chain did not iteration all onNewSession(), so socket is not created.
@@ -616,7 +627,7 @@ TEST_P(UdpProxyIntegrationTest, ReadSessionFilterStopOnNewSessionAndLaterContinu
             {{"read", 0, 0, true, false, true, false}, {"read", 0, 0, true, false, true, false}}));
 
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   std::string request = "hello";
@@ -644,7 +655,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilterStopOnWrite) {
   setup(1, absl::nullopt,
         getDrainerSessionFilterConfig({{"write", 0, 0, false, false, false, true}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   std::string request = "hello";
@@ -672,7 +683,7 @@ TEST_P(UdpProxyIntegrationTest, WriteSessionFilterStopOnWrite) {
 TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
   setup(1, absl::nullopt, getBufferSessionFilterConfig({{2, 2, true}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
@@ -722,7 +733,7 @@ TEST_P(UdpProxyIntegrationTest, BufferingFilterBasicFlow) {
 TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   setup(1, absl::nullopt, getBufferSessionFilterConfig({{1, 1, false}, {1, 1, false}}));
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
@@ -781,6 +792,50 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 4);
   test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
+}
+
+// Per session cluster setter filter sets non-existent cluster.
+TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterNoClusterFound) {
+  const std::string session_filters_config = R"EOF(
+  session_filters:
+  - name: foo
+    typed_config:
+      '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+      cluster: cluster_1
+)EOF";
+
+  setup(1, absl::nullopt, session_filters_config);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+  client.write("hello", *listener_address);
+
+  // cluster_1 does not exist, so the session will be closed.
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_no_route", 1);
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_total", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+// Basic loopback test with per session cluster setter filter.
+TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterBasicLoopback) {
+  const std::string session_filters_config = R"EOF(
+  session_filters:
+  - name: foo
+    typed_config:
+      '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+      cluster: cluster_0
+)EOF";
+
+  setup(1, absl::nullopt, session_filters_config, "cluster_1");
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  // Although the default cluster is cluster_1 which does not exist, the per session cluster setter
+  // filter will set the session cluster to cluster_0 .
+  requestResponseWithListenerAddress(*listener_address);
 }
 
 } // namespace

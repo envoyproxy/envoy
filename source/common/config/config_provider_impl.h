@@ -377,7 +377,7 @@ private:
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
-class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
+class ConfigProviderManagerImplBase : public ConfigProviderManager {
 public:
   /**
    * This is invoked by the /config_dump admin handler.

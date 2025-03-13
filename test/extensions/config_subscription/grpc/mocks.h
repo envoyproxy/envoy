@@ -10,7 +10,7 @@ namespace Config {
 template <class RequestProto, class ResponseProto>
 class MockGrpcStream : public GrpcStreamInterface<RequestProto, ResponseProto> {
 public:
-  MockGrpcStream() {}
+  MockGrpcStream() = default;
   ~MockGrpcStream() override = default;
 
   MOCK_METHOD(void, establishNewStream, ());
@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(void, onReceiveMessage, (ResponseProtoPtr<ResponseProto> && message));
   MOCK_METHOD(void, onReceiveTrailingMetadata, (Http::ResponseTrailerMapPtr && metadata));
   MOCK_METHOD(void, onRemoteClose, (Grpc::Status::GrpcStatus status, const std::string& message));
+  MOCK_METHOD(void, closeStream, ());
 };
 
 } // namespace Config

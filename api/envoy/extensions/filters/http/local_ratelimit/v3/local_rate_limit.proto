@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.local_ratelimit.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/token_bucket.proto";
@@ -22,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 16]
+// [#next-free-field: 19]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -110,6 +111,23 @@ message LocalRateLimit {
   // If unspecified, the default value is false.
   bool local_rate_limit_per_downstream_connection = 11;
 
+  // Enables the local cluster level rate limiting, iff this is set explicitly. For example,
+  // given an Envoy gateway that contains N Envoy instances and a rate limit rule X tokens
+  // per second. If this is set, the total rate limit of whole gateway will always be X tokens
+  // per second regardless of how N changes. If this is not set, the total rate limit of whole
+  // gateway will be N * X tokens per second.
+  //
+  // .. note::
+  //   This should never be set if the ``local_rate_limit_per_downstream_connection`` is set to
+  //   true. Because if per connection rate limiting is enabled, we assume that the token buckets
+  //   should never be shared across Envoy instances.
+  //
+  // .. note::
+  //   This only works when the :ref:`local cluster name
+  //   <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.local_cluster_name>` is set and
+  //   the related cluster is defined in the bootstrap configuration.
+  common.ratelimit.v3.LocalClusterRateLimit local_cluster_rate_limit = 16;
+
   // Defines the standard version to use for X-RateLimit headers emitted by the filter.
   //
   // Disabled by default.
@@ -130,4 +148,32 @@ message LocalRateLimit {
   // of the default ``UNAVAILABLE`` gRPC code for a rate limited gRPC call. The
   // HTTP code will be 200 for a gRPC response.
   bool rate_limited_as_resource_exhausted = 15;
+
+  // Rate limit configuration that is used to generate a list of descriptor entries based on
+  // the request context. The generated entries will be used to find one or multiple matched rate
+  // limit rule from the ``descriptors``.
+  // If this is set, then
+  // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+  // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+  // will be ignored.
+  //
+  // .. note::
+  //   Not all configuration fields of
+  //   :ref:`rate limit config <envoy_v3_api_msg_config.route.v3.RateLimit>` is supported at here.
+  //   Following fields are not supported:
+  //
+  //   1. :ref:`rate limit stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>`.
+  //   2. :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>`.
+  //   3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
+  //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
+  repeated config.route.v3.RateLimit rate_limits = 17;
+
+  // Specifies the max dynamic descriptors kept in the cache for a particular wildcard descriptor
+  // configured in the global :ref:`descriptors<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.descriptors>`.
+  // Wildcard descriptor means descriptor has one or more entries with just key and value omitted. For example if user has configured two descriptors
+  // with blank value entries, then max dynamic descriptors stored in the LRU cache will be 2 * max_dynamic_descriptors.
+  // Actual number of dynamic descriptors will depend on the cardinality of unique values received from the http request for the omitted
+  // values.
+  // Minimum is 1. Default is 20.
+  google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(validate.rules).uint32 = {gte: 1}];
 }

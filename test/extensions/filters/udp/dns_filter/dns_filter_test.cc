@@ -42,7 +42,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 class DnsFilterTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   DnsFilterTest()
-      : listener_address_(Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353")),
+      : listener_address_(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.2.1:5353")),
         api_(Api::createApiForTest(random_)),
         counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
                   queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
@@ -100,7 +100,7 @@ public:
 
   void sendQueryFromClient(const std::string& peer_address, const std::string& buffer) {
     Network::UdpRecvData data{};
-    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort(peer_address);
+    data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow(peer_address);
     data.addresses_.local_ = listener_address_;
     data.buffer_ = std::make_unique<Buffer::OwnedImpl>(buffer);
     data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -759,7 +759,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(AnyNumber());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -812,7 +812,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -865,7 +865,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -917,7 +917,8 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({}));
 
   // parse the result
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1003,7 +1004,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // Execute resolve callback. This should harmlessly return and not alter
   // the response received by the client. Even though we are returning a successful
   // response, the client does not get an answer
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"130.207.244.251"}));
 
   // parse the result
@@ -1365,7 +1366,7 @@ TEST_F(DnsFilterTest, InvalidAnswerNameTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1408,7 +1409,7 @@ TEST_F(DnsFilterTest, InvalidAnswerTypeTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1451,7 +1452,7 @@ TEST_F(DnsFilterTest, InvalidAnswerClassTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1495,7 +1496,7 @@ TEST_F(DnsFilterTest, InvalidAnswerAddressTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1542,7 +1543,7 @@ TEST_F(DnsFilterTest, InvalidAnswerDataLengthTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1581,7 +1582,7 @@ TEST_F(DnsFilterTest, TruncatedAnswerRecordTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1618,7 +1619,7 @@ TEST_F(DnsFilterTest, TruncatedQueryBufferTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1650,7 +1651,7 @@ TEST_F(DnsFilterTest, InvalidQueryClassTypeTest) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1682,7 +1683,7 @@ TEST_F(DnsFilterTest, InsufficientDataforQueryRecord) {
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
 
   Network::UdpRecvData data{};
-  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000");
+  data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
   data.addresses_.local_ = listener_address_;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>(dns_request, count);
   data.receive_time_ = MonotonicTime(std::chrono::seconds(0));
@@ -1863,12 +1864,11 @@ TEST_F(DnsFilterTest, NotImplementedQueryTest) {
   EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
 }
 
-TEST_F(DnsFilterTest, NoTransactionIdTest) {
+TEST_F(DnsFilterTest, ZeroTransactionIdTest) {
   InSequence s;
 
   setup(forward_query_off_config);
-  // This buffer has an invalid Transaction ID. We should return an error
-  // to the client
+  // This buffer has a Transaction ID of zero. This is not an error.
   constexpr char dns_request[] = {
       0x00, 0x00,                               // Transaction ID
       0x01, 0x20,                               // Flags
@@ -1888,8 +1888,8 @@ TEST_F(DnsFilterTest, NoTransactionIdTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
-  EXPECT_FALSE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, response_ctx_->getQueryResponseCode());
 }
 
 TEST_F(DnsFilterTest, InvalidShortBufferTest) {
@@ -1910,6 +1910,12 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
 }
 
 TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
+#if defined(__linux__) && defined(__s390x__)
+  // Skip on s390x because this test incorrectly depends on the ordering of
+  // addresses that happens to work on other platforms.
+  // See https://github.com/envoyproxy/envoy/pull/24330
+  GTEST_SKIP() << "Skipping RandomizeFirstAnswerTest on s390x";
+#endif
   InSequence s;
 
   setup(forward_query_off_config);
@@ -2421,6 +2427,133 @@ server_config:
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
   EXPECT_TRUE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardName) {
+  InSequence s;
+
+  const std::string wildcard_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foobaz.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+)EOF";
+  setup(wildcard_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.1"};
+  const std::string domain("www.foobaz.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardSubdomainPrevails) {
+  InSequence s;
+
+  const std::string wildcard_with_subdomain_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+      - name: "*.foo2.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.2"
+)EOF";
+  setup(wildcard_with_subdomain_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.2"};
+  const std::string domain("www.foo2.foo1.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardExactNamePrevails) {
+  InSequence s;
+
+  const std::string wildcard_and_exact_name_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+      - name: "bar.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.2"
+)EOF";
+  setup(wildcard_and_exact_name_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.2"};
+  const std::string domain("bar.foo1.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
 
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());

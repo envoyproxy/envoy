@@ -24,7 +24,7 @@ FilterFactoryCb DynamicForwardProxyNetworkFilterConfigFactory::createFilterFacto
   ProxyFilterConfigSharedPtr filter_config(
       std::make_shared<ProxyFilterConfig>(proto_config, cache_manager_factory, context));
 
-  return [filter_config](FilterChainFactoryCallbacks& callbacks) -> void {
+  return [filter_config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addReadFilter(std::make_shared<ProxyFilter>(filter_config));
   };
 }

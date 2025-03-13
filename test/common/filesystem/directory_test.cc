@@ -273,7 +273,7 @@ TEST_F(DirectoryTest, FileDeletedWhileIterating) {
                          EntrySet{
                              {".", FileType::Directory, absl::nullopt},
                              {"..", FileType::Directory, absl::nullopt},
-                             {"file1", FileType::Regular, 0},
+                             {"file2", FileType::Regular, 0},
                          }));
 }
 #endif

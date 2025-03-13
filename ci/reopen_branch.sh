@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+set -e
 
 ENVOY_GIT_USERNAME="${ENVOY_GIT_USERNAME:-envoy-bot}"
 ENVOY_GIT_EMAIL="${ENVOY_GIT_EMAIL:-envoy-bot@users.noreply.github.com}"

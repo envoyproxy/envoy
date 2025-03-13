@@ -23,7 +23,7 @@ namespace Common {
  */
 template <typename... CallbackArgs> class CallbackManager {
 public:
-  using Callback = std::function<void(CallbackArgs...)>;
+  using Callback = std::function<absl::Status(CallbackArgs...)>;
 
   /**
    * Add a callback.
@@ -46,11 +46,12 @@ public:
    *       to change (specifically, it will crash if the next callback in the list is deleted).
    * @param args supplies the callback arguments.
    */
-  void runCallbacks(CallbackArgs... args) {
+  absl::Status runCallbacks(CallbackArgs... args) {
     for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
       auto current = *(it++);
-      current->cb_(args...);
+      RETURN_IF_NOT_OK(current->cb_(args...));
     }
+    return absl::OkStatus();
   }
 
   /**
@@ -61,11 +62,12 @@ public:
    * @param run_with function that is responsible for generating inputs to callbacks. This will be
    * executed once for each callback.
    */
-  void runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
+  absl::Status runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
     for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
       auto cb = *(it++);
-      std::apply(cb->cb_, run_with());
+      RETURN_IF_NOT_OK(std::apply(cb->cb_, run_with()));
     }
+    return absl::OkStatus();
   }
 
   size_t size() const noexcept { return callbacks_.size(); }

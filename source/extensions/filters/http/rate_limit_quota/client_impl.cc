@@ -1,132 +1,39 @@
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
-#include "source/common/tracing/http_tracer_impl.h"
+#include <cstddef>
+#include <memory>
+
+#include "envoy/type/v3/ratelimit_strategy.pb.h"
+#include "envoy/type/v3/token_bucket.pb.h"
+
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_t> bucket_id) {
-  RateLimitQuotaUsageReports report;
-  // Build the report from quota bucket cache.
-  for (const auto& [id, bucket] : quota_buckets_) {
-    auto* usage = report.add_bucket_quota_usages();
-    *usage->mutable_bucket_id() = bucket->bucket_id;
-    usage->set_num_requests_allowed(bucket->quota_usage.num_requests_allowed);
-    usage->set_num_requests_denied(bucket->quota_usage.num_requests_denied);
-    auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        time_source_.monotonicTime().time_since_epoch());
-    // For the newly created bucket (i.e., `bucket_id` input is not null), its time
-    // elapsed since last report is 0.
-    // This case happens when we send the report to RLQS server immediately.
-    if (bucket_id.has_value() && bucket_id.value() == id) {
-      *usage->mutable_time_elapsed() = Protobuf::util::TimeUtil::NanosecondsToDuration(0);
-    } else {
-      *usage->mutable_time_elapsed() = Protobuf::util::TimeUtil::NanosecondsToDuration(
-          (now - bucket->quota_usage.last_report).count());
-    }
+using BucketAction = RateLimitQuotaResponse::BucketAction;
 
-    // Update the last_report time point.
-    bucket->quota_usage.last_report = now;
-  }
-
-  // Set the domain name.
-  report.set_domain(domain_name_);
-  ENVOY_LOG(debug, "The usage report that will be sent to RLQS server:\n{}", report.DebugString());
-  return report;
+void LocalRateLimitClientImpl::createBucket(
+    const BucketId& bucket_id, size_t id, const BucketAction& default_bucket_action,
+    std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
+    std::chrono::milliseconds fallback_ttl, bool initial_request_allowed) {
+  std::shared_ptr<GlobalRateLimitClientImpl> global_client = getGlobalClient();
+  // Intentionally crash if the local client is initialized with a null global
+  // client or TLS slot due to a bug.
+  global_client->createBucket(bucket_id, id, default_bucket_action, std::move(fallback_action),
+                              fallback_ttl, initial_request_allowed);
 }
 
-// This function covers both periodical report and immediate report case, with the difference that
-// bucked id in periodical report case is empty.
-void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
-  ASSERT(stream_ != nullptr);
-  // Build the report and then send the report to RLQS server.
-  // `end_stream` should always be set to false as we don't want to close the stream locally.
-  stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
-}
-
-void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
-  for (const auto& action : response->bucket_action()) {
-    if (!action.has_bucket_id() || action.bucket_id().bucket().empty()) {
-      ENVOY_LOG(error,
-                "Received a response, but bucket_id is missing : ", response->ShortDebugString());
-      continue;
-    }
-
-    // Get the hash id value from BucketId in the response.
-    const size_t bucket_id = MessageUtil::hash(action.bucket_id());
-    if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
-      // The response should be matched to the report we sent.
-      ENVOY_LOG(error,
-                "Received a response, but but it is not matched any quota "
-                "cache entry: ",
-                response->ShortDebugString());
-    } else {
-      quota_buckets_[bucket_id]->bucket_action = action;
-      // TODO(tyxia) Handle expired assignment via `assignment_time_to_live`.
-      if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
-        auto rate_limit_strategy = quota_buckets_[bucket_id]
-                                       ->bucket_action.quota_assignment_action()
-                                       .rate_limit_strategy();
-
-        if (rate_limit_strategy.has_token_bucket()) {
-          const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
-          // Convert absl::duration to int64_t seconds
-          int64_t fill_interval_sec = absl::ToInt64Seconds(
-              absl::Seconds(interval_proto.seconds()) + absl::Nanoseconds(interval_proto.nanos()));
-          double fill_rate_per_sec =
-              static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
-              fill_interval_sec;
-
-          quota_buckets_[bucket_id]->token_bucket_limiter = std::make_unique<TokenBucketImpl>(
-              rate_limit_strategy.token_bucket().max_tokens(), time_source_, fill_rate_per_sec);
-        }
-      }
-    }
-  }
-
-  // `rlqs_callback_` has been reset to nullptr for periodical report case.
-  // No need to invoke onQuotaResponse to continue the filter chain for this case as filter chain
-  // has not been paused.
-  if (rlqs_callback_ != nullptr) {
-    rlqs_callback_->onQuotaResponse(*response);
-  }
-}
-
-void RateLimitClientImpl::closeStream() {
-  // Close the stream if it is in open state.
-  if (stream_ != nullptr && !stream_closed_) {
-    ENVOY_LOG(debug, "Closing gRPC stream");
-    stream_->closeStream();
-    stream_closed_ = true;
-    stream_->resetStream();
-  }
-}
-
-void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
-                                        const std::string& message) {
-  // TODO(tyxia) Revisit later, maybe add some logging.
-  stream_closed_ = true;
-  ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  closeStream();
-}
-
-absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
-  // Starts stream if it has not been opened yet.
-  if (stream_ == nullptr) {
-    ENVOY_LOG(debug, "Trying to start the new gRPC stream");
-    stream_ = aync_client_.start(
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-        *this,
-        Http::AsyncClient::RequestOptions().setParentContext(
-            Http::AsyncClient::ParentContext{&stream_info}));
-  }
-
-  // Returns error status if start failed (i.e., stream_ is nullptr).
-  return stream_ == nullptr ? absl::InternalError("Failed to start the stream") : absl::OkStatus();
+std::shared_ptr<CachedBucket> LocalRateLimitClientImpl::getBucket(size_t id) {
+  std::shared_ptr<BucketsCache> buckets_cache = getBucketsCache();
+  // Intentionally crash if the client is initialized with a null global cache
+  // or TLS slot due to a bug.
+  auto bucket_it = buckets_cache->find(id);
+  return (bucket_it != buckets_cache->end()) ? bucket_it->second : nullptr;
 }
 
 } // namespace RateLimitQuota

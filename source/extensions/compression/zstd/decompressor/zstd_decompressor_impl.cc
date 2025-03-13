@@ -21,7 +21,7 @@ constexpr uint64_t MaxInflateRatio = 100;
 ZstdDecompressorImpl::ZstdDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
                                            const ZstdDDictManagerPtr& ddict_manager,
                                            uint32_t chunk_size)
-    : Common::Base(chunk_size), dctx_(ZSTD_createDCtx(), &ZSTD_freeDCtx),
+    : Envoy::Compression::Zstd::Common::Base(chunk_size), dctx_(ZSTD_createDCtx(), &ZSTD_freeDCtx),
       ddict_manager_(ddict_manager), stats_(generateStats(stats_prefix, scope)) {}
 
 void ZstdDecompressorImpl::decompress(const Buffer::Instance& input_buffer,

@@ -46,8 +46,11 @@ public:
     EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
       EXPECT_CALL(*mock_watcher, addWatch(path_.path(), Filesystem::Watcher::Events::MovedTo, _))
-          .WillOnce(Invoke([this](absl::string_view, uint32_t,
-                                  Filesystem::Watcher::OnChangedCb cb) { on_changed_cb_ = cb; }));
+          .WillOnce(
+              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+                on_changed_cb_ = cb;
+                return absl::OkStatus();
+              }));
       return mock_watcher;
     }));
     return dispatcher;
@@ -68,7 +71,7 @@ public:
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
     TestEnvironment::renameFile(temp_path, path_.path());
     if (run_dispatcher) {
-      on_changed_cb_(Filesystem::Watcher::Events::MovedTo);
+      THROW_IF_NOT_OK(on_changed_cb_(Filesystem::Watcher::Events::MovedTo));
     }
   }
 

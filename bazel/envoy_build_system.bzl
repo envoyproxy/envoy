@@ -1,8 +1,15 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_PACKAGE_VISIBILITY",
+)
+
 # The main Envoy bazel file. Load this file for all Envoy-specific build macros
 # and rules that you'd like to use in your BUILD files.
 load("@rules_foreign_cc//foreign_cc:cmake.bzl", "cmake")
 load(":envoy_binary.bzl", _envoy_cc_binary = "envoy_cc_binary")
-load(":envoy_internal.bzl", "envoy_external_dep_path")
+load(":envoy_internal.bzl", "envoy_external_dep_path", _envoy_linkstatic = "envoy_linkstatic")
 load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
@@ -15,6 +22,10 @@ load(
     _envoy_cc_win32_library = "envoy_cc_win32_library",
     _envoy_proto_library = "envoy_proto_library",
 )
+load(
+    ":envoy_mobile_defines.bzl",
+    _envoy_mobile_defines = "envoy_mobile_defines",
+)
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
@@ -24,13 +35,14 @@ load(
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_disable_exceptions = "envoy_select_disable_exceptions",
     _envoy_select_disable_logging = "envoy_select_disable_logging",
+    _envoy_select_enable_exceptions = "envoy_select_enable_exceptions",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
-    _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_nghttp2 = "envoy_select_nghttp2",
     _envoy_select_signal_trace = "envoy_select_signal_trace",
     _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
@@ -38,7 +50,6 @@ load(
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
     _envoy_select_wasm_wamr = "envoy_select_wasm_wamr",
     _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
-    _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
 )
 load(
     ":envoy_test.bzl",
@@ -53,20 +64,6 @@ load(
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
-load(
-    ":envoy_internal.bzl",
-    _envoy_linkstatic = "envoy_linkstatic",
-)
-load(
-    ":envoy_mobile_defines.bzl",
-    _envoy_mobile_defines = "envoy_mobile_defines",
-)
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
-    "EXTENSION_PACKAGE_VISIBILITY",
-)
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 def envoy_package(default_visibility = ["//visibility:public"]):
     native.package(default_visibility = default_visibility)
@@ -214,13 +211,13 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     options.extend(["-I" + include_path for include_path in include_paths])
     options.append("--descriptor_set_out=$@")
 
-    cmd = "$(location //external:protoc) " + " ".join(options + input_files)
+    cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
     native.genrule(
         name = name,
         srcs = srcs,
         outs = [out],
         cmd = cmd,
-        tools = ["//external:protoc"],
+        tools = ["@com_google_protobuf//:protoc"],
     )
 
 # Dependencies on Google grpc should be wrapped with this function.
@@ -238,21 +235,21 @@ envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_static_extension_registration = _envoy_select_static_extension_registration
 envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
-envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_enable_yaml = _envoy_select_enable_yaml
 envoy_select_disable_exceptions = _envoy_select_disable_exceptions
+envoy_select_enable_exceptions = _envoy_select_enable_exceptions
 envoy_select_hot_restart = _envoy_select_hot_restart
+envoy_select_nghttp2 = _envoy_select_nghttp2
 envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
 envoy_select_signal_trace = _envoy_select_signal_trace
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
 envoy_select_wasm_wamr = _envoy_select_wasm_wamr
-envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
 envoy_select_linkstatic = _envoy_linkstatic
 

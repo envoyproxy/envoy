@@ -41,9 +41,11 @@ TEST_F(IpResolverTest, DisallowsNamedPort) {
   envoy::config::core::v3::SocketAddress socket_address;
   socket_address.set_address("1.2.3.4");
   socket_address.set_named_port("http");
-  EXPECT_EQ(resolver_->resolve(socket_address).status().message(),
-            fmt::format("IP resolver can't handle port specifier type {}",
-                        envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort));
+  EXPECT_EQ(
+      resolver_->resolve(socket_address).status().message(),
+      fmt::format(
+          "IP resolver can't handle port specifier type {}",
+          static_cast<int>(envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort)));
 }
 
 TEST(ResolverTest, FromProtoAddress) {
@@ -170,7 +172,8 @@ TEST(ResolverTest, NonStandardResolver) {
 
 TEST(ResolverTest, UninitializedAddress) {
   envoy::config::core::v3::Address address;
-  EXPECT_EQ(resolveProtoAddress(address).status().message(), "Address must be set: ");
+  EXPECT_THAT(resolveProtoAddress(address).status().message(),
+              testing::HasSubstr("Address must be set: "));
 }
 
 TEST(ResolverTest, NoSuchResolver) {

@@ -8,7 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -47,7 +46,8 @@ public:
         quic_connection_(new MockEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr), connection_id_generator_)),
+            createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
+            connection_id_generator_)),
         quic_session_(quic_config_, {quic_version_},
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
@@ -153,7 +153,7 @@ public:
           EXPECT_EQ("200", headers->getStatusValue());
           EXPECT_EQ(capsule_protocol[0]->value().getStringView(), "?1");
         });
-    spdy::Http2HeaderBlock response_headers;
+    quiche::HttpHeaderBlock response_headers;
     response_headers[":status"] = "200";
     response_headers["capsule-protocol"] = "?1";
     std::string payload = spdyHeaderToHttp3StreamPayload(response_headers);
@@ -189,8 +189,8 @@ protected:
   std::string host_{"www.abc.com"};
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
-  spdy::Http2HeaderBlock spdy_response_headers_;
-  spdy::Http2HeaderBlock spdy_trailers_;
+  quiche::HttpHeaderBlock spdy_response_headers_;
+  quiche::HttpHeaderBlock spdy_trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
   std::string response_body_{"OK\n"};
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -209,6 +209,8 @@ protected:
 TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
   EXPECT_TRUE(result.ok());
+
+  quic_stream_->setFlushTimeout(std::chrono::milliseconds(100)); // No-op
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
@@ -249,10 +251,6 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
 }
 
 TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithMemSliceReleasor) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.quiche_use_mem_slice_releasor_api", "true"}});
-
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
@@ -350,7 +348,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
   for (const std::string status : {"100", "199", "100"}) {
-    spdy::Http2HeaderBlock continue_header;
+    quiche::HttpHeaderBlock continue_header;
     continue_header[":status"] = status;
     continue_header["i"] = absl::StrCat("", i++);
     std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
@@ -369,7 +367,7 @@ TEST_F(EnvoyQuicClientStreamTest, ResetUpon101SwitchProtocol) {
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
   // Receive several 10x headers, only the first 100 Continue header should be
   // delivered.
-  spdy::Http2HeaderBlock continue_header;
+  quiche::HttpHeaderBlock continue_header;
   continue_header[":status"] = "101";
   std::string data = spdyHeaderToHttp3StreamPayload(continue_header);
   quic::QuicStreamFrame frame(stream_id_, false, 0u, data);

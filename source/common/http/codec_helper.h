@@ -38,7 +38,7 @@ public:
     }
   }
 
-  void runResetCallbacks(StreamResetReason reason) {
+  void runResetCallbacks(StreamResetReason reason, absl::string_view details) {
     // Reset callbacks are a special case, and the only StreamCallbacks allowed
     // to run after local_end_stream_.
     if (reset_callbacks_started_) {
@@ -48,7 +48,7 @@ public:
     reset_callbacks_started_ = true;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
-        callbacks->onResetStream(reason, absl::string_view());
+        callbacks->onResetStream(reason, details);
       }
     }
   }

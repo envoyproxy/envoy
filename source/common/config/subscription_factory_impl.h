@@ -26,12 +26,11 @@ public:
                           XdsConfigTrackerOptRef xds_config_tracker);
 
   // Config::SubscriptionFactory
-  SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
-                                               absl::string_view type_url, Stats::Scope& scope,
-                                               SubscriptionCallbacks& callbacks,
-                                               OpaqueResourceDecoderSharedPtr resource_decoder,
-                                               const SubscriptionOptions& options) override;
-  SubscriptionPtr
+  absl::StatusOr<SubscriptionPtr> subscriptionFromConfigSource(
+      const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
+      Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
+  absl::StatusOr<SubscriptionPtr>
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,
                                 absl::string_view resource_type, Stats::Scope& scope,

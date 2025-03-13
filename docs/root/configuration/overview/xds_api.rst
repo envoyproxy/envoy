@@ -41,10 +41,8 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     eds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
         - envoy_grpc:
             cluster_name: some_xds_cluster
@@ -80,10 +78,8 @@ for the service definition. This is used by Envoy as a client when
 
     route_config_name: some_route_name
     config_source:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
         - envoy_grpc:
             cluster_name: some_xds_cluster
@@ -103,11 +99,9 @@ for the service definition. This is used by Envoy as a client when
 
     name: some_scoped_route_name
     scoped_rds:
-      resource_api_version: V3
       config_source:
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
           - envoy_grpc:
               cluster_name: some_xds_cluster
@@ -143,10 +137,8 @@ for the service definition. This is used by Envoy as a client when
 
     name: some_runtime_layer_name
     config_source:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
         - envoy_grpc:
             cluster_name: some_xds_cluster
@@ -167,10 +159,8 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     cds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
@@ -186,10 +176,8 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     eds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`eds_cluster_config
@@ -205,10 +193,8 @@ for the service definition. This is used by Envoy as a client when
 .. code-block:: yaml
 
     lds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
@@ -225,10 +211,8 @@ for the service definition. This is used by Envoy as a client when
 
     route_config_name: some_route_name
     config_source:
-      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`rds
@@ -295,10 +279,8 @@ be set to use the ADS channel. For example, a LDS config could be changed from
 .. code-block:: yaml
 
     lds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: REST
-        transport_api_version: V3
         cluster_names: [some_xds_cluster]
 
 to

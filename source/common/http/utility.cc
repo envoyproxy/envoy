@@ -22,6 +22,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -170,24 +171,6 @@ validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOpt
 
 } // namespace
 
-const uint32_t OptionsLimits::MIN_HPACK_TABLE_SIZE;
-const uint32_t OptionsLimits::DEFAULT_HPACK_TABLE_SIZE;
-const uint32_t OptionsLimits::MAX_HPACK_TABLE_SIZE;
-const uint32_t OptionsLimits::MIN_MAX_CONCURRENT_STREAMS;
-const uint32_t OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
-const uint32_t OptionsLimits::MAX_MAX_CONCURRENT_STREAMS;
-const uint32_t OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
-const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
-const uint32_t OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE;
-const uint32_t OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES;
-const uint32_t OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
-const uint32_t OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
-const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
-const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
-
 absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
@@ -267,9 +250,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http3 {
 namespace Utility {
-
-const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
 
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
@@ -777,6 +757,62 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
   encodeLocalReply(is_reset, std::move(prepared_local_reply));
 }
 
+bool Utility::remoteAddressIsTrustedProxy(
+    const Envoy::Network::Address::Instance& remote,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
+  for (const auto& cidr : trusted_cidrs) {
+    if (cidr.isInRange(remote)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
+    const Http::RequestHeaderMap& request_headers,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
+  const auto xff_header = request_headers.getForwardedForValue();
+  static constexpr size_t MAX_ALLOWED_XFF_ENTRIES = 20;
+
+  absl::InlinedVector<absl::string_view, 3> xff_entries = absl::StrSplit(xff_header, ',');
+  // If there are more than 20 entries in the XFF header, refuse to parse.
+  // There are very few valid use cases for this many entries and parsing too many has
+  // a performance impact.
+  if (xff_entries.size() > MAX_ALLOWED_XFF_ENTRIES) {
+    ENVOY_LOG_MISC(trace, "Too many entries in x-forwarded-for header");
+    return {nullptr, false};
+  }
+
+  Network::Address::InstanceConstSharedPtr last_valid_addr;
+
+  for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
+    const absl::string_view entry = StringUtil::trim(*it);
+    auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(entry));
+    if (addr == nullptr) {
+      return {nullptr, false};
+    }
+    last_valid_addr = addr;
+
+    bool remote_address_is_trusted_proxy = false;
+    for (const auto& cidr : trusted_cidrs) {
+      if (cidr.isInRange(*addr.get())) {
+        remote_address_is_trusted_proxy = true;
+        break;
+      }
+    }
+
+    if (remote_address_is_trusted_proxy) {
+      continue;
+    }
+
+    // If we reach here we found a non-trusted address
+    return {addr, xff_entries.size() == 1};
+  }
+  // If we reach this point all addresses in XFF were considered trusted, so return
+  // first IP in XFF (the last in the reverse-evaluated chain).
+  return {last_valid_addr, xff_entries.size() == 1};
+}
+
 Utility::GetLastAddressFromXffInfo
 Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
                                uint32_t num_to_skip) {
@@ -975,8 +1011,8 @@ std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_head
                       path);
 }
 
-void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
-                                     absl::string_view& path) {
+void Utility::extractSchemeHostPathFromUri(const absl::string_view& uri, absl::string_view& scheme,
+                                           absl::string_view& host, absl::string_view& path) {
   /**
    *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
    *
@@ -985,13 +1021,18 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
    *  pos:         ^
    *  host_pos:       ^
    *  path_pos:                       ^
+   *  scheme = "https"
    *  host = "example.com:8443"
    *  path = "/certs"
    */
+
+  // Find end of scheme.
   const auto pos = uri.find("://");
-  // Start position of the host
+  scheme = uri.substr(0, (pos == std::string::npos) ? 0 : pos);
+
+  // Start position of the host.
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
-  // Start position of the path
+  // Start position of the path.
   const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
@@ -1003,6 +1044,12 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
+void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path) {
+  absl::string_view scheme;
+  extractSchemeHostPathFromUri(uri, scheme, host, path);
+}
+
 std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
   if (file_path.size() >= 3 && file_path[1] == ':' && file_path[2] == '/' &&
       std::isalpha(file_path[0])) {
@@ -1011,11 +1058,15 @@ std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
   return absl::StrCat("/", file_path);
 }
 
-RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
-  absl::string_view host, path;
-  extractHostPathFromUri(http_uri.uri(), host, path);
+RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
+                                          bool include_scheme) {
+  absl::string_view scheme, host, path;
+  extractSchemeHostPathFromUri(http_uri.uri(), scheme, host, path);
 
   RequestMessagePtr message(new RequestMessageImpl());
+  if (include_scheme && !scheme.empty()) {
+    message->headers().setScheme(scheme);
+  }
   message->headers().setPath(path);
   message->headers().setHost(host);
 
@@ -1060,6 +1111,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "protocol error";
   case Http::StreamResetReason::OverloadManager:
     return "overload manager reset";
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    return "HTTP/1 premature upstream half close";
   }
 
   return "";
@@ -1248,6 +1301,15 @@ std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view 
   return encoded;
 }
 
+bool Utility::PercentEncoding::queryParameterIsUrlEncoded(absl::string_view value) {
+  for (char ch : value) {
+    if (shouldPercentEncodeChar(ch)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
   std::string decoded;
   decoded.reserve(encoded.size());
@@ -1330,7 +1392,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
-void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+absl::Status
+Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
   if (retry_policy.has_retry_back_off()) {
     const auto& core_back_off = retry_policy.retry_back_off();
 
@@ -1339,9 +1402,11 @@ void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throwEnvoyExceptionOrPanic("max_interval must be greater than or equal to the base_interval");
+      return absl::InvalidArgumentError(
+          "max_interval must be greater than or equal to the base_interval");
     }
   }
+  return absl::OkStatus();
 }
 
 envoy::config::route::v3::RetryPolicy
@@ -1378,9 +1443,30 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
       Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
 
   // set all the other fields with appropriate values.
-  route_retry_policy.set_retry_on(retry_on);
+  if (!retry_on.empty()) {
+    route_retry_policy.set_retry_on(retry_on);
+  } else {
+    route_retry_policy.set_retry_on(retry_policy.retry_on());
+  }
   route_retry_policy.mutable_per_try_timeout()->CopyFrom(
       route_retry_policy.retry_back_off().max_interval());
+
+  if (retry_policy.has_retry_priority()) {
+    route_retry_policy.mutable_retry_priority()->set_name(retry_policy.retry_priority().name());
+    route_retry_policy.mutable_retry_priority()->mutable_typed_config()->MergeFrom(
+        retry_policy.retry_priority().typed_config());
+  }
+
+  if (!retry_policy.retry_host_predicate().empty()) {
+    for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
+      auto* route_host_predicate = route_retry_policy.mutable_retry_host_predicate()->Add();
+      route_host_predicate->set_name(host_predicate.name());
+      route_host_predicate->mutable_typed_config()->MergeFrom(host_predicate.typed_config());
+    }
+  }
+
+  route_retry_policy.set_host_selection_retry_max_attempts(
+      retry_policy.host_selection_retry_max_attempts());
 
   return route_retry_policy;
 }
@@ -1405,16 +1491,10 @@ bool Utility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool Utility::schemeIsHttp(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Http;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Http);
 }
 
 bool Utility::schemeIsHttps(const absl::string_view scheme) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.handle_uppercase_scheme")) {
-    return scheme == Headers::get().SchemeValues.Https;
-  }
   return absl::EqualsIgnoreCase(scheme, Headers::get().SchemeValues.Https);
 }
 
@@ -1496,14 +1576,6 @@ bool Utility::isValidRefererValue(absl::string_view value) {
   // url.initialize uses http_parser_parse_url, which requires
   // a host to be present if there is a schema.
   Utility::Url url;
-
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_allow_partial_urls_in_referer")) {
-    if (url.initialize(value, false)) {
-      return true;
-    }
-    return false;
-  }
 
   if (url.initialize(value, false)) {
     return !(url.containsFragment() || url.containsUserinfo());

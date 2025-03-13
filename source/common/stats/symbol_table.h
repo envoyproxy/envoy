@@ -755,6 +755,16 @@ public:
   StatName add(absl::string_view name);
 
   /**
+   * Adds the StatName to the pool preserving the representation.
+   * This avoids stringifying if we already have a StatName object
+   * and is useful if parts of the StatName are dynamically encoded.
+   * @param name the stat name to add the container.
+   * @return the StatName held in the container for this name.
+   *
+   */
+  StatName add(StatName name);
+
+  /**
    * Does essentially the same thing as add(), but returns the storage as a
    * pointer which can later be used to create a StatName. This can be used
    * to accumulate a vector of uint8_t* which can later be used to create

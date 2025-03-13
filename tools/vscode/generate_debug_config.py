@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import pathlib
+import platform
 import shlex
 import shutil
 import subprocess
@@ -38,9 +39,8 @@ def binary_path(bazel_bin, target):
 
 
 def build_binary_with_debug_info(target):
-    targets = [target, target + ".dwp"]
-    subprocess.check_call(["bazel", *BAZEL_STARTUP_OPTIONS, "build", "-c", "dbg"] + BAZEL_OPTIONS
-                          + targets)
+    subprocess.check_call(["bazel", *BAZEL_STARTUP_OPTIONS, "build", "-c", "dbg", target]
+                          + BAZEL_OPTIONS)
 
     bazel_bin = bazel_info("bazel-bin", ["-c", "dbg"])
     return binary_path(bazel_bin, target)
@@ -76,7 +76,7 @@ def gdb_config(target, binary, workspace, execroot, arguments):
 
 
 def lldb_config(target, binary, workspace, execroot, arguments):
-    return {
+    cfg = {
         "name": "lldb " + target,
         "program": str(binary),
         "sourceMap": {
@@ -89,6 +89,13 @@ def lldb_config(target, binary, workspace, execroot, arguments):
         "type": "lldb",
         "request": "launch"
     }
+
+    # https://github.com/vadimcn/codelldb/discussions/517
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        cfg["sourceMap"] = {
+            ".": "${workspaceFolder}",
+        }
+    return cfg
 
 
 def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type, overwrite):

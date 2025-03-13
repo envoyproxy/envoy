@@ -9,3 +9,15 @@
          # These rules are not supposed to be depended on by other rust targets, and
          # as such they shouldn't provide a CrateInfo. However, one may still want to
          # write a rust_test for them, so we provide the CrateInfo wrapped in a provider
+
+--- rust/private/rustc.bzl
++++ rust/private/rustc.bzl
+@@ -1043,7 +1043,7 @@ def construct_arguments(
+ 
+     if toolchain.llvm_cov and ctx.configuration.coverage_enabled:
+         # https://doc.rust-lang.org/rustc/instrument-coverage.html
+-        rustc_flags.add("--codegen=instrument-coverage")
++        pass
+ 
+     if toolchain._experimental_link_std_dylib:
+         rustc_flags.add("--codegen=prefer-dynamic")

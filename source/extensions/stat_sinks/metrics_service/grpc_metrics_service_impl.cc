@@ -2,7 +2,6 @@
 
 #include <chrono>
 
-#include "envoy/common/exception.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
@@ -33,14 +32,18 @@ void GrpcMetricsStreamerImpl::send(MetricsPtr&& metrics) {
   message.mutable_envoy_metrics()->MergeFrom(*metrics);
 
   if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Establishing new gRPC metrics service stream");
     stream_ = client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     // For perf reasons, the identifier is only sent on establishing the stream.
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
-  if (stream_ != nullptr) {
-    stream_->sendMessage(message, false);
+  if (stream_ == nullptr) {
+    ENVOY_LOG(error,
+              "unable to establish metrics service stream. Will retry in the next flush cycle");
+    return;
   }
+  stream_->sendMessage(message, false);
 }
 
 MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
@@ -135,6 +138,7 @@ void MetricsFlusher::flushSummary(io::prometheus::client::MetricFamily& metrics_
     quantile->set_value(hist_stats.computedQuantiles()[i]);
   }
   summary->set_sample_count(hist_stats.sampleCount());
+  summary->set_sample_sum(hist_stats.sampleSum());
 }
 
 io::prometheus::client::Metric*

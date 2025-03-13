@@ -74,6 +74,16 @@ remaining datagrams to different clusters according to their source ports.
    :lines: 14-53
    :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
 
+.. _config_udp_listener_filters_udp_proxy_dynamic_cluster:
+
+Dynamic cluster selection
+-------------------------
+
+The upstream cluster used by the UDP proxy can be dynamically set by
+one of the session filters on a per-session basis by setting a per-session
+state object under the key ``envoy.udp_proxy.cluster``. See the
+implementation for the details.
+
 .. _config_udp_listener_filters_udp_proxy_session_filters:
 
 Session filters
@@ -146,6 +156,7 @@ statistics are rooted at *udp.<stat_prefix>.* with the following statistics:
   downstream_sess_tx_datagrams, Counter, Number of datagrams transmitted
   downstream_sess_tx_errors, Counter, Number of datagram transmission errors
   idle_timeout, Counter, Number of sessions destroyed due to idle timeout
+  session_filter_config_missing, Counter, Number of sessions destroyed due to missing session filter configuration
   downstream_sess_active, Gauge, Number of sessions currently active
 
 The following standard :ref:`upstream cluster stats <config_cluster_manager_cluster_stats>` are used

@@ -170,14 +170,34 @@ TEST_P(PathPatternMatchAndRewrite, IsValidMatchPattern) {
   EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
 }
 
+TEST_P(PathPatternMatchAndRewrite, IsValidPathGlobMatchPattern) {
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=*}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=*}/{doo=*}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/{hoo=*}/bar/{goo=*}").ok());
+
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo=*}").ok());
+  EXPECT_FALSE(isValidMatchPattern("//bar/{goo=*}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo=*}}").ok());
+}
+
+TEST_P(PathPatternMatchAndRewrite, IsValidTextGlobMatchPattern) {
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=**}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo=**}/doo").ok());
+  EXPECT_TRUE(isValidMatchPattern("/{foo=*}/bar/{goo=**}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/*/bar/**").ok());
+
+  EXPECT_FALSE(isValidMatchPattern("/{foo=**}/bar/{goo=*}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/**/bar/*").ok());
+}
+
 TEST_P(PathPatternMatchAndRewrite, IsValidRewritePattern) {
   EXPECT_TRUE(isValidRewritePattern("/foo/bar/{goo}").ok());
   EXPECT_TRUE(isValidRewritePattern("/foo/bar/{goo}/{doo}").ok());
   EXPECT_TRUE(isValidRewritePattern("/{hoo}/bar/{goo}").ok());
 
-  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
-  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
-  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
+  EXPECT_FALSE(isValidRewritePattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidRewritePattern("//bar/{goo}").ok());
+  EXPECT_FALSE(isValidRewritePattern("/foo/bar/{goo}}").ok());
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidSharedVariableSet) {

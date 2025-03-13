@@ -88,8 +88,12 @@ TEST_F(FileEventImplTest, EnabledEventsTriggeredAfterCreate) {
     }
     MockReadyCb ready_cb;
     auto user_file_event = std::make_unique<FileEventImpl>(
-        *dispatcher_, [&ready_cb](uint32_t arg) { ready_cb.called(arg); }, current_event,
-        io_source_);
+        *dispatcher_,
+        [&ready_cb](uint32_t arg) {
+          ready_cb.called(arg);
+          return absl::OkStatus();
+        },
+        current_event, io_source_);
     EXPECT_CALL(ready_cb, called(current_event));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     testing::Mock::VerifyAndClearExpectations(&ready_cb);
@@ -104,8 +108,12 @@ TEST_F(FileEventImplTest, ReadEventIsTriggeredWhenThePeerSetWriteEnd) {
     setWriteEnd();
     MockReadyCb ready_cb;
     auto user_file_event = std::make_unique<FileEventImpl>(
-        *dispatcher_, [&ready_cb](uint32_t arg) { ready_cb.called(arg); }, current_event,
-        io_source_);
+        *dispatcher_,
+        [&ready_cb](uint32_t arg) {
+          ready_cb.called(arg);
+          return absl::OkStatus();
+        },
+        current_event, io_source_);
     EXPECT_CALL(ready_cb, called(current_event));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     testing::Mock::VerifyAndClearExpectations(&ready_cb);
@@ -116,7 +124,12 @@ TEST_F(FileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
   setWritable();
   setReadable();
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_rw, io_source_);
   // The above should deliver both Read and Write during the activateIfEnabled(). It is not tested
   // here but in other test case.
 
@@ -128,7 +141,12 @@ TEST_F(FileEventImplTest, ReadEventNotDeliveredAfterDisabledRead) {
 
 TEST_F(FileEventImplTest, RescheduleAfterTriggered) {
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_rw, io_source_);
   {
     SCOPED_TRACE("1st schedule");
     user_file_event_->activate(event_rw);
@@ -157,7 +175,12 @@ TEST_F(FileEventImplTest, RescheduleAfterTriggered) {
 
 TEST_F(FileEventImplTest, RescheduleIsDeduplicated) {
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_rw, io_source_);
   {
     SCOPED_TRACE("1st schedule");
     user_file_event_->activate(event_rw);
@@ -184,7 +207,12 @@ TEST_F(FileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
         .WillOnce(Return((current_event & Event::FileReadyType::Write) != 0))
         .RetiresOnSaturation();
     auto user_file_event = std::make_unique<FileEventImpl>(
-        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+        *dispatcher_,
+        [this](uint32_t arg) {
+          ready_cb_.called(arg);
+          return absl::OkStatus();
+        },
+        event_rw, io_source_);
     EXPECT_CALL(ready_cb_, called(current_event));
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -193,7 +221,12 @@ TEST_F(FileEventImplTest, DefaultReturnAllEnabledReadAndWriteEvents) {
 TEST_F(FileEventImplTest, ActivateDoesNotHonerEnabled) {
   for (const auto enabled : events_all_combination) {
     auto user_file_event = std::make_unique<FileEventImpl>(
-        *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, enabled, io_source_);
+        *dispatcher_,
+        [this](uint32_t arg) {
+          ready_cb_.called(arg);
+          return absl::OkStatus();
+        },
+        enabled, io_source_);
     {
       EXPECT_CALL(ready_cb_, called(_)).Times(0);
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -209,7 +242,12 @@ TEST_F(FileEventImplTest, ActivateDoesNotHonerEnabled) {
 TEST_F(FileEventImplTest, ActivateWillSchedule) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -229,7 +267,12 @@ TEST_F(FileEventImplTest, ActivateWillSchedule) {
 TEST_F(FileEventImplTest, ActivateIfEnabledWillSchedule) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_all, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_all, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -245,7 +288,12 @@ TEST_F(FileEventImplTest, ActivateIfEnabledWillSchedule) {
 TEST_F(FileEventImplTest, ActivateDedup) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -267,7 +315,12 @@ TEST_F(FileEventImplTest, ActivateDedup) {
 TEST_F(FileEventImplTest, ActivateIfEnabledCanDedup) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_all, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_all, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -297,7 +350,12 @@ TEST_F(FileEventImplTest, ActivateIfEnabledCanDedup) {
 TEST_F(FileEventImplTest, EnabledClearActivate) {
   // IO is neither readable nor writable.
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); }, event_rw, io_source_);
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
+      event_rw, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -346,7 +404,11 @@ TEST_F(FileEventImplTest, EnabledClearActivate) {
 
 TEST_F(FileEventImplTest, ActivateIfEnabledTriggerOnlyEnabled) {
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
       Event::FileReadyType::Read | Event::FileReadyType::Closed, io_source_);
   {
     EXPECT_CALL(ready_cb_, called(_)).Times(0);
@@ -387,7 +449,11 @@ TEST_F(FileEventImplTest, ActivateIfEnabledTriggerOnlyEnabled) {
 TEST_F(FileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
   setWriteEnd();
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
 
   EXPECT_CALL(ready_cb_, called(Event::FileReadyType::Closed));
@@ -396,7 +462,11 @@ TEST_F(FileEventImplTest, EventClosedIsTriggeredBySetWriteEnd) {
 
 TEST_F(FileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
   {
     // No Closed event bit if enabled but not activated.
@@ -417,7 +487,11 @@ TEST_F(FileEventImplTest, EventClosedIsTriggeredByManullyActivate) {
 
 TEST_F(FileEventImplTest, NotImplementedEmulatedEdge) {
   user_file_event_ = std::make_unique<FileEventImpl>(
-      *dispatcher_, [this](uint32_t arg) { ready_cb_.called(arg); },
+      *dispatcher_,
+      [this](uint32_t arg) {
+        ready_cb_.called(arg);
+        return absl::OkStatus();
+      },
       Event::FileReadyType::Write | Event::FileReadyType::Closed, io_source_);
   user_file_event_->registerEventIfEmulatedEdge(0);
   user_file_event_->unregisterEventIfEmulatedEdge(0);

@@ -32,9 +32,16 @@ package api_impl
 */
 import "C"
 import (
+	"os"
+	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
+)
+
+var (
+	currLogLevel atomic.Int32
 )
 
 type commonCApiImpl struct{}
@@ -47,9 +54,33 @@ func (c *commonCApiImpl) Log(level api.LogType, message string) {
 }
 
 func (c *commonCApiImpl) LogLevel() api.LogType {
-	return api.LogType(C.envoyGoFilterLogLevel())
+	lv := currLogLevel.Load()
+	return api.LogType(lv)
 }
 
 func init() {
 	api.SetCommonCAPI(&commonCApiImpl{})
+
+	interval := time.Second
+	envInterval := os.Getenv("ENVOY_GOLANG_LOG_LEVEL_SYNC_INTERVAL")
+	if envInterval != "" {
+		dur, err := time.ParseDuration(envInterval)
+		if err == nil && dur >= time.Millisecond {
+			// protect against too frequent sync
+			interval = dur
+		} else {
+			api.LogErrorf("invalid env var ENVOY_GOLANG_LOG_LEVEL_SYNC_INTERVAL: %s", envInterval)
+		}
+	}
+
+	currLogLevel.Store(int32(C.envoyGoFilterLogLevel()))
+	ticker := time.NewTicker(interval)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				currLogLevel.Store(int32(C.envoyGoFilterLogLevel()))
+			}
+		}
+	}()
 }

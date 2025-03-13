@@ -3,6 +3,8 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/tracing/null_span_impl.h"
+
 namespace Envoy {
 namespace Formatter {
 
@@ -16,6 +18,16 @@ using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 class HttpFormatterContext {
 public:
   /**
+   * Interface for a context extension which can be used to provide non-HTTP specific data to
+   * formatters. This could be used for non-HTTP protocols to provide protocol specific data to
+   * formatters.
+   */
+  class Extension {
+  public:
+    virtual ~Extension() = default;
+  };
+
+  /**
    * Constructor that uses the provided request/response headers, response trailers, local reply
    * body, and access log type. Any of the parameters can be nullptr/empty.
    *
@@ -24,12 +36,14 @@ public:
    * @param response_trailers supplies the response trailers.
    * @param local_reply_body supplies the local reply body.
    * @param log_type supplies the access log type.
+   * @param active_span supplies the active span.
    */
   HttpFormatterContext(const Http::RequestHeaderMap* request_headers = nullptr,
                        const Http::ResponseHeaderMap* response_headers = nullptr,
                        const Http::ResponseTrailerMap* response_trailers = nullptr,
                        absl::string_view local_reply_body = {},
-                       AccessLogType log_type = AccessLogType::NotSet);
+                       AccessLogType log_type = AccessLogType::NotSet,
+                       const Tracing::Span* active_span = nullptr);
   /**
    * Set or overwrite the request headers.
    * @param request_headers supplies the request headers.
@@ -86,7 +100,7 @@ public:
   bool hasRequestHeaders() const { return request_headers_ != nullptr; }
 
   /**
-   * @return const Http::ResponseHeaderMap& the response headers. Empty respnose header map if
+   * @return const Http::ResponseHeaderMap& the response headers. Empty response header map if
    * no response headers are available.
    */
   const Http::ResponseHeaderMap& responseHeaders() const;
@@ -118,13 +132,44 @@ public:
    */
   AccessLogType accessLogType() const;
 
+  /**
+   * @return const Tracing::Span& the active span.
+   */
+  const Tracing::Span& activeSpan() const;
+
+  /**
+   * Set the context extension.
+   * @param extension supplies the context extension.
+   */
+  HttpFormatterContext& setExtension(const Extension& extension) {
+    extension_ = extension;
+    return *this;
+  }
+
+  /**
+   * @return OptRef<const ContextExtension> the context extension.
+   */
+  OptRef<const Extension> extension() const { return extension_; }
+
+  /**
+   * @return OptRef<const ExtensionType> the context extension casted to the specified type.
+   */
+  template <class Type> OptRef<const Type> typedExtension() const {
+    const Type* typed_extension = dynamic_cast<const Type*>(extension_.ptr());
+    return makeOptRefFromPtr(typed_extension);
+  }
+
 private:
   const Http::RequestHeaderMap* request_headers_{};
   const Http::ResponseHeaderMap* response_headers_{};
   const Http::ResponseTrailerMap* response_trailers_{};
   absl::string_view local_reply_body_{};
   AccessLogType log_type_{AccessLogType::NotSet};
+  const Tracing::Span* active_span_ = nullptr;
+  OptRef<const Extension> extension_;
 };
+
+using Context = HttpFormatterContext;
 
 } // namespace Formatter
 } // namespace Envoy

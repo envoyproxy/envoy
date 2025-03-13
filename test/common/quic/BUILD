@@ -15,7 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = ["envoy_quic_alarm_test.cc"],
-    external_deps = ["quiche_quic_platform"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_alarm_factory_lib",
@@ -23,12 +23,14 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
 envoy_cc_test(
     name = "envoy_quic_clock_test",
     srcs = ["envoy_quic_clock_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_clock_lib",
@@ -41,7 +43,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = ["envoy_quic_writer_test.cc"],
-    external_deps = ["quiche_quic_platform"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/network:io_socket_error_lib",
@@ -50,22 +52,27 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
-    external_deps = ["quiche_quic_platform"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/common/tls:context_config_lib",
+        "//source/common/tls:server_context_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:test_runtime_lib",
         "@com_github_google_quiche//:quic_core_versions_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
@@ -73,6 +80,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_filter_manager_connection_impl_test",
     srcs = ["quic_filter_manager_connection_impl_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_filter_manager_connection_lib",
@@ -86,6 +94,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = ["quic_stat_names_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_stat_names_lib",
@@ -98,16 +107,18 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = ["envoy_quic_proof_verifier_test.cc"],
-    external_deps = ["quiche_quic_platform"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/common/tls:context_config_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
-        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
+        "//test/common/tls/cert_validator:timed_cert_validator",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
@@ -115,6 +126,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = ["envoy_quic_server_stream_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -127,7 +139,6 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
@@ -138,6 +149,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_stream_test",
     srcs = ["envoy_quic_client_stream_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -149,7 +161,6 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
@@ -159,6 +170,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_session_test",
     srcs = ["envoy_quic_server_session_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
@@ -187,22 +199,27 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_session_test",
     srcs = ["envoy_quic_client_session_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
         "//envoy/stats:stats_macros",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/quic:client_codec_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ],
 )
@@ -210,6 +227,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = ["active_quic_listener_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
@@ -223,8 +241,10 @@ envoy_cc_test(
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
         "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         "//source/server:configuration_lib",
+        "//source/server:process_context_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -236,6 +256,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_dispatcher_test",
     srcs = ["envoy_quic_dispatcher_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
@@ -284,6 +305,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "client_connection_factory_impl_test",
     srcs = ["client_connection_factory_impl_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -302,12 +324,14 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
 envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = ["quic_io_handle_wrapper_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_io_handle_wrapper_lib",
@@ -321,6 +345,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_utils_test",
     srcs = ["envoy_quic_utils_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_utils_lib",
@@ -333,6 +358,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_simulated_watermark_buffer_test",
     srcs = ["envoy_quic_simulated_watermark_buffer_test.cc"],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = ["//source/common/quic:envoy_quic_simulated_watermark_buffer_lib"],
 )
@@ -343,11 +369,14 @@ envoy_cc_test_library(
     external_deps = ["bazel_runfiles"],
     tags = ["nofips"],
     deps = [
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",
+        "//source/common/quic:envoy_quic_connection_debug_visitor_factory_interface",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
+        "//test/common/config:dummy_config_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
@@ -360,13 +389,14 @@ envoy_cc_test(
     name = "quic_transport_socket_factory_test",
     srcs = ["quic_transport_socket_factory_test.cc"],
     data = [
-        "//test/extensions/transport_sockets/tls/test_data:certs",
+        "//test/common/tls/test_data:certs",
     ],
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/common/tls:context_config_lib",
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
@@ -377,6 +407,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_datagram_handler_test",
     srcs = envoy_select_enable_http_datagrams(["http_datagram_handler_test.cc"]),
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = envoy_select_enable_http_datagrams([
         "//source/common/quic:http_datagram_handler",
@@ -384,6 +415,33 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ]),
+)
+
+envoy_cc_test(
+    name = "cert_compression_test",
+    srcs = ["cert_compression_test.cc"],
+    deps = [
+        "//source/common/quic:cert_compression_lib",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "connection_id_matchers",
+    hdrs = ["connection_id_matchers.h"],
+    deps = ["//test/mocks/network:network_mocks"],
+)
+
+envoy_cc_test(
+    name = "envoy_deterministic_connection_id_generator_test",
+    srcs = ["envoy_deterministic_connection_id_generator_test.cc"],
+    rbe_pool = "6gig",
+    tags = ["nofips"],
+    deps = [
+        ":connection_id_matchers",
+        "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+    ],
 )
 
 envoy_proto_library(
@@ -408,6 +466,7 @@ envoy_cc_fuzz_test(
     name = "envoy_quic_h3_fuzz_test",
     srcs = ["envoy_quic_h3_fuzz_test.cc"],
     corpus = "envoy_quic_h3_fuzz_test_corpus",
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":envoy_quic_h3_fuzz_helper_lib",

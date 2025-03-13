@@ -8,6 +8,7 @@
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -21,12 +22,12 @@ namespace {
 
 class ThriftRouteMatcherTest : public testing::Test {
 public:
-  ThriftRouteMatcherTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+  ThriftRouteMatcherTest() = default;
 
 protected:
   RouteMatcher createMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route) {
-    return {route, absl::nullopt};
+    return {route, absl::nullopt, context_};
   }
 
   RouteMatcher createMatcher(const std::string& yaml) {
@@ -34,9 +35,9 @@ protected:
     return createMatcher(config);
   }
 
-private:
-  ScopedInjectableLoader<Regex::Engine> engine_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 
+private:
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
   parseRouteConfigurationFromV3Yaml(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;

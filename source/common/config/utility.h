@@ -12,11 +12,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-#include "envoy/stats/stats_matcher.h"
-#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
@@ -24,7 +19,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
-#include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -132,7 +126,7 @@ public:
    */
   static absl::Status
   validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                      const std::string& cluster_name, const std::string& config_source);
+                      absl::string_view cluster_name, absl::string_view config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
@@ -161,12 +155,12 @@ public:
   template <class Proto> static absl::Status checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-    if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
+    if (transport_api_version != envoy::config::core::v3::ApiVersion::AUTO &&
+        transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
       const std::string& warning = fmt::format(
-          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "V2 xDS transport protocol version is deprecated in {}. "
           "The v2 xDS major version has been removed and is no longer supported. "
-          "You may be missing explicit V3 configuration of the transport API version, "
-          "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
+          "See the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
       return absl::InvalidArgumentError(warning);
@@ -178,9 +172,10 @@ public:
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
-   * @return RateLimitSettings.
+   * @return absl::StatusOr<RateLimitSettings> - returns an error when an
+   *         invalid RateLimit config settings are provided.
    */
-  static RateLimitSettings
+  static absl::StatusOr<RateLimitSettings>
   parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
@@ -242,7 +237,7 @@ public:
    * Get a Factory from the registry with a particular name or return nullptr.
    * @param name string identifier for the particular implementation.
    */
-  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+  template <class Factory> static Factory* getFactoryByName(absl::string_view name) {
     if (name.empty()) {
       return nullptr;
     }
@@ -304,21 +299,21 @@ public:
    * @param typed_config for the extension config.
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetTypeName();
-    static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
+    static const std::string typed_struct_type(
+        xds::type::v3::TypedStruct::default_instance().GetTypeName());
+    static const std::string legacy_typed_struct_type(
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName());
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
@@ -358,7 +353,8 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
+    THROW_IF_NOT_OK(
+        translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config));
     return config;
   }
 
@@ -382,7 +378,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, validation_visitor, *config);
+    THROW_IF_NOT_OK(translateOpaqueConfig(typed_config, validation_visitor, *config));
     return config;
   }
 
@@ -392,37 +388,30 @@ public:
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
-   * Create TagProducer instance. Check all tag names for conflicts to avoid
-   * unexpected tag name overwriting.
-   * @param bootstrap bootstrap proto.
-   * @param cli_tags tags that are provided by the cli
-   * @throws EnvoyException when the conflict of tag names is found.
-   */
-  static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                    const Stats::TagVector& cli_tags);
-
-  /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
-   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
+   * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
+   *                         in the given index, a nullptr factory will be returned.
+   * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
+   * grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope, bool skip_cluster_check);
+                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx);
 
   /**
    * Translate opaque config from google.protobuf.Any to defined proto message.
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
+   * @return a status indicating if translation was a success
    */
-  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto);
+  static absl::Status translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                                            Protobuf::Message& out_proto);
 
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
@@ -431,22 +420,13 @@ public:
    * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
-   * @throws EnvoyException if there is a mismatch between design and configuration.
+   * @return a status indicating if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
-                                      const std::string& filter_chain_type, bool is_terminal_filter,
-                                      bool last_filter_in_current_config) {
-    if (is_terminal_filter && !last_filter_in_current_config) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Error: terminal filter named {} of type {} must be the "
-                      "last filter in a {} filter chain.",
-                      name, filter_type, filter_chain_type));
-    } else if (!is_terminal_filter && last_filter_in_current_config) {
-      ExceptionUtil::throwEnvoyException(fmt::format(
-          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
-          name, filter_type, filter_chain_type));
-    }
-  }
+  static absl::Status validateTerminalFilters(const std::string& name,
+                                              const std::string& filter_type,
+                                              const std::string& filter_chain_type,
+                                              bool is_terminal_filter,
+                                              bool last_filter_in_current_config);
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.
@@ -490,7 +470,6 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source,
       Random::RandomGenerator& random, const uint32_t default_base_interval_ms,
       absl::optional<const uint32_t> default_max_interval_ms) {
-
     auto& grpc_services = api_config_source.grpc_services();
     if (!grpc_services.empty() && grpc_services[0].has_envoy_grpc()) {
       return prepareJitteredExponentialBackOffStrategy(

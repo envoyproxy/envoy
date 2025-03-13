@@ -1,7 +1,8 @@
 #include "source/common/network/connection_impl.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
@@ -34,8 +35,8 @@ public:
   std::string postgresConfig(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
                              std::string additional_filters) {
     std::string main_config = fmt::format(
-        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template")),
+        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template"))),
         Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
         std::get<1>(upstream_ssl_config), // upstream SSL transport socket
@@ -295,7 +296,8 @@ public:
     // The tls transport socket will be inserted into fake_upstream when
     // Envoy's upstream starttls transport socket is converted to secure mode.
     std::unique_ptr<Ssl::ContextManager> tls_context_manager =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+            server_factory_context_);
 
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext downstream_tls_context;
 
@@ -315,12 +317,12 @@ public:
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        downstream_tls_context, mock_factory_ctx);
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+        downstream_tls_context, mock_factory_ctx, false);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
-            new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
+            *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
                 std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()), {})};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
@@ -527,18 +529,19 @@ public:
     // The tls transport socket will be inserted into fake_upstream when
     // Envoy's upstream starttls transport socket is converted to secure mode.
     std::unique_ptr<Ssl::ContextManager> tls_context_manager =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+            server_factory_context_);
 
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context;
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+    auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         upstream_tls_context, mock_factory_ctx);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::UpstreamTransportSocketFactoryPtr tls_context =
         Network::UpstreamTransportSocketFactoryPtr{
-            new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
+            *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
                 std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
 
     Network::TransportSocketOptionsConstSharedPtr options;

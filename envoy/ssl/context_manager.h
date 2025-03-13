@@ -10,7 +10,17 @@
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
+
+namespace Server {
+namespace Configuration {
+class CommonFactoryContext;
+} // namespace Configuration
+} // namespace Server
+
 namespace Ssl {
+
+using ContextAdditionalInitFunc =
+    std::function<absl::Status(Ssl::TlsContext& context, const Ssl::TlsCertificateConfig& cert)>;
 
 /**
  * Manages all of the SSL contexts in the process
@@ -22,15 +32,16 @@ public:
   /**
    * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
-                                                        const ClientContextConfig& config) PURE;
+  virtual absl::StatusOr<ClientContextSharedPtr>
+  createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
    */
-  virtual ServerContextSharedPtr
+  virtual absl::StatusOr<ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names) PURE;
+                         const std::vector<std::string>& server_names,
+                         ContextAdditionalInitFunc additional_init) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire, the value is
@@ -62,16 +73,6 @@ public:
 };
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;
-
-class ContextManagerFactory : public Config::UntypedFactory {
-public:
-  ~ContextManagerFactory() override = default;
-  virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
-
-  // There could be only one factory thus the name is static.
-  std::string name() const override { return "ssl_context_manager"; }
-  std::string category() const override { return "envoy.ssl_context_manager"; }
-};
 
 } // namespace Ssl
 } // namespace Envoy

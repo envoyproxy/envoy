@@ -38,8 +38,11 @@ public:
   // Returns the current number of requests and how many of them are successful.
   virtual RequestData requestCounts() PURE;
 
-  // return the average RPS across the sampling window
+  // Returns the average RPS across the sampling window.
   virtual uint32_t averageRps() const PURE;
+
+  // Returns the sample window for this controller.
+  virtual std::chrono::seconds samplingWindow() const PURE;
 };
 
 /**
@@ -67,6 +70,8 @@ public:
   }
 
   uint32_t averageRps() const override;
+
+  std::chrono::seconds samplingWindow() const override { return sampling_window_; }
 
 private:
   void recordRequest(bool success);

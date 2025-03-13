@@ -1,7 +1,7 @@
 #pragma once
 
 #include "source/common/common/empty_string.h"
-#include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
+#include "source/common/tls/connection_info_impl_base.h"
 
 #include "quiche/quic/core/quic_session.h"
 
@@ -32,6 +32,9 @@ public:
   const std::string& serialNumberPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& issuerPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& subjectPeerCertificate() const override { return EMPTY_STRING; }
+  Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override {
+    return absl::nullopt;
+  }
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override {
     return EMPTY_STRING;

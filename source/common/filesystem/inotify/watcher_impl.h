@@ -26,7 +26,7 @@ public:
   ~WatcherImpl() override;
 
   // Filesystem::Watcher
-  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
+  absl::Status addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   struct FileWatch {
@@ -39,7 +39,7 @@ private:
     std::list<FileWatch> watches_;
   };
 
-  void onInotifyEvent();
+  absl::Status onInotifyEvent();
 
   Filesystem::Instance& file_system_;
   int inotify_fd_;

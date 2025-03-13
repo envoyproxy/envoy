@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":geoip_mocks",
@@ -40,6 +41,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["geoip_filter_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":dummy_cc_proto",
@@ -49,7 +51,6 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],
 )
@@ -59,6 +60,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = select({
         "//bazel:linux": ["geoip_filter_integration_test.cc"],
+        "//bazel:darwin_any": ["geoip_filter_integration_test.cc"],
         "//conditions:default": [],
     }),
     data = [
@@ -67,6 +69,7 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.http.geoip",
     ],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/geoip:config",

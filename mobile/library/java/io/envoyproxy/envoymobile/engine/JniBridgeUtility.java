@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
+import android.util.Pair;
 import java.nio.charset.StandardCharsets;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +54,15 @@ public final class JniBridgeUtility {
     for (Map.Entry<String, String> entry : stringMap.entrySet()) {
       convertedBytes.add(entry.getKey().getBytes(StandardCharsets.UTF_8));
       convertedBytes.add(entry.getValue().getBytes(StandardCharsets.UTF_8));
+    }
+    return convertedBytes.toArray(new byte[0][0]);
+  }
+
+  public static byte[][] listOfStringPairsToJniBytes(List<Pair<String, String>> stringList) {
+    final List<byte[]> convertedBytes = new ArrayList<byte[]>(stringList.size() * 2);
+    for (Pair<String, String> entry : stringList) {
+      convertedBytes.add(entry.first.getBytes(StandardCharsets.UTF_8));
+      convertedBytes.add(entry.second.getBytes(StandardCharsets.UTF_8));
     }
     return convertedBytes.toArray(new byte[0][0]);
   }

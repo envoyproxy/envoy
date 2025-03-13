@@ -25,15 +25,12 @@ using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callback
 
 /**
  * Simple struct of additional contextual information of HTTP filter, e.g. filter config name
- * from configuration, canonical filter name, etc.
+ * from configuration, etc.
  */
 struct FilterContext {
   // The name of the filter configuration that used to create related filter factory function.
   // This could be any legitimate non-empty string.
   std::string config_name;
-  // Filter extension qualified name. This is used as a fallback of `config_name`. E.g.,
-  // "envoy.filters.http.buffer" for the HTTP buffer filter.
-  std::string filter_name;
 };
 
 /**
@@ -94,13 +91,11 @@ public:
    * Called when a new HTTP stream is created on the connection.
    * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
    *                FilterChainManager.
-   * @param only_create_if_configured if true, only creates filter chain if there is a non-default
-   *                                  configured filter chain. Default false.
    * @param options additional options for creating a filter chain.
    * @return whather a filter chain has been created.
    */
   virtual bool
-  createFilterChain(FilterChainManager& manager, bool only_create_if_configured = false,
+  createFilterChain(FilterChainManager& manager,
                     const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 
   /**
@@ -113,9 +108,10 @@ public:
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
   using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
-                                        const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainManager& manager) const PURE;
+  virtual bool createUpgradeFilterChain(
+      absl::string_view upgrade, const UpgradeMap* per_route_upgrade_map,
+      FilterChainManager& manager,
+      const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 };
 
 } // namespace Http

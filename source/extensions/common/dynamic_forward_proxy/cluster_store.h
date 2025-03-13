@@ -10,6 +10,12 @@ namespace Extensions {
 namespace Common {
 namespace DynamicForwardProxy {
 
+class DfpLb {
+public:
+  virtual ~DfpLb() = default;
+  virtual Upstream::HostConstSharedPtr findHostByName(const std::string& host) const PURE;
+};
+
 class DfpCluster {
 public:
   virtual ~DfpCluster() = default;

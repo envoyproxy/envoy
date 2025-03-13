@@ -40,8 +40,9 @@ public:
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufMessage::getStrictValidationVisitor(), config);
+    THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster_config.cluster_type().typed_config(), ProtobufMessage::getStrictValidationVisitor(),
+        config));
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
@@ -58,8 +59,10 @@ public:
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
     auto cache = dns_cache_manager_->getCache(config.dns_cache_config()).value();
-    cluster_.reset(
-        new Cluster(cluster_config, std::move(cache), config, factory_context, this->get()));
+    absl::Status creation_status = absl::OkStatus();
+    cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
+                               this->get(), creation_status));
+    THROW_IF_NOT_OK(creation_status);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -70,9 +73,9 @@ public:
     ON_CALL(lb_context_, downstreamConnection()).WillByDefault(Return(&connection_));
 
     member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
-        [this](const Upstream::HostVector& hosts_added,
-               const Upstream::HostVector& hosts_removed) -> void {
+        [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           onMemberUpdateCb(hosts_added, hosts_removed);
+          return absl::OkStatus();
         });
 
     absl::flat_hash_map<std::string, Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr>
@@ -86,9 +89,9 @@ public:
       }
     }));
     if (!existing_hosts.empty()) {
-      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0))).Times(existing_hosts.size());
+      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
     }
-    cluster_->initialize([] {});
+    cluster_->initialize([] { return absl::OkStatus(); });
   }
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr get() override {
@@ -98,7 +101,7 @@ public:
   void makeTestHost(const std::string& host, const std::string& address) {
     EXPECT_TRUE(host_map_.find(host) == host_map_.end());
     host_map_[host] = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
-    host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
+    host_map_[host]->address_ = Network::Utility::parseInternetAddressNoThrow(address);
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
@@ -109,7 +112,7 @@ public:
 
   void updateTestHostAddress(const std::string& host, const std::string& address) {
     EXPECT_FALSE(host_map_.find(host) == host_map_.end());
-    host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
+    host_map_[host]->address_ = Network::Utility::parseInternetAddressNoThrow(address);
   }
 
   void refreshLb() { lb_ = lb_factory_->create(lb_params_); }
@@ -121,10 +124,9 @@ public:
   }
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
-    StreamInfo::FilterState& filter_state =
-        const_cast<StreamInfo::FilterState&>(lb_context_.requestStreamInfo()->filterState());
+    StreamInfo::FilterStateSharedPtr filter_state = lb_context_.requestStreamInfo()->filterState();
 
-    filter_state.setData(
+    filter_state->setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
@@ -239,38 +241,37 @@ TEST_F(ClusterTest, BasicFlow) {
   makeTestHost("host1:0", "1.2.3.4");
   InSequence s;
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")).host);
 
   // Verify no host LB cases.
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")).host);
   EXPECT_EQ(nullptr, lb_->peekAnotherHost(setHostAndReturnContext("foo")));
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
   updateTestHostAddress("host1:0", "2.3.4.5");
-  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("2.3.4.5:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
   update_callbacks_->onDnsHostRemove("host1:0");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
 }
 
 // Outlier detection
@@ -281,38 +282,38 @@ TEST_F(ClusterTest, OutlierDetection) {
   InSequence s;
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]).ok());
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
-            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host2:0")).host->address()->asString());
 
   // Fail outlier check for host1
   setOutlierFailed("host1:0");
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
   // "host2:0" should not be affected
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
-            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host2:0")).host->address()->asString());
 
   // Clear outlier check failure for host1, it should be available again
   clearOutlierFailed("host1:0");
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 }
 
 // Various invalid LB context permutations in case the cluster is used outside of HTTP.
 TEST_F(ClusterTest, InvalidLbContext) {
   initialize(default_yaml_config_, false);
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_));
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(ClusterTest, FilterStateHostOverride) {
@@ -320,10 +321,11 @@ TEST_F(ClusterTest, FilterStateHostOverride) {
   makeTestHost("host1:0", "1.2.3.4");
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_CALL(*host_map_["host1:0"], touch());
-  EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0"))->address()->asString());
+  EXPECT_EQ(
+      "1.2.3.4:0",
+      lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0")).host->address()->asString());
 }
 
 // Verify cluster attaches to a populated cache.
@@ -357,7 +359,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -374,7 +376,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -407,7 +409,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -440,7 +442,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -472,7 +474,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -501,7 +503,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -531,7 +533,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.3:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -560,7 +562,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -590,7 +592,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
@@ -624,7 +626,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
   Upstream::MockHost host;
   EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+      *Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
