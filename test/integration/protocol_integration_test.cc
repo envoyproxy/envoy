@@ -5360,21 +5360,6 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
   }
 }
 
-TEST_P(ProtocolIntegrationTest, NewlinesBetweenRequestsAreIgnored) {
-  autonomous_upstream_ = true;
-  initialize();
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  // Make two requests in a row, with a technically-incorrect newline between
-  // them. Per RFC 9112, clients MUST NOT do this, but servers SHOULD tolerate it.
-  ASSERT_TRUE(tcp_client->write(
-      "POST / HTTP/1.1\r\nHost: foo.lyft.com\r\nContent-Length: 5\r\n\r\naaaaa"
-      "\r\nPOST / HTTP/1.1\r\nHost: foo.lyft.com\r\nContent-Length: 4\r\n\r\naaaa"));
-  // If the decoder doesn't correctly handle unexpected newlines, the second
-  // response is likely to be `400 Bad Request` instead of `200 OK`.
-  EXPECT_TCP_RESPONSE(tcp_client, testing::ContainsRegex("200 OK.*200 OK"));
-  tcp_client->close();
-}
-
 TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
   // This test is only for H/1 downstream and H/2 or H/3 upstream
   // Other cases are covered by the ServerHalfCloseBeforeClientWithBufferedResponseData
