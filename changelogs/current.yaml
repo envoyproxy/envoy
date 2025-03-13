@@ -13,11 +13,6 @@ minor_behavior_changes:
     Setting :ref:`dns_query_timeout
     <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
     to 0 will disable the the Envoy DNS query timeout and use the underlying DNS implementation timeout.
-- area: http
-  change: |
-    Added :ref:`ignore_http_11_upgrade
-    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
-    to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
 - area: ext_proc
   change: |
     When :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
@@ -129,6 +124,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Added :ref:`ignore_http_11_upgrade
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
+    to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
 - area: http
   change: |
     Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
