@@ -655,7 +655,7 @@ TEST_F(MatcherTest, ReentryWithRecursiveMatcher) {
                                stringOnMatch<TestData>("no match 1"));
   parent_matcher_1->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                                stringOnMatch<TestData>("match 2"));
-  OnMatch<TestData> on_match_1{{}, /*matcher=*/parent_matcher_1};
+  OnMatch<TestData> on_match_1{{}, /*matcher=*/parent_matcher_1, false};
   top_matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }), on_match_1);
 
   auto parent_matcher_2 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(std::nullopt);
@@ -665,7 +665,7 @@ TEST_F(MatcherTest, ReentryWithRecursiveMatcher) {
                                stringOnMatch<TestData>("no match 2"));
   parent_matcher_2->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                                stringOnMatch<TestData>("match 4"));
-  OnMatch<TestData> on_match_2{{}, /*matcher=*/parent_matcher_2};
+  OnMatch<TestData> on_match_2{{}, /*matcher=*/parent_matcher_2, false};
   top_matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }), on_match_2);
 
   // Expect to hit each match once via repeated re-entry, including the recursive on-no-match.
@@ -798,7 +798,7 @@ TEST_F(MatcherTest, KeepMatchingWithUnsupportedReentry) {
           std::make_unique<TestInput>(DataInputGetResult{
               DataInputGetResult::DataAvailability::AllDataAvailable, std::string("string")}),
           stringOnMatch<TestData>("keep matching", /*keep_matching=*/true));
-  ASSERT_OK(matcher_or);
+  ASSERT_TRUE(matcher_or.ok());
   std::shared_ptr<ExactMapMatcher<TestData>> matcher(matcher_or->release());
 
   ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher, false);
