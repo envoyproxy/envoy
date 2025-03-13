@@ -1017,7 +1017,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
   uint64_t response_code = Utility::getResponseStatus(headers);
   filter_manager_.streamInfo().setResponseCode(response_code);
 
-  if (filter_manager_.streamInfo().health_check_request_) {
+  if (filter_manager_.streamInfo().healthCheck()) {
     return;
   }
 

@@ -656,6 +656,15 @@ public:
   virtual void
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
+  /*
+   * @param short string type flag to indicate the noteworthy event of this stream. Mutliple flags
+   * could be added and will be concatenated with comma. It should not contain any empty or space
+   * characters (' ', '\t', '\f', '\v', '\n', '\r').
+   *
+   * The short string should not duplicate with the any registered response flags.
+   */
+  virtual void addCustomFlag(absl::string_view) PURE;
+
   /**
    * @return std::string& the name of the route. The name is get from the route() and it is
    *         empty if there is no route.
@@ -807,6 +816,11 @@ public:
    * flag. Only flags that are declared in the enum CoreResponseFlag type are supported.
    */
   virtual uint64_t legacyResponseFlags() const PURE;
+
+  /**
+   * @return all stream flags that are added.
+   */
+  virtual absl::string_view customFlags() const PURE;
 
   /**
    * @return whether the request is a health check request or not.
