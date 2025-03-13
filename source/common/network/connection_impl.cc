@@ -1027,7 +1027,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
 }
 
-// Constructor to create "clientConnection" object from an existing downstream connection
+// Constructor to create "clientConnection" object from an existing socket.
 ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher,
                                            Network::TransportSocketPtr&& transport_socket,
                                            Network::ConnectionSocketPtr&& downstream_socket)

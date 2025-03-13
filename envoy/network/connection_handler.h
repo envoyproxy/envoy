@@ -412,12 +412,12 @@ public:
   virtual LocalRevConnRegistry* getLocalRegistry() PURE;
 
   /**
-   * Helper function to create a ReverseConnectionListenerConfig from a google.protobuf.Any.
+   * Helper function to create a ReverseConnectionListenerConfig from a ProtobufWkt.Any.
    * @param config is the reverse connection listener config.
    * @return the ReverseConnectionListenerConfig object.
    */
   virtual absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>
-  fromAnyConfig(const google::protobuf::Any& config) PURE;
+  fromAnyConfig(const ProtobufWkt::Any& config) PURE;
 };
 
 } // namespace Network

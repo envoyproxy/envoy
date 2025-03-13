@@ -107,11 +107,11 @@ using CreateConnectionDataFn =
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(
-      HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-      uint64_t effective_concurrent_stream_limit, uint64_t configured_concurrent_stream_limit,
-      OptRef<Upstream::Host::CreateConnectionData> opt_data,
-      CreateConnectionDataFn connection_fn = nullptr)
+  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+               uint64_t effective_concurrent_stream_limit,
+               uint64_t configured_concurrent_stream_limit,
+               OptRef<Upstream::Host::CreateConnectionData> opt_data,
+               CreateConnectionDataFn connection_fn = nullptr)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
                                             configured_concurrent_stream_limit) {
@@ -127,7 +127,7 @@ public:
         return static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)
             ->host()
             ->createConnection(parent.dispatcher(), parent.socketOptions(),
-                                parent.transportSocketOptions());
+                               parent.transportSocketOptions());
       };
     }
     Upstream::Host::CreateConnectionData data = connection_fn(parent);

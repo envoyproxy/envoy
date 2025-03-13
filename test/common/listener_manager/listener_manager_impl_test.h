@@ -473,7 +473,7 @@ protected:
   public:
     MOCK_METHOD(Network::LocalRevConnRegistry*, getLocalRegistry, ());
     MOCK_METHOD(absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>, fromAnyConfig,
-                (const google::protobuf::Any& config));
+                (const ProtobufWkt::Any& config));
   };
 
   class DummyReverseConnectionListenerConfig : public Network::ReverseConnectionListenerConfig {
