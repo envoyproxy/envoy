@@ -28,10 +28,15 @@ public:
     if (n == 0) {
       return nullptr;
     }
+// std::aligned_alloc is not available in the Android NDK until v28.
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 28
+    return nullptr;
+#else
     std::size_t bytes = n * sizeof(T);
     // Ensure bytes is a multiple of Alignment, which is required by std::aligned_alloc.
     bytes = round_up_to_alignment(bytes);
     return static_cast<T*>(std::aligned_alloc(Alignment, bytes));
+#endif
   }
 
   void deallocate(T* p, std::size_t) noexcept {

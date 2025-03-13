@@ -9,6 +9,8 @@ namespace Envoy {
 namespace Memory {
 namespace {
 
+#if !defined(__ANDROID_API__) || __ANDROID_API__ >= 28
+
 TEST(AlignedAllocatorTest, AllocationSize) {
   using Alloc = AlignedAllocator<uint8_t, 8>;
   EXPECT_EQ(Alloc::round_up_to_alignment(0), 0);
@@ -48,6 +50,8 @@ TEST(AlignedAllocatorTest, Nullability) {
   EXPECT_EQ(alloc.allocate(0), nullptr);
   alloc.deallocate(nullptr, 0); // Should not crash
 }
+
+#endif // !defined(__ANDROID_API__) || __ANDROID_API__ >= 28
 
 } // namespace
 } // namespace Memory

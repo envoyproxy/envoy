@@ -63,10 +63,14 @@ public:
 private:
   const envoy::config::core::v3::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
+#if !defined(__ANDROID_API__) || __ANDROID_API__ >= 28
   // The vector's data() is used by the setsockopt syscall, which needs to be int-size-aligned on
   // some platforms, the AlignedAllocator here makes it pointer-size-aligned, which satisfies the
   // requirement, although it can be slightly over-aligned.
   const std::vector<uint8_t, Memory::AlignedAllocator<uint8_t, alignof(void*)>> value_;
+#else
+  const std::vector<uint8_t> value_;
+#endif
   // If present, specifies the socket type that this option applies to. Attempting to set this
   // option on a socket of a different type will be a no-op.
   absl::optional<Network::Socket::Type> socket_type_;
