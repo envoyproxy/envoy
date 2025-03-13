@@ -419,7 +419,12 @@ message Http1ProtocolOptions {
   // to reject custom methods.
   bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // Ignore HTTP/1.1 upgrade values matching any of the supplied matchers
+  // Ignore HTTP/1.1 upgrade values matching any of the supplied matchers.
+  //
+  // .. note::
+  //
+  //   `h2c` upgrades are always removed for backwards compatibility, regardless of the
+  //   value in this setting.
   repeated type.matcher.v3.StringMatcher ignore_http_11_upgrade = 11;
 }
 
