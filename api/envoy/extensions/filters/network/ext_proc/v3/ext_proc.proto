@@ -64,6 +64,7 @@ message NetworkExternalProcessor {
 }
 
 // Options for controlling processing behavior.
+// Filter will reject the config if both read and write are SKIP mode.
 message ProcessingMode {
   // Defines how traffic should be handled by the external processor.
   enum DataSendMode {
