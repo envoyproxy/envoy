@@ -987,6 +987,28 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SignerFails) {
   delete (raw_metadata_fetcher_);
 }
 
+TEST_F(IamRolesAnywhereCredentialsProviderTest, Coverage) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  expectDocument(201, "", message);
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  EXPECT_TRUE(provider_friend.needsRefresh());
+}
+
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {
 public:
   IamRolesAnywhereCredentialsProviderBadCredentialsTest() : api_(Api::createApiForTest()){};
