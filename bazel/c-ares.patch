@@ -1,0 +1,25 @@
+# Workaround c-ares trusting /etc/hosts entries for localhost
+diff --git a/src/lib/ares_getaddrinfo.c b/src/lib/ares_getaddrinfo.c
+index eabd17fc..2fa4c1b0 100644
+--- a/src/lib/ares_getaddrinfo.c
++++ b/src/lib/ares_getaddrinfo.c
+@@ -449,6 +449,19 @@ static void next_lookup(struct host_query *hquery, ares_status_t status)
+       break;
+ 
+     case 'f':
++      /* FIXME: This works around wonky /etc/hosts files having localhost
++       * entries with IPs that are *not* loopback IPs. */
++      if (ares_is_localhost(hquery->name)) {
++          if (ares_addrinfo_localhost(hquery->name, hquery->port, &hquery->hints,
++                                      hquery->ai) == ARES_SUCCESS) {
++            end_hquery(hquery, ARES_SUCCESS);
++            break;
++          }
++          hquery->remaining_lookups++;
++          next_lookup(hquery, status);
++          break;
++      }
++
+       /* Host file lookup */
+       if (file_lookup(hquery) == ARES_SUCCESS) {
+         end_hquery(hquery, ARES_SUCCESS);
