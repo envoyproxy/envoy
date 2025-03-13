@@ -447,7 +447,7 @@ envoy_cc_library(
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
+        "//source/extensions/quic/connection_id_generator/deterministic:envoy_deterministic_connection_id_generator_config",
         "//source/server:active_udp_listener",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
@@ -669,6 +669,18 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "@com_github_google_quiche//:quic_core_connection_id_generator_interface_lib",
         "@com_github_google_quiche//:quic_load_balancer_encoder_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_deterministic_connection_id_generator_lib",
+    srcs = ["envoy_deterministic_connection_id_generator.cc"],
+    hdrs = ["envoy_deterministic_connection_id_generator.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_connection_id_generator_factory_interface",
+        ":envoy_quic_utils_lib",
+        "@com_github_google_quiche//:quic_core_deterministic_connection_id_generator_lib",
     ],
 )
 

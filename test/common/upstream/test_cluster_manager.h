@@ -115,8 +115,9 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&,
-                      const xds::core::v3::ResourceLocator*, ClusterManager&) override {
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource&,
+                                      const xds::core::v3::ResourceLocator*,
+                                      ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 

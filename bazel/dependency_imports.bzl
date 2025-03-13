@@ -10,6 +10,7 @@ load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
@@ -25,7 +26,9 @@ GO_VERSION = "1.23.1"
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
-def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION):
+BUF_VERSION = "v1.50.0"
+
+def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION, buf_version = BUF_VERSION):
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
@@ -65,6 +68,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()
+
+    rules_buf_toolchains(version = buf_version)
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     # These repos also have transient dependencies - `build_external` allows them to use them.

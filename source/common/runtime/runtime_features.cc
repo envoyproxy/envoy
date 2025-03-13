@@ -34,9 +34,9 @@ RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_dfp_cluster_removal_on_cds_update);
 RUNTIME_GUARD(envoy_reloadable_features_boolean_to_string_fix);
 RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshake);
+RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_fail_on_empty_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
-RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
@@ -64,15 +64,16 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_internal_authority_header_validator);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
+RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
 RUNTIME_GUARD(envoy_reloadable_features_local_reply_traverses_filter_chain_after_1xx);
 RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_lua_flow_control_while_http_call);
 RUNTIME_GUARD(envoy_reloadable_features_mmdb_files_reload_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
-RUNTIME_GUARD(envoy_reloadable_features_no_timer_based_rate_limit_token_bucket);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_use_refresh_token);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
+RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefer_ipv6_dns_on_macos);
 RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
@@ -91,7 +92,6 @@ RUNTIME_GUARD(envoy_reloadable_features_sanitize_sni_in_access_log);
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_trace_sampling);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
-RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_retry_on_different_event_loop);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -154,6 +154,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // TODO(renjietang): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
+// TODO(fredyw): Remove after done with debugging.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
@@ -166,6 +168,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 
 // TODO(renjietang): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
+// TODO(abeyad): Evaluate and either remove or make a config knob in
+// https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

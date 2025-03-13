@@ -371,8 +371,13 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
   p.set_authorization_endpoint("INVALID_URL");
-  auto secret_reader = std::make_shared<MockSecretReader>();
+  // Add mandatory fields.
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%/redirected");
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact("redirected");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
 
+  // Attempt to create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
   EXPECT_THROW_WITH_MESSAGE(
       std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
                                      scope_, "test."),

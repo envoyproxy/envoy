@@ -28,8 +28,8 @@ void testForbiddenConfig(const std::string& yaml) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   HeaderToMetadataConfig factory;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context).value(),
-               EnvoyException);
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
 }
 
 // Tests that empty (metadata) keys are rejected.
