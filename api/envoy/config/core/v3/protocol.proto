@@ -423,7 +423,7 @@ message Http1ProtocolOptions {
   //
   // .. note::
   //
-  //   `h2c` upgrades are always removed for backwards compatibility, regardless of the
+  //   ``h2c`` upgrades are always removed for backwards compatibility, regardless of the
   //   value in this setting.
   repeated type.matcher.v3.StringMatcher ignore_http_11_upgrade = 11;
 }
