@@ -276,6 +276,7 @@ proto_library(
         "//envoy/extensions/string_matcher/lua/v3:pkg",
         "//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg",
         "//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg",
+        "//envoy/extensions/tracers/v3/fluentd:pkg",
         "//envoy/extensions/transport_sockets/alts/v3:pkg",
         "//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg",
         "//envoy/extensions/transport_sockets/internal_upstream/v3:pkg",
