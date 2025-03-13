@@ -418,7 +418,8 @@ public:
     options.ndomains = 0;
     options.timeout = 0;
     options.qcache_max_ttl = 0;
-    resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS | ARES_OPT_QUERY_CACHE |
+    resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
+                                               ARES_OPT_QUERY_CACHE |
                                                (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
   }
   bool isCaresDefaultTheOnlyNameserver() { return resolver_->isCaresDefaultTheOnlyNameserver(); }
@@ -801,8 +802,8 @@ public:
   }
 
   static bool isAddressLocal(const std::string& address) {
-      auto addr = Network::Utility::parseInternetAddressNoThrow(address);
-      return Network::Utility::isLoopbackAddress(*addr) || Network::Utility::isInternalAddress(*addr);
+    auto addr = Network::Utility::parseInternetAddressNoThrow(address);
+    return Network::Utility::isLoopbackAddress(*addr) || Network::Utility::isInternalAddress(*addr);
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
@@ -826,9 +827,8 @@ public:
           // is link-local.
           if (address == "localhost") {
             EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
-            for_each(address_as_string_list.begin(), address_as_string_list.end(), [&](std::string addr) {
-                EXPECT_TRUE(isAddressLocal(addr));
-            });
+            for_each(address_as_string_list.begin(), address_as_string_list.end(),
+                     [&](std::string addr) { EXPECT_TRUE(isAddressLocal(addr)); });
           } else {
             EXPECT_THAT(address_as_string_list, UnorderedElementsAreArray(expected_results));
           }
@@ -1537,7 +1537,8 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "127.0.0.1:53", *stats_store_.rootScope());
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "127.0.0.1:53",
+                                                *stats_store_.rootScope());
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
@@ -1973,12 +1974,12 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 
 // Validate that qcache is disabled by default.
 TEST_P(DnsImplTest, DnsImplAresQCacheDisabled) {
-    ares_options opts{};
-    int optmask = 0;
-    EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
-    EXPECT_TRUE((optmask & ARES_OPT_QUERY_CACHE) == ARES_OPT_QUERY_CACHE);
-    EXPECT_EQ(0, opts.qcache_max_ttl);
-    ares_destroy_options(&opts);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_QUERY_CACHE) == ARES_OPT_QUERY_CACHE);
+  EXPECT_EQ(0, opts.qcache_max_ttl);
+  ares_destroy_options(&opts);
 }
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
