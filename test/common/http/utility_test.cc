@@ -285,6 +285,57 @@ TEST(HttpUtility, removeUpgrade) {
 
     ASSERT_EQ(converted_headers, expected_headers);
   }
+
+  // Test with multiple matchers.
+  {
+    envoy::type::matcher::v3::StringMatcher matcher;
+    std::vector<Matchers::StringMatcherPtr> matchers;
+    matcher.set_exact("foo1");
+    matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+    matcher.set_exact("foo2");
+    matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+    {
+      TestRequestHeaderMapImpl expected_headers = {{":method", "GET"},
+                                                   {"Connection", "keep-alive, Upgrade"}};
+      TestRequestHeaderMapImpl converted_headers = {
+          {":method", "GET"}, {"Upgrade", "foo1"}, {"Connection", "keep-alive, Upgrade"}};
+
+      Utility::removeUpgrade(converted_headers, matchers);
+
+      ASSERT_EQ(converted_headers, expected_headers);
+    }
+    {
+      TestRequestHeaderMapImpl expected_headers = {{":method", "GET"},
+                                                   {"Connection", "keep-alive, Upgrade"}};
+      TestRequestHeaderMapImpl converted_headers = {
+          {":method", "GET"}, {"Upgrade", "foo2"}, {"Connection", "keep-alive, Upgrade"}};
+
+      Utility::removeUpgrade(converted_headers, matchers);
+
+      ASSERT_EQ(converted_headers, expected_headers);
+    }
+    {
+      TestRequestHeaderMapImpl expected_headers = {
+          {":method", "GET"}, {"Upgrade", "foo3"}, {"Connection", "keep-alive, Upgrade"}};
+      TestRequestHeaderMapImpl converted_headers = {
+          {":method", "GET"}, {"Upgrade", "foo3"}, {"Connection", "keep-alive, Upgrade"}};
+
+      Utility::removeUpgrade(converted_headers, matchers);
+
+      ASSERT_EQ(converted_headers, expected_headers);
+    }
+    {
+      TestRequestHeaderMapImpl expected_headers = {
+          {":method", "GET"}, {"Upgrade", "foo3"}, {"Connection", "keep-alive, Upgrade"}};
+      TestRequestHeaderMapImpl converted_headers = {{":method", "GET"},
+                                                    {"Upgrade", "foo1, foo2, foo3"},
+                                                    {"Connection", "keep-alive, Upgrade"}};
+
+      Utility::removeUpgrade(converted_headers, matchers);
+
+      ASSERT_EQ(converted_headers, expected_headers);
+    }
+  }
 }
 
 TEST(HttpUtility, removeConnectionUpgrade) {
