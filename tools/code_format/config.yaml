@@ -188,7 +188,6 @@ paths:
     - source/extensions/filters/http/wasm
     - source/extensions/filters/network/dubbo_proxy
     - source/extensions/filters/network/rbac
-    - source/extensions/filters/network/sni_dynamic_forward_proxy
     - source/extensions/filters/network/common
     - source/extensions/filters/network/redis_proxy
     - source/extensions/filters/network/zookeeper_proxy
