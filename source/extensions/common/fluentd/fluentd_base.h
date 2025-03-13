@@ -115,8 +115,17 @@ protected:
   uint64_t approximate_message_size_bytes_ = 0;
 };
 
+template <typename ConfigType, typename SharedPtrType> class FluentdCache {
+public:
+  virtual ~FluentdCache() = default;
+
+  virtual SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
+                                    Random::RandomGenerator& random,
+                                    TimeSource* time_source = nullptr) = 0;
+};
+
 template <typename T, typename ConfigType, typename SharedPtrType, typename WeakPtrType>
-class FluentdCacheBase {
+class FluentdCacheBase : public FluentdCache<ConfigType, SharedPtrType> {
 public:
   FluentdCacheBase(Upstream::ClusterManager& cluster_manager, Stats::Scope& parent_scope,
                    ThreadLocal::SlotAllocator& tls, const std::string& scope_prefix)
@@ -130,7 +139,8 @@ public:
   virtual ~FluentdCacheBase() = default;
 
   SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
-                            Random::RandomGenerator& random, TimeSource* time_source = nullptr) {
+                            Random::RandomGenerator& random,
+                            TimeSource* time_source = nullptr) override {
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = MessageUtil::hash(*config);
     auto it = cache.instances_.find(cache_key);

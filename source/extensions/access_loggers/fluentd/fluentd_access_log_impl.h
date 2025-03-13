@@ -29,8 +29,8 @@ public:
   MessagePackBuffer packMessage();
 };
 
-using FluentdAccessLoggerWeakPtr = std::weak_ptr<FluentdAccessLoggerImpl>;
-using FluentdAccessLoggerSharedPtr = std::shared_ptr<FluentdAccessLoggerImpl>;
+using FluentdAccessLoggerWeakPtr = std::weak_ptr<FluentdService>;
+using FluentdAccessLoggerSharedPtr = std::shared_ptr<FluentdService>;
 
 class FluentdAccessLoggerCacheImpl
     : public FluentdCacheBase<FluentdAccessLoggerImpl, FluentdAccessLogConfig,
@@ -53,7 +53,8 @@ protected:
   }
 };
 
-using FluentdAccessLoggerCacheSharedPtr = std::shared_ptr<FluentdAccessLoggerCacheImpl>;
+using FluentdAccessLoggerCacheSharedPtr =
+    std::shared_ptr<FluentdCache<FluentdAccessLogConfig, FluentdAccessLoggerSharedPtr>>;
 
 /**
  * Access log Instance that writes logs to a Fluentd.

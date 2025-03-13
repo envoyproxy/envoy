@@ -455,30 +455,21 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
   retry_timer_->invokeCallback();
   retry_timer_->invokeCallback();
 }
-/*
-class MockFluentdAccessLogger : public FluentdAccessLoggerImpl {
-  public:
-    MockFluentdAccessLogger(Upstream::ThreadLocalCluster& cluster,
-                            Tcp::AsyncTcpClientPtr client,
-                            Event::Dispatcher& dispatcher,
-                            const FluentdAccessLogConfig& config,
-                            BackOffStrategyPtr backoff_strategy,
-                            Stats::Scope& parent_scope)
-        : FluentdAccessLoggerImpl(cluster, std::move(client), dispatcher, config,
-                                  std::move(backoff_strategy), parent_scope) {}
 
-    MOCK_METHOD(void, log, (EntryPtr&& entry), (override));
-  };
+class MockFluentdAccessLogger : public FluentdService {
+public:
+  MOCK_METHOD(void, log, (EntryPtr &&));
+};
 
+class MockFluentdAccessLoggerCache
+    : public FluentdCache<FluentdAccessLogConfig, FluentdAccessLoggerSharedPtr> {
+public:
+  MOCK_METHOD(FluentdAccessLoggerSharedPtr, getOrCreate,
+              (const std::shared_ptr<FluentdAccessLogConfig>&, Random::RandomGenerator&,
+               TimeSource*),
+              (override));
+};
 
-class MockFluentdAccessLoggerCache : public FluentdAccessLoggerCacheImpl {
-  public:
-    MockFluentdAccessLoggerCache(Upstream::ClusterManager& cluster_manager,
-                                  Stats::Scope& parent_scope,
-                                  ThreadLocal::SlotAllocator& tls)
-        : FluentdAccessLoggerCacheImpl(cluster_manager, parent_scope, tls) {}
-  };
-    */
 class MockFluentdFormatter : public FluentdFormatter {
 public:
   MOCK_METHOD(std::vector<uint8_t>, format,
@@ -499,25 +490,17 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config_;
 };
-/*
+
 TEST_F(FluentdAccessLogTest, CreateAndLog) {
   auto* formatter = new NiceMock<MockFluentdFormatter>();
-  // Mock the components that are used to create the logger.
-  NiceMock<Upstream::MockThreadLocalCluster> cluster_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  auto logger = std::make_shared<MockFluentdAccessLogger>(
-      cluster_, Tcp::AsyncTcpClientPtr{new Tcp::AsyncClient::MockAsyncTcpClient()}, dispatcher_,
-      config_, BackOffStrategyPtr{new MockBackOffStrategy()}, context_.scope());
+  auto logger = std::make_shared<MockFluentdAccessLogger>();
+  auto logger_cache = std::make_shared<MockFluentdAccessLoggerCache>();
 
-  auto logger_cache_ =
-std::make_shared<FluentdAccessLoggerCacheImpl>(context_.serverFactoryContext().clusterManager(),
-                                                                 context_.scope(), tls_);
-
-  EXPECT_CALL(logger_cache_, getOrCreate(_, _, _)).WillOnce(Return(logger));
+  EXPECT_CALL(*logger_cache, getOrCreate(_, _, _)).WillOnce(Return(logger));
 
   auto access_log = FluentdAccessLog(AccessLog::FilterPtr{filter_}, FluentdFormatterPtr{formatter},
                                      std::make_shared<FluentdAccessLogConfig>(config_), tls_,
-                                     random_, logger_cache_);
+                                     random_, logger_cache);
 
   MockTimeSystem time_system;
   EXPECT_CALL(time_system, systemTime).WillOnce(Return(SystemTime(std::chrono::seconds(200))));
@@ -534,7 +517,7 @@ std::make_shared<FluentdAccessLoggerCacheImpl>(context_.serverFactoryContext().c
 
   access_log.log({}, stream_info);
 }
-*/
+
 TEST_F(FluentdAccessLogTest, UnknownCluster) {
   FluentdAccessLogFactory factory;
 
