@@ -56,7 +56,7 @@ public:
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const PURE;
 
@@ -99,7 +99,7 @@ public:
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const PURE;
 };
@@ -166,7 +166,7 @@ private:
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const override;
 
@@ -205,7 +205,7 @@ public:
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const override;
 

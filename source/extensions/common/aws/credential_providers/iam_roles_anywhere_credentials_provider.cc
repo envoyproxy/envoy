@@ -29,24 +29,13 @@ namespace Common {
 namespace Aws {
 using std::chrono::seconds;
 
-constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
-
-// IAM Roles Anywhere credential strings
-constexpr char CREDENTIAL_SET[] = "credentialSet";
-constexpr char CREDENTIALS_LOWER[] = "credentials";
-constexpr char ACCESS_KEY_ID_LOWER[] = "accessKeyId";
-constexpr char SECRET_ACCESS_KEY_LOWER[] = "secretAccessKey";
-constexpr char EXPIRATION_LOWER[] = "expiration";
-constexpr char SESSION_TOKEN_LOWER[] = "sessionToken";
-
-constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
-
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
+    std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer,
     envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
         iam_roles_anywhere_config)
 
@@ -57,20 +46,11 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       role_session_name_(iam_roles_anywhere_config.role_session_name()),
       profile_arn_(iam_roles_anywhere_config.profile_arn()),
       trust_anchor_arn_(iam_roles_anywhere_config.trust_anchor_arn()), region_(region),
-      server_factory_context_(context) {
+      server_factory_context_(context), roles_anywhere_signer_(std::move(roles_anywhere_signer)) {
 
   session_duration_ = PROTOBUF_GET_SECONDS_OR_DEFAULT(
       iam_roles_anywhere_config, session_duration,
       Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
-
-  auto roles_anywhere_certificate_provider =
-      std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
-          context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
-          iam_roles_anywhere_config.certificate_chain());
-  // Create our own x509 signer just for IAM Roles Anywhere
-  roles_anywhere_signer_ = std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
-      absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region_),
-      roles_anywhere_certificate_provider, context_->mainThreadDispatcher().timeSource());
 }
 
 void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
@@ -198,17 +178,13 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  if (context_) {
-    setCredentialsToAllThreads(
-        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
-    stats_->credential_refreshes_succeeded_.inc();
-    ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
-    refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
-    // Set receiver state in statistics
-    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
-  } else {
-    cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
-  }
+  setCredentialsToAllThreads(
+      std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+  stats_->credential_refreshes_succeeded_.inc();
+  ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
+  refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  // Set receiver state in statistics
+  stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
   handleFetchDone();
 }
 

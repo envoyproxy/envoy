@@ -18,6 +18,16 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+// IAM Roles Anywhere credential strings
+constexpr char CREDENTIAL_SET[] = "credentialSet";
+constexpr char CREDENTIALS_LOWER[] = "credentials";
+constexpr char ACCESS_KEY_ID_LOWER[] = "accessKeyId";
+constexpr char SECRET_ACCESS_KEY_LOWER[] = "secretAccessKey";
+constexpr char EXPIRATION_LOWER[] = "expiration";
+constexpr char SESSION_TOKEN_LOWER[] = "sessionToken";
+
+constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
+
 /**
  *
  * IAMRolesAnywhereCredentialsProvider purpose is to Exchange X509 Credentials for Temporary AWS
@@ -59,6 +69,7 @@ public:
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
+      std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer,
       envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
           iam_roles_anywhere_config);
 

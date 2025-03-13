@@ -38,11 +38,6 @@ public:
 class IAMRolesAnywhereSigV4Signer : public IAMRolesAnywhereSignerBaseImpl {
 
 public:
-  // IAMRolesAnywhereSigV4Signer(absl::string_view service_name, absl::string_view region,
-  //                                 const CredentialsProviderChainSharedPtr& credentials_provider,
-  //                                 Server::Configuration::CommonFactoryContext& context)
-  //     : IAMRolesAnywhereSignerBaseImpl(service_name, region, credentials_provider, context) {}
-
   IAMRolesAnywhereSigV4Signer(absl::string_view service_name, absl::string_view region,
                               const X509CredentialsProviderSharedPtr& credentials_provider,
                               TimeSource& timesource)

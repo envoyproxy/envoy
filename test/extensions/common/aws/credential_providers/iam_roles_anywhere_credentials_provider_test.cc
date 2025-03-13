@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -222,13 +223,25 @@ public:
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
 
+    auto roles_anywhere_certificate_provider =
+        std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
+            context_, iam_roles_anywhere_config_.certificate(),
+            iam_roles_anywhere_config_.private_key(),
+            iam_roles_anywhere_config_.certificate_chain());
+    // Create our own x509 signer just for IAM Roles Anywhere
+    auto roles_anywhere_signer =
+        std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+            absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+            roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
+
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        "ap-southeast-2", refresh_state, initialization_timer, iam_roles_anywhere_config_);
+        "ap-southeast-2", refresh_state, initialization_timer, std::move(roles_anywhere_signer),
+        iam_roles_anywhere_config_);
   }
 
   Event::DispatcherPtr setupDispatcher() {
@@ -444,7 +457,6 @@ public:
 // Test cases created from python implementation of iam roles anywhere session
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   // This is what we expect to see requested by the signer
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   auto headers =
       Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
   Http::RequestMessageImpl message(std::move(headers));
@@ -877,6 +889,104 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, EmptyJsonResponse) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(IamRolesAnywhereCredentialsProviderTest, SignerFails) {
+  // Should return no credentials when the internal signer fails
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+
+  expectDocument(201, "", message);
+
+  ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+
+  auto cert_env = std::string("CERT");
+
+  std::string yaml = fmt::format(R"EOF(
+  environment_variable: "{}"
+)EOF",
+                                 cert_env);
+
+  TestUtility::loadFromYamlAndValidate(yaml, certificate_data_source_);
+
+  TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
+
+  auto pkey_env = std::string("PKEY");
+  TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
+  yaml = fmt::format(R"EOF(
+  environment_variable: "{}"
+)EOF",
+                     pkey_env);
+
+  TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source_);
+
+  auto chain_env = std::string("CHAIN");
+  TestEnvironment::setEnvVar(chain_env, server_root_chain_rsa_pem, 1);
+  yaml = fmt::format(R"EOF(
+  environment_variable: "{}"
+)EOF",
+                     chain_env);
+
+  TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
+
+  iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
+  iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
+  iam_roles_anywhere_config_.mutable_certificate()->set_environment_variable("CERT");
+  iam_roles_anywhere_config_.set_role_session_name("session");
+  iam_roles_anywhere_config_.mutable_session_duration()->set_seconds(3600);
+  iam_roles_anywhere_config_.set_role_arn("arn:role-arn");
+  iam_roles_anywhere_config_.set_profile_arn("arn:profile-arn");
+  iam_roles_anywhere_config_.set_trust_anchor_arn("arn:trust-anchor-arn");
+  ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+  manager_optref_.emplace(base_manager_);
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+      .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com:443"));
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  auto roles_anywhere_certificate_provider =
+      std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
+          context_, iam_roles_anywhere_config_.certificate(),
+          iam_roles_anywhere_config_.private_key(), iam_roles_anywhere_config_.certificate_chain());
+
+  std::unique_ptr<MockIAMRolesAnywhereSigV4Signer> mock_signer =
+      std::make_unique<MockIAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
+  auto* mock_ptr = mock_signer.get();
+
+  // Force signing to fail
+  EXPECT_CALL(*mock_ptr, sign(_, true, _)).WillOnce(Return(absl::InvalidArgumentError("error")));
+
+  provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+      context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      "ap-southeast-2", refresh_state, initialization_timer, std::move(mock_signer),
+      iam_roles_anywhere_config_);
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+  delete (raw_metadata_fetcher_);
+}
+
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {
 public:
   IamRolesAnywhereCredentialsProviderBadCredentialsTest() : api_(Api::createApiForTest()){};
@@ -926,16 +1036,27 @@ public:
     base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
     manager_optref_.emplace(base_manager_);
+
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com/sessions"));
 
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
+    auto roles_anywhere_certificate_provider =
+        std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
+            context_, iam_roles_anywhere_config_.certificate(),
+            iam_roles_anywhere_config_.private_key(),
+            iam_roles_anywhere_config_.certificate_chain());
+    // Create our own x509 signer just for IAM Roles Anywhere
+    auto roles_anywhere_signer =
+        std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+            absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+            roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
 
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         MetadataFetcher::create, "ap-southeast-2", refresh_state, initialization_timer,
-        iam_roles_anywhere_config_);
+        std::move(roles_anywhere_signer), iam_roles_anywhere_config_);
   }
 
   OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
