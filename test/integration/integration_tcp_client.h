@@ -82,7 +82,7 @@ using IntegrationTcpClientPtr = std::unique_ptr<IntegrationTcpClient>;
 // between the received data and the matcher.
 // This can't be implemented as a matcher because it has side-effects, and
 // implementing it as a function results in the test line number being lost
-// appearing on failure, so this is an appropriate case for a macro.
+// from the output on failure, so this is an appropriate case for a macro.
 #define EXPECT_TCP_RESPONSE(tcp_client, matcher)                                                   \
   {                                                                                                \
     testing::Matcher<absl::string_view> m = matcher;                                               \
