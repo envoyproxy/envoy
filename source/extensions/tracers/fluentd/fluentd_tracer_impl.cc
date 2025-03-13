@@ -130,11 +130,25 @@ Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
   Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
   TimeSource* time_source = &context.serverFactoryContext().timeSource();
 
+  uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
+  uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
+
+  if (fluentd_config->has_retry_policy() && fluentd_config->retry_policy().has_retry_back_off()) {
+    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(fluentd_config->retry_policy().retry_back_off(),
+                                                  base_interval, DefaultBaseBackoffIntervalMs);
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(fluentd_config->retry_policy().retry_back_off(), max_interval,
+                                   base_interval_ms * DefaultMaxBackoffIntervalFactor);
+  }
+
   // Create a thread local tracer
   tls_slot_->set([fluentd_config = fluentd_config_, &random, &time_source,
-                  tracer_cache = tracer_cache_](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalTracer>(
-        tracer_cache->getOrCreate(fluentd_config, random, time_source));
+                  tracer_cache = tracer_cache_, base_interval_ms,
+                  max_interval_ms](Event::Dispatcher&) {
+    BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        base_interval_ms, max_interval_ms, random);
+    return std::make_shared<ThreadLocalTracer>(tracer_cache->getOrCreate(
+        fluentd_config, random, std::move(backoff_strategy), time_source));
   });
 }
 
@@ -178,8 +192,8 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
                                      TimeSource* time_source)
     : FluentdBase(
           cluster, std::move(client), dispatcher, config.tag(),
-          config.has_retry_options() && config.retry_options().has_max_connect_attempts()
-              ? absl::optional<uint32_t>(config.retry_options().max_connect_attempts().value())
+          config.has_retry_policy() && config.retry_policy().has_num_retries()
+              ? absl::optional<uint32_t>(config.retry_policy().num_retries().value())
               : absl::nullopt,
           parent_scope, config.stat_prefix(), std::move(backoff_strategy),
           PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs),

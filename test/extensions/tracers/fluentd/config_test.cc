@@ -70,9 +70,9 @@ TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
           stat_prefix: "envoy.tracers.fluentd"
           buffer_flush_interval: 0.0001s
           buffer_size_bytes: 16384
-          retry_options:
-            max_connect_attempts: 1024
-            backoff_options:
+          retry_policy:
+            num_retries: 1024
+            retry_back_off:
               base_interval: 0.5s
               max_interval: 5s
     )EOF";

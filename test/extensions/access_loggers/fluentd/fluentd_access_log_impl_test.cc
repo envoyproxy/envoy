@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/backoff_strategy.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/fluentd/config.h"
 #include "source/extensions/access_loggers/fluentd/fluentd_access_log_impl.h"
@@ -339,8 +340,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateLoggerWhenClusterNotFound) {
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto logger =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config), random_);
+  auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
+                                           random_, std::move(std::unique_ptr<BackOffStrategy>{}));
 
   EXPECT_TRUE(logger == nullptr);
 }
@@ -356,8 +357,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto logger =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config), random_);
+  auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
+                                           random_, std::move(std::unique_ptr<BackOffStrategy>{}));
   EXPECT_TRUE(logger != nullptr);
 }
 
@@ -372,16 +373,16 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersSameHash) {
   config1.set_cluster(cluster_name_);
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
-  auto logger1 =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1), random_);
+  auto logger1 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1),
+                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
   EXPECT_TRUE(logger1 != nullptr);
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config2;
   config2.set_cluster(cluster_name_); // config hash will be different than config1
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
-  auto logger2 =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2), random_);
+  auto logger2 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2),
+                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got the same logger
@@ -402,8 +403,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config1.set_cluster(cluster_name_);
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
-  auto logger1 =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1), random_);
+  auto logger1 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1),
+                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
   EXPECT_TRUE(logger1 != nullptr);
 
   Event::MockTimer* flush_timer2 = new Event::MockTimer(&dispatcher_);
@@ -415,8 +416,8 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config2.set_cluster("different_cluster"); // config hash will be different than config1
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
-  auto logger2 =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2), random_);
+  auto logger2 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2),
+                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got two different loggers
@@ -442,8 +443,22 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
   config.mutable_retry_options()->mutable_backoff_options()->mutable_max_interval()->set_nanos(
       20000000);
 
-  auto logger =
-      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config), random_);
+  uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
+  uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
+
+  if (config.has_retry_options() && config.retry_options().has_backoff_options()) {
+    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config.retry_options().backoff_options(),
+                                                  base_interval, DefaultBaseBackoffIntervalMs);
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(config.retry_options().backoff_options(), max_interval,
+                                   base_interval_ms * DefaultMaxBackoffIntervalFactor);
+  }
+
+  BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+      base_interval_ms, max_interval_ms, random_);
+
+  auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
+                                           random_, std::move(backoff_strategy));
   ASSERT_TRUE(logger != nullptr);
 
   // Setting random so it doesn't add jitter
@@ -466,7 +481,7 @@ class MockFluentdAccessLoggerCache
 public:
   MOCK_METHOD(FluentdAccessLoggerSharedPtr, getOrCreate,
               (const std::shared_ptr<FluentdAccessLogConfig>&, Random::RandomGenerator&,
-               TimeSource*),
+               BackOffStrategyPtr, TimeSource*),
               (override));
 };
 
@@ -496,7 +511,7 @@ TEST_F(FluentdAccessLogTest, CreateAndLog) {
   auto logger = std::make_shared<MockFluentdAccessLogger>();
   auto logger_cache = std::make_shared<MockFluentdAccessLoggerCache>();
 
-  EXPECT_CALL(*logger_cache, getOrCreate(_, _, _)).WillOnce(Return(logger));
+  EXPECT_CALL(*logger_cache, getOrCreate(_, _, _, _)).WillOnce(Return(logger));
 
   auto access_log = FluentdAccessLog(AccessLog::FilterPtr{filter_}, FluentdFormatterPtr{formatter},
                                      std::make_shared<FluentdAccessLogConfig>(config_), tls_,

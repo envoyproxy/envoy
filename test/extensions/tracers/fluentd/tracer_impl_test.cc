@@ -41,7 +41,7 @@ public:
     config_.set_tag(tag_);
 
     if (max_connect_attempts.has_value()) {
-      config_.mutable_retry_options()->mutable_max_connect_attempts()->set_value(
+      config_.mutable_retry_policy()->mutable_num_retries()->set_value(
           max_connect_attempts.value());
     }
 
@@ -395,10 +395,10 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto tracer =
-      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-                                 context.serverFactoryContext().api().randomGenerator(),
-                                 &context.serverFactoryContext().timeSource());
+  auto tracer = tracer_cache_->getOrCreate(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      std::move(std::unique_ptr<BackOffStrategy>{}), &context.serverFactoryContext().timeSource());
   EXPECT_EQ(tracer, nullptr);
 }
 
@@ -408,10 +408,10 @@ TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto tracer =
-      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-                                 context.serverFactoryContext().api().randomGenerator(),
-                                 &context.serverFactoryContext().timeSource());
+  auto tracer = tracer_cache_->getOrCreate(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      std::move(std::unique_ptr<BackOffStrategy>{}), &context.serverFactoryContext().timeSource());
   EXPECT_NE(tracer, nullptr);
 }
 
@@ -422,15 +422,15 @@ TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
 
-  auto tracer1 =
-      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-                                 context.serverFactoryContext().api().randomGenerator(),
-                                 &context.serverFactoryContext().timeSource());
+  auto tracer1 = tracer_cache_->getOrCreate(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      std::move(std::unique_ptr<BackOffStrategy>{}), &context.serverFactoryContext().timeSource());
 
-  auto tracer2 =
-      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-                                 context.serverFactoryContext().api().randomGenerator(),
-                                 &context.serverFactoryContext().timeSource());
+  auto tracer2 = tracer_cache_->getOrCreate(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      std::move(std::unique_ptr<BackOffStrategy>{}), &context.serverFactoryContext().timeSource());
 
   EXPECT_EQ(tracer1, tracer2);
 }

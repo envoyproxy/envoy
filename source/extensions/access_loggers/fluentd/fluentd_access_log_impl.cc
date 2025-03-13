@@ -52,9 +52,24 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
                                    FluentdAccessLoggerCacheSharedPtr access_logger_cache)
     : ImplBase(std::move(filter)), formatter_(std::move(formatter)), tls_slot_(tls.allocateSlot()),
       config_(config), access_logger_cache_(access_logger_cache) {
-  tls_slot_->set([config = config_, &random,
-                  access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreate(config, random));
+
+  uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
+  uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
+
+  if (config->has_retry_options() && config->retry_options().has_backoff_options()) {
+    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(),
+                                                  base_interval, DefaultBaseBackoffIntervalMs);
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(), max_interval,
+                                   base_interval_ms * DefaultMaxBackoffIntervalFactor);
+  }
+
+  tls_slot_->set([config = config_, &random, access_logger_cache = access_logger_cache_,
+                  base_interval_ms, max_interval_ms](Event::Dispatcher&) {
+    BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        base_interval_ms, max_interval_ms, random);
+    return std::make_shared<ThreadLocalLogger>(
+        access_logger_cache->getOrCreate(config, random, std::move(backoff_strategy)));
   });
 }
 

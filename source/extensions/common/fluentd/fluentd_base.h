@@ -121,6 +121,7 @@ public:
 
   virtual SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
                                     Random::RandomGenerator& random,
+                                    BackOffStrategyPtr backoff_strategy,
                                     TimeSource* time_source = nullptr) = 0;
 };
 
@@ -139,7 +140,7 @@ public:
   virtual ~FluentdCacheBase() = default;
 
   SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
-                            Random::RandomGenerator& random,
+                            Random::RandomGenerator& random, BackOffStrategyPtr backoff_strategy,
                             TimeSource* time_source = nullptr) override {
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = MessageUtil::hash(*config);
@@ -155,20 +156,6 @@ public:
 
     auto client =
         cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
-
-    uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
-    uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
-
-    if (config->has_retry_options() && config->retry_options().has_backoff_options()) {
-      base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(),
-                                                    base_interval, DefaultBaseBackoffIntervalMs);
-      max_interval_ms =
-          PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(), max_interval,
-                                     base_interval_ms * DefaultMaxBackoffIntervalFactor);
-    }
-
-    BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
-        base_interval_ms, max_interval_ms, random);
 
     auto instance = createInstance(*cluster, std::move(client), cache.dispatcher_, *config,
                                    std::move(backoff_strategy), random, time_source);
