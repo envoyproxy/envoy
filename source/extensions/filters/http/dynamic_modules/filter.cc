@@ -11,7 +11,9 @@ void DynamicModuleHttpFilter::initializeInModuleFilter() {
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
 }
 
-void DynamicModuleHttpFilter::onStreamComplete() {}
+void DynamicModuleHttpFilter::onStreamComplete() {
+  config_->on_http_filter_stream_complete_(thisAsVoidPtr(), in_module_filter_);
+}
 
 void DynamicModuleHttpFilter::onDestroy() { destroy(); };
 
