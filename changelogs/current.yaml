@@ -132,7 +132,7 @@ removed_config_or_runtime:
 new_features:
 - area: geoip
   change: |
-    Added options on the geoip filter ``envoy.extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.isp`` 
+    Added options on the geoip filter ``envoy.extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.isp``
     that contains the isp name and ``envoy.extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.is_apple_private_relay``
     that has ``true`` or ``false`` depending if the isp name is ``iCloud Private Relay``.
     Performs a lookup on the IP address to get the ISP name from the Maxmind database provider and check if it is iCloud Private Relay.
