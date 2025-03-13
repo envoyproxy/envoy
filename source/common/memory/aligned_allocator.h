@@ -1,12 +1,10 @@
 #pragma once
 
-#ifdef __ANDROID_API__
-#if __ANDROID_API__ < 28
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 28
 #include <stdlib.h>
 
 #define ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN 1
-#endif // __ANDROID_API__ < 28
-#endif // ifdef __ANDROID_API__
+#endif // if defined(__ANDROID_API__) && __ANDROID_API__ < 28
 
 #include <cstddef>
 #include <cstdlib>
