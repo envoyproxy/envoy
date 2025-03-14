@@ -418,6 +418,28 @@ TEST_P(ProtocolIntegrationTest, MixedCaseScheme) {
   EXPECT_TRUE(scheme.empty() || scheme == "http");
 }
 
+TEST_P(ProtocolIntegrationTest, SchemeTransformation) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_scheme_header_transformation()->set_scheme_to_overwrite("https");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setScheme("Http");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  auto scheme = upstream_request_->headers().getSchemeValue();
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    EXPECT_EQ(scheme, "https");
+  } else {
+    // For H/1 upstreams the test fake upstream does not have :scheme, since it is set in HCM
+    EXPECT_TRUE(scheme.empty());
+  }
+}
+
 TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
