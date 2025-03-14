@@ -530,36 +530,27 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
-
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
-  // Web Identity Credentials and Container Credentials
+  // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere.ap-southeast-2.amazonaws.com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
+                                 "amazonaws_com.credential_refreshes_performed",
                                  1);
-
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
-  // Web Identity Credentials and Container Credentials
+  // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
-                                 "metadata_server_internal.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
+                                 "amazonaws_com.credential_refreshes_performed",
                                  1);
-
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {

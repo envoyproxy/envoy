@@ -96,7 +96,7 @@ AwsRequestSigningFilterFactory::createSigner(
       config.has_credential_provider() &&
       (config.credential_provider().has_assume_role_with_web_identity_provider() ||
        config.credential_provider().has_credentials_file_provider() ||
-      config.credential_provider().has_iam_roles_anywhere_provider());
+       config.credential_provider().has_iam_roles_anywhere_provider());
 
   if (config.has_credential_provider()) {
     if (config.credential_provider().has_inline_credential()) {

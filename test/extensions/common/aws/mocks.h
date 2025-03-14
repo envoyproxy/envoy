@@ -157,7 +157,7 @@ public:
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
               (Server::Configuration::ServerFactoryContext & context,
-               AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+               AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
                const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
                    iam_roles_anywhere_config),
               (const));
@@ -185,7 +185,7 @@ public:
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
               (Server::Configuration::ServerFactoryContext & context,
-               AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+               AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
                const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
                    iam_roles_anywhere_config),
               (const));

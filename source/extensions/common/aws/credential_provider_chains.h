@@ -15,6 +15,8 @@
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/utility.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -56,7 +58,7 @@ public:
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const PURE;
 
@@ -99,7 +101,7 @@ public:
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const PURE;
 };
@@ -166,7 +168,7 @@ private:
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const override;
 
@@ -205,7 +207,7 @@ public:
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
           iam_roles_anywhere_config) const override;
 
