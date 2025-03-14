@@ -37,6 +37,7 @@ envoy_cc_library(
         ":abi_impl",
         ":filter_config_lib",
         ":filter_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
