@@ -54,6 +54,49 @@ typed_config:
   - exact: x-amzn-trace-id
 )EOF";
 
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE = R"EOF(
+aws_request_signing:
+  credential_provider:
+    iam_roles_anywhere_provider:
+      role_arn: arn:aws:iam::012345678901:role/rolesanywhere
+      certificate: {filename: /certificates/certificate.pem}
+      private_key: {filename: /certificates/private-key.pem}
+      trust_anchor_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/8d105284-f0a7-4939-a7e6-8df768ea535f
+      profile_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:profile/4af0c6cf-506a-4469-b1b5-5f3fecdaabdf
+      session_duration: 900s
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_excluded_headers:
+  - prefix: x-envoy
+  - prefix: x-forwarded
+  - exact: x-amzn-trace-id
+stat_prefix: some-prefix
+  )EOF";
+
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM = R"EOF(
+aws_request_signing:
+  credential_provider:
+    custom_credential_provider_chain: true
+    iam_roles_anywhere_provider:
+      role_arn: arn:aws:iam::012345678901:role/rolesanywhere
+      certificate: {filename: /certificates/certificate.pem}
+      private_key: {filename: /certificates/private-key.pem}
+      trust_anchor_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/8d105284-f0a7-4939-a7e6-8df768ea535f
+      profile_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:profile/4af0c6cf-506a-4469-b1b5-5f3fecdaabdf
+      session_duration: 900s
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_excluded_headers:
+  - prefix: x-envoy
+  - prefix: x-forwarded
+  - exact: x-amzn-trace-id
+stat_prefix: some-prefix
+  )EOF";
+
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4A = R"EOF(
 name: envoy.filters.http.aws_request_signing
 typed_config:
@@ -276,9 +319,9 @@ public:
         }));
   }
 
-  void dnsSetup() {
+  void dnsSetup(std::string hostname) {
     ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
-    expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+    expectResolve(Network::DnsLookupFamily::V4Only, hostname);
   }
 
   void addStandardFilter(bool downstream = true) {
@@ -338,7 +381,7 @@ public:
 TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 
   // Web Identity Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -356,7 +399,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
 
   // Web Identity Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   addCustomCredentialChainFilter();
@@ -370,7 +413,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
 TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
 
   // Web Identity Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -388,7 +431,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
 TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
 
   // Instance Profile Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     *bootstrap.mutable_static_resources()->add_clusters() =
@@ -415,7 +458,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -430,7 +473,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -446,7 +489,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -467,7 +510,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -476,6 +519,39 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
+  initialize();
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
+                                 "metadata_server_internal.credential_refreshes_performed",
+                                 1);
+
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+}
+
+TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
+  // Web Identity Credentials and Container Credentials
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE);
+  initialize();
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere.ap-southeast-2.amazonaws.com.credential_refreshes_performed",
+                                 1);
+
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+}
+
+TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
+  dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
+  // Web Identity Credentials and Container Credentials
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM);
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
                                  "metadata_server_internal.credential_refreshes_performed",
@@ -601,7 +677,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -622,7 +698,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
@@ -639,7 +715,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
@@ -656,7 +732,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstanceProfile) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
@@ -695,9 +771,9 @@ public:
         }));
   }
 
-  void dnsSetup() {
+  void dnsSetup(std::string hostname) {
     ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
-    expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+    expectResolve(Network::DnsLookupFamily::V4Only, hostname);
   }
 
   NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
@@ -726,7 +802,7 @@ public:
 TEST_F(CdsInteractionTest, CDSUpdateDoesNotRemoveOurClusters) {
 
   // STS cluster requires dns mocking
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
