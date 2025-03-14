@@ -9,6 +9,7 @@ import public "envoy/config/trace/v3/lightstep.proto";
 import public "envoy/config/trace/v3/opentelemetry.proto";
 import public "envoy/config/trace/v3/service.proto";
 import public "envoy/config/trace/v3/zipkin.proto";
+import public "envoy/extensions/tracers/v3/fluentd/fluentd.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "TraceProto";
