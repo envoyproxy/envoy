@@ -4,12 +4,14 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
-
-#include "test/mocks/upstream/cluster_manager.h"
+#include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 #include "gmock/gmock.h"
 
@@ -55,6 +57,30 @@ public:
   MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback &&));
 };
 
+class MockIAMRolesAnywhereCredentialsProvider : public IAMRolesAnywhereCredentialsProvider {
+public:
+  MockIAMRolesAnywhereCredentialsProvider();
+  ~MockIAMRolesAnywhereCredentialsProvider() override;
+
+  MOCK_METHOD(Credentials, getCredentials, ());
+};
+
+class MockIAMRolesAnywhereX509CredentialsProvider : public IAMRolesAnywhereX509CredentialsProvider {
+public:
+  MockIAMRolesAnywhereX509CredentialsProvider();
+  ~MockIAMRolesAnywhereX509CredentialsProvider() override;
+
+  MOCK_METHOD(X509Credentials, getCredentials, ());
+};
+
+class MockX509CredentialsProvider : public X509CredentialsProvider {
+public:
+  MockX509CredentialsProvider();
+  ~MockX509CredentialsProvider() override;
+
+  MOCK_METHOD(X509Credentials, getCredentials, ());
+};
+
 class MockFetchMetadata {
 public:
   virtual ~MockFetchMetadata() = default;
@@ -93,6 +119,127 @@ public:
   MOCK_METHOD(Credentials, chainGetCredentials, ());
   MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
   MOCK_METHOD(void, onCredentialUpdate, ());
+};
+
+class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
+public:
+  MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext&,
+       (const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)),
+      (const));
+
+  CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)
+      const override {
+    return mockCreateCredentialsFileCredentialsProvider(context, config);
+  }
+
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
+
+  MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
+              (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
+               const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
+               absl::string_view, absl::string_view,
+               MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+               absl::string_view));
+
+  MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
+              (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
+               const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
+               MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+               absl::string_view));
+
+  MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+              (Server::Configuration::ServerFactoryContext & context,
+               AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+               const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                   iam_roles_anywhere_config),
+              (const));
+};
+
+class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
+public:
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext&,
+       (const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)),
+      (const));
+
+  CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)
+      const override {
+    return mockCreateCredentialsFileCredentialsProvider(context, config);
+  }
+
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
+
+  MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+              (Server::Configuration::ServerFactoryContext & context,
+               AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+               const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                   iam_roles_anywhere_config),
+              (const));
+};
+
+class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
+public:
+  MOCK_METHOD(absl::StatusOr<EC_KEY*>, derivePrivateKey,
+              (absl::string_view access_key_id, absl::string_view secret_access_key));
+  MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
+};
+
+// Friend class for testing callbacks
+class MetadataCredentialsProviderBaseFriend {
+public:
+  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
+      : provider_(provider) {}
+
+  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
+  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
+  bool needsRefresh() { return provider_->needsRefresh(); };
+};
+
+class MockIAMRolesAnywhereSigV4Signer : public IAMRolesAnywhereSigV4Signer {
+
+public:
+  MockIAMRolesAnywhereSigV4Signer(absl::string_view service_name, absl::string_view region,
+                                  const X509CredentialsProviderSharedPtr& credentials_provider,
+                                  TimeSource& timesource)
+      : IAMRolesAnywhereSigV4Signer(service_name, region, credentials_provider, timesource) {}
+  ~MockIAMRolesAnywhereSigV4Signer() override = default;
+
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestMessage & message, bool sign_body,
+               const absl::string_view override_region));
+
+private:
+  MOCK_METHOD(std::string, createCredentialScope,
+              (const absl::string_view short_date, const absl::string_view override_region),
+              (const));
+
+  MOCK_METHOD(std::string, createSignature,
+              (const X509Credentials credentials, const absl::string_view string_to_sign), (const));
+
+  MOCK_METHOD(std::string, createAuthorizationHeader,
+              (const X509Credentials x509_credentials, const absl::string_view credential_scope,
+               (const std::map<std::string, std::string>& canonical_headers),
+               const absl::string_view signature),
+              (const));
+
+  MOCK_METHOD(std::string, createStringToSign,
+              (const X509Credentials x509_credentials, const absl::string_view canonical_request,
+               const absl::string_view long_date, const absl::string_view credential_scope),
+              (const));
 };
 
 } // namespace Aws

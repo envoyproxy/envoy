@@ -56,25 +56,21 @@ secret access key (the session token is optional).
    For EKS Pod Identity, The environment variable ``AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`` will point to a mounted file in the container,
    containing the string required in the Authorization header sent to the EKS Pod Identity Agent. The fields ``AccessKeyId``, ``SecretAccessKey``,
    and ``Token`` are used, and credentials are cached for 1 hour or until they expire (according to the field ``Expiration``).
+   Note that the latest update on AWS credentials provider utility provides an option to use http async client functionality instead of libcurl
+   to fetch the credentials. To fetch the credentials from either EC2 instance metadata or ECS task metadata a static cluster pointing
+   towards the credentials provider is required. The static cluster name has to be ``ec2_instance_metadata_server_internal`` for fetching from EC2 instance
+   metadata or ``ecs_task_metadata_server_internal`` for fetching from ECS task metadata.
 
-   .. note::
+   If these clusters are not provided in the bootstrap configuration then either of these will be added by default.
+   The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
+   not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
 
-      The AWS credentials provider now supports two methods for fetching credentials:
+5. `IAM Roles Anywhere <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ can be used to retrieve IAM temporary credentials in exchange for an X509 Certificate.
+   A PEM formatted certificate, private key and certificate chain can be provided using the :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
+   Private keys must currently be provided in unencrypted, PKCS#8 format.
 
-      * HTTP async client (new)
-      * libcurl (legacy)
-
-      To fetch credentials from EC2 or ECS, you must configure a static cluster pointing to the credentials provider:
-
-      * For EC2: use cluster name ``ec2_instance_metadata_server_internal``
-      * For ECS: use cluster name ``ecs_task_metadata_server_internal``
-
-   These static clusters are handled automatically:
-
-   * They are added by default if not specified in bootstrap configuration.
-   * They are created even when ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is disabled. This
-     ensures the cluster configuration is ready when you enable HTTP client credential fetching later by setting the
-     reloadable feature to ``true``.
+Alternatively, each AWS filter (either AWS Request Signing or AWS Lambda) has its own optional configuration to specify the source of the credentials. For example, AWS Request Signing filter
+has :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
 
 Statistics
 ----------

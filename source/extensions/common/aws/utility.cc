@@ -1,24 +1,5 @@
 #include "source/extensions/common/aws/utility.h"
 
-#include <cstdint>
-#include <limits>
-
-#include "envoy/upstream/cluster_manager.h"
-
-#include "source/common/common/empty_string.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/protobuf/utility.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
-
-#include "absl/strings/match.h"
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
-#include "curl/curl.h"
-#include "fmt/printf.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -283,6 +264,44 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
 }
 
 /**
+ * This function generates an RolesAnywhere Endpoint from a region string.
+ */
+// TODO: @nbaws - merge this code with sts endpoint code
+std::string Utility::getRolesAnywhereEndpoint(absl::string_view region) {
+  std::string single_region;
+
+  // If we contain a comma or asterisk it looks like a region set.
+  if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
+    // Use the first element from a region set if we have multiple regions specified.
+    const std::vector<std::string> region_v = absl::StrSplit(region, ',');
+    // If we still have a * in the first element, then send them to us-east-1 fips or global
+    // endpoint.
+    if (absl::StrContains(region_v[0], '*')) {
+#ifdef ENVOY_SSL_FIPS
+      return "rolesanywhere-fips.us-east-1.amazonaws.com";
+#else
+      return "rolesanywhere.amazonaws.com";
+#endif
+    }
+    single_region = region_v[0];
+  } else {
+    // Otherwise it's a standard region, so use that.
+    single_region = region;
+  }
+
+  if (single_region == "cn-northwest-1" || single_region == "cn-north-1") {
+    return fmt::format("rolesanywhere.{}.amazonaws.com.cn", single_region);
+  }
+#ifdef ENVOY_SSL_FIPS
+  if (single_region == "us-east-1" || single_region == "us-east-2" ||
+      single_region == "us-west-1" || single_region == "us-west-2") {
+    return fmt::format("rolesanywhere-fips.{}.amazonaws.com", single_region);
+  }
+#endif
+  return fmt::format("rolesanywhere.{}.amazonaws.com", single_region);
+}
+
+/**
  * This function generates an STS Endpoint from a region string.
  * If a SigV4A region set has been provided, it will use the first region in region set, and if
  * that region still contains a wildcard, the STS Endpoint will be set to us-east-1 global endpoint
@@ -392,7 +411,7 @@ absl::optional<std::string> Utility::fetchMetadataWithCurl(Http::RequestMessage&
     if (res == CURLE_OK) {
       break;
     }
-    ENVOY_LOG_MISC(debug, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
+    ENVOY_LOG(debug, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
     buffer.clear();
     std::this_thread::sleep_for(RETRY_DELAY);
   }
@@ -465,7 +484,7 @@ bool Utility::resolveProfileElementsFromFile(
     absl::flat_hash_map<std::string, std::string>& elements) {
   std::ifstream file(profile_file);
   if (!file.is_open()) {
-    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
+    ENVOY_LOG(debug, "Error opening credentials file {}", profile_file);
     return false;
   }
   std::unique_ptr<std::istream> stream;
@@ -560,7 +579,7 @@ std::string Utility::getStringFromJsonOrDefault(Json::ObjectSharedPtr json_objec
   value_or_error = json_object->getValue(string_value);
   if ((!value_or_error.ok()) || (!absl::holds_alternative<std::string>(value_or_error.value()))) {
 
-    ENVOY_LOG_MISC(error, "Unable to retrieve string value from json: {}", string_value);
+    ENVOY_LOG(error, "Unable to retrieve string value from json: {}", string_value);
     return string_default;
   }
   return absl::get<std::string>(value_or_error.value());
@@ -573,14 +592,14 @@ int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
   value_or_error = json_object->getValue(integer_value);
   if (!value_or_error.ok() || ((!absl::holds_alternative<double>(value_or_error.value())) &&
                                (!absl::holds_alternative<int64_t>(value_or_error.value())))) {
-    ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
+    ENVOY_LOG(error, "Unable to retrieve integer value from json: {}", integer_value);
     return integer_default;
   }
   auto json_integer = value_or_error.value();
   // Handle double formatted integers IE exponent format such as 1.714449238E9
   if (auto* double_integer = absl::get_if<double>(&json_integer)) {
     if (*double_integer < 0) {
-      ENVOY_LOG_MISC(error, "Integer {} less than 0: {}", integer_value, *double_integer);
+      ENVOY_LOG(error, "Integer {} less than 0: {}", integer_value, *double_integer);
       return integer_default;
     } else {
       return int64_t(*double_integer);
