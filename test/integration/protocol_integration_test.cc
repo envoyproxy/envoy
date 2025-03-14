@@ -432,7 +432,12 @@ TEST_P(ProtocolIntegrationTest, SchemeTransformation) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
   auto scheme = upstream_request_->headers().getSchemeValue();
-  EXPECT_TRUE(scheme.empty() || scheme == "https");
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    EXPECT_EQ(scheme, "https");
+  } else {
+    // For H/1 upstreams the test fake upstream does not have :scheme, since it is set in HCM
+    EXPECT_TRUE(scheme.empty());
+  }
 }
 
 TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
