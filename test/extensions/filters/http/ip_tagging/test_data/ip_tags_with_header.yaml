@@ -1,0 +1,4 @@
+ip_tags:
+  - ip_tag_name: internal_request_with_optional_header
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}

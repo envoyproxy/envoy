@@ -1,4 +1,7 @@
 ip_tags:
+  - ip_tag_name: external_request
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
   - ip_tag_name: internal_request
     ip_list:
       - {address_prefix: 1.2.3.5, prefix_len: 32}
