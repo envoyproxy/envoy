@@ -22,7 +22,7 @@ namespace Tracers {
 namespace Fluentd {
 
 using namespace Envoy::Extensions::Common::Fluentd;
-using FluentdConfig = envoy::config::trace::v3::FluentdConfig;
+using FluentdConfig = envoy::extensions::tracers::v3::FluentdConfig;
 using FluentdConfigSharedPtr = std::shared_ptr<FluentdConfig>;
 
 // Span context definitions
