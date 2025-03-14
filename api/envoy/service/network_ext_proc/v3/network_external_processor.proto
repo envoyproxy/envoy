@@ -112,12 +112,12 @@ message ProcessingResponse {
     // This is the default behavior and allows traffic to flow normally.
     CONTINUE = 0;
 
-    // Close the connection gracefully (e.g., with a proper TCP FIN).
+    // Close the connection with normal TCP FIN.
     // This allows for clean connection termination with a normal close sequence.
     // Any buffered data will be sent before closing.
     CLOSE = 1;
 
-    // Immediately reset the connection (e.g., with a TCP RST).
+    // Immediately reset the connection with TCP RST.
     // This forcibly terminates the connection without a clean shutdown,
     // discarding any buffered data. Use this for security-critical situations
     // or when immediate termination is required.
