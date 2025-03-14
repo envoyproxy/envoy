@@ -341,7 +341,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateLoggerWhenClusterNotFound) {
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
   auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
-                                           random_, std::move(std::unique_ptr<BackOffStrategy>{}));
+                                           random_, std::unique_ptr<BackOffStrategy>{});
 
   EXPECT_TRUE(logger == nullptr);
 }
@@ -358,7 +358,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
   auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
-                                           random_, std::move(std::unique_ptr<BackOffStrategy>{}));
+                                           random_, std::unique_ptr<BackOffStrategy>{});
   EXPECT_TRUE(logger != nullptr);
 }
 
@@ -374,7 +374,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersSameHash) {
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
   auto logger1 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1),
-                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
+                                            random_, std::unique_ptr<BackOffStrategy>{});
   EXPECT_TRUE(logger1 != nullptr);
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config2;
@@ -382,7 +382,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersSameHash) {
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
   auto logger2 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2),
-                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
+                                            random_, std::unique_ptr<BackOffStrategy>{});
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got the same logger
@@ -404,7 +404,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
   auto logger1 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1),
-                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
+                                            random_, std::unique_ptr<BackOffStrategy>{});
   EXPECT_TRUE(logger1 != nullptr);
 
   Event::MockTimer* flush_timer2 = new Event::MockTimer(&dispatcher_);
@@ -417,7 +417,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
   auto logger2 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2),
-                                            random_, std::move(std::unique_ptr<BackOffStrategy>{}));
+                                            random_, std::unique_ptr<BackOffStrategy>{});
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got two different loggers
