@@ -27,10 +27,10 @@ namespace HttpFilters {
 namespace IpTagging {
 namespace {
 
-  std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry;
+std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry;
 
-  namespace {
-        const std::string internal_request_config = R"EOF(
+namespace {
+const std::string internal_request_config = R"EOF(
 request_type: internal
 ip_tags:
   - ip_tag_name: internal_request
@@ -38,17 +38,17 @@ ip_tags:
       - {address_prefix: 1.2.3.5, prefix_len: 32}
 )EOF";
 
-        const std::string internal_request_with_json_file_config = R"EOF(
+const std::string internal_request_with_json_file_config = R"EOF(
  request_type: internal
  ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json"
  )EOF";
 
-        const std::string internal_request_with_yaml_file_config = R"EOF(
+const std::string internal_request_with_yaml_file_config = R"EOF(
  request_type: internal
  ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
  )EOF";
 
-      const std::string external_request_config = R"EOF(
+const std::string external_request_config = R"EOF(
 request_type: external
 ip_tags:
   - ip_tag_name: external_request
@@ -56,17 +56,17 @@ ip_tags:
       - {address_prefix: 1.2.3.4, prefix_len: 32}
 )EOF";
 
-        const std::string external_request_with_json_file_config = R"EOF(
+const std::string external_request_with_json_file_config = R"EOF(
  request_type: external
  ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.json"
  )EOF";
 
-        const std::string external_request_with_yaml_file_config = R"EOF(
+const std::string external_request_with_yaml_file_config = R"EOF(
  request_type: external
  ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.yaml"
  )EOF";
 
-   const std::string both_request_config = R"EOF(
+const std::string both_request_config = R"EOF(
 request_type: both
 ip_tags:
   - ip_tag_name: external_request
@@ -77,17 +77,17 @@ ip_tags:
       - {address_prefix: 1.2.3.5, prefix_len: 32}
 )EOF";
 
-   const std::string both_request_with_json_file_config = R"EOF(
+const std::string both_request_with_json_file_config = R"EOF(
 request_type: both
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.json"
 )EOF";
 
-   const std::string both_request_with_yaml_file_config = R"EOF(
+const std::string both_request_with_yaml_file_config = R"EOF(
 request_type: both
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.yaml"
 )EOF";
 
-  const std::string internal_request_with_header_config = R"EOF(
+const std::string internal_request_with_header_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
@@ -97,21 +97,21 @@ ip_tags:
       - {address_prefix: 1.2.3.4, prefix_len: 32}
 )EOF";
 
-  const std::string internal_request_with_header_with_json_file_config = R"EOF(
+const std::string internal_request_with_header_with_json_file_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
 )EOF";
 
-  const std::string internal_request_with_header_with_yaml_file_config = R"EOF(
+const std::string internal_request_with_header_with_yaml_file_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
 )EOF";
 
-  const std::string internal_request_with_replace_header_config = R"EOF(
+const std::string internal_request_with_replace_header_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
@@ -122,7 +122,7 @@ ip_tags:
       - {address_prefix: 1.2.3.4, prefix_len: 32}
 )EOF";
 
-  const std::string internal_request_with_replace_header_with_json_file_config = R"EOF(
+const std::string internal_request_with_replace_header_with_json_file_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
@@ -130,7 +130,7 @@ ip_tag_header:
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
 )EOF";
 
-  const std::string internal_request_with_replace_header_with_yaml_file_config = R"EOF(
+const std::string internal_request_with_replace_header_with_yaml_file_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
@@ -138,24 +138,20 @@ ip_tag_header:
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
 )EOF";
 
-  }// namespace
+} // namespace
 
 class IpTaggingFilterTest : public ::testing::TestWithParam<std::string> {
 public:
-  IpTaggingFilterTest()
-      : api_(Api::createApiForTest())
-        {
+  IpTaggingFilterTest() : api_(Api::createApiForTest()) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))
         .WillByDefault(Return(true));
   }
 
-  static void SetUpTestSuite() {
-    ip_tags_registry = std::make_shared<IpTagsRegistrySingleton>();
-  }
+  static void SetUpTestSuite() { ip_tags_registry = std::make_shared<IpTagsRegistrySingleton>(); }
 
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
-      TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     config_ = std::make_shared<IpTaggingFilterConfig>(config, ip_tags_registry, "prefix.",
                                                       *stats_.rootScope(), runtime_, *api_,
                                                       validation_visitor_);
@@ -220,8 +216,8 @@ public:
 // TEST_F(IpTaggingFilterTest, InternalRequestIpTagsYamlFile) {
 //   const std::string config_yaml = R"EOF(
 // request_type: internal
-// ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
-// )EOF";
+// ip_tags_path: "{{ test_rundir
+// }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml" )EOF";
 //   initializeFilter(config_yaml, true);
 //   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
 //   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
@@ -250,8 +246,8 @@ public:
 // TEST_F(IpTaggingFilterTest, InternalRequestIpTagsJsonFile) {
 //   const std::string config_yaml = R"EOF(
 // request_type: internal
-// ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json"
-// )EOF";
+// ip_tags_path: "{{ test_rundir
+// }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json" )EOF";
 //   initializeFilter(config_yaml, true);
 //   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
 //   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
@@ -277,8 +273,7 @@ public:
 //   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 // }
 
-class InternalRequestIpTaggingFilterTest: public IpTaggingFilterTest {
-};
+class InternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(InternalRequestIpTaggingFilterTest, InternalRequest) {
   const std::string config = GetParam();
@@ -308,13 +303,11 @@ TEST_P(InternalRequestIpTaggingFilterTest, InternalRequest) {
 }
 
 INSTANTIATE_TEST_CASE_P(InternalRequest, InternalRequestIpTaggingFilterTest,
-                        ::testing::ValuesIn(
-                          {internal_request_config,
-                          internal_request_with_json_file_config,
-                          internal_request_with_yaml_file_config}));
+                        ::testing::ValuesIn({internal_request_config,
+                                             internal_request_with_json_file_config,
+                                             internal_request_with_yaml_file_config}));
 
-class ExternalRequestIpTaggingFilterTest: public IpTaggingFilterTest {
-};
+class ExternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(ExternalRequestIpTaggingFilterTest, ExternalRequest) {
   const std::string config = GetParam();
@@ -344,14 +337,11 @@ TEST_P(ExternalRequestIpTaggingFilterTest, ExternalRequest) {
 }
 
 INSTANTIATE_TEST_CASE_P(ExternalRequest, ExternalRequestIpTaggingFilterTest,
-                        ::testing::ValuesIn(
-                          {external_request_config,
-                          external_request_with_json_file_config,
-                          external_request_with_yaml_file_config
-                          }));
+                        ::testing::ValuesIn({external_request_config,
+                                             external_request_with_json_file_config,
+                                             external_request_with_yaml_file_config}));
 
-class BothRequestIpTaggingFilterTest: public IpTaggingFilterTest {
-};
+class BothRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(BothRequestIpTaggingFilterTest, BothRequest) {
   const std::string config = GetParam();
@@ -381,14 +371,11 @@ TEST_P(BothRequestIpTaggingFilterTest, BothRequest) {
 }
 
 INSTANTIATE_TEST_CASE_P(BothRequest, BothRequestIpTaggingFilterTest,
-                        ::testing::ValuesIn(
-                          {both_request_config,
-                          both_request_with_json_file_config,
-                          both_request_with_yaml_file_config
-                          }));
+                        ::testing::ValuesIn({both_request_config,
+                                             both_request_with_json_file_config,
+                                             both_request_with_yaml_file_config}));
 
-class NoHitsIpTaggingFilterTest: public IpTaggingFilterTest {
-};
+class NoHitsIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(NoHitsIpTaggingFilterTest, NoHits) {
   const std::string config = GetParam();
@@ -412,14 +399,11 @@ TEST_P(NoHitsIpTaggingFilterTest, NoHits) {
 }
 
 INSTANTIATE_TEST_CASE_P(NoHits, NoHitsIpTaggingFilterTest,
-                        ::testing::ValuesIn(
-                          {internal_request_config,
-                          internal_request_with_json_file_config,
-                          internal_request_with_yaml_file_config
-                          }));
+                        ::testing::ValuesIn({internal_request_config,
+                                             internal_request_with_json_file_config,
+                                             internal_request_with_yaml_file_config}));
 
-class AppendEntryFilterTest: public IpTaggingFilterTest {
-};
+class AppendEntryFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(AppendEntryFilterTest, AppendEntry) {
   const std::string config = GetParam();
@@ -440,18 +424,15 @@ TEST_P(AppendEntryFilterTest, AppendEntry) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-
 INSTANTIATE_TEST_CASE_P(AppendEntry, AppendEntryFilterTest,
-                        ::testing::ValuesIn(
-                          {internal_request_config,
-                          internal_request_with_json_file_config,
-                          internal_request_with_yaml_file_config
-                          }));
+                        ::testing::ValuesIn({internal_request_config,
+                                             internal_request_with_json_file_config,
+                                             internal_request_with_yaml_file_config}));
 
-class ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest: public IpTaggingFilterTest {
-};
+class ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest : public IpTaggingFilterTest {};
 
-TEST_P(ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest, ReplaceAlternateHeaderWhenActionIsDefaulted) {
+TEST_P(ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest,
+       ReplaceAlternateHeaderWhenActionIsDefaulted) {
   const std::string config = GetParam();
   initializeFilter(config);
   Http::TestRequestHeaderMapImpl request_headers{
@@ -474,12 +455,11 @@ TEST_P(ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest, ReplaceAlternateHe
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-INSTANTIATE_TEST_CASE_P(ReplaceAlternateHeaderWhenActionIsDefaulted, ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest,
-                        ::testing::ValuesIn(
-                          {internal_request_with_header_config,
-                          //internal_request_with_header_with_json_file_config,
-                          internal_request_with_header_with_yaml_file_config
-                          }));
+INSTANTIATE_TEST_CASE_P(ReplaceAlternateHeaderWhenActionIsDefaulted,
+                        ReplaceAlternateHeaderWhenActionIsDefaultedFilterTest,
+                        ::testing::ValuesIn({internal_request_with_header_config,
+                                             // internal_request_with_header_with_json_file_config,
+                                             internal_request_with_header_with_yaml_file_config}));
 
 // class ReplaceAlternateHeaderFilterTest: public IpTaggingFilterTest {
 // };
