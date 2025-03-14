@@ -89,6 +89,10 @@ bug_fixes:
 - area: listener
   change: |
     Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
+- area: http1
+  change: |
+    Adjusts balsa parser to allow arbitrary sequences of CR and LF at the start of requests. This fix can be reverted by setting
+    runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` to ``false``
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
