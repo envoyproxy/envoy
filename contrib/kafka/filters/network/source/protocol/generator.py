@@ -822,6 +822,7 @@ class RenderingHelper:
         # Templates are resolved relatively to main start script, due to main & test templates being
         # stored in different directories.
         env = jinja2.Environment(
+            autoescape=jinja2.select_autoescape(['html', 'xml']),
             loader=jinja2.FileSystemLoader(
                 searchpath=os.path.dirname(os.path.abspath(sys.argv[0]))))
         env.filters['camel_case_to_snake_case'] = RenderingHelper.camel_case_to_snake_case
