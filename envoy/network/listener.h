@@ -134,6 +134,42 @@ public:
 
 using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;
 
+class RevConnRegistry;
+
+/**
+ * Configuration for a reverse connection listener.
+ */
+class ReverseConnectionListenerConfig {
+public:
+  virtual ~ReverseConnectionListenerConfig() = default;
+
+  /**
+   * Encapsulates the source node, cluster and tenant IDs of the local envoy. These are used when
+   * the listener creates reverse connections.
+   */
+  struct ReverseConnParams {
+    std::string src_node_id_;
+    std::string src_cluster_id_;
+    std::string src_tenant_id_;
+    absl::flat_hash_map<std::string, uint32_t> remote_cluster_to_conn_count_map_;
+  };
+  using ReverseConnParamsPtr = std::unique_ptr<ReverseConnParams>;
+  /**
+   * @return the private ReverseConnParams object, containing
+   * the params identifying the local envoy.
+   */
+  virtual ReverseConnParamsPtr& getReverseConnParams() PURE;
+
+  /**
+   * @return the global reverse conn registry.
+   */
+  virtual RevConnRegistry& reverseConnRegistry() PURE;
+};
+
+using ReverseConnectionListenerConfigOptRef = OptRef<ReverseConnectionListenerConfig>;
+using ReverseConnectionListenerConfigPtr = std::unique_ptr<ReverseConnectionListenerConfig>;
+using ReverseConnParamsPtr = Network::ReverseConnectionListenerConfig::ReverseConnParamsPtr;
+
 /**
  * Description of the listener.
  */
@@ -259,6 +295,17 @@ public:
    * @return the internal configuration for the listener IFF it is an internal listener.
    */
   virtual InternalListenerConfigOptRef internalListenerConfig() PURE;
+
+  /**
+   * @return the reverse connection configuration for the listener IFF it is an reverse connection
+   * listener.
+   */
+  virtual ReverseConnectionListenerConfigOptRef reverseConnectionListenerConfig() const PURE;
+
+  /**
+   * @return the listener's version.
+   */
+  virtual const std::string& versionInfo() const PURE;
 
   /**
    * @param address is used for query the address specific connection balancer.

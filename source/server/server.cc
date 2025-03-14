@@ -642,6 +642,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     auto config = Config::Utility::translateAnyToFactoryConfig(
         bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
+    ENVOY_LOG(trace, "creating bootstrap extension from factory: {}", factory.name());
     bootstrap_extensions_.push_back(
         factory.createBootstrapExtension(*config, serverFactoryContext()));
   }

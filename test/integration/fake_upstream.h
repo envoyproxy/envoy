@@ -940,6 +940,11 @@ private:
       return parent_.socket_factories_;
     }
     bool bindToPort() const override { return true; }
+    Network::ReverseConnectionListenerConfigOptRef
+    reverseConnectionListenerConfig() const override {
+      ENVOY_LOG_MISC(info, "Reverse connection config is not supported for FakeListener.");
+      return Network::ReverseConnectionListenerConfigOptRef();
+    }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
@@ -947,6 +952,7 @@ private:
     Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    const std::string& versionInfo() const override { PANIC("Not implemented for FakeListener."); }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
