@@ -1,0 +1,2 @@
+admin:
+  fail_startup_listener_health: true

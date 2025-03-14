@@ -67,7 +67,7 @@ TEST_P(AdminInstanceTest, AdminHeapProfiler) {
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
   AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
-                                   server_, false);
+                                   server_, false, false);
   Http::TestResponseHeaderMapImpl header_map;
   request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
   request_headers_.setPath("/cpuprofiler?enable=y");

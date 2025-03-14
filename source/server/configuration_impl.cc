@@ -261,6 +261,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
         Network::SocketOptionFactory::buildLiteralOptions(admin.socket_options()));
   }
   admin_.ignore_global_conn_limit_ = admin.ignore_global_conn_limit();
+  admin_.fail_startup_listener_health_ = admin.fail_startup_listener_health();
 
   if (!bootstrap.flags_path().empty()) {
     flags_path_ = bootstrap.flags_path();

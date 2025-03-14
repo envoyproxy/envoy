@@ -71,7 +71,7 @@ class AdminImpl : public Admin,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
-            bool ignore_global_conn_limit);
+            bool ignore_global_conn_limit, bool fail_startup_listener_health);
 
   Http::Code runCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
@@ -500,6 +500,7 @@ private:
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const bool fail_startup_listener_health_;
 };
 
 } // namespace Server

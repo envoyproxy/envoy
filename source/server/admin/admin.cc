@@ -106,7 +106,7 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
-                     bool ignore_global_conn_limit)
+                     bool ignore_global_conn_limit, bool fail_startup_listener_health)
     : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
@@ -269,7 +269,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
       local_reply_(LocalReply::Factory::createDefault()),
       ignore_global_conn_limit_(ignore_global_conn_limit),
-      header_validator_factory_(createHeaderValidatorFactory(server.serverFactoryContext())) {
+      header_validator_factory_(createHeaderValidatorFactory(server.serverFactoryContext())),
+      fail_startup_listener_health_(fail_startup_listener_health) {
 #ifndef NDEBUG
   // Verify that no duplicate handlers exist.
   absl::flat_hash_set<absl::string_view> handlers;

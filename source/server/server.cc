@@ -545,7 +545,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   if (!options().hotRestartDisabled()) {
     server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
   }
-  InstanceBase::failHealthcheck(false);
 
   // Check if bootstrap has server version override set, if yes, we should use that as
   // 'server.version' stat.
@@ -605,6 +604,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   absl::Status creation_status;
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
   RETURN_IF_NOT_OK(creation_status);
+  InstanceBase::failHealthcheck(initial_config.admin().failStartupListenerHealth());
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -620,7 +620,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
   admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
-                                       initial_config.admin().ignoreGlobalConnLimit());
+                                       initial_config.admin().ignoreGlobalConnLimit(),
+                                       initial_config.admin().failStartupListenerHealth());
 
   config_tracker = admin_->getConfigTracker();
 #endif
