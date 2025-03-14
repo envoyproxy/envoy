@@ -652,7 +652,8 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
 void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
                             const std::vector<Matchers::StringMatcherPtr>& matchers) {
   if (headers.Upgrade()) {
-    auto tokens = Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
+    std::vector<absl::string_view> tokens =
+        Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
 
     auto end = std::remove_if(tokens.begin(), tokens.end(), [&](absl::string_view token) {
       return std::any_of(
@@ -660,7 +661,7 @@ void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
           [&token](const Matchers::StringMatcherPtr& matcher) { return matcher->match(token); });
     });
 
-    auto new_value = absl::StrJoin(tokens.begin(), end, ",");
+    const std::string new_value = absl::StrJoin(tokens.begin(), end, ",");
 
     if (new_value.empty()) {
       headers.removeUpgrade();
@@ -673,7 +674,7 @@ void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
 void Utility::removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
                                       StringUtil::CaseUnorderedSet tokens_to_remove) {
   if (headers.Connection()) {
-    std::string new_value =
+    const std::string new_value =
         StringUtil::removeTokens(headers.getConnectionValue(), ",", tokens_to_remove, ",");
     if (new_value.empty()) {
       headers.removeConnection();
