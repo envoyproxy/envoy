@@ -899,6 +899,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "parser_integration_test",
+    srcs = ["parser_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+    ],
+)
+
+envoy_cc_test(
     name = "multi_envoy_test",
     size = "large",
     srcs = envoy_select_admin_functionality([

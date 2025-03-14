@@ -181,4 +181,18 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
+bool IntegrationTcpClient::waitForTcpResponse(testing::Matcher<absl::string_view> matcher,
+                                              std::chrono::milliseconds timeout) {
+  auto len = data().size();
+  while (true) {
+    if (testing::Matches(matcher)(data())) {
+      return true;
+    }
+    if (waitForData(len + 1, timeout) != testing::AssertionSuccess()) {
+      return false;
+    }
+    len = data().size();
+  }
+}
+
 } // namespace Envoy
