@@ -894,6 +894,7 @@ init
 initialize
 initializer
 initializers
+inits
 inlined
 inlining
 inobservability
@@ -1215,6 +1216,10 @@ regexes
 reified
 reify
 reimplements
+reinit
+reinitialize
+reinitializes
+reinits
 rele
 releasor
 reloadable
