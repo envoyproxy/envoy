@@ -1,18 +1,12 @@
-#include "source/extensions/common/aws/sigv4a_key_derivation.h"
-
-#include <openssl/ssl.h>
-
-#include "source/common/common/logger.h"
-#include "source/common/crypto/utility.h"
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
-EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
-                                              absl::string_view secret_access_key) {
+absl::StatusOr<EC_KEY*> SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
+                                                              absl::string_view secret_access_key) {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
@@ -74,21 +68,17 @@ EC_KEY* SigV4AKeyDerivation::derivePrivateKey(absl::string_view access_key_id,
 
       // And set the private key we calculated above
       if (!EC_KEY_set_private_key(ec_key, priv_key_num)) {
-        ENVOY_LOG(debug, "Failed to set openssl private key");
         BN_free(priv_key_num);
         OPENSSL_free(ec_key);
-        return nullptr;
+        return absl::InvalidArgumentError("SigV4a private key could not be set");
       }
       BN_free(priv_key_num);
     }
   }
 
-  if (result == SigV4AKeyDerivationResult::AkdrNextCounter) {
-    ENVOY_LOG(debug, "Key derivation exceeded retries, returning no signature");
-    return nullptr;
-  }
-
-  return ec_key;
+  return (result == SigV4AKeyDerivationResult::AkdrNextCounter)
+             ? absl::StatusOr<EC_KEY*>(absl::InvalidArgumentError("Key derivation tries excepted"))
+             : absl::StatusOr<EC_KEY*>(ec_key);
 }
 
 bool SigV4AKeyDerivation::derivePublicKey(EC_KEY* ec_key) {

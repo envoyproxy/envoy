@@ -1,24 +1,5 @@
 #include "source/extensions/common/aws/utility.h"
 
-#include <cstdint>
-#include <limits>
-
-#include "envoy/upstream/cluster_manager.h"
-
-#include "source/common/common/empty_string.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/protobuf/utility.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
-
-#include "absl/strings/match.h"
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
-#include "curl/curl.h"
-#include "fmt/printf.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -392,7 +373,7 @@ absl::optional<std::string> Utility::fetchMetadataWithCurl(Http::RequestMessage&
     if (res == CURLE_OK) {
       break;
     }
-    ENVOY_LOG_MISC(debug, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
+    ENVOY_LOG(debug, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
     buffer.clear();
     std::this_thread::sleep_for(RETRY_DELAY);
   }
@@ -465,7 +446,7 @@ bool Utility::resolveProfileElementsFromFile(
     absl::flat_hash_map<std::string, std::string>& elements) {
   std::ifstream file(profile_file);
   if (!file.is_open()) {
-    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
+    ENVOY_LOG(debug, "Error opening credentials file {}", profile_file);
     return false;
   }
   std::unique_ptr<std::istream> stream;
@@ -560,7 +541,7 @@ std::string Utility::getStringFromJsonOrDefault(Json::ObjectSharedPtr json_objec
   value_or_error = json_object->getValue(string_value);
   if ((!value_or_error.ok()) || (!absl::holds_alternative<std::string>(value_or_error.value()))) {
 
-    ENVOY_LOG_MISC(error, "Unable to retrieve string value from json: {}", string_value);
+    ENVOY_LOG(error, "Unable to retrieve string value from json: {}", string_value);
     return string_default;
   }
   return absl::get<std::string>(value_or_error.value());
@@ -573,14 +554,14 @@ int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
   value_or_error = json_object->getValue(integer_value);
   if (!value_or_error.ok() || ((!absl::holds_alternative<double>(value_or_error.value())) &&
                                (!absl::holds_alternative<int64_t>(value_or_error.value())))) {
-    ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
+    ENVOY_LOG(error, "Unable to retrieve integer value from json: {}", integer_value);
     return integer_default;
   }
   auto json_integer = value_or_error.value();
   // Handle double formatted integers IE exponent format such as 1.714449238E9
   if (auto* double_integer = absl::get_if<double>(&json_integer)) {
     if (*double_integer < 0) {
-      ENVOY_LOG_MISC(error, "Integer {} less than 0: {}", integer_value, *double_integer);
+      ENVOY_LOG(error, "Integer {} less than 0: {}", integer_value, *double_integer);
       return integer_default;
     } else {
       return int64_t(*double_integer);
