@@ -97,13 +97,16 @@ message ProcessingRequest {
 message ProcessingResponse {
   // DataProcessedStatus indicates whether the data was modified by the external processor.
   enum DataProcessedStatus {
+    // The data processed status is unknown.
+    UNKNOWN = 0;
+
     // The data remains unchanged. Envoy will use the original data.
     // This is useful when the processor only wants to inspect but not modify the traffic.
-    UNMODIFIED = 0;
+    UNMODIFIED = 1;
 
     // The data has been modified. Envoy will use the modified data provided in the response.
     // This allows the processor to transform the network traffic as needed.
-    MODIFIED = 1;
+    MODIFIED = 2;
   }
 
   // ConnectionStatus determines what happens to the connection after processing.
