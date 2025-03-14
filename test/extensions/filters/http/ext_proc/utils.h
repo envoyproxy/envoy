@@ -65,23 +65,22 @@ envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
 
 class TestOnProcessingResponse : public OnProcessingResponse {
 public:
-  void
-  afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::ProcessingResponse& response,
-                                absl::Status processing_status,
-                                Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                     absl::Status processing_status,
+                                     Envoy::StreamInfo::StreamInfo&) override;
 
-  void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::HeadersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingRequestBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingResponseBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingRequestBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
+                                  Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingResponseBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
+                                   Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void
-  afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ProcessingResponse& response,
+  afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response,
                                   absl::Status processing_status,
                                   Envoy::StreamInfo::StreamInfo&) override;
 
