@@ -154,6 +154,9 @@ public:
   struct MatchResult {
     const MatchState match_state_;
     const absl::optional<OnMatch<DataType>> on_match_;
+    // Non-null if the match was completed and the match tree can be re-entered to check for
+    // additional matches from where the initial matching stopped.
+    std::unique_ptr<MatchTree<DataType>> matcher_reentrant_ = nullptr;
   };
 
   // Attempts to match against the matching data (which should contain all the data requested via
