@@ -136,6 +136,7 @@ envoy_cc_test_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codec_interface",
         "//envoy/network:address_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/server/overload:thread_local_overload_state",
         "//envoy/tracing:trace_context_interface",
         "//source/common/api:api_lib",

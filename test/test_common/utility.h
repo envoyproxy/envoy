@@ -9,6 +9,7 @@
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
@@ -1399,5 +1400,20 @@ MATCHER_P(JsonStringEq, expected, "") {
   do {                                                                                             \
   } while (0)
 #endif
+
+/**
+ * ScopedThreadLocalSingletonSetter is a helper class for setting a thread local server context for
+ * the duration of the lifetime of the object. The backing instance of singleton is owned by the
+ * caller.
+ */
+class ScopedThreadLocalServerContextSetter {
+public:
+  ~ScopedThreadLocalServerContextSetter() {
+    Server::Configuration::ServerFactoryContextInstance::clear();
+  }
+  ScopedThreadLocalServerContextSetter(Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContextInstance::initialize(&context);
+  }
+};
 
 } // namespace Envoy

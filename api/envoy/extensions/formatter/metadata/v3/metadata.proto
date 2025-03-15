@@ -56,6 +56,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    METADATA(DYNAMIC:NAMESPACE:KEY):Z is equivalent to :ref:`DYNAMIC_METADATA(NAMESPACE:KEY):Z<config_access_log_format_dynamic_metadata>`
 //    METADATA(CLUSTER:NAMESPACE:KEY):Z is equivalent to :ref:`CLUSTER_METADATA(NAMESPACE:KEY):Z<config_access_log_format_cluster_metadata>`
 //    METADATA(UPSTREAM_HOST:NAMESPACE:KEY):Z is equivalent to :ref:`UPSTREAM_METADATA(NAMESPACE:KEY):Z<config_access_log_format_upstream_host_metadata>`
-
+//
+// .. warning::
+//   This extension is treated as built-in extension and will be enabled by default now.
+//   It is unnecessary to configure this extension.
 message Metadata {
 }
