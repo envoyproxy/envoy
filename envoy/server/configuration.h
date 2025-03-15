@@ -158,6 +158,11 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
+
+  /**
+   * @return bool whether to fail listener health checks at startup.
+   */
+  virtual bool failStartupListenerHealth() const PURE;
 };
 
 /**

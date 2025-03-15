@@ -1770,6 +1770,16 @@ TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
+TEST_P(ServerInstanceImplTest, AdminStartupHealth) {
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  EXPECT_FALSE(server_->healthCheckFailed());
+}
+
+TEST_P(ServerInstanceImplTest, AdminFailStartupHealth) {
+  initialize("test/server/test_data/server/bootstrap_fail_startup_health.yaml");
+  EXPECT_TRUE(server_->healthCheckFailed());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

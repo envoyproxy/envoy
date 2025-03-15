@@ -213,12 +213,14 @@ private:
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     AccessLog::InstanceSharedPtrVector accessLogs() const override { return access_logs_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
+    bool failStartupListenerHealth() const override { return fail_startup_listener_health_; }
 
     std::string profile_path_;
     AccessLog::InstanceSharedPtrVector access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
     bool ignore_global_conn_limit_;
+    bool fail_startup_listener_health_;
   };
 
   AdminImpl admin_;

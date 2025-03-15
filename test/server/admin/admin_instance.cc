@@ -9,7 +9,7 @@ namespace Server {
 
 AdminInstanceTest::AdminInstanceTest()
     : cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-      admin_(cpu_profile_path_, server_, false), request_headers_{{":path", "/"}},
+      admin_(cpu_profile_path_, server_, false, false), request_headers_{{":path", "/"}},
       admin_filter_(admin_) {
   AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
