@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.dynamic_forwarding.v3;
+
+import "envoy/config/cluster/v3/cluster.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.dynamic_forwarding.v3";
+option java_outer_classname = "DynamicForwarding";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/dynamic_forwarding/v3;dynamic_forwardingv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Forwarding Load Balancing Policy]
+
+// This configuration allows the built-in PICK_FIRST LB policy to be configured
+// via the LB policy extension point.
+message DynamicForwarding {
+  // The child LB policy to create for initial locality picking, or fallback
+  // endpoint picking.
+  .envoy.config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1;
+
+  // When true primary and fallback endpoints are provided in the HTTP headers.
+  // If headers are present, the values in the request metadata are ignored.
+  // If headers are not present, the values in the request metadata are used.
+  bool use_http_headers_for_endpoints = 2;
+
+  // The header name to use for the primary endpoint.
+  // Defaults to "x-gateway-destination-endpoint".
+  // Endpoint provided in this header takes precedence over value in the request
+  // metadata.
+  string primary_endpoint_http_header_name = 3;
+
+  // The header name to use for the fallback endpoints.
+  // Defaults to "x-gateway-destination-fallback-endpoint-list".
+  // Endpoints provided in this header take precedence over values in the
+  // request metadata.
+  string fallback_endpoint_list_http_header_name = 4;
+  string fallback_endpoint_http_header_name = 5;
+}
