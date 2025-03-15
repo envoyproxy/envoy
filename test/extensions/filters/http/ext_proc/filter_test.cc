@@ -4163,7 +4163,6 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
 
-
   // Header response arrives before any body data.
   processResponseHeaders(false, absl::nullopt);
 

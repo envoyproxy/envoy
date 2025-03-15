@@ -750,8 +750,8 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
     protocol_config->set_send_body_without_waiting_for_header_response(
         config_->sendBodyWithoutWaitingForHeaderResponse());
     protocol_config_encoded_ = true;
-    ENVOY_STREAM_LOG(debug, "Filter protocol configurations encoded {}",
-                     *decoder_callbacks_, protocol_config->DebugString());
+    ENVOY_STREAM_LOG(debug, "Filter protocol configurations encoded {}", *decoder_callbacks_,
+                     protocol_config->DebugString());
   }
 }
 
