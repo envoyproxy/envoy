@@ -191,7 +191,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
     if (!isResponseWithNoRecords(status)) {
       ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
-                      "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_, status, ares_strerror(status));
+                      "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
+                      status, ares_strerror(status));
     } else {
       ENVOY_LOG_EVENT(debug, "cares_resolution_no_records", "dns resolution without records for {}",
                       dns_name_);
