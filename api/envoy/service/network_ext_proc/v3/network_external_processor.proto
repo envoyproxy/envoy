@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package envoy.service.network_ext_proc.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/struct.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.service.network_ext_proc.v3";
+option java_outer_classname = "NetworkExternalProcessorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/network_ext_proc/v3;network_ext_procv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Network External Processing Service]
+
+// The Network External Processing filter allows an external service to dynamically
+// interact with and modify L4 network traffic passing through Envoy. Unlike the
+// HTTP External Processing filter, this service operates at the TCP/UDP level,
+// providing access to raw network data.
+//
+// The filter communicates with an external gRPC service that can:
+// * Inspect network traffic in both directions (client->server and server->client)
+// * Modify the payload data
+// * Control connection lifecycle (continue, close gracefully, or reset)
+//
+// Use cases include:
+// * Custom protocol inspection and modification
+// * Advanced traffic manipulation
+// * Security scanning and filtering
+// * Dynamic connection management
+//
+// The service uses a bidirectional gRPC stream, maintaining state throughout
+// the connection lifetime while allowing asynchronous processing.
+
+// NetworkExternalProcessor service defines the contract between Envoy and
+// external processing servers for L4 network traffic.
+service NetworkExternalProcessor {
+  // Process establishes a bidirectional stream between Envoy and the external
+  // processing server. Envoy sends ProcessingRequests containing network data
+  // and the server responds with ProcessingResponses containing processing
+  // decisions and potentially modified data.
+  //
+  // The server should handle processing timeout properly to avoid blocking
+  // network traffic for extended periods. Any uncaught exceptions will
+  // be treated as errors and will terminate the stream.
+  //
+  // Implementation note: The server should process requests in the order
+  // they are received to maintain proper sequencing of network traffic.
+  rpc Process(stream ProcessingRequest) returns (stream ProcessingResponse) {
+  }
+}
+
+// The payload data from network layer
+message Data {
+  // The raw payload data
+  bytes data = 1;
+
+  // Indicates whether this is the last data frame in the current direction.
+  // The external processor should still respond to this message even
+  // if there is no more data expected in this direction.
+  bool end_of_stream = 2;
+}
+
+// ProcessingRequest contains data sent from Envoy to the external processing server.
+// Each request contains either read data (from client) or write data (to client)
+// along with optional metadata.
+message ProcessingRequest {
+  // ReadData contains the network data intercepted in the request path (client to server).
+  // This is sent to the external processor when data arrives from the downstream client.
+  // If this is set, write_data should not be set.
+  Data read_data = 1;
+
+  // WriteData contains the network data intercepted in the response path (server to client).
+  // This is sent to the external processor when data arrives from the upstream server.
+  // If this is set, read_data should not be set.
+  Data write_data = 2;
+
+  // Optional metadata associated with the request.
+  // This can include connection properties, filter configuration, and any other
+  // contextual information that might be useful for processing decisions.
+  //
+  // The metadata is not automatically propagated from request to response.
+  // The external processor must include any needed metadata in its response.
+  config.core.v3.Metadata metadata = 3;
+}
+
+// ProcessingResponse contains the response from the external processing server to Envoy.
+// Each response corresponds to a ProcessingRequest and indicates how the network
+// traffic should be handled.
+// [#next-free-field: 6]
+message ProcessingResponse {
+  // DataProcessedStatus indicates whether the data was modified by the external processor.
+  enum DataProcessedStatus {
+    // The data processed status is unknown.
+    UNKNOWN = 0;
+
+    // The data remains unchanged. Envoy will use the original data.
+    // This is useful when the processor only wants to inspect but not modify the traffic.
+    UNMODIFIED = 1;
+
+    // The data has been modified. Envoy will use the modified data provided in the response.
+    // This allows the processor to transform the network traffic as needed.
+    MODIFIED = 2;
+  }
+
+  // ConnectionStatus determines what happens to the connection after processing.
+  enum ConnectionStatus {
+    // Continue normal processing of the connection.
+    // This is the default behavior and allows traffic to flow normally.
+    CONTINUE = 0;
+
+    // Close the connection with normal TCP FIN.
+    // This allows for clean connection termination with a normal close sequence.
+    // Any buffered data will be sent before closing.
+    CLOSE = 1;
+
+    // Immediately reset the connection with TCP RST.
+    // This forcibly terminates the connection without a clean shutdown,
+    // discarding any buffered data. Use this for security-critical situations
+    // or when immediate termination is required.
+    CLOSE_RST = 2;
+  }
+
+  // The processed ReadData containing potentially modified data for the request path.
+  // This should be sent in response to a ProcessingRequest with read_data, and the
+  // previous data in ProcessingRequest will be replaced by the new data in Envoy's data plane.
+  // If this is set, write_data should not be set.
+  Data read_data = 1;
+
+  // The processed WriteData containing potentially modified data for the response path.
+  // This should be sent in response to a ProcessingRequest with write_data, and the
+  // previous data in ProcessingRequest will be replaced by the new data in Envoy's data plane.
+  // If this is set, read_data should not be set.
+  Data write_data = 2;
+
+  // Indicates whether the data was modified or not.
+  // This is mandatory and tells Envoy whether to use the original or modified data.
+  DataProcessedStatus data_processing_status = 3;
+
+  // Optional: Determines the connection behavior after processing.
+  // If not specified, CONTINUE is assumed, and the connection proceeds normally.
+  // Use CLOSE or CLOSE_RST to terminate the connection based on processing results.
+  ConnectionStatus connection_status = 4;
+
+  // Optional metadata associated with the request.
+  // This can include connection properties, filter configuration, and any other
+  // contextual information that might be useful for processing decisions.
+  //
+  // The metadata is not automatically propagated from request to response.
+  // The external processor must include any needed metadata in its response.
+  google.protobuf.Struct dynamic_metadata = 5;
+}
