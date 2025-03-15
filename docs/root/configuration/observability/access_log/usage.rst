@@ -1391,6 +1391,27 @@ UDP
   TCP/UDP
     Not implemented ("-").
 
+%PATH(X:Y):Z%
+  HTTP
+    The value of the request path. The parameter X is used to specify should the output contains
+    query or not. The parameter Y is used to specify the position of the request path. Both X and Y
+    are optional.
+
+    The X parameter can be:
+
+    * ``WQ``: With Query. If the X is not presetn, ``WQ`` will be used.
+    * ``NQ``: No Query.
+
+    The Y parameter can be:
+
+    * ``ORIG``: Get the request path from the ``x-envoy-original-path`` header.
+    * ``PATH``: Get the request path from the ``:path`` header.
+    * ``ORIG_OR_PATH``: Get the request path from the ``x-envoy-original-path`` header if it is
+      present, otherwise get it from the ``:path`` header. If the Y is not present, ``ORIG_OR_PATH``
+      will be used.
+  TCP/UDP
+    Not implemented ("-").
+
 %CUSTOM_FLAGS%
   Custom flags set into the stream info. This could be used to log any custom event from the filters.
   Multiple flags are separated by comma.
