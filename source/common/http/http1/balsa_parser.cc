@@ -184,6 +184,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
 size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
+  size_t skipped_bytes = 0;
   if (len > 0 && !first_byte_processed_) {
     if (delay_reset_) {
       if (first_message_) {
@@ -193,21 +194,28 @@ size_t BalsaParser::execute(const char* slice, int len) {
       }
     }
 
-    if (message_type_ == MessageType::Request && !allow_custom_methods_ &&
-        !isFirstCharacterOfValidMethod(*slice)) {
-      status_ = ParserStatus::Error;
-      error_message_ = "HPE_INVALID_METHOD";
-      return 0;
+    if (message_type_ == MessageType::Request && !allow_custom_methods_) {
+      // Skip `(\r|\n).*`.
+      while (allow_cr_and_lf_at_request_start_ && len > 0 && (*slice == '\r' || *slice == '\n')) {
+        slice += 1;
+        skipped_bytes += 1;
+        len -= 1;
+      }
+      if (len > 0 && !isFirstCharacterOfValidMethod(*slice)) {
+        status_ = ParserStatus::Error;
+        error_message_ = "HPE_INVALID_METHOD";
+        return skipped_bytes;
+      }
     }
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
       status_ = ParserStatus::Error;
       error_message_ = "HPE_INVALID_CONSTANT";
-      return 0;
+      return skipped_bytes;
     }
 
     status_ = convertResult(connection_->onMessageBegin());
     if (status_ == ParserStatus::Error) {
-      return 0;
+      return skipped_bytes;
     }
 
     first_byte_processed_ = true;
@@ -217,16 +225,16 @@ size_t BalsaParser::execute(const char* slice, int len) {
       ((message_type_ == MessageType::Response && hasTransferEncoding()) ||
        !headers_.content_length_valid())) {
     MessageDone();
-    return 0;
+    return skipped_bytes;
   }
 
   if (first_byte_processed_ && len == 0) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_EOF_STATE";
-    return 0;
+    return skipped_bytes;
   }
 
-  return framer_.ProcessInput(slice, len);
+  return framer_.ProcessInput(slice, len) + skipped_bytes;
 }
 
 void BalsaParser::resume() {

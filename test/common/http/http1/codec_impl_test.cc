@@ -4278,6 +4278,30 @@ TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
   EXPECT_EQ(1u, buffer.length());
 }
 
+// Receiving any number of `\r` or `\n` as first byte is not an error.
+TEST_P(Http1ServerConnectionImplTest, CROrLFAsFirstBytesIsNotAnError) {
+#ifdef ENVOY_ENABLE_UHV
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    // BalsaParser allows custom methods if UHV is enabled.
+    return;
+  }
+#endif
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start", "true"}});
+
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
+
+  // Starting with arbitrary number of CR and LF is not an error.
+  Buffer::OwnedImpl buffer("\r\r\r\n\n\rGET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
 // Receiving a first byte that cannot start a valid response is an error.
 TEST_P(Http1ClientConnectionImplTest, InvalidResponseFirstCharacter) {
   initialize();
