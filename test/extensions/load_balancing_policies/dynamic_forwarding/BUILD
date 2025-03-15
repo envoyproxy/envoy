@@ -1,0 +1,83 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
+    "envoy_package",
+    "envoy_proto_library",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_names = ["envoy.load_balancing_policies.dynamic_forwarding"],
+    deps = [
+        ":test_lb",
+        ":test_lb_proto_cc_proto",
+        "//envoy/upstream:load_balancer_interface",
+        "//source/common/config:utility_lib",
+        "//source/extensions/load_balancing_policies/dynamic_forwarding:config",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/dynamic_forwarding/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "selected_hosts_test",
+    srcs = ["selected_hosts_test.cc"],
+    extension_names = ["envoy.load_balancing_policies.dynamic_forwarding"],
+    deps = [
+        "//source/common/protobuf",
+        "//source/extensions/load_balancing_policies/dynamic_forwarding:selected_hosts",
+        "//test/test_common:status_utility_lib",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+envoy_proto_library(
+    name = "test_lb_proto",
+    srcs = ["test_lb.proto"],
+)
+
+envoy_cc_test_library(
+    name = "test_lb",
+    srcs = ["test_lb.cc"],
+    hdrs = ["test_lb.h"],
+    deps = [
+        ":test_lb_proto_cc_proto",
+        "//envoy/common:optref_lib",
+        "//envoy/common:random_generator_interface",
+        "//envoy/common:time_interface",
+        "//envoy/registry",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:thread_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib_header",
+        "//source/common/upstream:load_balancer_factory_base_lib",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
