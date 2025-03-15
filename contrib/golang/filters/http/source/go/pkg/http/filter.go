@@ -412,6 +412,14 @@ func (c *httpConfig) DefineGaugeMetric(name string) api.GaugeMetric {
 	}
 }
 
+func (c *httpConfig) SecretManager() api.SecretManager {
+	return c
+}
+
+func (c *httpConfig) GetGenericSecret(name string) (string, bool) {
+	return cAPI.HttpGetStringSecret(unsafe.Pointer(c.config), name)
+}
+
 func (c *httpConfig) Finalize() {
 	cAPI.HttpConfigFinalize(unsafe.Pointer(c.config))
 }

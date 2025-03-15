@@ -498,3 +498,14 @@ func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, valu
 	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
 	handleCApiStatus(res)
 }
+
+func (c *httpCApiImpl) HttpGetStringSecret(cfg unsafe.Pointer, key string) (string, bool) {
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoFilterHttpGetStringSecret(cfg, unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	if res == C.CAPIValueNotFound {
+		return "", false
+	}
+	handleCApiStatus(res)
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
+}
