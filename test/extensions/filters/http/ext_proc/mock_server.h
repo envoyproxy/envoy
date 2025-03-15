@@ -32,6 +32,7 @@ public:
   ~MockStream() override;
   MOCK_METHOD(void, send, (envoy::service::ext_proc::v3::ProcessingRequest&&, bool));
   MOCK_METHOD(bool, close, ());
+  MOCK_METHOD(bool, halfCloseAndDeleteOnRemoteClose, ());
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(void, notifyFilterDestroy, ());

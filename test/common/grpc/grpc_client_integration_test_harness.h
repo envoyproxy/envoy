@@ -189,6 +189,7 @@ public:
             EXPECT_EQ(total_bytes_rev - header_bytes_rev,
                       recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
           }
+          response_received_ = true;
           dispatcher_helper_.exitDispatcherIfNeeded();
         }));
     dispatcher_helper_.setStreamEventPending();
@@ -234,6 +235,19 @@ public:
 
   void sendServerReset() { fake_stream_->encodeResetStream(); }
 
+  void encodeServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
+                            const TestMetadata& metadata) {
+    Http::TestResponseTrailerMapImpl reply_trailers{
+        {"grpc-status", std::to_string(enumToInt(grpc_status))}};
+    if (!grpc_message.empty()) {
+      reply_trailers.addCopy("grpc-message", grpc_message);
+    }
+    for (const auto& value : metadata) {
+      reply_trailers.addCopy(value.first, value.second);
+    }
+    fake_stream_->encodeTrailers(reply_trailers);
+  }
+
   void closeStream() {
     grpc_stream_->closeStream();
     waitForEndStream();
@@ -249,10 +263,22 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
+  void waitForRemoteCloseAndDelete() { grpc_stream_->waitForRemoteCloseAndDelete(); }
+
+  void runDispatcherUntilResponseReceived() {
+    while (!response_received_) {
+      if (dispatcher_helper_.pending_stream_events_ == 0) {
+        ++dispatcher_helper_.pending_stream_events_;
+      }
+      dispatcher_helper_.runDispatcher();
+    }
+  }
+
   DispatcherHelper& dispatcher_helper_;
   FakeStream* fake_stream_{};
   AsyncStream<helloworld::HelloRequest> grpc_stream_{};
   const TestMetadata empty_metadata_;
+  bool response_received_{};
 };
 
 using HelloworldStreamPtr = std::unique_ptr<HelloworldStream>;
@@ -512,6 +538,10 @@ public:
     if (watermark_callbacks_ != nullptr) {
       options.setSidestreamWatermarkCallbacks(watermark_callbacks_);
     }
+    if (on_stream_delete_callback_) {
+      options.setOnDeleteCallbacksForTestOnly(on_stream_delete_callback_);
+    }
+    options.setRemoteCloseTimeout(remote_close_timeout_);
     stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
@@ -530,6 +560,20 @@ public:
     expectExtraHeaders(fake_stream);
 
     return stream;
+  }
+
+  void setOnDeleteCallback() {
+    on_stream_delete_callback_ = [this]() {
+      std::cout << "stream deleted on remote close" << std::endl;
+      stream_deleted_on_remote_close_ = true;
+      dispatcher_->exit();
+    };
+  }
+
+  void runDispatcherUntilStreamDeletion() {
+    while (!stream_deleted_on_remote_close_) {
+      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+    }
   }
 
   Event::DelegatingTestTimeSystem<TimeSystemVariant> time_system_;
@@ -580,6 +624,10 @@ public:
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};
+  std::function<void()> on_stream_delete_callback_;
+  bool stream_deleted_on_remote_close_{false};
+  // By default this will cause the test to timeout and fail.
+  std::chrono::milliseconds remote_close_timeout_{60000};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.

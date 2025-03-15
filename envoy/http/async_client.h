@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -383,6 +384,14 @@ public:
       sidestream_watermark_callbacks = callbacks;
       return *this;
     }
+    StreamOptions& setOnDeleteCallbacksForTestOnly(std::function<void()> callback) {
+      on_delete_callback_for_test_only = callback;
+      return *this;
+    }
+    StreamOptions& setRemoteCloseTimeout(std::chrono::milliseconds timeout) {
+      remote_close_timeout = timeout;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -443,6 +452,15 @@ public:
     absl::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
+
+    // The amount of tiem to wait for server to half-close its stream after client
+    // has half-closed its stream.
+    // Defaults to 1 second.
+    std::chrono::milliseconds remote_close_timeout{1000};
+
+    // This callback is invoked when AsyncStream object is deleted.
+    // Test only use to validate deferred deletion.
+    std::function<void()> on_delete_callback_for_test_only;
   };
 
   /**
