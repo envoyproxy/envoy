@@ -1588,12 +1588,13 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
-  if (!filter_manager_.streamInfo().route() ||
-      !filter_manager_.streamInfo().route()->routeEntry() || !request_headers_) {
+  if (!hasCachedRoute() || !request_headers_) {
     return;
   }
-  const auto& route = filter_manager_.streamInfo().route()->routeEntry();
-
+  const Router::RouteEntry* route = cached_route_.value()->routeEntry();
+  if (route == nullptr) {
+    return;
+  }
   auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
   std::chrono::milliseconds timeout;
   bool disable_timer = false;
