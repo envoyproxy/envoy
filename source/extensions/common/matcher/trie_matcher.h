@@ -71,7 +71,8 @@ public:
     }
   }
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
+protected:
+  typename MatchTree<DataType>::MatchResult doMatch(const DataType& data) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
@@ -94,7 +95,8 @@ public:
         continue;
       }
       if (node.on_match_->action_cb_) {
-        return {MatchState::MatchComplete, OnMatch<DataType>{node.on_match_->action_cb_, nullptr}};
+        return {MatchState::MatchComplete,
+                OnMatch<DataType>{node.on_match_->action_cb_, nullptr, false}};
       }
       // Resume any subtree matching to preserve backtracking progress.
       auto matched = evaluateMatch(*node.on_match_->matcher_, data);
@@ -102,7 +104,7 @@ public:
         return {MatchState::UnableToMatch, absl::nullopt};
       }
       if (matched.match_state_ == MatchState::MatchComplete && matched.result_) {
-        return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr}};
+        return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr, false}};
       }
       if (first) {
         first = false;
