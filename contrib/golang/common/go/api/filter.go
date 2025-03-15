@@ -329,6 +329,7 @@ type ConfigCallbacks interface {
 
 	// Get secret manager.
 	// Secrets should be defined in the plugin configuration.
+	// It is unsafe to use this secret manager from a goroutine.
 	SecretManager() SecretManager
 }
 

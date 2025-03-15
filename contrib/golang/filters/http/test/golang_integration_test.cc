@@ -841,8 +841,8 @@ typed_config:
     cleanup();
   }
 
-  void testSecrets(const std::string&& secret_key, const std::string&& expected_secret_value,
-                   const std::string&& status_code) {
+  void testSecrets(const std::string secret_key, const std::string expected_secret_value,
+                   const std::string status_code) {
     initializeSecretsConfig();
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
     Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
