@@ -6,6 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/matchers.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/header_formatter.h"
@@ -497,6 +498,9 @@ struct Http1Settings {
   // headers set. By default such messages are rejected, but if option is enabled - Envoy will
   // remove Content-Length header and process message.
   bool allow_chunked_length_{false};
+  // Remove HTTP/1.1 Upgrade header tokens matching any provided matcher. By default such
+  // messages are rejected
+  std::shared_ptr<const std::vector<Matchers::StringMatcherPtr>> ignore_upgrade_matchers_;
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
