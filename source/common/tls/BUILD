@@ -21,6 +21,7 @@ envoy_cc_library(
         ":utility_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:utility_lib",
     ],
 )
 
