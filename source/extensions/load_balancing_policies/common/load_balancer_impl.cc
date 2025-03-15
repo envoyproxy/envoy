@@ -432,8 +432,8 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
       force_direct_routing_(locality_config.has_value()
-                                 ? locality_config->zone_aware_lb_config().force_direct_routing()
-                                 : false),
+                                ? locality_config->zone_aware_lb_config().force_direct_routing()
+                                : false),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -503,10 +503,10 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
       runtime_.snapshot().getBoolean(RuntimeForceDirectRouting, force_direct_routing_);
   // If we have lower percent of hosts in the local cluster in the same locality,
   // we can push all of the requests directly to upstream cluster in the same locality.
-  if (upstreamHostsPerLocality.hasLocalLocality() && force_direct_routing) ||
+  if ((upstreamHostsPerLocality.hasLocalLocality() && force_direct_routing) ||
       (upstreamHostsPerLocality.hasLocalLocality() &&
-      locality_percentages[0].upstream_percentage > 0 &&
-      locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) {
+       locality_percentages[0].upstream_percentage > 0 &&
+       locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage)) {
     state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
     return;
   }
