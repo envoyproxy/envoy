@@ -28,7 +28,7 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
 
-  ENVOY_LOG(info, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),
+  ENVOY_LOG(debug, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),
             removed_resources.size());
 
   std::vector<std::string> exception_msgs;
@@ -70,15 +70,19 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
           { exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what())); });
   }
 
+  uint32_t removed = 0;
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;
       ENVOY_LOG(debug, "{}: remove cluster '{}'", name_, resource_name);
+      ++removed;
     }
   }
 
-  ENVOY_LOG(info, "{}: added/updated {} cluster(s), skipped {} unmodified cluster(s)", name_,
-            added_or_updated, skipped);
+  ENVOY_LOG(
+      info,
+      "{}: added/updated {} cluster(s), removed {} cluster(s), skipped {} unmodified cluster(s)",
+      name_, added_or_updated, removed, skipped);
 
   if (any_applied) {
     system_version_info_ = system_version_info;
