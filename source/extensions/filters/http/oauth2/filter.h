@@ -90,17 +90,20 @@ struct CookieNames {
                   cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
                     cookie_names.oauth_expires(), cookie_names.id_token(),
-                    cookie_names.refresh_token(), cookie_names.oauth_nonce()) {}
+                    cookie_names.refresh_token(), cookie_names.oauth_nonce(),
+                    cookie_names.code_verifier()) {}
 
   CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
               const std::string& oauth_expires, const std::string& id_token,
-              const std::string& refresh_token, const std::string& oauth_nonce)
+              const std::string& refresh_token, const std::string& oauth_nonce,
+              const std::string& code_verifier)
       : bearer_token_(bearer_token.empty() ? BearerToken : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? OauthHMAC : oauth_hmac),
         oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
         id_token_(id_token.empty() ? IdToken : id_token),
         refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token),
-        oauth_nonce_(oauth_nonce.empty() ? OauthNonce : oauth_nonce) {}
+        oauth_nonce_(oauth_nonce.empty() ? OauthNonce : oauth_nonce),
+        code_verifier_(code_verifier.empty() ? CodeVerifier : code_verifier) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
@@ -108,6 +111,7 @@ struct CookieNames {
   const std::string id_token_;
   const std::string refresh_token_;
   const std::string oauth_nonce_;
+  const std::string code_verifier_;
 
   static constexpr absl::string_view OauthExpires = "OauthExpires";
   static constexpr absl::string_view BearerToken = "BearerToken";
@@ -115,6 +119,7 @@ struct CookieNames {
   static constexpr absl::string_view OauthNonce = "OauthNonce";
   static constexpr absl::string_view IdToken = "IdToken";
   static constexpr absl::string_view RefreshToken = "RefreshToken";
+  static constexpr absl::string_view CodeVerifier = "CodeVerifier";
 };
 
 /**
@@ -188,6 +193,9 @@ public:
     return refresh_token_cookie_settings_;
   }
   const CookieSettings& nonceCookieSettings() const { return nonce_cookie_settings_; }
+  const CookieSettings& codeVerifierCookieSettings() const {
+    return code_verifier_cookie_settings_;
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -225,6 +233,7 @@ private:
   const CookieSettings id_token_cookie_settings_;
   const CookieSettings refresh_token_cookie_settings_;
   const CookieSettings nonce_cookie_settings_;
+  const CookieSettings code_verifier_cookie_settings_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

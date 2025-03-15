@@ -35,6 +35,9 @@ minor_behavior_changes:
     AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
     credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
     then the original behaviour with a signing failure will occur.
+- area: oauth2
+  change: |
+    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
