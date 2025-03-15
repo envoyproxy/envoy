@@ -18,7 +18,7 @@ envoy_cc_extension(
     deps = [
         ":fluentd_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/tracers/v3/fluentd:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/tracers/fluentd/v3:pkg_cc_proto",
     ],
 )
 
@@ -35,6 +35,6 @@ envoy_cc_library(
         "//source/extensions/common/fluentd:fluentd_base_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@com_github_msgpack_cpp//:msgpack",
-        "@envoy_api//envoy/extensions/tracers/v3/fluentd:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/tracers/fluentd/v3:pkg_cc_proto",
     ],
 )

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
-import "envoy/config/core/v3/base.proto";
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -49,5 +47,5 @@ message FluentdConfig {
   google.protobuf.UInt32Value buffer_size_bytes = 5;
 
   // Optional retry, in case upstream connection has failed. If this field is not set, the default values will be applied.
-  config.core.v3.RetryPolicy retry_policy = 6;
+  core.v3.RetryPolicy retry_policy = 6;
 }
