@@ -364,6 +364,7 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_headers());
+    protocolConfigEncoding(request);
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -5148,7 +5149,6 @@ TEST_P(ExtProcIntegrationTest, ProtocolConfigurationEncodingTest) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBodyAndTrailer("hello world");
-  // processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   processRequestBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
   EXPECT_TRUE(protocol_config_encoded_);
   EXPECT_EQ(protocol_config_.request_body_mode(), ProcessingMode::STREAMED);
