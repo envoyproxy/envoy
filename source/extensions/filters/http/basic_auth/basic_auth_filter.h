@@ -5,6 +5,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/hash/algorithm_provider.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -95,6 +96,7 @@ private:
 
   // The callback function.
   FilterConfigConstSharedPtr config_;
+  Hash::AlgorithmProviderSharedPtr hash_algorithm_provider_;
 };
 
 } // namespace BasicAuth
