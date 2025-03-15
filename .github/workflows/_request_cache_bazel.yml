@@ -70,7 +70,7 @@ jobs:
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cache-key }}
-        force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
+        force-install: ${{ contains(fromJSON('["oracle-16cpu-64gb-arm64", "oracle-2cpu-8gb-arm64"]'), inputs.runs-on) }}
     - run: |
         # Simulate container build directory
         sudo mkdir /build

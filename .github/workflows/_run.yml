@@ -262,7 +262,7 @@ jobs:
       if: ${{ inputs.gcs-cache-bucket }}
       with:
         key: ${{ secrets.gcs-cache-key }}
-        force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
+        force-install: ${{ contains(fromJSON('["oracle-16cpu-64gb-arm64", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
     - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.15
       if: ${{ inputs.gcs-cache-bucket }}
       name: >-
