@@ -63,12 +63,11 @@ class SecretReader {
 public:
   SecretReader(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Server::Configuration::FactoryContext& context);
-  absl::optional<const std::string> secret(const std::string&& name);
+  absl::optional<const std::string> secret(const std::string& name) const;
 
 private:
   absl::flat_hash_map<std::string, std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>>
       secrets_;
-  const std::string empty_secret_;
 };
 /**
  * Configuration for the HTTP golang extension filter.
@@ -86,6 +85,7 @@ public:
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
   GolangFilterStats& stats() { return stats_; }
+  const SecretReader& getSecretReader() const { return *secret_reader_; }
 
   void newGoPluginConfig();
   CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
@@ -110,6 +110,8 @@ private:
   MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
   // filter level config is created in C++ side, and freed by Golang GC finalizer.
   httpConfigInternal* config_{nullptr};
+
+  Event::Dispatcher& event_dispatcher_;
   std::shared_ptr<SecretReader> secret_reader_;
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_;
@@ -314,6 +316,7 @@ public:
   CAPIStatus getStringFilterState(absl::string_view key, uint64_t* value_data, int* value_len);
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
+  CAPIStatus getSecret(absl::string_view key, uint64_t* value_data, int* value_len);
 
   bool isProcessingInGo() {
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();

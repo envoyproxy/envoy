@@ -284,6 +284,14 @@ func (r *httpRequest) Finalize(reason int) {
 	cAPI.HttpFinalize(unsafe.Pointer(r), reason)
 }
 
+func (r *httpRequest) SecretManager() api.SecretManager {
+	return r
+}
+
+func (r *httpRequest) GetGenericSecret(name string) (string, bool) {
+	return cAPI.HttpGetStringSecret(unsafe.Pointer(r), name)
+}
+
 type streamInfo struct {
 	request *httpRequest
 }
@@ -394,6 +402,8 @@ func (f *filterState) GetString(key string) string {
 
 type httpConfig struct {
 	config *C.httpConfig
+	// protect c->str_value in the C++ side from being used concurrently.
+	mutex sync.Mutex
 }
 
 func (c *httpConfig) DefineCounterMetric(name string) api.CounterMetric {
@@ -417,7 +427,7 @@ func (c *httpConfig) SecretManager() api.SecretManager {
 }
 
 func (c *httpConfig) GetGenericSecret(name string) (string, bool) {
-	return cAPI.HttpGetStringSecret(unsafe.Pointer(c.config), name)
+	return cAPI.HttpConfigGetStringSecret(unsafe.Pointer(c), name)
 }
 
 func (c *httpConfig) Finalize() {

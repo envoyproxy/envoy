@@ -361,6 +361,15 @@ CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_l
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
+                                            uint64_t* value_data, int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = stringViewFromGoPointer(key_data, key_len);
+        return filter->getSecret(key_str, value_data, value_len);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,
                                          int name_len, uint32_t* metric_id) {
   return envoyGoConfigHandlerWrapper(
@@ -393,8 +402,8 @@ CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t v
       });
 }
 
-CAPIStatus envoyGoFilterHttpGetStringSecret(void* c, void* key_data, int key_len,
-                                            uint64_t* value_data, int* value_len) {
+CAPIStatus envoyGoFilterHttpConfigGetStringSecret(void* c, void* key_data, int key_len,
+                                                  uint64_t* value_data, int* value_len) {
   return envoyGoConfigHandlerWrapper(
       c,
       [key_data, key_len, value_data,

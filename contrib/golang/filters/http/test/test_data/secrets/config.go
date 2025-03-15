@@ -1,6 +1,9 @@
 package secrets
 
 import (
+	"fmt"
+
+	xds "github.com/cncf/xds/go/xds/type/v3"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -15,14 +18,37 @@ func init() {
 
 type config struct {
 	secretManager api.SecretManager
+	secretKey     string
+	secretValue   string
+	path          string
 }
 
 type parser struct {
 }
 
-func (p *parser) Parse(_ *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
+func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
+	configStruct := &xds.TypedStruct{}
+	if err := any.UnmarshalTo(configStruct); err != nil {
+		return nil, err
+	}
+	v := configStruct.Value
+	path := v.AsMap()["path"].(string)
+	secretKey := v.AsMap()["secret_key"].(string)
+	secretValue, ok := v.AsMap()["secret_value"].(string)
+	if !ok {
+		secretValue = ""
+	}
+	if path == "/config" {
+		actualSecret, _ := callbacks.SecretManager().GetGenericSecret(secretKey)
+		if secretValue != actualSecret {
+			panic(fmt.Sprintf("expected secret %s got %s", secretValue, actualSecret))
+		}
+	}
 	conf := &config{
 		secretManager: callbacks.SecretManager(),
+		secretKey:     secretKey,
+		secretValue:   secretValue,
+		path:          path,
 	}
 	return conf, nil
 }
@@ -37,7 +63,7 @@ func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.Strea
 		panic("unexpected config type")
 	}
 	return &filter{
-		callbacks:     callbacks,
-		secretManager: conf.secretManager,
+		callbacks: callbacks,
+		config:    conf,
 	}
 }

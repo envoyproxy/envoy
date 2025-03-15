@@ -1457,6 +1457,47 @@ void Filter::deferredDeleteRequest(HttpRequestInternal* req) {
   }
 }
 
+CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data, int* value_len) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto populateFilter = [](Filter& f, const absl::string_view name, uint64_t* value_data,
+                           int* value_len) {
+    auto maybe_secret = f.config_->getSecretReader().secret(std::string(name));
+    if (!maybe_secret.has_value()) {
+      *value_len = -1;
+    } else {
+      f.req_->strValue = maybe_secret.value();
+      *value_data = reinterpret_cast<uint64_t>(f.req_->strValue.data());
+      *value_len = f.req_->strValue.length();
+    }
+  };
+  ENVOY_LOG(debug, "golang filter getSecret '{}'", name);
+  if (isThreadSafe()) {
+    ENVOY_LOG(debug, "golang filter getSecret replying directly");
+    populateFilter(*this, name, value_data, value_len);
+    return CAPIStatus::CAPIOK;
+  } else {
+    ENVOY_LOG(debug, "golang filter getSecret posting request to dispatcher");
+    auto weak_ptr = weak_from_this();
+    getDispatcher().post(
+        [this, populateFilter, weak_ptr, name = std::string(name), value_data, value_len] {
+          ENVOY_LOG(debug, "golang filter getSecret request in worker thread");
+          if (!weak_ptr.expired() && !hasDestroyed()) {
+            populateFilter(*this, name, value_data, value_len);
+            dynamic_lib_->envoyGoRequestSemaDec(req_);
+          } else {
+            ENVOY_LOG(info, "golang filter has gone or destroyed in getSecret");
+          }
+        });
+    return CAPIStatus::CAPIYield;
+  }
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId() {
@@ -1484,9 +1525,9 @@ FilterConfig::FilterConfig(
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))) {
-  secret_reader_ = std::make_shared<SecretReader>(proto_config, context);
-};
+      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
+      event_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
+      secret_reader_(std::make_shared<SecretReader>(proto_config, context)){};
 
 void FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");
@@ -1619,13 +1660,21 @@ CAPIStatus FilterConfig::recordMetric(uint32_t metric_id, uint64_t value) {
 
 CAPIStatus FilterConfig::getSecret(const absl::string_view name, uint64_t* value_data,
                                    int* value_len) {
+  if (!event_dispatcher_.isThreadSafe()) {
+    ENVOY_LOG(debug, "golang config getSecret not in main thread");
+    *value_len = -1;
+    return CAPIStatus::CAPIOK;
+  }
+  ENVOY_LOG(debug, "golang config getSecret '{}'", name);
+  // No need to lock as we are sure to run in the main thread
   auto maybe_secret = secret_reader_->secret(std::string(name));
   if (!maybe_secret.has_value()) {
-    return CAPIStatus::CAPIValueNotFound;
+    *value_len = -1;
+  } else {
+    str_value_ = maybe_secret.value();
+    *value_data = reinterpret_cast<uint64_t>(str_value_.data());
+    *value_len = str_value_.length();
   }
-  str_value_ = maybe_secret.value();
-  *value_data = reinterpret_cast<uint64_t>(str_value_.data());
-  *value_len = str_value_.length();
   return CAPIStatus::CAPIOK;
 }
 
@@ -1796,7 +1845,7 @@ SecretReader::SecretReader(
   }
 }
 
-absl::optional<const std::string> SecretReader::secret(const std::string&& name) {
+absl::optional<const std::string> SecretReader::secret(const std::string& name) const {
   auto secret = secrets_.find(name);
   if (secret != secrets_.end()) {
     return secret->second->secret();

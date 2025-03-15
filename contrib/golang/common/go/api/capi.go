@@ -59,6 +59,7 @@ type HttpCAPI interface {
 	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
 	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
@@ -66,7 +67,7 @@ type HttpCAPI interface {
 	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
 	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 	HttpConfigFinalize(c unsafe.Pointer)
-	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
+	HttpConfigGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
 	/* These APIs have nothing to do with request */
 	HttpLog(level LogType, message string)

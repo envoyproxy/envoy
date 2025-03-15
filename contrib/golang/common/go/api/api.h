@@ -118,6 +118,8 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key_data, int ke
                                                  uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_len,
                                               uint64_t* value_data, int* value_len, int* rc);
+CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
+                                            uint64_t* value_data, int* value_len);
 
 /* These APIs have nothing to do with request */
 void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);
@@ -130,8 +132,8 @@ CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* na
 CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset);
 CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, uint64_t* value);
 CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
-CAPIStatus envoyGoFilterHttpGetStringSecret(void* c, void* key_data, int key_len,
-                                            uint64_t* value_data, int* value_len);
+CAPIStatus envoyGoFilterHttpConfigGetStringSecret(void* c, void* key_data, int key_len,
+                                                  uint64_t* value_data, int* value_len);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int close_type);

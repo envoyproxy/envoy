@@ -178,6 +178,11 @@ type StreamFilterCallbacks interface {
 	// * ErrValueNotFound
 	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
+
+	// Get secret manager.
+	// Secrets should be defined in the plugin configuration.
+	// It is safe to use this secret manager from any goroutine.
+	SecretManager() SecretManager
 }
 
 // FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
@@ -329,7 +334,9 @@ type ConfigCallbacks interface {
 
 	// Get secret manager.
 	// Secrets should be defined in the plugin configuration.
-	// It is unsafe to use this secret manager from a goroutine.
+	// Use this secret manager only in the Parse and Merge config threads.
+	// Otherwize, it will always return missing secrets.
+	// Only serves static secrets (not using SDS)
 	SecretManager() SecretManager
 }
 
