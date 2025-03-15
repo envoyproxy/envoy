@@ -147,7 +147,6 @@ message ProcessingRequest {
   //
   bool observability_mode = 10;
 
-  // [#not-implemented-hide:]
   // Specify the filter protocol configurations to be sent to the server.
   // ``protocol_config`` is only encoded in the first ``ProcessingRequest`` message from the client to the server.
   ProtocolConfiguration protocol_config = 11;
