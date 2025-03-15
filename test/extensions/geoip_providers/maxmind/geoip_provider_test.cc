@@ -200,6 +200,33 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   expectStats("isp_db");
 }
 
+TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        asn: "x-geo-asn"
+        isp: "x-geo-isp"
+        is_apple_private_relay: "x-geo-apple-private-relay"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("::12.96.16.1");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(3, captured_lookup_response_.size());
+  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("7018", asn_it->second);
+  const auto& isp_it = captured_lookup_response_.find("x-geo-isp");
+  EXPECT_EQ("AT&T Services", isp_it->second);
+  expectStats("isp_db");
+  const auto& apple_it = captured_lookup_response_.find("x-geo-apple-private-relay");
+  EXPECT_EQ("false", apple_it->second);
+}
+
 TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
