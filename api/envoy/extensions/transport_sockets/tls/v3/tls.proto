@@ -25,7 +25,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.tls]
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
 
-// [#next-free-field: 3]
 // TLS per host session cache configuration.
 message TlsPerHostSessionCacheConfig {
   // Specifies the maximum number of upstream hosts that can have their TLS session keys cached.
