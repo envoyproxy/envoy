@@ -2,6 +2,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
@@ -416,11 +417,13 @@ public:
     fake_upstreams_.clear();
   }
 
-  void setup(
-      bool pass_all_tlvs, const std::vector<uint8_t>& tlvs_listener,
-      const std::vector<uint8_t>& tlvs_upstream,
-      const std::vector<std::pair<uint8_t, std::vector<unsigned char>>>& custom_tlvs_from_host,
-      const std::vector<std::pair<uint8_t, std::vector<unsigned char>>>& custom_tlvs_from_config) {
+  void
+  setup(bool pass_all_tlvs, const std::vector<uint8_t>& tlvs_listener,
+        const std::vector<uint8_t>& tlvs_upstream,
+        const std::vector<std::pair<uint8_t, std::vector<unsigned char>>>& custom_tlvs_from_host,
+        const std::vector<std::pair<uint8_t, std::vector<unsigned char>>>& custom_tlvs_from_config,
+        bool disable_listener_filter) {
+    disable_listener_filter_ = disable_listener_filter;
     pass_all_tlvs_ = pass_all_tlvs;
     tlvs_listener_.assign(tlvs_listener.begin(), tlvs_listener.end());
     tlvs_upstream_.assign(tlvs_upstream.begin(), tlvs_upstream.end());
@@ -429,23 +432,25 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
-      auto pass_through_tlvs = proxy_protocol.mutable_pass_through_tlvs();
-      if (pass_all_tlvs_) {
-        pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
-      } else {
-        pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
-        for (const auto& tlv_type : tlvs_listener_) {
-          pass_through_tlvs->add_tlv_type(tlv_type);
+    if (!disable_listener_filter_) {
+      config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proxy_protocol;
+        auto pass_through_tlvs = proxy_protocol.mutable_pass_through_tlvs();
+        if (pass_all_tlvs_) {
+          pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
+        } else {
+          pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+          for (const auto& tlv_type : tlvs_listener_) {
+            pass_through_tlvs->add_tlv_type(tlv_type);
+          }
         }
-      }
 
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* ppv_filter = listener->add_listener_filters();
-      ppv_filter->set_name("envoy.listener.proxy_protocol");
-      ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
-    });
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        auto* ppv_filter = listener->add_listener_filters();
+        ppv_filter->set_name("envoy.listener.proxy_protocol");
+        ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
+      });
+    }
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket =
@@ -514,6 +519,7 @@ public:
   FakeRawConnectionPtr fake_upstream_connection_;
 
 private:
+  bool disable_listener_filter_ = false;
   bool pass_all_tlvs_ = false;
   std::vector<uint8_t> tlvs_listener_;
   std::vector<uint8_t> tlvs_upstream_;
@@ -528,7 +534,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTLVsIntegrationTest,
 // This test adding the listener proxy protocol filter and upstream proxy filter, the TLVs
 // are passed by listener and re-generated in transport socket based on API config.
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs) {
-  setup(false, {0x05, 0x06}, {0x06}, {}, {});
+  setup(false, {0x05, 0x06}, {0x06}, {}, {}, false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -599,7 +605,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs)
 }
 
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
-  setup(true, {}, {}, {}, {});
+  setup(true, {}, {}, {}, {}, false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -681,7 +687,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
 }
 
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTypeLocal) {
-  setup(true, {}, {}, {}, {});
+  setup(true, {}, {}, {}, {}, false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -724,7 +730,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTypeLocal) {
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolWithCustomMetadata) {
   std::vector<std::pair<uint8_t, std::vector<unsigned char>>> custom_tlvs = {
       {0x96, {'f', 'o', 'o'}}, {0x97, {'b', 'a', 'r'}}};
-  setup(false, {}, {}, custom_tlvs, {});
+  setup(false, {}, {}, custom_tlvs, {}, false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -803,7 +809,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolWithPrecedence) {
       {0x97, {'b', 'a', 'r'}},
   };
 
-  setup(true, {}, {}, host_metadata_tlvs, config_tlvs);
+  setup(true, {}, {}, host_metadata_tlvs, config_tlvs, false);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -904,6 +910,83 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolWithPrecedence) {
     EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 3]), 0x09);
     EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 4]), 0x0A);
   }
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTcpProxyTLVs) {
+  const uint8_t tlv_type = 0xF2;
+  setup(false, {}, {tlv_type}, {}, {}, true);
+
+  // Setup tcp_proxy filter to add a custom tlv in the proxy protocol state.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* tlv = tcp_proxy_config.add_proxy_protocol_tlvs();
+    tlv->set_type(tlv_type);
+    tlv->set_value("tst");
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+
+  auto listener_port = lookupPort("listener_0");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(listener_port);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+
+  std::string observed_data;
+  ASSERT_TRUE(tcp_client->write("data"));
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(38, &observed_data));
+    // - signature
+    // - version and command type, address family and protocol, length of addresses
+    // - src address, dest address
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x12, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
+    EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+    // Match destination port.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[26]), listener_port >> 8);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[27]), listener_port & 0xFF);
+
+    // Match tlv: 0xF2(type), 0x00, 0x03(length), t, s, t
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[28]), tlv_type);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[29]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[30]), 0x03); // length
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[31]), 't');
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[32]), 's');
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[33]), 't');
+  } else if (GetParam() == Envoy::Network::Address::IpVersion::v6) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(62, &observed_data));
+    // - signature
+    // - version and command type, address family and protocol, length of addresses
+    // - src address
+    // - dest address
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
+    EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+    // Match destination port.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[50]), listener_port >> 8);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[51]), listener_port & 0xFF);
+
+    // Match tlv: 0xF2(type), 0x00, 0x03(length), t, s, t
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[52]), tlv_type);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[53]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[54]), 0x03); // length
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[55]), 't');
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[56]), 's');
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[57]), 't');
+  }
+  EXPECT_THAT(observed_data, testing::EndsWith("data"));
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());

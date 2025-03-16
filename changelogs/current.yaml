@@ -58,6 +58,12 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: connection pool
+  change: |
+    Fixed a bug in :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>` where established connection
+    unused capacity was not considered in the logic to establish new connections, resulting in new connections anytime there was not
+    a connection currently in the process of being established. This resulted in far too many connections being established, with the only
+    bounds being cluster circuit breaker limits or upstream service limits.
 - area: ext_authz
   change: |
     Removed validation constraint on :ref:`disabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute.disabled>` so
@@ -80,6 +86,9 @@ bug_fixes:
     Before the :scheme header was always 'http'.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
+- area: listener
+  change: |
+    Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -161,6 +170,11 @@ new_features:
     Added alpha support for asynchronous load balancing. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details. Support can
     be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
+- area: quic
+  change: |
+    Added an :ref:`extension
+    <envoy_v3_api_msg_extensions.quic.connection_id_generator.quic_lb.v3.Config>` to support QUIC-LB draft standard for
+    connection ID generation.
 - area: ext_proc
   change: |
     Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
@@ -176,6 +190,10 @@ new_features:
   change: |
     Added ``QUERY_PARAM`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
     for more details.
+- area: formatter
+  change: |
+    Added ``CUSTOM_FLAGS`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
+    for more details.
 - area: http
   change: |
     Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
@@ -187,6 +205,10 @@ new_features:
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
+- area: redis_proxy
+  change: |
+    Added :ref:`custom_commands <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    configuring custom commands for redis proxy.
 - area: dfp
   change: |
     Added a feature to disable DNS refresh on failure by setting :ref:`disable_dns_refresh_on_failure
@@ -237,6 +259,18 @@ new_features:
     Added :ref:`per-upstream session cache <<envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsPerHostSessionCacheConfig>`
     support to allow the TLS session manager to cache and use session keys by upstream host. This is useful when different
     upstream hosts serving the same destination use distinct TLS configurations (keys).
+- area: rate_limit
+  change: |
+    Added the explict runtime switch
+    :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enabled>` and
+    :ref:`filter_enforced <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enforced>` to control the
+    filter behavior.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying PROXY protocol TLVs to be added in the PROXY protocol state created by the TCP proxy filter.
+    TLVs added in the PROXY protocol state will be added to the PROXY protocol v2 header sent upstream.
 - area: sockets
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
