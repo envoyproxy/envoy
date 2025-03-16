@@ -270,5 +270,11 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: original_dst
+  change: |
+    Added support for batching host updates in original_dst cluster using
+    :ref:`batch_update_interval <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.batch_update_interval>`.
+    This feature helps prevent performance bottlenecks by consolidating multiple host updates into single updates at
+    specified intervals, which is particularly beneficial for large clusters with frequent updates.
 
 deprecated:

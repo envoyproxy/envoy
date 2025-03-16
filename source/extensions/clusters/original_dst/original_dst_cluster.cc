@@ -198,7 +198,8 @@ OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })),
-      host_map_(std::make_shared<HostMultiMap>()) {
+      host_map_(std::make_shared<HostMultiMap>()),
+      batch_update_timer_(dispatcher_.createTimer([this]() -> void { batchUpdate(); })) {
   if (config.has_original_dst_lb_config()) {
     const auto& lb_config = config.original_dst_lb_config();
     if (lb_config.use_http_header()) {
@@ -212,37 +213,68 @@ OriginalDstCluster::OriginalDstCluster(const envoy::config::cluster::v3::Cluster
     if (lb_config.has_upstream_port_override()) {
       port_override_ = lb_config.upstream_port_override().value();
     }
+    if (lb_config.has_batch_update_interval()) {
+      batch_update_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(lb_config.batch_update_interval()));
+    }
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
-  std::string address = host->address()->asString();
-  HostMultiMapSharedPtr new_host_map = std::make_shared<HostMultiMap>(*getCurrentHostMap());
-  auto it = new_host_map->find(address);
-  if (it != new_host_map->end()) {
-    // If the entry already exists, that means the worker that posted this host
-    // had a stale host map. Because the host is potentially in that worker's
-    // connection pools, we save the host in the host map hosts_ list and the
-    // cluster priority set. Subsequently, the entire hosts_ list and the
-    // primary host are removed collectively, once no longer in use.
-    it->second->hosts_.push_back(host);
-  } else {
-    // The first worker that creates a host for the address defines the primary
-    // host structure.
-    new_host_map->emplace(address, std::make_shared<HostsForAddress>(host));
+  // If batch update is disabled, add the host immediately.
+  if (batch_update_interval_.count() == 0) {
+    std::vector<HostSharedPtr> hosts{std::move(host)};
+    addHosts(hosts);
+    return;
   }
-  ENVOY_LOG(debug, "addHost() adding {} {}.", *host, address);
+
+  // If batch update is enabled, add the host to the pending list
+  // and enable the timer if it is not already enabled.
+  pending_add_hosts_list_.push_back(host);
+  if (!batch_update_timer_->enabled()) {
+    batch_update_timer_->enableTimer(batch_update_interval_);
+  }
+}
+
+void OriginalDstCluster::addHosts(std::vector<HostSharedPtr>& hosts) {
+  HostMultiMapSharedPtr new_host_map = std::make_shared<HostMultiMap>(*getCurrentHostMap());
+  for (auto& host : hosts) {
+    std::string address = host->address()->asString();
+    auto it = new_host_map->find(address);
+    if (it != new_host_map->end()) {
+      // If the entry already exists, that means the worker that posted this host
+      // had a stale host map. Because the host is potentially in that worker's
+      // connection pools, we save the host in the host map hosts_ list and the
+      // cluster priority set. Subsequently, the entire hosts_ list and the
+      // primary host are removed collectively, once no longer in use.
+      it->second->hosts_.push_back(host);
+    } else {
+      // The first worker that creates a host for the address defines the primary
+      // host structure.
+      new_host_map->emplace(address, std::make_shared<HostsForAddress>(host));
+    }
+    ENVOY_LOG(debug, "addHosts() adding {} {}.", *host, address);
+  }
   setHostMap(new_host_map);
 
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
-  all_hosts->emplace_back(host);
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()), {},
-      {std::move(host)}, {}, random_.random(), absl::nullopt, absl::nullopt);
+  all_hosts->insert(all_hosts->end(), hosts.begin(), hosts.end());
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                            {}, hosts, {}, random_.random(), absl::nullopt, absl::nullopt);
+}
+
+void OriginalDstCluster::batchUpdate() {
+  if (pending_add_hosts_list_.empty()) {
+    return;
+  }
+  ENVOY_LOG(debug, "batchUpdate() with {} hosts", pending_add_hosts_list_.size());
+  addHosts(pending_add_hosts_list_);
+  pending_add_hosts_list_.clear();
 }
 
 void OriginalDstCluster::cleanup() {
