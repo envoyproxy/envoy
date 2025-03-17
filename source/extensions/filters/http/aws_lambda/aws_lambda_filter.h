@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -116,6 +117,7 @@ class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filt
 
 public:
   Filter(const FilterSettingsSharedPtr& settings, const FilterStats& stats, bool is_upstream);
+  ~Filter() override { cancel_callback_(); }
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -142,12 +144,16 @@ private:
   void dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& body,
                          Buffer::Instance& out);
 
+  void continueDecodeHeaders(FilterSettings& settings);
+  void continueDecodeData(FilterSettings& settings);
+
   FilterSettingsSharedPtr settings_;
   FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
   Http::ResponseHeaderMap* response_headers_ = nullptr;
   bool skip_ = false;
   bool is_upstream_ = false;
+  Envoy::CancelWrapper::CancelFunction cancel_callback_ = []() {};
 };
 
 } // namespace AwsLambdaFilter

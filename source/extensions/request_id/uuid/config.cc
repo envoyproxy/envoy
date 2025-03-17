@@ -16,7 +16,7 @@ void UUIDRequestIDExtension::set(Http::RequestHeaderMap& request_headers, bool e
   const Http::HeaderEntry* request_id_header = request_headers.RequestId();
 
   // No request ID then set new one anyway.
-  if (request_id_header == nullptr) {
+  if (request_id_header == nullptr || request_id_header->value().empty()) {
     request_headers.setRequestId(random_.uuid());
     return;
   }

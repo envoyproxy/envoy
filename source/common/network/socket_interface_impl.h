@@ -8,6 +8,20 @@
 namespace Envoy {
 namespace Network {
 
+class DefaultSocketInterfaceExtension : public Network::SocketInterfaceExtension {
+public:
+  DefaultSocketInterfaceExtension(Network::SocketInterface& sock_interface,
+                                  std::shared_ptr<Io::IoUringWorkerFactory> io_uring_worker_factory)
+      : Network::SocketInterfaceExtension(sock_interface),
+        io_uring_worker_factory_(io_uring_worker_factory) {}
+
+  // Server::BootstrapExtension
+  void onWorkerThreadInitialized() override;
+
+protected:
+  std::shared_ptr<Io::IoUringWorkerFactory> io_uring_worker_factory_;
+};
+
 class SocketInterfaceImpl : public SocketInterfaceBase {
 public:
   // SocketInterface
@@ -33,8 +47,12 @@ public:
                              Io::IoUringWorkerFactory* io_uring_worker_factory = nullptr);
 
 protected:
-  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
+                                 absl::optional<int> domain,
                                  const SocketCreationOptions& options) const;
+
+private:
+  std::weak_ptr<Io::IoUringWorkerFactory> io_uring_worker_factory_;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

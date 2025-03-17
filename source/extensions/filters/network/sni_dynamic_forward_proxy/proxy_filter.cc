@@ -19,12 +19,12 @@ namespace SniDynamicForwardProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-    Upstream::ClusterManager&)
+    Upstream::ClusterManager&, absl::Status& creation_status)
     : port_(static_cast<uint16_t>(proto_config.port_value())),
       dns_cache_manager_(cache_manager_factory.get()),
       save_upstream_address_(proto_config.save_upstream_address()) {
   auto cache_or_error = dns_cache_manager_->getCache(proto_config.dns_cache_config());
-  THROW_IF_NOT_OK_REF(cache_or_error.status());
+  SET_AND_RETURN_IF_NOT_OK(cache_or_error.status(), creation_status);
   dns_cache_ = std::move(cache_or_error.value());
 }
 

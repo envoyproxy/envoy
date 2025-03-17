@@ -1,0 +1,43 @@
+config {
+  name: "envoy.filters.http.grpc_json_reverse_transcoder"
+}
+
+data {
+  headers {
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/bookstore.Bookstore/CreateShelf"
+    }
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
+  }
+  proto_body {
+    message {
+      [type.googleapis.com/bookstore.CreateShelfRequest] {
+        shelf {
+          id: 12
+          theme: "Kids"
+        }
+      }
+    }
+    chunk_size: 1
+  }
+}
+
+upstream_data {
+  headers {
+    headers {
+      key: "content-type"
+      value: "application/json"
+    }
+  }
+  http_body {
+    data: "{\"id\": 12, \"theme\": \"Kids\"}"
+  }
+}
