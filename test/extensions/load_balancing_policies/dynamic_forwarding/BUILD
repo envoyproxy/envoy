@@ -40,6 +40,58 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "load_balancer_test",
+    srcs = ["load_balancer_test.cc"],
+    extension_names = ["envoy.load_balancing_policies.dynamic_forwarding"],
+    deps = [
+        ":test_lb",
+        ":test_lb_proto_cc_proto",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/extensions/load_balancing_policies/dynamic_forwarding:config",
+        "//source/extensions/load_balancing_policies/dynamic_forwarding:load_balancer",
+        "//source/extensions/load_balancing_policies/dynamic_forwarding:metadata_keys",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings:string_view",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/dynamic_forwarding/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    extension_names = ["envoy.load_balancing_policies.dynamic_forwarding"],
+    deps = [
+        ":test_lb",
+        ":test_lb_proto_cc_proto",
+        "//envoy/http:codec_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/network:address_interface",
+        "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/load_balancing_policies/dynamic_forwarding:config",
+        "//test/integration:fake_upstream_lib",
+        "//test/integration:http_integration_lib",
+        "//test/integration:http_integration_lib_light",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings:string_view",
+        "@com_google_absl//absl/types:span",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "selected_hosts_test",
     srcs = ["selected_hosts_test.cc"],
     extension_names = ["envoy.load_balancing_policies.dynamic_forwarding"],

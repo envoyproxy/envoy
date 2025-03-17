@@ -143,12 +143,16 @@ DynamicForwardingLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext*
   // First check if headers or request metadata contains the list of endpoints
   // that should be used for serving.
   // TODO(yavlasov): Store parsed SelectedHosts in the filter state to avoid
-  // parsing it during retries.
+  // parsing it again during retries.
   absl::StatusOr<std::unique_ptr<SelectedHosts>> selected_hosts_result = getSelectedHosts(context);
   if (!selected_hosts_result.ok()) {
-    // TODO(yanavlasov): use fallback LB in this case
-    return {nullptr};
+    ENVOY_LOG(trace,
+              "Failed to parse selected endpoints with error {}. "
+              "Using fallback LB policy.",
+              selected_hosts_result.status().message());
+    return fallback_picker_lb_->chooseHost(context);
   }
+
   auto selected_hosts = std::move(selected_hosts_result.value());
   if (selected_hosts) {
     HostConstSharedPtr host =
