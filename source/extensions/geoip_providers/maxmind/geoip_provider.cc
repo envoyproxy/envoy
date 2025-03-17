@@ -203,18 +203,18 @@ void GeoipProvider::lookupInCityDb(
       if (status == MMDB_SUCCESS) {
         if (config_->isLookupEnabledForHeader(config_->cityHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->cityHeader().value(),
-                                  absl::nullopt, MMDB_CITY_LOOKUP_ARGS[0], MMDB_CITY_LOOKUP_ARGS[1],
+                                  MMDB_CITY_LOOKUP_ARGS[0], MMDB_CITY_LOOKUP_ARGS[1],
                                   MMDB_CITY_LOOKUP_ARGS[2]);
         }
         if (config_->isLookupEnabledForHeader(config_->regionHeader())) {
-          populateGeoLookupResult(
-              mmdb_lookup_result, lookup_result, config_->regionHeader().value(), absl::nullopt,
-              MMDB_REGION_LOOKUP_ARGS[0], MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->regionHeader().value(), MMDB_REGION_LOOKUP_ARGS[0],
+                                  MMDB_REGION_LOOKUP_ARGS[1], MMDB_REGION_LOOKUP_ARGS[2]);
         }
         if (config_->isLookupEnabledForHeader(config_->countryHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->countryHeader().value(), absl::nullopt,
-                                  MMDB_COUNTRY_LOOKUP_ARGS[0], MMDB_COUNTRY_LOOKUP_ARGS[1]);
+                                  config_->countryHeader().value(), MMDB_COUNTRY_LOOKUP_ARGS[0],
+                                  MMDB_COUNTRY_LOOKUP_ARGS[1]);
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(CITY_DB_TYPE);
@@ -251,7 +251,7 @@ void GeoipProvider::lookupInAsnDb(
       if (status == MMDB_SUCCESS) {
         if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
-                                  absl::nullopt, MMDB_ASN_LOOKUP_ARGS[0]);
+                                  MMDB_ASN_LOOKUP_ARGS[0]);
         }
 
         MMDB_free_entry_data_list(entry_data_list);
@@ -289,27 +289,23 @@ void GeoipProvider::lookupInAnonDb(
       if (status == MMDB_SUCCESS) {
         if (config_->isLookupEnabledForHeader(config_->anonHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->anonHeader().value(),
-                                  absl::nullopt, MMDB_ANON_LOOKUP_ARGS[0]);
+                                  MMDB_ANON_LOOKUP_ARGS[0]);
         }
         if (config_->isLookupEnabledForHeader(config_->anonVpnHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonVpnHeader().value(), absl::nullopt,
-                                  MMDB_ANON_LOOKUP_ARGS[1]);
+                                  config_->anonVpnHeader().value(), MMDB_ANON_LOOKUP_ARGS[1]);
         }
         if (config_->isLookupEnabledForHeader(config_->anonHostingHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonHostingHeader().value(), absl::nullopt,
-                                  MMDB_ANON_LOOKUP_ARGS[2]);
+                                  config_->anonHostingHeader().value(), MMDB_ANON_LOOKUP_ARGS[2]);
         }
         if (config_->isLookupEnabledForHeader(config_->anonTorHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonTorHeader().value(), absl::nullopt,
-                                  MMDB_ANON_LOOKUP_ARGS[3]);
+                                  config_->anonTorHeader().value(), MMDB_ANON_LOOKUP_ARGS[3]);
         }
         if (config_->isLookupEnabledForHeader(config_->anonProxyHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                  config_->anonProxyHeader().value(), absl::nullopt,
-                                  MMDB_ANON_LOOKUP_ARGS[4]);
+                                  config_->anonProxyHeader().value(), MMDB_ANON_LOOKUP_ARGS[4]);
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(ANON_DB_TYPE);
@@ -347,12 +343,19 @@ void GeoipProvider::lookupInIspDb(
 
         if (config_->isLookupEnabledForHeader(config_->ispHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->ispHeader().value(),
-                                  absl::nullopt, MMDB_ISP_LOOKUP_ARGS[0]);
+                                  MMDB_ISP_LOOKUP_ARGS[0]);
         }
         if (config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result,
                                   config_->applePrivateRelayHeader().value(),
-                                  "iCloud Private Relay", MMDB_ISP_LOOKUP_ARGS[0]);
+                                  MMDB_ISP_LOOKUP_ARGS[0]);
+          if (lookup_result.find(config_->applePrivateRelayHeader().value()) !=
+                  lookup_result.end() &&
+              lookup_result[config_->applePrivateRelayHeader().value()] == "iCloud Private Relay") {
+            lookup_result[config_->applePrivateRelayHeader().value()] = "true";
+          } else {
+            lookup_result[config_->applePrivateRelayHeader().value()] = "false";
+          }
         }
         MMDB_free_entry_data_list(entry_data_list);
         if (lookup_result.size() > n_prev_hits) {
@@ -462,7 +465,7 @@ template <class... Params>
 void GeoipProvider::populateGeoLookupResult(
     MMDB_lookup_result_s& mmdb_lookup_result,
     absl::flat_hash_map<std::string, std::string>& lookup_result, const std::string& result_key,
-    absl::optional<std::string> compare_with, Params... lookup_params) const {
+    Params... lookup_params) const {
   MMDB_entry_data_s entry_data;
   if ((MMDB_get_value(&mmdb_lookup_result.entry, &entry_data, lookup_params..., NULL)) ==
       MMDB_SUCCESS) {
@@ -476,11 +479,6 @@ void GeoipProvider::populateGeoLookupResult(
       result_value = entry_data.boolean ? "true" : "false";
     }
     if (!result_value.empty()) {
-      // Check the result value against the comparison value and return "true" or "false"
-      // accordingly.
-      if (compare_with.has_value()) {
-        result_value = (result_value == compare_with.value()) ? "true" : "false";
-      }
       lookup_result.insert(std::make_pair(result_key, result_value));
     }
   }

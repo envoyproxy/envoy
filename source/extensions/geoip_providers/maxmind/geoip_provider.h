@@ -152,9 +152,7 @@ private:
   template <typename... Params>
   void populateGeoLookupResult(MMDB_lookup_result_s& mmdb_lookup_result,
                                absl::flat_hash_map<std::string, std::string>& lookup_result,
-                               const std::string& result_key,
-                               absl::optional<std::string> compare_with,
-                               Params... lookup_params) const;
+                               const std::string& result_key, Params... lookup_params) const;
   MaxmindDbSharedPtr getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
