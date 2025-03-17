@@ -71,7 +71,7 @@ jobs:
           bazel-extra: >-
             --config=remote-cache-envoy-engflow
           rbe: false
-          runs-on: envoy-arm64-large
+          runs-on: oracle-32cpu-128gb-arm64
           timeout-minutes: 180
         - target: docs
           name: Docs
