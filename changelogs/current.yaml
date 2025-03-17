@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    The ``isp_db_path`` field was previously assigned the ASN database path. The ASN database path should
+    now be assigned to the new ``asn_db_path`` field.
 - area: http2
   change: |
     Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
