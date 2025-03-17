@@ -58,6 +58,12 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: connection pool
+  change: |
+    Fixed a bug in :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>` where established connection
+    unused capacity was not considered in the logic to establish new connections, resulting in new connections anytime there was not
+    a connection currently in the process of being established. This resulted in far too many connections being established, with the only
+    bounds being cluster circuit breaker limits or upstream service limits.
 - area: ext_authz
   change: |
     Removed validation constraint on :ref:`disabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute.disabled>` so
@@ -203,6 +209,10 @@ new_features:
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
+- area: redis_proxy
+  change: |
+    Added :ref:`custom_commands <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    configuring custom commands for redis proxy.
 - area: dfp
   change: |
     Added a feature to disable DNS refresh on failure by setting :ref:`disable_dns_refresh_on_failure
@@ -248,6 +258,18 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
+- area: rate_limit
+  change: |
+    Added the explict runtime switch
+    :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enabled>` and
+    :ref:`filter_enforced <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enforced>` to control the
+    filter behavior.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying PROXY protocol TLVs to be added in the PROXY protocol state created by the TCP proxy filter.
+    TLVs added in the PROXY protocol state will be added to the PROXY protocol v2 header sent upstream.
 - area: sockets
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
