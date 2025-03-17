@@ -1813,7 +1813,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
 
   verifyDownstreamResponse(*response, 201);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
-  // Verify that the reponseprocessor added headers to dynamic metadata
+  // Verify that the response processor added headers to dynamic metadata
   verifyMultipleHeaderValues(
       response->headers(),
       Envoy::Http::LowerCaseString("envoy-test-ext_proc-response_headers_response"), ":status",
