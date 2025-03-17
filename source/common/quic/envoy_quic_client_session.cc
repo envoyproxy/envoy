@@ -106,6 +106,11 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
+  if (http3_options_.has_value() && http3_options_->disable_qpack()) {
+    DisableHuffmanEncoding();
+    DisableCookieCrumbling();
+    set_qpack_maximum_dynamic_table_capacity(0);
+  }
 }
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
