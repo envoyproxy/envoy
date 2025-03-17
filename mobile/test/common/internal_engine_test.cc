@@ -442,7 +442,7 @@ TEST_F(InternalEngineTest, ThreadCreationFailed) {
   auto thread_factory = std::make_unique<Thread::MockPosixThreadFactory>();
   EXPECT_CALL(*thread_factory, createThread(_, _, false)).WillOnce(Return(ByMove(nullptr)));
   std::unique_ptr<InternalEngine> engine(new InternalEngine(
-      createDefaultEngineCallbacks(test_context), {}, {}, {}, std::move(thread_factory)));
+      createDefaultEngineCallbacks(test_context), {}, {}, {}, false, std::move(thread_factory)));
   Platform::EngineBuilder builder;
   envoy_status_t status = runEngine(engine, builder, LOG_LEVEL);
   EXPECT_EQ(status, ENVOY_FAILURE);

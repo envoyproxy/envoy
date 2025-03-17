@@ -268,6 +268,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:early_header_mutation_mock",
@@ -299,6 +300,8 @@ envoy_cc_test(
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
         "//envoy/network:proxy_protocol_options_lib",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
+        "//test/server:utility_lib",
     ],
 )
 

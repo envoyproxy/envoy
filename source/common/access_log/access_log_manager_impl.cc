@@ -41,7 +41,7 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
   }
 
   Api::IoCallBoolResult open_result = file->open(default_flags);
-  if (!open_result.return_value_) {
+  if (!open_result.ok()) {
     return absl::InvalidArgumentError(fmt::format("unable to open file '{}': {}", file_name,
                                                   open_result.err_->getErrorDetails()));
   }

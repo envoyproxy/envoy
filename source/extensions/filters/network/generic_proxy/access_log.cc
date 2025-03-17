@@ -1,6 +1,9 @@
 #include "source/extensions/filters/network/generic_proxy/access_log.h"
 
+#include "envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "envoy/registry/registry.h"
+
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,26 +32,20 @@ ProtobufWkt::Value StringValueFormatterProvider::formatValueWithContext(
 absl::optional<std::string>
 GenericStatusCodeFormatterProvider::formatWithContext(const FormatterContext& context,
                                                       const StreamInfo::StreamInfo&) const {
-  if (context.response_ == nullptr) {
-    return absl::nullopt;
-  }
-
-  const int code = context.response_->status().code();
+  CHECK_DATA_OR_RETURN(context, response_, absl::nullopt);
+  const int code = checked_data->response_->status().code();
   return std::to_string(code);
 }
 
 ProtobufWkt::Value
 GenericStatusCodeFormatterProvider::formatValueWithContext(const FormatterContext& context,
                                                            const StreamInfo::StreamInfo&) const {
-  if (context.response_ == nullptr) {
-    return ValueUtil::nullValue();
-  }
-
-  const int code = context.response_->status().code();
+  CHECK_DATA_OR_RETURN(context, response_, ValueUtil::nullValue());
+  const int code = checked_data->response_->status().code();
   return ValueUtil::numberValue(code);
 }
 
-class SimpleCommandParser : public CommandParser {
+class GenericProxyCommandParser : public Formatter::CommandParser {
 public:
   using ProviderFunc =
       std::function<FormatterProviderPtr(absl::string_view, absl::optional<size_t> max_length)>;
@@ -75,10 +72,8 @@ private:
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
                       const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     if (context.request_) {
-                       return std::string(context.request_->method());
-                     }
-                     return absl::nullopt;
+                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                     return std::string(checked_data->request_->method());
                    });
              }},
             {"HOST",
@@ -86,10 +81,8 @@ private:
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
                       const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     if (context.request_) {
-                       return std::string(context.request_->host());
-                     }
-                     return absl::nullopt;
+                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                     return std::string(checked_data->request_->host());
                    });
              }},
             {"PATH",
@@ -97,10 +90,8 @@ private:
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
                       const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     if (context.request_) {
-                       return std::string(context.request_->path());
-                     }
-                     return absl::nullopt;
+                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                     return std::string(checked_data->request_->path());
                    });
              }},
             {"PROTOCOL",
@@ -108,10 +99,8 @@ private:
                return std::make_unique<StringValueFormatterProvider>(
                    [](const FormatterContext& context,
                       const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     if (context.request_) {
-                       return std::string(context.request_->protocol());
-                     }
-                     return absl::nullopt;
+                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+                     return std::string(checked_data->request_->protocol());
                    });
              }},
             {"REQUEST_PROPERTY",
@@ -120,10 +109,9 @@ private:
                    [key = std::string(command_arg)](
                        const FormatterContext& context,
                        const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     if (!context.request_) {
-                       return absl::nullopt;
-                     }
-                     auto optional_view = context.request_->get(key);
+                     CHECK_DATA_OR_RETURN(context, request_, absl::nullopt);
+
+                     auto optional_view = checked_data->request_->get(key);
                      if (!optional_view.has_value()) {
                        return absl::nullopt;
                      }
@@ -136,10 +124,8 @@ private:
                    [key = std::string(command_arg)](
                        const FormatterContext& context,
                        const StreamInfo::StreamInfo&) -> absl::optional<std::string> {
-                     if (!context.response_) {
-                       return absl::nullopt;
-                     }
-                     auto optional_view = context.response_->get(key);
+                     CHECK_DATA_OR_RETURN(context, response_, absl::nullopt);
+                     auto optional_view = checked_data->response_->get(key);
                      if (!optional_view.has_value()) {
                        return absl::nullopt;
                      }
@@ -154,18 +140,9 @@ private:
   }
 };
 
-class DefaultBuiltInCommandParserFactory : public BuiltInCommandParserFactory {
-public:
-  std::string name() const override { return "envoy.built_in_formatters.generic_poxy.default"; }
-
-  // BuiltInCommandParserFactory
-  CommandParserPtr createCommandParser() const override {
-    return std::make_unique<SimpleCommandParser>();
-  }
-};
-
-REGISTER_FACTORY(DefaultBuiltInCommandParserFactory, BuiltInCommandParserFactory);
-REGISTER_FACTORY(FileAccessLogFactory, AccessLogInstanceFactory);
+Formatter::CommandParserPtr createGenericProxyCommandParser() {
+  return std::make_unique<GenericProxyCommandParser>();
+}
 
 } // namespace GenericProxy
 } // namespace NetworkFilters
