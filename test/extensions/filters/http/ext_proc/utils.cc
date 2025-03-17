@@ -49,57 +49,64 @@ envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
 void TestOnProcessingResponse::afterProcessingRequestHeaders(
     const envoy::service::ext_proc::v3::HeadersResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_response() && response.response().has_header_mutation());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.request_headers_response",
-                                 getHeaderMutations(response.response().header_mutation()));
+  if (response.has_response() && response.response().has_header_mutation()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-request_headers_response",
+                                   getHeaderMutations(response.response().header_mutation()));
+  }
 }
 
 void TestOnProcessingResponse::afterProcessingResponseHeaders(
     const envoy::service::ext_proc::v3::HeadersResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_response() && response.response().has_header_mutation());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.response_headers_response",
-                                 getHeaderMutations(response.response().header_mutation()));
+  if (response.has_response() && response.response().has_header_mutation()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-response_headers_response",
+                                   getHeaderMutations(response.response().header_mutation()));
+  }
 }
 
 void TestOnProcessingResponse::afterProcessingRequestBody(
     const envoy::service::ext_proc::v3::BodyResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_response() && response.response().has_body_mutation());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.request_body_response",
-                                 getBodyMutation(response.response().body_mutation()));
+  if (response.has_response() && response.response().has_body_mutation()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-request_body_response",
+                                   getBodyMutation(response.response().body_mutation()));
+  }
 }
 
 void TestOnProcessingResponse::afterProcessingResponseBody(
     const envoy::service::ext_proc::v3::BodyResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_response() && response.response().has_body_mutation());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.response_body_response",
-                                 getBodyMutation(response.response().body_mutation()));
+  if (response.has_response() && response.response().has_body_mutation()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-response_body_response",
+                                   getBodyMutation(response.response().body_mutation()));
+  }
 }
 
 void TestOnProcessingResponse::afterProcessingRequestTrailers(
     const envoy::service::ext_proc::v3::TrailersResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_header_mutation());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.request_trailers_response",
-                                 getHeaderMutations(response.header_mutation()));
+  if (response.has_header_mutation()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-request_trailers_response",
+                                   getHeaderMutations(response.header_mutation()));
+  }
 }
 
 void TestOnProcessingResponse::afterProcessingResponseTrailers(
     const envoy::service::ext_proc::v3::TrailersResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_header_mutation());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.response_trailers_response",
-                                 getHeaderMutations(response.header_mutation()));
+  if (response.has_header_mutation()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-response_trailers_response",
+                                   getHeaderMutations(response.header_mutation()));
+  }
 }
 
 void TestOnProcessingResponse::afterReceivingImmediateResponse(
     const envoy::service::ext_proc::v3::ImmediateResponse& response, absl::Status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
-  ASSERT(response.has_headers());
-  stream_info.setDynamicMetadata("envoy.test.ext_proc.response_immediate_response",
-                                 getHeaderMutations(response.headers()));
+  if (response.has_headers()) {
+    stream_info.setDynamicMetadata("envoy-test-ext_proc-response_immediate_response",
+                                   getHeaderMutations(response.headers()));
+  }
 }
 } // namespace ExternalProcessing
 } // namespace HttpFilters

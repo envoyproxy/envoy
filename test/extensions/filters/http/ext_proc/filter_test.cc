@@ -5345,9 +5345,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
 
   ASSERT_TRUE(
-      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_headers_response"));
+      dynamic_metadata_.filter_metadata().contains("envoy-test-ext_proc-request_headers_response"));
   const auto& request_headers_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_headers_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-request_headers_response");
   ProtobufWkt::Struct expected_request_headers;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5390,9 +5390,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
   ASSERT_TRUE(dynamic_metadata_.filter_metadata().contains(
-      "envoy.test.ext_proc.response_headers_response"));
+      "envoy-test-ext_proc-response_headers_response"));
   const auto& response_headers_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_headers_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-response_headers_response");
   ProtobufWkt::Struct expected_response_headers;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5610,9 +5610,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   ASSERT_TRUE(
-      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_body_response"));
+      dynamic_metadata_.filter_metadata().contains("envoy-test-ext_proc-request_body_response"));
   const auto& request_body_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_body_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-request_body_response");
   ProtobufWkt::Struct expected_request_body;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5644,9 +5644,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   EXPECT_EQ("Hello, World!", buffered_response_data.toString());
 
   ASSERT_TRUE(
-      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.response_body_response"));
+      dynamic_metadata_.filter_metadata().contains("envoy-test-ext_proc-response_body_response"));
   const auto& response_body_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_body_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-response_body_response");
   ProtobufWkt::Struct expected_response_body;
   TestUtility::loadFromJson(R"EOF(
 {
