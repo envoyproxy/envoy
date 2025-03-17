@@ -80,6 +80,9 @@ bug_fixes:
     :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` on the listener is set.
     Now additional address :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` are correctly
     applied even if the listener has no socket options configured.
+- area: udp
+  change: |
+    Fixed wrong metric calculation of 'downstream_rx_datagram_dropped'.
 - area: http
   change: |
     Fixed the jwks fetcher to set the :scheme pseudo header according to the uri ('http' or 'https').
@@ -209,6 +212,10 @@ new_features:
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
+- area: redis_proxy
+  change: |
+    Added :ref:`custom_commands <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    configuring custom commands for redis proxy.
 - area: dfp
   change: |
     Added a feature to disable DNS refresh on failure by setting :ref:`disable_dns_refresh_on_failure
