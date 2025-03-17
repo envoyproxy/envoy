@@ -4697,8 +4697,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quiche_common_platform_quiche_mem_slice",
-    hdrs = ["quiche/common/platform/api/quiche_mem_slice.h"],
     srcs = ["quiche/common/platform/api/quiche_mem_slice.cc"],
+    hdrs = ["quiche/common/platform/api/quiche_mem_slice.h"],
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
@@ -5053,8 +5053,8 @@ envoy_cc_test(
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_platform",
-        ":quiche_common_platform_test",
         ":quiche_common_platform_quiche_mem_slice",
+        ":quiche_common_platform_test",
     ],
 )
 
