@@ -76,8 +76,7 @@ bug_fixes:
     ``envoy.reloadable_features.original_src_fix_port_exhaustion`` to ``false``.
 - area: redis
   change: |
-    Fixed a crash bug when the DNS resolution status is completed, but the response is empty. This behavior change can be
-    reverted by setting runtime guard ``envoy.reloadable_features.redis_empty_dns_response`` to ``false``.
+    Fixed a crash bug when the DNS resolution status is completed, but the response is empty.
 - area: listener
   change: |
     Fixed a bug where socket options specified only on an additional address were not applied unless
