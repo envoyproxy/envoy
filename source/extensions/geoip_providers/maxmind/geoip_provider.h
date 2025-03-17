@@ -1,7 +1,5 @@
 #pragma once
 
-#include <atomic>
-
 #include "envoy/common/platform.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
