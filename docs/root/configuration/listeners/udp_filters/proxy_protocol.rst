@@ -20,7 +20,7 @@ the addresses stored in the encapsulated PROXY protocol header.
 This filter is not session-oriented, and works on a per-datagram basis.
 Each UDP datagram's source and destination addresses are overwritten with
 the addresses in the encapsulated PROXY header before being passed to the
-next filter. The PROXY header is also removed from the payload. Any TLVs 
+next filter. The PROXY header is also removed from the payload. Any TLVs
 are ignored.
 This filter only supports PROXY protocol V2, since PROXY protocol V1 does
 not explicitly support UDP.

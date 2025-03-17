@@ -818,6 +818,13 @@ envoy.filters.udp.dns_filter:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
+envoy.filters.udp.proxy_protocol:
+  categories:
+  - envoy.filters.udp_listener
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.proxy_protocol.v3.ProxyProtocol
 envoy.filters.udp_listener.udp_proxy:
   categories:
   - envoy.filters.udp_listener
