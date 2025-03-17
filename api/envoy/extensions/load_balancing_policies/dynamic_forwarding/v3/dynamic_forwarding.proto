@@ -3,11 +3,12 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.dynamic_forwarding.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.dynamic_forwarding.v3";
-option java_outer_classname = "DynamicForwarding";
+option java_outer_classname = "DynamicForwardingProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/dynamic_forwarding/v3;dynamic_forwardingv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // component. While it can work with a built in HTTP filter it is primarily intended to
 // work in conjunction with the ext_proc or WASM HTTP filters.
 //
-// The ext_proc or WASM filter must implement k8s proposal for AI gateway inferences extensions 
+// The ext_proc or WASM filter must implement k8s proposal for AI gateway inferences extensions
 // https://github.com/kubernetes-sigs/gateway-api-inference-extension/tree/main/docs/proposals/004-endpoint-picker-protocol
 // to integrate with this load balancing policy.
 //
@@ -44,7 +45,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message DynamicForwarding {
   // The child LB policy to create for initial locality picking, or fallback
   // endpoint picking.
-  .envoy.config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1 [(validate.rules).message = {required: true}];
+  config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1
+      [(validate.rules).message = {required: true}];
 
   // When true primary endpoint is provided in the HTTP header.
   // If header is present, the values in the request metadata are ignored.
