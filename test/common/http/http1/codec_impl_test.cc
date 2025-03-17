@@ -4325,7 +4325,7 @@ TEST_P(Http1ServerConnectionImplTest, CROrLFAsFirstBytesIsBalsaErrorFlagOff) {
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
   }
 
-  // Starting with arbitrary number of CR and LF is not an error.
+  // Starting with arbitrary number of CR and LF is an error for Balsa parser.
   Buffer::OwnedImpl buffer("\r\r\r\n\n\rGET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
   auto pre_parse_length = buffer.length();
   auto status = codec_->dispatch(buffer);
@@ -4336,6 +4336,34 @@ TEST_P(Http1ServerConnectionImplTest, CROrLFAsFirstBytesIsBalsaErrorFlagOff) {
   } else {
     EXPECT_TRUE(status.ok());
   }
+}
+
+TEST_P(Http1ServerConnectionImplTest, CROrLFAsFirstBytesIsNotAnErrorFullBufferOfCRLF) {
+#ifdef ENVOY_ENABLE_UHV
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    // BalsaParser allows custom methods if UHV is enabled.
+    return;
+  }
+#endif
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start", "true"}});
+
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
+
+  // Starting with arbitrary number of CR and LF is not an error, even if its in its own buffer.
+  Buffer::OwnedImpl buffer("\r\r\r\n\n\r");
+  Buffer::OwnedImpl buffer2("GET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(buffer.length(), 0);
+  status = codec_->dispatch(buffer2);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(buffer2.length(), 0);
 }
 
 // Receiving a first byte that cannot start a valid response is an error.

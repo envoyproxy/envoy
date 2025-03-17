@@ -205,6 +205,9 @@ size_t BalsaParser::execute(const char* slice, int len) {
         status_ = ParserStatus::Error;
         error_message_ = "HPE_INVALID_METHOD";
         return skipped_bytes;
+      } else if (len == 0) {
+        // All our bytes were either \r or \n. Return skipped_bytes without invoking the framer.
+        return skipped_bytes;
       }
     }
     if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
