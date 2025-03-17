@@ -1332,11 +1332,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
                        "Treat the immediate response message as spurious response.");
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
-
-      if (on_processing_response_) {
-        on_processing_response_->afterReceivingImmediateResponse(
-            response->immediate_response(), processing_status, decoder_callbacks_->streamInfo());
-      }
     } else {
       setDecoderDynamicMetadata(*response);
       // We won't be sending anything more to the stream after we
@@ -1347,7 +1342,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       closeStream();
       if (on_processing_response_) {
         on_processing_response_->afterReceivingImmediateResponse(
-            response->immediate_response(), processing_status, decoder_callbacks_->streamInfo());
+            response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
       }
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
