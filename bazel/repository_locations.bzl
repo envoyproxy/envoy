@@ -1486,8 +1486,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.56.0",
-        sha256 = "f1306aac0b258b790df01ad9abc6abb0df0b65416c74b4ef27f4aab298780a64",
+        version = "0.59.0",
+        sha256 = "e6bfd5d5133832bc13c9a57d73e66cf5e9775c66e324e8e78ba060f17596b3fe",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1498,7 +1498,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "dataplane_ext",
         ],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-12-16",
+        release_date = "2025-03-11",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",
