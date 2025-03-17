@@ -4302,6 +4302,42 @@ TEST_P(Http1ServerConnectionImplTest, CROrLFAsFirstBytesIsNotAnError) {
   EXPECT_TRUE(status.ok());
 }
 
+// Receiving any number of `\r` or `\n` as first byte is not an error.
+TEST_P(Http1ServerConnectionImplTest, CROrLFAsFirstBytesIsBalsaErrorFlagOff) {
+#ifdef ENVOY_ENABLE_UHV
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    // BalsaParser allows custom methods if UHV is enabled.
+    return;
+  }
+#endif
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start", "false"}});
+
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_CALL(decoder,
+                sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+  } else {
+    EXPECT_CALL(decoder, decodeHeaders_(_, true));
+  }
+
+  // Starting with arbitrary number of CR and LF is not an error.
+  Buffer::OwnedImpl buffer("\r\r\r\n\n\rGET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
+  auto pre_parse_length = buffer.length();
+  auto status = codec_->dispatch(buffer);
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+    EXPECT_EQ(buffer.length(), pre_parse_length);
+  } else {
+    EXPECT_TRUE(status.ok());
+  }
+}
+
 // Receiving a first byte that cannot start a valid response is an error.
 TEST_P(Http1ClientConnectionImplTest, InvalidResponseFirstCharacter) {
   initialize();
