@@ -9,6 +9,5 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@envoy_api//envoy/extensions/tracers/fluentd/v3:pkg",
     ],
 )
