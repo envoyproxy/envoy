@@ -56,20 +56,35 @@ const std::string default_city_config_yaml = R"EOF(
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
 
-const std::string default_isp_db_path =
+const std::string default_asn_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb";
 
-const std::string default_updated_isp_db_path =
+const std::string default_updated_asn_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test-Updated.mmdb";
 
+const std::string default_asn_config_yaml = R"EOF(
+  common_provider_config:
+    geo_headers_to_add:
+      asn: "x-geo-asn"
+  asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+)EOF";
+
+const std::string default_isp_db_path =
+    "{{ test_rundir "
+    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb";
+
+const std::string default_updated_isp_db_path =
+    "{{ test_rundir "
+    "}}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test-Updated.mmdb";
+
 const std::string default_isp_config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        asn: "x-geo-asn"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-  )EOF";
+  common_provider_config:
+    geo_headers_to_add:
+      isp: "x-geo-isp"
+  isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+)EOF";
 
 const std::string default_anon_db_path =
     "{{ test_rundir "
@@ -168,7 +183,7 @@ public:
 
 class GeoipProviderTest : public testing::Test, public GeoipProviderTestBase {};
 
-TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
+TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
@@ -177,7 +192,7 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
         city: "x-geo-city"
         asn: "x-geo-asn"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -197,14 +212,34 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndIspDbsSuccessfulLookup) {
   const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
   EXPECT_EQ("15169", asn_it->second);
   expectStats("city_db");
-  expectStats("isp_db");
+  expectStats("asn_db");
+}
+
+TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        asn: "x-geo-asn"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(1, captured_lookup_response_.size());
+  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("15169", asn_it->second);
+  expectStats("asn_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        asn: "x-geo-asn"
         isp: "x-geo-isp"
         is_apple_private_relay: "x-geo-apple-private-relay"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
@@ -217,9 +252,7 @@ TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(3, captured_lookup_response_.size());
-  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
-  EXPECT_EQ("7018", asn_it->second);
+  EXPECT_EQ(2, captured_lookup_response_.size());
   const auto& isp_it = captured_lookup_response_.find("x-geo-isp");
   EXPECT_EQ("AT&T Services", isp_it->second);
   expectStats("isp_db");
@@ -546,7 +579,7 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
       geo_headers_to_add:
         city: "x-geo-city"
         asn: "x-geo-asn"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF",
         "city"},
     {
@@ -555,9 +588,18 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
       geo_headers_to_add:
         is_anon: "x-geo-anon"
         asn: "x-geo-asn"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF",
         "anon"},
+    {
+        R"EOF(
+      common_provider_config:
+        geo_headers_to_add:
+          isp: "x-geo-isp"
+          asn: "x-geo-asn"
+      asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    )EOF",
+        "isp"},
 };
 
 INSTANTIATE_TEST_SUITE_P(TestName, GeoipProviderGeoDbNotSetDeathTest,
@@ -719,6 +761,8 @@ struct MmdbReloadTestCase mmdb_reload_test_cases[] = {
     {default_city_config_yaml, "city_db", default_city_db_path, default_updated_city_db_path,
      "x-geo-city", "Boxford", "BoxfordImaginary", "78.26.243.166"},
     {default_isp_config_yaml, "isp_db", default_isp_db_path, default_updated_isp_db_path,
+     "x-geo-isp", "AT&T Services", "AT&T Services Special", "::12.96.16.1"},
+    {default_asn_config_yaml, "asn_db", default_asn_db_path, default_updated_asn_db_path,
      "x-geo-asn", "15169", "77777", "78.26.243.166"},
     {default_anon_config_yaml, "anon_db", default_anon_db_path, default_updated_anon_db_path,
      "x-geo-anon", "true", "false", "65.4.3.2"},

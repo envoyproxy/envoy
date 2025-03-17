@@ -279,7 +279,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   EXPECT_THROW_WITH_MESSAGE(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
                             Envoy::EnvoyException,
                             "At least one geolocation database path needs to be configured: "
-                            "city_db_path, isp_db_path or anon_db_path");
+                            "city_db_path, isp_db_path, asn_db_path or anon_db_path");
 }
 
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {

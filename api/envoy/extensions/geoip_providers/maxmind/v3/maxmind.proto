@@ -20,6 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // MaxMind geolocation provider :ref:`configuration overview <config_geoip_providers_maxmind>`.
 // At least one geolocation database path :ref:`city_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path>`,
 // :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path>` or
+// :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.asn_db_path>` or
 // :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>` must be configured.
 // [#extension: envoy.geoip_providers.maxmind]
 
@@ -28,7 +29,7 @@ message MaxMindConfig {
   // Database file is expected to have .mmdb extension.
   string city_db_path = 1 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
-  // Full file path to the Maxmind ASN database, e.g. /etc/GeoLite2-ASN.mmdb.
+  // Full file path to the Maxmind ISP database, e.g. /etc/GeoLite2-ISP.mmdb.
   // Database file is expected to have .mmdb extension.
   string isp_db_path = 2 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
@@ -39,4 +40,8 @@ message MaxMindConfig {
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
   common.v3.CommonGeoipProviderConfig common_provider_config = 4
       [(validate.rules).message = {required: true}];
+
+  // Full file path to the Maxmind ASN database, e.g. /etc/GeoLite2-ASN.mmdb.
+  // Database file is expected to have .mmdb extension.
+  string asn_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 }
