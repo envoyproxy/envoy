@@ -9,7 +9,6 @@
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
-#include "google/protobuf/struct.pb.h"
 #include "source/extensions/filters/http/ext_proc/config.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -20,10 +19,10 @@
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
-#include "test/integration/http_integration.h"
 #include "test/integration/filters/common.h"
-#include "test/test_common/test_runtime.h"
+#include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -246,7 +245,7 @@ protected:
       processing_response_factory_registration_ =
           std::make_unique<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>(
               *processing_response_factory_);
-      google::protobuf::Struct config;
+      ProtobufWkt::Struct config;
       proto_config_.mutable_on_processing_response()->set_name("test-on-processing-response");
       proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
     }
@@ -1792,7 +1791,9 @@ TEST_P(ExtProcIntegrationTest, MismatchedContentLengthAndBodyLength) {
 // an ext_proc server that responds to the response_headers message
 // by requesting to modify the response headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
-  initializeConfig(ConfigOptions{.add_response_processor = true});
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -1885,7 +1886,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
 // by checking the headers and modifying the trailers
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
-  initializeConfig(ConfigOptions{.add_response_processor = true});
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -1971,7 +1974,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
 // by requesting to modify the response body and headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
-  initializeConfig(ConfigOptions{.add_response_processor = true});
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -2330,7 +2335,9 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponse) {
 // should still be seen by the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  initializeConfig(ConfigOptions{.add_response_processor = true});
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBody("Evil content!", absl::nullopt);
   processRequestHeadersMessage(
