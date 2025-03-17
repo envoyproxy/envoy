@@ -266,5 +266,9 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: load_balancing
+  change: |
+    Added Dynamic Forwarding Load Balancing policy. See
+    :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
 
 deprecated:

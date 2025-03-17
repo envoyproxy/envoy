@@ -14,6 +14,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamic Forwarding Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.dynamic_forwarding]
 
 // Configuration for the Dynamic Forwarding Load Balancing policy.
 //
