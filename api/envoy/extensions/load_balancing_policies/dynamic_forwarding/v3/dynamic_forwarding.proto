@@ -4,6 +4,7 @@ package envoy.extensions.load_balancing_policies.dynamic_forwarding.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.dynamic_forwarding.v3";
 option java_outer_classname = "DynamicForwarding";
@@ -13,28 +14,64 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamic Forwarding Load Balancing Policy]
 
-// This configuration allows the built-in PICK_FIRST LB policy to be configured
-// via the LB policy extension point.
+// Configuration for the Dynamic Forwarding Load Balancing policy.
+//
+// This policy allows endpoint picking to be implemented in an external to Envoy
+// component. While it can work with a built in HTTP filter it is primarily intended to
+// work in conjunction with the ext_proc or WASM HTTP filters.
+//
+// The ext_proc or WASM filter must implement k8s proposal for AI gateway inferences extensions 
+// https://github.com/kubernetes-sigs/gateway-api-inference-extension/tree/main/docs/proposals/004-endpoint-picker-protocol
+// to integrate with this load balancing policy.
+//
+// This policy uses selected endpoints from either request headers or request metadata.
+// Use of request headers must be enabled in the configuration and is disabled by default. If enabled, Envoy
+// uses the ``x-gateway-destination-endpoint`` header for the primary endpoint. The value must contain a single ``IP:port`` token.
+// For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
+//
+// If the header is not present Envoy uses untyped request metadata under the ``envoy.lb`` key. The metadata ``protobuf.Struct``
+// contains a string value with the string value under the ``x-gateway-destination-endpoint`` key. The value has the same
+// format as the ``x-gateway-destination-endpoint`` header.
+//
+// If neither header nor metadata is present or there were errors parsing header or metadata values the
+// specified fallback load balancing policy is used. This allows load balancing to degrade to a
+// a built in policy (i.e. Round Robin) in case external endpoint picker fails.
+//
+// See the :ref:`load balancing architecture
+// overview<arch_overview_load_balancing_types>` for more information.
+//
+// [#next-free-field: 6]
 message DynamicForwarding {
   // The child LB policy to create for initial locality picking, or fallback
   // endpoint picking.
-  .envoy.config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1;
+  .envoy.config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1 [(validate.rules).message = {required: true}];
 
-  // When true primary and fallback endpoints are provided in the HTTP headers.
-  // If headers are present, the values in the request metadata are ignored.
-  // If headers are not present, the values in the request metadata are used.
+  // When true primary endpoint is provided in the HTTP header.
+  // If header is present, the values in the request metadata are ignored.
+  // If header is not present, the values in the request metadata are used.
   bool use_http_headers_for_endpoints = 2;
 
   // The header name to use for the primary endpoint.
   // Defaults to "x-gateway-destination-endpoint".
+  // The header value contains a single IP:port value. The IPv6 address must
+  // be enclosed in square brackets.
   // Endpoint provided in this header takes precedence over value in the request
   // metadata.
   string primary_endpoint_http_header_name = 3;
 
-  // The header name to use for the fallback endpoints.
-  // Defaults to "x-gateway-destination-fallback-endpoint-list".
+  // [#not-implemented-hide:]
+  // The header name to use for specifing multiple fallback endpoints.
+  // Defaults to "x-gateway-destination-endpoint-fallbacks".
+  // Header value is a comma separated list of IP:port tokens.
   // Endpoints provided in this header take precedence over values in the
   // request metadata.
   string fallback_endpoint_list_http_header_name = 4;
+
+  // [#not-implemented-hide:]
+  // The header name to use for specifing single fallback endpoint.
+  // Defaults to "x-gateway-destination-endpoint-fallback".
+  // Value format is the same as the primary endpoint header.
+  // Endpoint provided in this header take precedence over values in the
+  // request metadata.
   string fallback_endpoint_http_header_name = 5;
 }

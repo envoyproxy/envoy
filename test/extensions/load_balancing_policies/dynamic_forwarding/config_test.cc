@@ -43,9 +43,8 @@ TEST(DynamicForwardingLbonfigTest, NoFallbackLb) {
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.dynamic_forwarding", factory.name());
 
-  auto result = factory.loadConfig(context, config_msg);
-  EXPECT_THAT(result, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
-                                               "The fallback picking policy must be set."));
+  EXPECT_THROW_WITH_REGEX(factory.loadConfig(context, config_msg).value(), EnvoyException,
+                          "value is required");
 }
 
 TEST(DynamicForwardingLbonfigTest, NoFallbackPolicies) {

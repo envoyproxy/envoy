@@ -18,17 +18,13 @@ constexpr absl::string_view kEndpointsFallbackIndexKey =
     "envoy.extensions.load_balancing_policies.dynamic_forwarding.fallback_index";
 constexpr absl::string_view kEndpointsFallbackIndexFieldName = "index";
 
-// This message can be represented as a protobuf Struct using the following
-// schema:
+// This message is represented as a protobuf Struct using the following schema:
 // {
-//   "x-gateway-destination-endpoint": {
-//     "address": <string>,
-//   },
-//   "x-gateway-destination-endpoint-fallback": {
-//   }
+//   "x-gateway-destination-endpoint": <string>,
 // }
 
 // Default header names for providing the primary and fallback endpoints.
+// TODO(yanavlasov): implement fallback endpoints.
 constexpr absl::string_view kPrimaryEndpointHeaderName = "x-gateway-destination-endpoint";
 constexpr absl::string_view kFallbackSingleEndpointHeaderName =
     "x-gateway-destination-endpoint-fallback";
