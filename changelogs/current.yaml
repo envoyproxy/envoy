@@ -74,12 +74,18 @@ bug_fixes:
     Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the
     kernel prematurely reserving ephemeral ports. This behavior change can be reverted by setting runtime guard
     ``envoy.reloadable_features.original_src_fix_port_exhaustion`` to ``false``.
+- area: redis
+  change: |
+    Fixed a crash bug when the DNS resolution status is completed, but the response is empty.
 - area: listener
   change: |
     Fixed a bug where socket options specified only on an additional address were not applied unless
     :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` on the listener is set.
     Now additional address :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` are correctly
     applied even if the listener has no socket options configured.
+- area: udp
+  change: |
+    Fixed wrong metric calculation of 'downstream_rx_datagram_dropped'.
 - area: http
   change: |
     Fixed the jwks fetcher to set the :scheme pseudo header according to the uri ('http' or 'https').
