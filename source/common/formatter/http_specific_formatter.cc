@@ -353,7 +353,8 @@ absl::StatusOr<FormatterProviderPtr> PathFormatter::create(absl::string_view wit
   } else if (with_query.empty()) {
     with_query_bool = true;
   } else {
-    return absl::InvalidArgumentError(fmt::format("Invalid PATH option: {}", with_query));
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid PATH option: '{}', only 'WQ'/'NQ' are allowed", with_query));
   }
 
   if (option == "ORIG") {
@@ -365,7 +366,8 @@ absl::StatusOr<FormatterProviderPtr> PathFormatter::create(absl::string_view wit
   } else if (option.empty()) {
     option_enum = OriginalPathOrPath;
   } else {
-    return absl::InvalidArgumentError(fmt::format("Invalid PATH option: {}", option));
+    return absl::InvalidArgumentError(fmt::format(
+        "Invalid PATH option: '{}', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed", option));
   }
 
   return std::make_unique<PathFormatter>(with_query_bool, option_enum, max_length);

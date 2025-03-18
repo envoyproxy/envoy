@@ -1395,12 +1395,13 @@ UDP
   HTTP
     The value of the request path. The parameter X is used to specify should the output contains
     query or not. The parameter Y is used to specify the source of the request path. Both X and Y
-    are optional.
+    are optional. And Z is an optional parameter denoting string truncation up to Z characters long.
 
     The X parameter can be:
 
-    * ``WQ``: With Query. If the X is not present, ``WQ`` will be used.
-    * ``NQ``: No Query.
+    * ``WQ``: The output will be the full request path which contains the query parameters. If the X
+      is not present, ``WQ`` will be used.
+    * ``NQ``: The output will be the request path without the query parameters.
 
     The Y parameter can be:
 

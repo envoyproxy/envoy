@@ -5104,12 +5104,14 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
 TEST(SubstitutionFormatterTest, PathTest) {
   {
     EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
-                              EnvoyException, "Invalid PATH option: A");
+                              EnvoyException,
+                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(),
-                              EnvoyException, "Invalid PATH option: B");
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
+        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
   }
 
   {
