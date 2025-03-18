@@ -15,6 +15,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
@@ -2135,6 +2136,36 @@ TEST_P(TcpProxyTest, UpstreamStartSecureTransport) {
   raiseEventUpstreamConnected(0);
   EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport);
   filter_->startUpstreamSecureTransport();
+}
+
+// Test that the proxy protocol TLV is set.
+TEST_P(TcpProxyTest, SetTLV) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("tst");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the downstream TLV is set.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF1, tlvs[0].type);
+  EXPECT_EQ("tst", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Verify the upstream TLV is set.
+  const auto upstream_header = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
+  ASSERT_TRUE(upstream_header.has_value());
+  const auto& upstream_tlvs = upstream_header->tlv_vector_;
+  ASSERT_EQ(1, upstream_tlvs.size());
+  EXPECT_EQ(0xF1, upstream_tlvs[0].type);
+  EXPECT_EQ("tst", std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
 }
 
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());

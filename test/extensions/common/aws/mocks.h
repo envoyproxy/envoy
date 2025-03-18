@@ -184,18 +184,16 @@ public:
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
-              (Server::Configuration::ServerFactoryContext & context,
                AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
                const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
                    iam_roles_anywhere_config),
               (const));
 };
 
-class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
 public:
-  MOCK_METHOD(absl::StatusOr<EC_KEY*>, derivePrivateKey,
-              (absl::string_view access_key_id, absl::string_view secret_access_key));
-  MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
+MOCK_METHOD(absl::StatusOr<EC_KEY*>, derivePrivateKey,
+            (absl::string_view access_key_id, absl::string_view secret_access_key));
+MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
 };
 
 // Friend class for testing callbacks
@@ -217,7 +215,6 @@ public:
                                   TimeSource& timesource)
       : IAMRolesAnywhereSigV4Signer(service_name, region, credentials_provider, timesource) {}
   ~MockIAMRolesAnywhereSigV4Signer() override = default;
-
   MOCK_METHOD(absl::Status, sign,
               (Http::RequestMessage & message, bool sign_body,
                const absl::string_view override_region));

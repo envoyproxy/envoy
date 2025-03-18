@@ -145,6 +145,8 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
 void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
                                         WriteBufferSource& buffer_source) {
   auto status = onWrite(filter, buffer_source);
+  ENVOY_CONN_LOG(trace, "onResumeWriting: returned status={}", connection_,
+                 static_cast<int>(status));
   if (status == FilterStatus::Continue) {
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
     connection_.rawWrite(write_buffer.buffer, write_buffer.end_stream);

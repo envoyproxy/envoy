@@ -175,6 +175,8 @@ public:
   MOCK_METHOD(void, setParentStreamInfo, (const StreamInfo&), ());
   MOCK_METHOD(void, clearParentStreamInfo, ());
   MOCK_METHOD(OptRef<const StreamInfo>, parentStreamInfo, (), (const));
+  MOCK_METHOD(void, addCustomFlag, (absl::string_view));
+  MOCK_METHOD(absl::string_view, customFlags, (), (const));
 
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
@@ -200,6 +202,7 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
+  std::string stream_flags_;
 };
 
 } // namespace StreamInfo

@@ -35,6 +35,10 @@ minor_behavior_changes:
     AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
     credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
     then the original behaviour with a signing failure will occur.
+- area: formatter
+  change: |
+    The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
+    substitution format string if the related extensions are linked.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -58,6 +62,12 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: connection pool
+  change: |
+    Fixed a bug in :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>` where established connection
+    unused capacity was not considered in the logic to establish new connections, resulting in new connections anytime there was not
+    a connection currently in the process of being established. This resulted in far too many connections being established, with the only
+    bounds being cluster circuit breaker limits or upstream service limits.
 - area: ext_authz
   change: |
     Removed validation constraint on :ref:`disabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute.disabled>` so
@@ -68,18 +78,27 @@ bug_fixes:
     Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the
     kernel prematurely reserving ephemeral ports. This behavior change can be reverted by setting runtime guard
     ``envoy.reloadable_features.original_src_fix_port_exhaustion`` to ``false``.
+- area: redis
+  change: |
+    Fixed a crash bug when the DNS resolution status is completed, but the response is empty.
 - area: listener
   change: |
     Fixed a bug where socket options specified only on an additional address were not applied unless
     :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` on the listener is set.
     Now additional address :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` are correctly
     applied even if the listener has no socket options configured.
+- area: udp
+  change: |
+    Fixed wrong metric calculation of 'downstream_rx_datagram_dropped'.
 - area: http
   change: |
     Fixed the jwks fetcher to set the :scheme pseudo header according to the uri ('http' or 'https').
     Before the :scheme header was always 'http'.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
+- area: listener
+  change: |
+    Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -161,6 +180,11 @@ new_features:
     Added alpha support for asynchronous load balancing. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details. Support can
     be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
+- area: quic
+  change: |
+    Added an :ref:`extension
+    <envoy_v3_api_msg_extensions.quic.connection_id_generator.quic_lb.v3.Config>` to support QUIC-LB draft standard for
+    connection ID generation.
 - area: ext_proc
   change: |
     Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
@@ -176,6 +200,10 @@ new_features:
   change: |
     Added ``QUERY_PARAM`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
     for more details.
+- area: formatter
+  change: |
+    Added ``CUSTOM_FLAGS`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
+    for more details.
 - area: http
   change: |
     Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
@@ -187,6 +215,10 @@ new_features:
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
+- area: redis_proxy
+  change: |
+    Added :ref:`custom_commands <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    configuring custom commands for redis proxy.
 - area: dfp
   change: |
     Added a feature to disable DNS refresh on failure by setting :ref:`disable_dns_refresh_on_failure
@@ -232,6 +264,18 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
+- area: rate_limit
+  change: |
+    Added the explict runtime switch
+    :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enabled>` and
+    :ref:`filter_enforced <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.filter_enforced>` to control the
+    filter behavior.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying PROXY protocol TLVs to be added in the PROXY protocol state created by the TCP proxy filter.
+    TLVs added in the PROXY protocol state will be added to the PROXY protocol v2 header sent upstream.
 - area: sockets
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in

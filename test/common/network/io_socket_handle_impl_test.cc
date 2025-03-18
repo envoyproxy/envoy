@@ -177,6 +177,108 @@ TEST(IoSocketHandleImpl, ErrnoIfaddrs) {
   EXPECT_FALSE(maybe_interface_name.has_value());
 }
 
+TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillRepeatedly(Invoke([](int /*fd*/, msghdr* msg_hdr, int /*flags*/) {
+        msg_hdr->msg_iovlen = 1;
+        msg_hdr->msg_flags = 0;
+
+        sockaddr_in peer_address{};
+        peer_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        peer_address.sin_family = AF_INET;
+        peer_address.sin_port = htons(12345);
+        memcpy(msg_hdr->msg_name, &peer_address, sizeof(peer_address));
+        msg_hdr->msg_namelen = sizeof(peer_address);
+
+        struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(msg_hdr->msg_control);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SO_RXQ_OVFL;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+        uint32_t dropped = 5;
+        memcpy(CMSG_DATA(cmsg), &dropped, sizeof(uint32_t));
+        msg_hdr->msg_controllen = cmsg->cmsg_len;
+
+        return Api::SysCallSizeResult{1, 0};
+      }));
+
+  uint32_t dropped_packets = 0;
+
+  char buffer[128] = {};
+  Buffer::RawSlice slice{buffer, sizeof(buffer)};
+
+  Network::IoHandle::RecvMsgOutput output(1, &dropped_packets);
+
+  IoSocketHandleImpl io_handle;
+  auto result = io_handle.recvmsg(&slice, 1, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+  EXPECT_EQ(dropped_packets, 5);
+
+  result = io_handle.recvmsg(&slice, 1, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+
+  // Since the SO_RXQ_OVFL control message represents the number of dropped datagrams since socket
+  // creation It's expected to see the same value after the second recvmsg call.
+  EXPECT_EQ(dropped_packets, 5);
+}
+
+TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _))
+      .WillRepeatedly(Invoke([](int /*fd*/, mmsghdr* mmsg_hdr, unsigned int /*num*/, int /*flags*/,
+                                timespec* /*tp*/) {
+        mmsg_hdr[0].msg_len = 100;
+        mmsg_hdr[0].msg_hdr.msg_flags = 0;
+
+        sockaddr_in peer_address{};
+        peer_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        peer_address.sin_family = AF_INET;
+        peer_address.sin_port = htons(12345);
+        memcpy(mmsg_hdr[0].msg_hdr.msg_name, &peer_address, sizeof(peer_address));
+        mmsg_hdr[0].msg_hdr.msg_namelen = sizeof(peer_address);
+
+        struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(mmsg_hdr[0].msg_hdr.msg_control);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SO_RXQ_OVFL;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+        uint32_t dropped = 5;
+        memcpy(CMSG_DATA(cmsg), &dropped, sizeof(uint32_t));
+        mmsg_hdr[0].msg_hdr.msg_controllen = cmsg->cmsg_len;
+
+        return Api::SysCallIntResult{1, 0};
+      }));
+
+  uint32_t dropped_packets = 0;
+
+  char buffer[128] = {};
+  Buffer::RawSlice slice{buffer, sizeof(buffer)};
+  RawSliceArrays slices = {{slice}};
+
+  Network::IoHandle::RecvMsgOutput output(slices.size(), &dropped_packets);
+
+  IoSocketHandleImpl io_handle;
+  auto result = io_handle.recvmmsg(slices, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+  EXPECT_EQ(output.msg_[0].msg_len_, 100);
+  EXPECT_EQ(dropped_packets, 5);
+
+  result = io_handle.recvmmsg(slices, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+  EXPECT_EQ(output.msg_[0].msg_len_, 100);
+
+  // Since the SO_RXQ_OVFL control message represents the number of dropped datagrams since socket
+  // creation It's expected to see the same value after the second recvmmsg call.
+  EXPECT_EQ(dropped_packets, 5);
+}
+
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
-#include "aws_cluster_manager.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

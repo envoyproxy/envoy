@@ -413,7 +413,6 @@ TEST_F(CustomCredentialsProviderChainTest, CreateFileAndWebProviders) {
 
 TEST_F(CustomCredentialsProviderChainTest, IAMRolesAnywhere) {
   std::string role_arn;
-  NiceMock<MockCustomCredentialsProviderChainFactories> factories;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   Api::ApiPtr api;
   auto region = "ap-southeast-2";
@@ -435,8 +434,6 @@ TEST_F(CustomCredentialsProviderChainTest, IAMRolesAnywhere) {
 }
 
 TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  envoy::extensions::common::aws::v3::InlineCredentialProvider inline_credential;
   inline_credential.set_access_key_id("TestAccessKey");
   inline_credential.set_secret_access_key("TestSecret");
   inline_credential.set_session_token("TestSessionToken");

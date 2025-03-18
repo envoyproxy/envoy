@@ -2518,7 +2518,7 @@ public:
   FakeReadFilter() = default;
   ~FakeReadFilter() override {
     EXPECT_TRUE(callbacks_ != nullptr);
-    // The purpose is to verify that when FilterManger is destructed, ConnectionSocketImpl is not
+    // The purpose is to verify that when FilterManager is destructed, ConnectionSocketImpl is not
     // destructed, and ConnectionSocketImpl can still be accessed via ReadFilterCallbacks.
     EXPECT_TRUE(callbacks_->connection().state() != Network::Connection::State::Open);
   }
