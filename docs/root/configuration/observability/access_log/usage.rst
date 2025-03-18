@@ -1399,7 +1399,7 @@ UDP
 
     The X parameter can be:
 
-    * ``WQ``: With Query. If the X is not presetn, ``WQ`` will be used.
+    * ``WQ``: With Query. If the X is not present, ``WQ`` will be used.
     * ``NQ``: No Query.
 
     The Y parameter can be:
