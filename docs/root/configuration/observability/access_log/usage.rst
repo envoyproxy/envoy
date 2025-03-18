@@ -1394,7 +1394,7 @@ UDP
 %PATH(X:Y):Z%
   HTTP
     The value of the request path. The parameter X is used to specify should the output contains
-    query or not. The parameter Y is used to specify the position of the request path. Both X and Y
+    query or not. The parameter Y is used to specify the source of the request path. Both X and Y
     are optional.
 
     The X parameter can be:
