@@ -42,7 +42,7 @@ enum class FilterStatus {
   Continue,
   // Stop executing further filters.
   StopIteration,
-  
+
   // Stops executing further filters but does not close the connection immediately.
   //
   // When a filter returns StopIterationDontClose, it pauses further processing and
