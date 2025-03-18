@@ -19,6 +19,7 @@ namespace Cache {
   STATNAME(event_type)                                                                             \
   STATNAME(hit)                                                                                    \
   STATNAME(miss)                                                                                   \
+  STATNAME(failed_validation)                                                                      \
   STATNAME(uncacheable)                                                                            \
   STATNAME(upstream_reset)                                                                         \
   STATNAME(lookup_error)                                                                           \
@@ -39,6 +40,8 @@ public:
             {{stat_names_.cache_label_, label_}, {stat_names_.event_type_, stat_names_.hit_}}),
         tags_miss_(
             {{stat_names_.cache_label_, label_}, {stat_names_.event_type_, stat_names_.miss_}}),
+        tags_failed_validation_({{stat_names_.cache_label_, label_},
+                                 {stat_names_.event_type_, stat_names_.failed_validation_}}),
         tags_uncacheable_({{stat_names_.cache_label_, label_},
                            {stat_names_.event_type_, stat_names_.uncacheable_}}),
         tags_upstream_reset_({{stat_names_.cache_label_, label_},
@@ -58,6 +61,8 @@ public:
                                Stats::Gauge::ImportMode::NeverImport, tags_just_label_)),
         counter_hit_(counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_hit_)),
         counter_miss_(counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_miss_)),
+        counter_failed_validation_(
+            counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_failed_validation_)),
         counter_uncacheable_(
             counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_uncacheable_)),
         counter_upstream_reset_(
@@ -88,6 +93,7 @@ private:
   const Stats::StatNameTagVector tags_just_label_;
   const Stats::StatNameTagVector tags_hit_;
   const Stats::StatNameTagVector tags_miss_;
+  const Stats::StatNameTagVector tags_failed_validation_;
   const Stats::StatNameTagVector tags_uncacheable_;
   const Stats::StatNameTagVector tags_upstream_reset_;
   const Stats::StatNameTagVector tags_lookup_error_;
@@ -97,6 +103,7 @@ private:
   Stats::Gauge& gauge_upstream_buffered_bytes_;
   Stats::Counter& counter_hit_;
   Stats::Counter& counter_miss_;
+  Stats::Counter& counter_failed_validation_;
   Stats::Counter& counter_uncacheable_;
   Stats::Counter& counter_upstream_reset_;
   Stats::Counter& counter_lookup_error_;
@@ -110,8 +117,9 @@ CacheFilterStatsPtr generateStats(Stats::Scope& scope, absl::string_view label) 
 void CacheFilterStatsImpl::incForStatus(CacheEntryStatus status) {
   switch (status) {
   case CacheEntryStatus::Miss:
-  case CacheEntryStatus::FailedValidation:
     return counter_miss_.inc();
+  case CacheEntryStatus::FailedValidation:
+    return counter_failed_validation_.inc();
   case CacheEntryStatus::Hit:
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::Follower:

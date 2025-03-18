@@ -56,12 +56,16 @@ TEST_F(CacheStatsTest, StatsAreConstructedCorrectly) {
   Stats::CounterOptConstRef hits =
       context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.hit");
   EXPECT_THAT(hits, OptCounterIs("cache.event", 4));
-  // 2 for miss
+  // 1 for miss
   stats_->incForStatus(CacheEntryStatus::Miss);
-  stats_->incForStatus(CacheEntryStatus::FailedValidation);
   Stats::CounterOptConstRef misses =
       context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.miss");
-  EXPECT_THAT(misses, OptCounterIs("cache.event", 2));
+  EXPECT_THAT(misses, OptCounterIs("cache.event", 1));
+  // 1 for failed validation
+  stats_->incForStatus(CacheEntryStatus::FailedValidation);
+  Stats::CounterOptConstRef failed_validations = context_.store_.findCounterByString(
+      "cache.event.cache_label.fake_cache.event_type.failed_validation");
+  EXPECT_THAT(failed_validations, OptCounterIs("cache.event", 1));
   // 1 for validated
   stats_->incForStatus(CacheEntryStatus::Validated);
   Stats::CounterOptConstRef validates =
