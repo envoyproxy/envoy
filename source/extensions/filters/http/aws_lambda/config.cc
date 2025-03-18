@@ -1,17 +1,5 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
 
-#include "envoy/common/optref.h"
-#include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
-#include "envoy/registry/registry.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
-
-#include "source/common/common/fmt.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
-#include "source/extensions/common/aws/utility.h"
-#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
