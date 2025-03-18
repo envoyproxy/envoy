@@ -42,7 +42,19 @@ enum class FilterStatus {
   Continue,
   // Stop executing further filters.
   StopIteration,
-  // Stop executing further filters. continueClosing() must be called in the filter.
+  
+  // Stops executing further filters but does not close the connection immediately.
+  //
+  // When a filter returns StopIterationDontClose, it pauses further processing and
+  // prevents the connection from closing if the connection want to close the filter chain.
+  // The filter is responsible for eventually calling continueClosing() when it has finished
+  // its necessary work.
+  //
+  // This is typically used when a filter needs to delay closure due to:
+  //   - Data external processing to avoid data loss.
+  //
+  // Failure to call continueClosing() after returning StopIterationDontClose
+  // will result in a stalled connection and possible resource leaks.
   StopIterationDontClose,
 };
 
