@@ -53,11 +53,6 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
-  if (http3_options_.has_value() && http3_options_->disable_qpack()) {
-    DisableHuffmanEncoding();
-    DisableCookieCrumbling();
-    set_qpack_maximum_dynamic_table_capacity(0);
-  }
   // If a factory is available, create a debug visitor and attach it to the connection.
   if (debug_visitor_factory.has_value()) {
     debug_visitor_ =
@@ -209,6 +204,11 @@ void EnvoyQuicServerSession::setHttp3Options(
     }
   }
   set_allow_extended_connect(http3_options_->allow_extended_connect());
+  if (http3_options_->disable_qpack()) {
+    DisableHuffmanEncoding();
+    DisableCookieCrumbling();
+    set_qpack_maximum_dynamic_table_capacity(0);
+  }
 }
 
 void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
