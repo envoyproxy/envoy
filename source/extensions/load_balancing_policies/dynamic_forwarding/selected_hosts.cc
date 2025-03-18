@@ -86,7 +86,7 @@ SelectedHosts::make(const Envoy::ProtobufWkt::Struct& selected_endpoints) {
   }
   auto selected_hosts = std::make_unique<SelectedHosts>(
       SelectedHosts{std::move(primary_endpoint_result.value().front()), {}});
-  return std::move(selected_hosts);
+  return selected_hosts;
 }
 
 } // namespace DynamicForwarding
