@@ -116,11 +116,15 @@ bool FilterManagerImpl::startUpstreamSecureTransport() {
 }
 
 void FilterManagerImpl::maybeClose() {
+  if (connection_.state() != Connection::State::Open) {
+    return;
+  }
+
   ENVOY_CONN_LOG(trace,
-                 "onConnectionClose: pending_remote_close_={}, pending_local_close_={}, "
-                 "pending_close_write_filter_={}, pending_close_read_filter_={}",
-                 connection_, state_.pending_remote_close_, state_.pending_local_close_,
-                 state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+    "maybeClose(): pending_remote_close_={}, pending_local_close_={}, "
+    "pending_close_write_filter_={}, pending_close_read_filter_={}",
+    connection_, state_.pending_remote_close_, state_.pending_local_close_,
+    state_.pending_close_write_filter_, state_.pending_close_read_filter_);
 
   // Check if we need to close the connection
   if ((state_.pending_remote_close_ || state_.pending_local_close_) &&
@@ -133,7 +137,6 @@ void FilterManagerImpl::maybeClose() {
 }
 
 void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
-  // Ignore if connection is not in Open state
   if (connection_.state() != Connection::State::Open) {
     return;
   }

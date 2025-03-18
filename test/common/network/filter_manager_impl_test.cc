@@ -520,7 +520,7 @@ TEST_F(NetworkFilterManagerTest, BothReadAndWriteFiltersHoldClose) {
   read_filter->callbacks_->continueClosing();
 
   // After both filters continue closing, we should close
-  EXPECT_CALL(connection_, closeConnection(ConnectionCloseAction{ConnectionEvent::RemoteClose}));
+  EXPECT_CALL(connection_, closeConnection(remote_close_action_));
   filter->write_callbacks_->continueClosing();
 }
 
