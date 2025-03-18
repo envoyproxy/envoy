@@ -685,6 +685,10 @@ TEST_F(HttpFilterTest, SimplestPost) {
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  EXPECT_EQ(last_request_.protocol_config().request_body_mode(), ProcessingMode::NONE);
+  EXPECT_EQ(last_request_.protocol_config().response_body_mode(), ProcessingMode::NONE);
+  EXPECT_FALSE(last_request_.protocol_config().send_body_without_waiting_for_header_response());
   processRequestHeaders(false,
                         [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
                           EXPECT_FALSE(header_req.end_of_stream());
@@ -707,6 +711,7 @@ TEST_F(HttpFilterTest, SimplestPost) {
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processResponseHeaders(
       false, [](const HttpHeaders& header_resp, ProcessingResponse&, HeadersResponse&) {
         EXPECT_FALSE(header_resp.end_of_stream());
@@ -1812,18 +1817,23 @@ TEST_F(HttpFilterTest, StreamingSendDataRandomGrpcLatency) {
   Buffer::OwnedImpl req_data("foo");
   // Latency 50 80 60 30 100.
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(50));
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(80));
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(60));
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(30));
 
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt, false, std::chrono::microseconds(100));
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
@@ -1873,6 +1883,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
 
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestHeaders(false, absl::nullopt);
   // Test content-length header is removed in request in streamed mode.
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
@@ -1891,6 +1902,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   want_request_body.add(req_chunk_1.toString());
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk_1, true));
   got_request_body.move(req_chunk_1);
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processRequestBody(absl::nullopt);
   EXPECT_EQ(want_request_body.toString(), got_request_body.toString());
   EXPECT_FALSE(decoding_watermarked);
@@ -1903,6 +1915,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processResponseHeaders(false, absl::nullopt);
   // Test content-length header is removed in response in streamed mode.
   EXPECT_EQ(response_headers_.ContentLength(), nullptr);
@@ -1919,6 +1932,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     want_response_body.add(resp_chunk.toString());
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
     got_response_body.move(resp_chunk);
+    EXPECT_FALSE(last_request_.has_protocol_config());
     processResponseBody(absl::nullopt, false);
   }
 
@@ -2570,7 +2584,6 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeadersDefault) {
   )EOF");
   EXPECT_EQ(filter_->config().allowModeOverride(), true);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
   // Override header processing with DEFAULT.
   processRequestHeaders(false,
                         [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
@@ -2586,7 +2599,6 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeadersDefault) {
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-
   processResponseHeaders(false, [](const HttpHeaders& header_resp, ProcessingResponse&,
                                    HeadersResponse&) {
     EXPECT_FALSE(header_resp.end_of_stream());
@@ -3566,10 +3578,12 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
   response_headers_.addCopy(LowerCaseString(":status"), "200");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_TRUE(last_request_.has_protocol_config());
   processResponseHeaders(false, absl::nullopt);
   // Construct a large trailer message to be close to the HCM size limit.
   resp_trailers_.addCopy(LowerCaseString("x-some-trailer"), std::string(1950, 'a'));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(resp_trailers_));
+  EXPECT_FALSE(last_request_.has_protocol_config());
   processResponseTrailers(
       [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailer_resp) {
         auto headers_mut = trailer_resp.mutable_header_mutation();
@@ -4148,6 +4162,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedBeforeBody) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
   // Header response arrives before any body data.
   processResponseHeaders(false, absl::nullopt);
 
@@ -4214,6 +4229,11 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  EXPECT_EQ(last_request_.protocol_config().request_body_mode(), ProcessingMode::NONE);
+  EXPECT_EQ(last_request_.protocol_config().response_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_TRUE(last_request_.protocol_config().send_body_without_waiting_for_header_response());
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
@@ -4552,6 +4572,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestHeaders(false, absl::nullopt);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
@@ -4577,6 +4598,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
 
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
 
+  EXPECT_FALSE(last_request_.has_protocol_config());
   // Server now sends back response.
   processResponseHeadersAfterTrailer(absl::nullopt);
   processResponseBodyStreamedAfterTrailer(" AAAAA ", want_response_body);

@@ -201,6 +201,12 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
+
+  /// This is called when the stream is complete.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  ///
+  /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
+  fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
@@ -1213,6 +1219,16 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
   drop_wrapped_c_void_ptr!(filter_ptr, HttpFilter<EnvoyHttpFilterImpl>);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
 #[no_mangle]

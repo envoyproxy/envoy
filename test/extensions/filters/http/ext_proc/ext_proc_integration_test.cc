@@ -44,6 +44,7 @@ using envoy::service::ext_proc::v3::HttpTrailers;
 using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
@@ -221,6 +222,14 @@ protected:
         MapPair<std::string, Any>("envoy.filters.http.ext_proc", cfg_any));
   }
 
+  void protocolConfigEncoding(ProcessingRequest& request) {
+    protocol_config_encoded_ = false;
+    if (request.has_protocol_config()) {
+      protocol_config_encoded_ = true;
+      protocol_config_ = request.protocol_config();
+    }
+  }
+
   IntegrationStreamDecoderPtr sendDownstreamRequest(
       absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
@@ -355,6 +364,7 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_headers());
+    protocolConfigEncoding(request);
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -397,6 +407,8 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_response_headers());
+    protocolConfigEncoding(request);
+
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -419,6 +431,8 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_body());
+    protocolConfigEncoding(request);
+
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -449,6 +463,8 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_response_body());
+    protocolConfigEncoding(request);
+
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -828,6 +844,8 @@ protected:
   }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  bool protocol_config_encoded_ = false;
+  ProtocolConfiguration protocol_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
@@ -5119,6 +5137,29 @@ TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedNotSendTrailerTes
   handleUpstreamRequest(100);
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ProtocolConfigurationEncodingTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("hello world");
+  processRequestBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  EXPECT_TRUE(protocol_config_encoded_);
+  EXPECT_EQ(protocol_config_.request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(protocol_config_.response_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_TRUE(protocol_config_.send_body_without_waiting_for_header_response());
+
+  handleUpstreamRequest(100);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  EXPECT_FALSE(protocol_config_encoded_);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  EXPECT_FALSE(protocol_config_encoded_);
   verifyDownstreamResponse(*response, 200);
 }
 
