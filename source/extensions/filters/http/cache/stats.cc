@@ -114,7 +114,7 @@ void CacheFilterStatsImpl::incForStatus(CacheEntryStatus status) {
     return counter_miss_.inc();
   case CacheEntryStatus::Hit:
   case CacheEntryStatus::FoundNotModified:
-  case CacheEntryStatus::Streamed:
+  case CacheEntryStatus::Follower:
   case CacheEntryStatus::ValidatedFree:
     return counter_hit_.inc();
   case CacheEntryStatus::Validated:

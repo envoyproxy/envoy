@@ -51,7 +51,7 @@ TEST_F(CacheStatsTest, StatsAreConstructedCorrectly) {
   // 4 for hit
   stats_->incForStatus(CacheEntryStatus::Hit);
   stats_->incForStatus(CacheEntryStatus::FoundNotModified);
-  stats_->incForStatus(CacheEntryStatus::Streamed);
+  stats_->incForStatus(CacheEntryStatus::Follower);
   stats_->incForStatus(CacheEntryStatus::ValidatedFree);
   Stats::CounterOptConstRef hits =
       context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.hit");

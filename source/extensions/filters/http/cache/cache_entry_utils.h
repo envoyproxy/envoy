@@ -27,13 +27,14 @@ struct ResponseMetadata {
 enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate response to the request.
   Hit,
-  // The request provoked the cache entry to be populated - either it
-  // was not already populated or validation failed.
+  // The request was cacheable and was not already in the cache. This also means
+  // the cache was populated by this request.
   Miss,
   // The entry was being inserted when this request was made - it's like a
-  // hit, but streamed, so still potentially subject to upstream reset
-  // because the cache entry isn't fully populated yet.
-  Streamed,
+  // hit, but streamed from the same request as the original "Miss", so still
+  // potentially subject to upstream reset because the cache entry isn't fully
+  // populated yet.
+  Follower,
   // The request was not cacheable. All matching requests will go to the
   // upstream.
   Uncacheable,

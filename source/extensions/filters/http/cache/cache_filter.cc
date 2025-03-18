@@ -161,7 +161,7 @@ static absl::string_view responseCodeDetailsFromStatus(CacheEntryStatus status) 
     return CacheResponseCodeDetails::CacheFilterInsert;
   case CacheEntryStatus::Hit:
   case CacheEntryStatus::FoundNotModified:
-  case CacheEntryStatus::Streamed:
+  case CacheEntryStatus::Follower:
   case CacheEntryStatus::Validated:
   case CacheEntryStatus::ValidatedFree:
   case CacheEntryStatus::UpstreamReset:

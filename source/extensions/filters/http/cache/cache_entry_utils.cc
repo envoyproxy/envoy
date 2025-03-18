@@ -13,8 +13,8 @@ absl::string_view cacheEntryStatusString(CacheEntryStatus s) {
     return "Hit";
   case CacheEntryStatus::Miss:
     return "Miss";
-  case CacheEntryStatus::Streamed:
-    return "Streamed";
+  case CacheEntryStatus::Follower:
+    return "Follower";
   case CacheEntryStatus::Uncacheable:
     return "Uncacheable";
   case CacheEntryStatus::Validated:

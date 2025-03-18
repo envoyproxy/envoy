@@ -12,7 +12,7 @@ namespace {
 
 TEST(Coverage, CacheEntryStatusString) {
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Hit), "Hit");
-  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Streamed), "Streamed");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Follower), "Follower");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Miss), "Miss");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Uncacheable), "Uncacheable");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Validated), "Validated");

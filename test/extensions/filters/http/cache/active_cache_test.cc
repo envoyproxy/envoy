@@ -374,8 +374,8 @@ TEST_F(ActiveCacheTest, CacheMissWithCacheableResponseProvokesSharedInsertStream
   // First result should be cache miss because it triggered insertion.
   EXPECT_THAT(result1->status_, Eq(CacheEntryStatus::Miss));
   ASSERT_THAT(result2, NotNull());
-  // Second result should be streamed from the insertion.
-  EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Streamed));
+  // Second result should be a follower from the insertion.
+  EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Follower));
   // Request after insert is complete should be able to lookup immediately.
   active_cache_->lookup(testLookupRequest("/a"),
                         [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
@@ -437,8 +437,8 @@ TEST_F(ActiveCacheTest,
   // First result should be cache miss because it triggered insertion.
   EXPECT_THAT(result1->status_, Eq(CacheEntryStatus::Miss));
   ASSERT_THAT(result2, NotNull());
-  // Second result should be streamed from the existing insertion.
-  EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Streamed));
+  // Second result should be a follower from the existing insertion.
+  EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Follower));
   // Request after header-insert is complete should be able to lookup immediately.
   active_cache_->lookup(testLookupRequest("/a"),
                         [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });

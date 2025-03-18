@@ -238,7 +238,7 @@ void ActiveCacheEntry::handleValidationAndSendLookupResponses(CacheEntryStatus s
     // If there was more than one recipient, and the first one was a miss, the
     // rest will be streamed.
     if (status == CacheEntryStatus::Miss) {
-      status = CacheEntryStatus::Streamed;
+      status = CacheEntryStatus::Follower;
     }
   }
   if (it != lookup_subscribers_.end()) {
