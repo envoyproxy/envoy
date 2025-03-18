@@ -80,7 +80,13 @@ struct ActiveLookupResult {
 using ActiveLookupResultPtr = std::unique_ptr<ActiveLookupResult>;
 using ActiveLookupResultCallback = absl::AnyInvocable<void(ActiveLookupResultPtr)>;
 
-// May or may not be a singleton; must include the interface for the case when it is.
+// ActiveCache is a wrapper around an HttpCache which provides a shorter-lived in-memory
+// cache of headers and already open cache entries. All the http-specific aspects of the
+// cache (range requests, validation, etc.) are performed by the ActiveCacheEntry
+// so the HttpCache only needs to support simple read/write operations.
+//
+// May or may not be a singleton, depending on the specific cache extension; must include
+// the Singleton::Instance interface to support cases when it is.
 class ActiveCache : public Singleton::Instance, public CacheFilterStatsProvider {
 public:
   // This is implemented in ActiveCacheImpl so that tests which only use a mock don't
