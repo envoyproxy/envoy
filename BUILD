@@ -34,7 +34,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-# These two definitions exist to help reduce Envoy upstream core code depending on extensions.
+# These  two definitions exist to help reduce Envoy upstream core code depending on extensions.
 # To avoid visibility problems, see notes in source/extensions/extensions_build_config.bzl
 #
 # TODO(#9953) //test/config_test:__pkg__ should probably be split up and removed.
