@@ -1691,7 +1691,7 @@ void Filter::onProcessHeadersResponse(const envoy::service::ext_proc::v3::Header
                                                              decoder_callbacks_->streamInfo());
     } else {
       on_processing_response_->afterProcessingResponseHeaders(response, status,
-                                                              decoder_callbacks_->streamInfo());
+                                                              encoder_callbacks_->streamInfo());
     }
   }
 }
@@ -1706,7 +1706,7 @@ void Filter::onProcessTrailersResponse(
                                                               decoder_callbacks_->streamInfo());
     } else {
       on_processing_response_->afterProcessingResponseTrailers(response, status,
-                                                               decoder_callbacks_->streamInfo());
+                                                               encoder_callbacks_->streamInfo());
     }
   }
 }
@@ -1720,7 +1720,7 @@ void Filter::onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyRespo
                                                           decoder_callbacks_->streamInfo());
     } else {
       on_processing_response_->afterProcessingResponseBody(response, status,
-                                                           decoder_callbacks_->streamInfo());
+                                                           encoder_callbacks_->streamInfo());
     }
   }
 }

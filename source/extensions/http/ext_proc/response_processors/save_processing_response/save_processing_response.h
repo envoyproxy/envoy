@@ -44,10 +44,10 @@ public:
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   // Not implemented.
   void afterProcessingRequestBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
-                                  Envoy::StreamInfo::StreamInfo&) override{};
+                                  Envoy::StreamInfo::StreamInfo&) override {};
   // Not implemented.
   void afterProcessingResponseBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
-                                   Envoy::StreamInfo::StreamInfo&) override{};
+                                   Envoy::StreamInfo::StreamInfo&) override {};
   void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
@@ -67,6 +67,8 @@ private:
   void addToFilterState(envoy::service::ext_proc::v3::ProcessingResponse processing_response,
                         absl::Status status, Envoy::StreamInfo::StreamInfo& stream_info);
 
+  // Answer whether the response from the external processor should be saved to
+  // filter state based on the configured save options for the response type and processing status.
   bool shouldSaveResponse(SaveOptions save_options, absl::Status status) {
     if (!save_options.save_response) {
       return false;
