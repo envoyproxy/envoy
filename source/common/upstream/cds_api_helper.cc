@@ -28,8 +28,10 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
 
-  ENVOY_LOG(info, "{}: response indicates {} added/updated cluster(s), {} removed cluster(s); applying changes", name_, added_resources.size(),
-            removed_resources.size());
+  ENVOY_LOG(
+      info,
+      "{}: response indicates {} added/updated cluster(s), {} removed cluster(s); applying changes",
+      name_, added_resources.size(), removed_resources.size());
 
   std::vector<std::string> exception_msgs;
   absl::flat_hash_set<std::string> cluster_names(added_resources.size());
