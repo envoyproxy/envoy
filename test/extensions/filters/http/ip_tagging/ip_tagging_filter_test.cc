@@ -25,6 +25,21 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
+
+class IpTaggingFilterConfigPeer {
+public:
+  static IpTagsLoader& ipTagsLoader(IpTaggingFilterConfig& filter_config) {
+    return filter_config.tags_loader_;
+  }
+  static const std::shared_ptr<IpTagsRegistrySingleton>&
+  ipTagsRegistry(const IpTaggingFilterConfig& filter_config) {
+    return filter_config.ip_tags_registry_;
+  }
+  static const std::string& ipTagsPath(const IpTaggingFilterConfig& filter_config) {
+    return filter_config.ip_tags_path_;
+  }
+};
+
 namespace {
 
 std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry;
@@ -276,6 +291,34 @@ ip_tags_path: /test/tags.csv
                             "Unsupported file format, unable to parse ip tags from file.");
 }
 
+TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config1);
+  auto config1 = std::make_shared<IpTaggingFilterConfig>(proto_config1, ip_tags_registry, "prefix.",
+                                                         *stats_.rootScope(), runtime_, *api_,
+                                                         validation_visitor_);
+  const std::string config2_string = R"EOF(
+ request_type: external
+ ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json"
+ )EOF";
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(config2_string), proto_config2);
+  auto config2 = std::make_shared<IpTaggingFilterConfig>(proto_config2, ip_tags_registry, "prefix.",
+                                                         *stats_.rootScope(), runtime_, *api_,
+                                                         validation_visitor_);
+  auto ip_tags_registry1 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config1);
+  auto ip_tags_registry2 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config2);
+  EXPECT_EQ(ip_tags_registry1.get(), ip_tags_registry2.get());
+  LcTrieSharedPtr ip_tags1 =
+      ip_tags_registry1->get(IpTaggingFilterConfigPeer::ipTagsPath(*config1),
+                             IpTaggingFilterConfigPeer::ipTagsLoader(*config1));
+  LcTrieSharedPtr ip_tags2 =
+      ip_tags_registry2->get(IpTaggingFilterConfigPeer::ipTagsPath(*config2),
+                             IpTaggingFilterConfigPeer::ipTagsLoader(*config2));
+  EXPECT_EQ(ip_tags1.get(), ip_tags2.get());
+}
+
 class InternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
 
 TEST_P(InternalRequestIpTaggingFilterTest, InternalRequest) {
@@ -497,9 +540,9 @@ TEST_P(ClearAlternateHeaderWhenUnmatchedAndSanitizedFilterTest,
        ClearAlternateHeaderWhenUnmatchedAndSanitized) {
   const std::string config = GetParam();
   initializeFilter(config);
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"x-envoy-internal", "true"}, {"x-envoy-optional-header", "foo"}}; // header will be
-                                                                         // removed
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
+                                                 {"x-envoy-optional-header", "foo"}}; // header will
+                                                                                      // be removed
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(

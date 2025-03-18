@@ -165,7 +165,8 @@ private:
   }
 
   void incCounter(Stats::StatName name);
-
+  // Allow the unit test to have access to private members.
+  friend class IpTaggingFilterConfigPeer;
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
