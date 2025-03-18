@@ -62,7 +62,7 @@ public:
     close(type);
   }
 
-  void closeConnection(ConnectionCloseAction action) override {
+  void closeConnection(Network::ConnectionCloseAction action) override {
     IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
   }
 
