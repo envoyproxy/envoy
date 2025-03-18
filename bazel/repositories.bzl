@@ -535,8 +535,6 @@ def _depend_on_what_you_use():
     external_http_archive(
         name = "depend_on_what_you_use",
         build_file_content = BUILD_ALL_CONTENT,
-        # patch_args = ["-p1"],
-        # patches = ["@envoy//bazel:depend_on_what_you_use.patch"],
     )
 
 def _dwyu_pcpp():

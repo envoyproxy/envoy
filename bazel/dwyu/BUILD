@@ -3,6 +3,6 @@ package(default_visibility = ["//visibility:public"])
 dwyu_make_cc_info_mapping(
     name = "map_transitive_deps",
     mapping = {
-        "//dwyu-test:addressbook_proto" : MAP_TRANSITIVE_DEPS
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto": MAP_TRANSITIVE_DEPS,
     },
 )
