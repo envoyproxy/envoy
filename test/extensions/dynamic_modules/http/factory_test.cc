@@ -44,8 +44,7 @@ filter_config:
   auto factory_cb = result.value();
   Http::MockFilterChainFactoryCallbacks callbacks;
 
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
-  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
 }
 
@@ -74,8 +73,7 @@ filter_name: foo
   auto factory_cb = result.value();
   Http::MockFilterChainFactoryCallbacks callbacks;
 
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
-  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
 }
 
@@ -107,8 +105,7 @@ filter_config:
   auto factory_cb = result.value();
   Http::MockFilterChainFactoryCallbacks callbacks;
 
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
-  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
 }
 
@@ -151,6 +148,8 @@ filter_config:
       {"no_http_filter_response_headers", "envoy_dynamic_module_on_http_filter_response_headers"},
       {"no_http_filter_response_body", "envoy_dynamic_module_on_http_filter_response_body"},
       {"no_http_filter_response_trailers", "envoy_dynamic_module_on_http_filter_response_trailers"},
+      {"no_http_filter_stream_complete", "envoy_dynamic_module_on_http_filter_stream_complete"},
+      {"no_http_filter_destroy", "envoy_dynamic_module_on_http_filter_destroy"},
   };
 
   for (const auto& test_case : test_cases) {

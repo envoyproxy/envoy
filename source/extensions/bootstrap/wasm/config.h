@@ -44,6 +44,7 @@ public:
     return *plugin_config_;
   }
   void onServerInitialized() override;
+  void onWorkerThreadInitialized() override{};
 
 private:
   void createWasm(Server::Configuration::ServerFactoryContext& context);

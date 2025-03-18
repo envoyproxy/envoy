@@ -23,13 +23,18 @@ SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_inf
                                         const absl::optional<SpanContext> parent_context,
                                         const std::string& /*trace_id*/,
                                         const std::string& /*name*/, OTelSpanKind /*kind*/,
-                                        OptRef<const Tracing::TraceContext>,
+                                        OptRef<const Tracing::TraceContext> trace_context,
                                         const std::vector<SpanContext>& /*links*/) {
 
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(*compiled_expr_, arena, &local_info_, stream_info,
-                                    nullptr /* request_headers */, nullptr /* response_headers */,
-                                    nullptr /* response_trailers */);
+  const ::Envoy::Http::RequestHeaderMap* request_headers = nullptr;
+  if (trace_context.has_value() && trace_context->requestHeaders().has_value()) {
+    request_headers = trace_context->requestHeaders().ptr();
+  }
+
+  auto eval_status = Expr::evaluate(
+      *compiled_expr_, arena, &local_info_, stream_info, request_headers /* request_headers */,
+      nullptr /* response_headers */, nullptr /* response_trailers */);
   SamplingResult result;
   if (!eval_status.has_value() || eval_status.value().IsError()) {
     result.decision = Decision::Drop;

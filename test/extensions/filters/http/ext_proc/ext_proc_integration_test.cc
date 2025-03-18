@@ -44,6 +44,7 @@ using envoy::service::ext_proc::v3::HttpTrailers;
 using envoy::service::ext_proc::v3::ImmediateResponse;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::ProtocolConfiguration;
 using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
@@ -221,6 +222,14 @@ protected:
         MapPair<std::string, Any>("envoy.filters.http.ext_proc", cfg_any));
   }
 
+  void protocolConfigEncoding(ProcessingRequest& request) {
+    protocol_config_encoded_ = false;
+    if (request.has_protocol_config()) {
+      protocol_config_encoded_ = true;
+      protocol_config_ = request.protocol_config();
+    }
+  }
+
   IntegrationStreamDecoderPtr sendDownstreamRequest(
       absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
@@ -355,6 +364,7 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_headers());
+    protocolConfigEncoding(request);
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -397,6 +407,8 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_response_headers());
+    protocolConfigEncoding(request);
+
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -419,6 +431,8 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_body());
+    protocolConfigEncoding(request);
+
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -449,6 +463,8 @@ protected:
     }
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_response_body());
+    protocolConfigEncoding(request);
+
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -828,6 +844,8 @@ protected:
   }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  bool protocol_config_encoded_ = false;
+  ProtocolConfiguration protocol_config_{};
   uint32_t max_message_timeout_ms_{0};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
@@ -1088,12 +1106,12 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
   verifyDownstreamResponse(*response, 500);
 }
 
-TEST_P(ExtProcIntegrationTest, OnlyRequestHeaders) {
+TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
   // Skip the header processing on response path.
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequestWithBody("body", absl::nullopt);
 
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
@@ -1111,19 +1129,55 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeaders) {
   // ext_proc will immediately close side stream in this case, because by default Envoy gRPC client
   // will reset the stream if the server half-closes before the client. Note that the ext_proc
   // filter has not yet half-closed the sidestream, since it is doing it during its destruction.
-  // TODO(yanavlasov): Enable independent half-close for Envoy gRPC client and remove this check.
-  // TODO(yanavlasov): Reset in Google gRPC case is unexpected. Diagnose and fix.
+  // This is expected behavior for gRPC protocol.
   EXPECT_TRUE(processor_stream_->waitForReset());
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(upstream_request_->bodyLength(), 4);
 
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(100, true);
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ServerHalfClosesAfterHeaders) {
+  // Configure ext_proc to send both headers and body
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [](const HttpHeaders& headers, HeadersResponse&) {
+                                 EXPECT_FALSE(headers.end_of_stream());
+                                 return true;
+                               });
+
+  // However right after processing headers, half-close the stream indicating that server
+  // is not interested in the request body.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+  processor_stream_->encodeResetStream();
+
+  // Even if the gRPC server half-closed, processing of the main request still continues.
+  // Verify that data made it to upstream.
+  codec_client_->sendData(*request_encoder_, 10, true);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->bodyLength(), 10);
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -5083,6 +5137,29 @@ TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedNotSendTrailerTes
   handleUpstreamRequest(100);
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ProtocolConfigurationEncodingTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("hello world");
+  processRequestBodyMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  EXPECT_TRUE(protocol_config_encoded_);
+  EXPECT_EQ(protocol_config_.request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(protocol_config_.response_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_TRUE(protocol_config_.send_body_without_waiting_for_header_response());
+
+  handleUpstreamRequest(100);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  EXPECT_FALSE(protocol_config_encoded_);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  EXPECT_FALSE(protocol_config_encoded_);
   verifyDownstreamResponse(*response, 200);
 }
 

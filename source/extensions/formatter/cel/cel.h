@@ -34,16 +34,10 @@ private:
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
-  CELFormatterCommandParser(Server::Configuration::CommonFactoryContext& context)
-      : local_info_(context.localInfo()),
-        expr_builder_(Extensions::Filters::Common::Expr::getBuilder(context)){};
+  CELFormatterCommandParser() = default;
   ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                  absl::string_view subcommand,
                                                  absl::optional<size_t> max_length) const override;
-
-private:
-  const ::Envoy::LocalInfo::LocalInfo& local_info_;
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr expr_builder_;
 };
 
 } // namespace Formatter
