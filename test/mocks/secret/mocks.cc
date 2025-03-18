@@ -31,5 +31,8 @@ MockSecretCallbacks::MockSecretCallbacks() = default;
 
 MockSecretCallbacks::~MockSecretCallbacks() = default;
 
+MockGenericSecretConfigProvider::MockGenericSecretConfigProvider() = default;
+MockGenericSecretConfigProvider::~MockGenericSecretConfigProvider() = default;
+
 } // namespace Secret
 } // namespace Envoy

@@ -26,13 +26,35 @@ public:
 class AwsManagedClusterUpdateCallbacksHandle
     : public RaiiListElement<AwsManagedClusterUpdateCallbacks*> {
 public:
-  AwsManagedClusterUpdateCallbacksHandle(AwsManagedClusterUpdateCallbacks& cb,
+  AwsManagedClusterUpdateCallbacksHandle(Server::Configuration::ServerFactoryContext& context,
+                                         AwsManagedClusterUpdateCallbacks& cb,
                                          std::list<AwsManagedClusterUpdateCallbacks*>& parent)
-      : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb) {}
-};
+      : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb), context_(context) {}
 
+public:
+  Server::Configuration::ServerFactoryContext& context_;
+};
 using AwsManagedClusterUpdateCallbacksHandlePtr =
     std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
+
+class AwsClusterManager {
+
+public:
+  virtual ~AwsClusterManager() = default;
+
+  virtual absl::Status
+  addManagedCluster(absl::string_view cluster_name,
+                    const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
+                    absl::string_view uri) PURE;
+
+  virtual absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
+  addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
+                                   AwsManagedClusterUpdateCallbacks& cb) PURE;
+  virtual absl::StatusOr<std::string> getUriFromClusterName(absl::string_view cluster_name) PURE;
+
+private:
+  virtual void createQueuedClusters() PURE;
+};
 
 /**
  * Manages clusters for any number of credentials provider instances
@@ -60,13 +82,22 @@ using AwsManagedClusterUpdateCallbacksHandlePtr =
  * be many instantiations of the credential provider for different roles, regions and profiles. The
  * aws cluster manager will dedupe these clusters as required.
  */
-class AwsClusterManager : public Envoy::Singleton::Instance,
-                          public Upstream::ClusterUpdateCallbacks {
+class AwsClusterManagerImpl : public AwsClusterManager,
+                              public Envoy::Singleton::Instance,
+                              public Upstream::ClusterUpdateCallbacks {
   // Friend class for testing callbacks
   friend class AwsClusterManagerFriend;
 
 public:
-  AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
+  AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context);
+  ~AwsClusterManagerImpl() override {
+    if (cm_handle_) {
+      // We exit last due to being pinned, so we must call cancel on the callbacks handle as it will
+      // already be invalid by this time
+      auto* handle = dynamic_cast<RaiiListElement<ClusterUpdateCallbacks*>*>(cm_handle_.get());
+      handle->cancel();
+    }
+  };
 
   /**
    * Add a managed cluster to the aws cluster manager
@@ -76,7 +107,7 @@ public:
   absl::Status
   addManagedCluster(absl::string_view cluster_name,
                     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
-                    absl::string_view uri);
+                    absl::string_view uri) override;
 
   /**
    * Add a callback to be signaled when a managed cluster comes online. This is used to kick off
@@ -86,8 +117,8 @@ public:
 
   absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
   addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
-                                   AwsManagedClusterUpdateCallbacks& cb);
-  absl::StatusOr<std::string> getUriFromClusterName(absl::string_view cluster_name);
+                                   AwsManagedClusterUpdateCallbacks& cb) override;
+  absl::StatusOr<std::string> getUriFromClusterName(absl::string_view cluster_name) override;
 
 private:
   // Callbacks for cluster manager
@@ -99,7 +130,7 @@ private:
    * manager initialization
    */
 
-  void createQueuedClusters();
+  void createQueuedClusters() override;
   struct CredentialsProviderCluster {
     CredentialsProviderCluster(envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
                                std::string uri)
@@ -116,10 +147,10 @@ private:
   std::atomic<bool> queue_clusters_ = true;
   Server::Configuration::ServerFactoryContext& context_;
   Upstream::ClusterUpdateCallbacksHandlePtr cm_handle_;
-  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
   std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
+using AwsClusterManagerImplPtr = std::shared_ptr<AwsClusterManagerImpl>;
 using AwsClusterManagerPtr = std::shared_ptr<AwsClusterManager>;
 using AwsClusterManagerOptRef = OptRef<AwsClusterManagerPtr>;
 

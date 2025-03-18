@@ -277,6 +277,8 @@ envoy_cc_test(
     rbe_pool = "2core",
     deps = [
         "//source/common/config:xds_manager_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:status_utility_lib",

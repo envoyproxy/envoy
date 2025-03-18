@@ -29,6 +29,9 @@ else
 fi
 
 setup_clang_toolchain() {
+    if [[ -n "${CLANG_TOOLCHAIN_SETUP}" ]]; then
+        return
+    fi
     CONFIG_PARTS=()
     if [[ -n "${ENVOY_RBE}" ]]; then
         CONFIG_PARTS+=("remote")
@@ -209,9 +212,7 @@ function bazel_envoy_api_build() {
 }
 
 function bazel_envoy_api_go_build() {
-    if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
-        setup_clang_toolchain
-    fi
+    setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
     GO_TARGETS=(@envoy_api//...)
     read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"

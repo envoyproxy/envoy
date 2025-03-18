@@ -6,6 +6,7 @@ import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/v3/hash_policy.proto";
 
 import "google/protobuf/duration.proto";
@@ -26,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -259,4 +260,20 @@ message TcpProxy {
 
   // Additional access log options for TCP Proxy.
   TcpAccessLogOptions access_log_options = 17;
+
+  // If set, the specified PROXY protocol TLVs (Type-Length-Value) will be added to the PROXY protocol
+  // state created by the TCP proxy filter. These TLVs will be sent in the PROXY protocol v2 header
+  // to upstream.
+  //
+  // This field only takes effect when the TCP proxy filter is creating new PROXY protocol
+  // state and there is an upstream proxy protocol transport socket configured in the cluster.
+  // If the connection already contains PROXY protocol state (including any TLVs) parsed by a
+  // downstream proxy protocol listener filter, the TLVs specified here are ignored.
+  //
+  // .. note::
+  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header, you must also
+  //   configure the passthrough TLVs on the upstream proxy protocol transport. See
+  //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
+  //   for details.
+  repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
 }

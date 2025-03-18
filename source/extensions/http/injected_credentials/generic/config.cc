@@ -28,18 +28,16 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 Common::CredentialInjectorSharedPtr
 GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const Generic& config, const std::string& /*stats_prefix*/,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   const auto& credential_secret = config.credential();
-  auto& server_context = context.serverFactoryContext();
-  auto& cluster_manager = server_context.clusterManager();
+  auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
   auto secret_provider = secretsProvider(credential_secret, secret_manager,
                                          transport_socket_factory, context.initManager());
 
   auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
-      std::move(secret_provider), context.serverFactoryContext().threadLocal(),
-      server_context.api());
+      std::move(secret_provider), context.threadLocal(), context.api());
   std::string header = config.header();
   if (header.empty()) {
     header = "Authorization";

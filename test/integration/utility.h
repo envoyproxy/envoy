@@ -266,13 +266,14 @@ public:
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
 
+    length_to_wait_for_ = 0;
+    wait_for_length_ = false;
+
     if (timeout_timer->enabled()) {
       timeout_timer->disableTimer();
       return testing::AssertionSuccess();
     }
 
-    length_to_wait_for_ = 0;
-    wait_for_length_ = false;
     return testing::AssertionFailure() << "Timed out waiting for " << length << " bytes of data\n";
   }
 
