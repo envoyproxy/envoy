@@ -51,7 +51,7 @@ enum class FilterStatus {
   // its necessary work.
   //
   // This is typically used when a filter needs to delay closure due to:
-  //   - Data external processing to avoid data loss.
+  //   - External data processing.
   //
   // Failure to call continueClosing() after returning StopIterationDontClose
   // will result in a stalled connection and possible resource leaks.
