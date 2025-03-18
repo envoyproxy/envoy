@@ -332,6 +332,10 @@ message ExternalProcessor {
 
   // Decorator to introduce custom logic that runs after a message received from
   // the External Processor is processed.
+  //
+  // .. note::
+  //   Response processors are currently in alpha.
+  //
   // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23
       [(xds.annotations.v3.field_status).work_in_progress = true];
