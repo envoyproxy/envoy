@@ -7,13 +7,14 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/health_check.proto";
 
+import "xds/core/v3/collection_entry.proto";
+
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
-
-import "xds/core/v3/collection_entry.proto";
 
 option java_package = "io.envoyproxy.envoy.config.endpoint.v3";
 option java_outer_classname = "EndpointComponentsProto";
