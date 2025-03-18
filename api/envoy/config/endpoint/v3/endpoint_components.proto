@@ -178,7 +178,8 @@ message LocalityLbEndpoints {
   core.v3.Metadata metadata = 9;
 
   // The group of endpoints belonging to the locality specified.
-  // This is ignored if `leds_cluster_locality_config` is set.
+  // This is ignored if :ref:`leds_cluster_locality_config
+  // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.leds_cluster_locality_config>` is set.
   repeated LbEndpoint lb_endpoints = 2;
 
   oneof lb_config {
@@ -188,7 +189,9 @@ message LocalityLbEndpoints {
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // LEDS Configuration for the current locality.
-    // If this is set, the `lb_endpoints` field is ignored.
+    // If this is set, the :ref:`lb_endpoints
+    // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.lb_endpoints>`
+    // field is ignored.
     LedsClusterLocalityConfig leds_cluster_locality_config = 8;
   }
 
