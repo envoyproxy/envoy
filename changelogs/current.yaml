@@ -92,7 +92,7 @@ bug_fixes:
     (with timeout) for the server to half-close its stream.
     This behavioral change is disabled by default and can be enabled by setting runtime guard
     ``envoy.reloadable_features.ext_proc_graceful_grpc_close`` to true.
-    The remote close timeout is 1 second by default and can be chnaged by setting the
+    The remote close timeout is 1 second by default and can be changed by setting the
     ``envoy.filters.http.ext_proc.remote_close_timeout_milliseconds`` runtime value.
 - area: listener
   change: |
