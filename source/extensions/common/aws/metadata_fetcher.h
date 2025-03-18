@@ -1,17 +1,17 @@
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
