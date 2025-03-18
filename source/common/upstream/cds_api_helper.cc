@@ -28,7 +28,7 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
     maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
 
-  ENVOY_LOG(debug, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),
+  ENVOY_LOG(info, "{}: response indicates {} added/updated cluster(s), {} removed cluster(s); applying changes", name_, added_resources.size(),
             removed_resources.size());
 
   std::vector<std::string> exception_msgs;
@@ -81,7 +81,7 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
 
   ENVOY_LOG(
       info,
-      "{}: added/updated {} cluster(s), removed {} cluster(s), skipped {} unmodified cluster(s)",
+      "{}: added/updated {} cluster(s) (skipped {} unmodified cluster(s)); removed {} cluster(s)",
       name_, added_or_updated, removed, skipped);
 
   if (any_applied) {
