@@ -7,9 +7,9 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/health_check.proto";
 
-import "xds/core/v3/collection_entry.proto";
-
 import "google/protobuf/wrappers.proto";
+
+import "xds/core/v3/collection_entry.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
