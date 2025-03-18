@@ -126,7 +126,6 @@ void FilterManagerImpl::maybeClose() {
   if ((state_.pending_remote_close_ || state_.pending_local_close_) &&
       (state_.pending_close_read_filter_ == 0 && state_.pending_close_write_filter_ == 0)) {
     if (latched_close_action_.has_value()) {
-      ENVOY_LOG(info, "boteng latched_close_action_");
       finalizeClose(latched_close_action_.value());
     }
     return;
@@ -207,8 +206,6 @@ void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
   auto status = onWrite(filter, buffer_source);
   if (status == FilterStatus::Continue) {
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
-    ENVOY_LOG(info, "boteng onResumeWriting iteration");
-    ENVOY_LOG(info, "boteng {}", write_buffer.buffer.toString());
     connection_.rawWrite(write_buffer.buffer, write_buffer.end_stream);
   }
 }
