@@ -331,7 +331,7 @@ message ExternalProcessor {
   repeated ProcessingMode allowed_override_modes = 22;
 
   // Decorator to introduce custom logic that runs after a message received from
-  // the External Processor is processed.
+  // the External Processor is processed, but before continuing filter chain iteration.
   //
   // .. note::
   //   Response processors are currently in alpha.
