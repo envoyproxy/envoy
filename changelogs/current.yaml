@@ -35,6 +35,10 @@ minor_behavior_changes:
     AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
     credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
     then the original behaviour with a signing failure will occur.
+- area: formatter
+  change: |
+    The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
+    substitution format string if the related extensions are linked.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -74,6 +78,9 @@ bug_fixes:
     Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the
     kernel prematurely reserving ephemeral ports. This behavior change can be reverted by setting runtime guard
     ``envoy.reloadable_features.original_src_fix_port_exhaustion`` to ``false``.
+- area: redis
+  change: |
+    Fixed a crash bug when the DNS resolution status is completed, but the response is empty.
 - area: listener
   change: |
     Fixed a bug where socket options specified only on an additional address were not applied unless

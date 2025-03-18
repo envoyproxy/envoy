@@ -1,23 +1,5 @@
 #include "source/extensions/common/aws/signer_base_impl.h"
 
-#include <openssl/ssl.h>
-
-#include <cstddef>
-#include <cstdint>
-#include <regex>
-
-#include "envoy/common/exception.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
-#include "source/common/crypto/utility.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/str_join.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -70,7 +52,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   if (!credentials.hasCredentials()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
-    ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
+    ENVOY_LOG(debug, "Sign exiting early - no credentials found");
     return absl::OkStatus();
   }
 
