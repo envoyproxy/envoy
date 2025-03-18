@@ -87,6 +87,28 @@ enum class DetectedCloseType {
 };
 
 /**
+ * Combines connection event and close type for connection close operations
+ */
+struct ConnectionCloseAction {
+  ConnectionEvent event_;
+  ConnectionCloseType type_;
+
+  bool operator==(const ConnectionCloseAction& other) const {
+    return event_ == other.event_ && type_ == other.type_;
+  }
+
+  bool operator!=(const ConnectionCloseAction& other) const { return !(*this == other); }
+
+  // Constructor for local close
+  ConnectionCloseAction(ConnectionEvent event_type = ConnectionEvent::Connected,
+                        ConnectionCloseType close_type = ConnectionCloseType::NoFlush)
+      : event_(event_type), type_(close_type) {}
+
+  bool isLocalClose() const { return event_ == ConnectionEvent::LocalClose; }
+  bool isRemoteClose() const { return event_ == ConnectionEvent::RemoteClose; }
+};
+
+/**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
 class Connection : public Event::DeferredDeletable,
@@ -150,6 +172,8 @@ public:
    * @return true if half-close semantics are enabled, false otherwise.
    */
   virtual bool isHalfCloseEnabled() const PURE;
+
+  virtual void enableCloseThroughFilterManager(bool enabled) PURE;
 
   /**
    * Close the connection.

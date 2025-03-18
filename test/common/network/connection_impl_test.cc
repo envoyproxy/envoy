@@ -2538,6 +2538,252 @@ private:
   ReadFilterCallbacks* callbacks_{nullptr};
 };
 
+class ConnectionImplCloseTest : public ConnectionImplTest {
+public:
+  void setUpBasicFilterChain() {
+    setUpBasicConnectionWithAddress(Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    client_read_filter_ = std::make_shared<NiceMock<MockReadFilter>>();
+    client_connection_->addReadFilter(client_read_filter_);
+    connect();
+  }
+
+  std::shared_ptr<MockReadFilter> client_read_filter_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplCloseTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test that by default close doesn't go through the filter manager
+TEST_P(ConnectionImplCloseTest, DefaultCloseSkipsFilterManager) {
+  setUpBasicFilterChain();
+
+  // By default, enable_close_through_filter_manager_ is false
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::NoFlush);
+
+  // We should see the local close propagate to the client side
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test that when enabled, close goes through the filter manager (except for Abort, NoFlush, and
+// AbortReset)
+TEST_P(ConnectionImplCloseTest, EnabledCloseGoesViaFilterManager) {
+  setUpBasicFilterChain();
+  bool filter_invoked = false;
+
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  // We expect onData to be called when we send data, and we'll return StopIterationDontClose
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        filter_invoked = true;
+        dispatcher_->exit();
+        return FilterStatus::StopIterationDontClose;
+      }));
+  
+  ENVOY_LOG_MISC(info, "boteng send data");
+  // Write some data from client to server to make sure read filter is active
+  Buffer::OwnedImpl data("test data");
+  client_connection_->write(data, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Verify the filter was invoked
+  EXPECT_TRUE(filter_invoked);
+
+  // Attempt to close the connection - if using filter manager,
+  // this will be held by the StopIterationDontClose return
+  server_connection_->close(ConnectionCloseType::FlushWrite);
+
+  // Connection should still be open because filter returned StopIterationDontClose
+  // This is our proof that filter manager was used
+  EXPECT_EQ(server_connection_->state(), Connection::State::Open);
+
+  // Now allow the close to complete by continuing
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  read_filter_->callbacks_->continueReading();
+  read_filter_->callbacks_->continueClosing();
+
+  // Client should see the close
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test Abort type bypasses filter manager
+TEST_P(ConnectionImplCloseTest, AbortBypassesFilterManager) {
+  setUpBasicFilterChain();
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  // Verify that Abort type bypasses filter manager and closes immediately
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::Abort);
+
+  // Client should see the close
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test NoFlush type bypasses filter manager
+TEST_P(ConnectionImplCloseTest, NoFlushBypassesFilterManager) {
+  setUpBasicFilterChain();
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  // Verify that NoFlush type bypasses filter manager
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::NoFlush);
+
+  // Client should see the close
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test Abort with pending data - data should be discarded
+TEST_P(ConnectionImplCloseTest, AbortWithPendingData) {
+  setUpBasicFilterChain();
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  // Write data that should be discarded with Abort
+  Buffer::OwnedImpl data("data that should be discarded");
+  server_connection_->write(data, false);
+
+  // Abort should discard pending data and close immediately
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::Abort);
+
+  // Client should see close without receiving the data
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test AbortReset close type
+TEST_P(ConnectionImplCloseTest, AbortResetCloseBehavior) {
+  setUpBasicFilterChain();
+
+  // Even with filter manager enabled, AbortReset should always bypass it
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  // Verify AbortReset bypasses filter manager
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::AbortReset);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test special close with details
+TEST_P(ConnectionImplCloseTest, CloseWithDetails) {
+  setUpBasicFilterChain();
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  // Close with details - for NoFlush, should bypass filter manager
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::NoFlush, "test close details");
+
+  // Client should see the close
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test that clos with FlushWriteAndDelay is gated by the filter manager.
+TEST_P(ConnectionImplCloseTest, FlushWriteAndDelayThroughFilterManager) {
+  setUpBasicFilterChain();
+  bool filter_invoked = false;
+
+  server_connection_->enableCloseThroughFilterManager(true);
+  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(1000));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+
+  // We expect onData to be called when we send data, and we'll return StopIterationDontClose
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        filter_invoked = true;
+        dispatcher_->exit();
+        return FilterStatus::StopIterationDontClose;
+      }));
+
+  // Write some data from client to server to make sure read filter is active
+  Buffer::OwnedImpl data("test data");
+  client_connection_->write(data, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_TRUE(filter_invoked);
+
+  server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+
+  // Verify connection is in Open state since it is closing through filter manager.
+  EXPECT_EQ(server_connection_->state(), Connection::State::Open);
+
+  // Now allow the filter to continue, which should allow the delayed close to progress
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  read_filter_->callbacks_->continueClosing();
+  time_system_.setMonotonicTime(std::chrono::milliseconds(1100));
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+
+  // Run the event loop until the close completes
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Test that we don't read from socket when connection is closing through filter manager
+TEST_P(ConnectionImplCloseTest, SkipReadWhenClosingThroughFilterManager) {
+  setUpBasicFilterChain();
+  bool filter_invoked = false;
+
+  server_connection_->enableCloseThroughFilterManager(true);
+
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        filter_invoked = true;
+        dispatcher_->exit();
+        return FilterStatus::StopIterationDontClose;
+      }));
+
+  // Write some data from client to server to make sure read filter is active
+  Buffer::OwnedImpl data("test data");
+  client_connection_->write(data, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_TRUE(filter_invoked);
+
+  // Initiate connection close - which should be held by the StopIterationDontClose
+  server_connection_->close(ConnectionCloseType::FlushWrite);
+
+  // Verify connection is in Open state since it is closing through filter manager
+  EXPECT_EQ(server_connection_->state(), Connection::State::Open);
+
+  // The connection is now in the process of closing through filter manager
+  // Send more data from client - this should NOT trigger onData again because
+  // filter_manager_.closingThroughFilterManager() is true
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .Times(0); // This is the key expectation - onData should NOT be called
+
+  Buffer::OwnedImpl more_data("more data that should be ignored");
+  client_connection_->write(more_data, false);
+
+  // Run event loop to process the data - but the filter's onData should not be called
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Now allow the filter to continue, which should allow the close to progress
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  read_filter_->callbacks_->continueClosing();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+
+  // Run the event loop until the close completes
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest()
@@ -3284,6 +3530,31 @@ protected:
 TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
   InSequence s;
   initialize();
+
+  // Delayed connection close.
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(*file_event_, setEnabled(Event::FileReadyType::Closed));
+  connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+
+  // Read event, doRead() happens on connection but no filter onData().
+  EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer) -> IoResult {
+        buffer.add(val_.c_str(), val_.size());
+        return {PostIoAction::KeepOpen, val_.size(), false};
+      }));
+  EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Read).ok());
+  // Deferred close.
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+}
+
+// Test that if a read event occurs after
+// close(ConnectionCloseType::FlushWriteAndDelay), the read is not propagated to
+// a read filter even it is closing through filter manager.
+TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithFilterManager) {
+  InSequence s;
+  initialize();
+  connection_->enableCloseThroughFilterManager(true);
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));

@@ -102,6 +102,12 @@ void MultiConnectionBaseImpl::enableHalfClose(bool enabled) {
   }
 }
 
+void MultiConnectionBaseImpl::enableCloseThroughFilterManager(bool enabled) {
+  for (auto& connection : connections_) {
+    connection->enableCloseThroughFilterManager(enabled);
+  }
+}
+
 bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
   return connections_[0]->isHalfCloseEnabled();
 }

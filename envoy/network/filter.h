@@ -41,7 +41,9 @@ enum class FilterStatus {
   // Continue to further filters.
   Continue,
   // Stop executing further filters.
-  StopIteration
+  StopIteration,
+  // Stop executing further filters. continueClosing() must be called in the filter.
+  StopIterationDontClose,
 };
 
 /**
@@ -87,6 +89,11 @@ public:
    *                   in the filter chain.
    */
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   *
+   */
+  virtual void continueClosing() PURE;
 };
 
 /**
@@ -178,6 +185,11 @@ public:
    * mode to secure mode.
    */
   virtual bool startUpstreamSecureTransport() PURE;
+
+  /**
+   *
+   */
+  virtual void continueClosing() PURE;
 };
 
 /**

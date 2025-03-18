@@ -92,6 +92,9 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
+      } else if (status == FilterStatus::StopIterationDontClose) {
+        (*entry)->handleStopIterationDontClose();
+        return;
       }
     }
   }
@@ -110,6 +113,59 @@ bool FilterManagerImpl::startUpstreamSecureTransport() {
     }
   }
   return false;
+}
+
+void FilterManagerImpl::maybeClose() {
+  ENVOY_CONN_LOG(trace,
+                 "onConnectionClose: pending_remote_close_={}, pending_local_close_={}, "
+                 "pending_close_write_filter_={}, pending_close_read_filter_={}",
+                 connection_, state_.pending_remote_close_, state_.pending_local_close_,
+                 state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+
+  // Check if we need to close the connection
+  if ((state_.pending_remote_close_ || state_.pending_local_close_) &&
+      (state_.pending_close_read_filter_ == 0 && state_.pending_close_write_filter_ == 0)) {
+    if (latched_close_action_.has_value()) {
+      ENVOY_LOG(info, "boteng latched_close_action_");
+      finalizeClose(latched_close_action_.value());
+    }
+    return;
+  }
+}
+
+void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
+  // Ignore if connection is not in Open state
+  if (connection_.state() != Connection::State::Open) {
+    return;
+  }
+
+  ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
+
+  ENVOY_CONN_LOG(trace,
+                 "onConnectionClose: pending_remote_close_={}, pending_local_close_={}, "
+                 "pending_close_write_filter_={}, pending_close_read_filter_={}",
+                 connection_, state_.pending_remote_close_, state_.pending_local_close_,
+                 state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+
+  latched_close_action_ = close_action;
+  if (close_action.isLocalClose()) {
+    state_.pending_local_close_ = true;
+  } else if (close_action.isRemoteClose()) {
+    state_.pending_remote_close_ = true;
+  }
+
+  // Only finalize if we have no pending filters
+  // TODO(botengyao) this can be more intelligent to distinguish remote close and local close.
+  if (state_.pending_close_read_filter_ == 0 && state_.pending_close_write_filter_ == 0) {
+    finalizeClose(close_action);
+    return;
+  }
+
+  // Otherwise, wait for filters to complete
+  // The close will be finalized when both filter counts reach 0
+  ENVOY_CONN_LOG(trace, "delaying close: pending read filters: {}, pending write filters: {}",
+                 connection_, state_.pending_close_read_filter_,
+                 state_.pending_close_write_filter_);
 }
 
 FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_); }
@@ -134,6 +190,10 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
     FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
       return FilterStatus::StopIteration;
+    } else if (status == FilterStatus::StopIterationDontClose) {
+      (*entry)->handleStopIterationDontClose();
+      // The connection write path can still check StopIteration.
+      return FilterStatus::StopIteration;
     }
   }
 
@@ -147,6 +207,8 @@ void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
   auto status = onWrite(filter, buffer_source);
   if (status == FilterStatus::Continue) {
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
+    ENVOY_LOG(info, "boteng onResumeWriting iteration");
+    ENVOY_LOG(info, "boteng {}", write_buffer.buffer.toString());
     connection_.rawWrite(write_buffer.buffer, write_buffer.end_stream);
   }
 }

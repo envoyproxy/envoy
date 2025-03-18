@@ -94,12 +94,14 @@ public:
    * @param end_stream supplies whether this is the last byte to write on the connection.
    */
   virtual void rawWrite(Buffer::Instance& data, bool end_stream) PURE;
+
+  virtual void closeConnection(ConnectionCloseAction action) PURE;
 };
 
 /**
  * This is a filter manager for TCP (L4) filters. It is split out for ease of testing.
  */
-class FilterManagerImpl {
+class FilterManagerImpl : protected Logger::Loggable<Logger::Id::connection> {
 public:
   FilterManagerImpl(FilterManagerConnection& connection, const Socket& socket)
       : connection_(connection), socket_(socket) {}
@@ -112,6 +114,26 @@ public:
   void onRead();
   FilterStatus onWrite();
   bool startUpstreamSecureTransport();
+  void maybeClose();
+  void onConnectionClose(ConnectionCloseAction close_action);
+
+  void finalizeClose(ConnectionCloseAction close_action) {
+    state_.pending_local_close_ = false;
+    state_.pending_remote_close_ = false;
+    connection_.closeConnection(close_action);
+  }
+
+  bool closingThroughFilterManager() {
+    return state_.pending_local_close_ || state_.pending_remote_close_;
+  }
+
+protected:
+  struct State {
+    uint32_t pending_close_write_filter_{0};
+    uint32_t pending_close_read_filter_{0};
+    bool pending_remote_close_{false};
+    bool pending_local_close_{false};
+  };
 
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
@@ -125,6 +147,25 @@ private:
       FixedReadBufferSource buffer_source{data, end_stream};
       parent_.onContinueReading(this, buffer_source);
     }
+
+    void continueClosing() override {
+      if (pending_close_) {
+        pending_close_ = false;
+        parent_.state_.pending_close_read_filter_ -= 1;
+      }
+
+      if (parent_.state_.pending_close_read_filter_ == 0) {
+        parent_.maybeClose();
+      }
+    }
+
+    void handleStopIterationDontClose() {
+      if (!pending_close_) {
+        pending_close_ = true;
+        parent_.state_.pending_close_read_filter_ += 1;
+      }
+    }
+
     Upstream::HostDescriptionConstSharedPtr upstreamHost() override {
       return parent_.host_description_;
     }
@@ -136,6 +177,7 @@ private:
     FilterManagerImpl& parent_;
     ReadFilterSharedPtr filter_;
     bool initialized_{};
+    bool pending_close_{false};
   };
 
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
@@ -151,8 +193,27 @@ private:
       parent_.onResumeWriting(this, buffer_source);
     }
 
+    void continueClosing() override {
+      if (pending_close_) {
+        pending_close_ = false;
+        parent_.state_.pending_close_write_filter_ -= 1;
+      }
+
+      if (parent_.state_.pending_close_write_filter_ == 0) {
+        parent_.maybeClose();
+      }
+    }
+
+    void handleStopIterationDontClose() {
+      if (!pending_close_) {
+        pending_close_ = true;
+        parent_.state_.pending_close_write_filter_ += 1;
+      }
+    }
+
     FilterManagerImpl& parent_;
     WriteFilterSharedPtr filter_;
+    bool pending_close_{false};
   };
 
   using ActiveWriteFilterPtr = std::unique_ptr<ActiveWriteFilter>;
@@ -167,6 +228,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<ActiveWriteFilterPtr> downstream_filters_;
+  State state_;
+  absl::optional<ConnectionCloseAction> latched_close_action_;
 };
 
 } // namespace Network
