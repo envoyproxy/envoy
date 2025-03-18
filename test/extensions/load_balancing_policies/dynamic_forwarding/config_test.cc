@@ -64,6 +64,34 @@ TEST(DynamicForwardingLbonfigTest, NoFallbackPolicies) {
                                                "fallback load balancer factory with names from "));
 }
 
+TEST(DynamicForwardingLbonfigTest, FirstValidFallbackPolicyIsUsed) {
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
+
+  ::envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name("envoy.load_balancers.dynamic_forwarding");
+  DynamicForwarding config_msg;
+
+  ProtobufWkt::Struct invalid_policy;
+  auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
+                                     ->add_policies()
+                                     ->mutable_typed_extension_config();
+  typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
+  typed_extension_config->set_name("non_existent_policy");
+  Config fallback_picker_config;
+  typed_extension_config = config_msg.mutable_fallback_picking_policy()
+                               ->add_policies()
+                               ->mutable_typed_extension_config();
+  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  typed_extension_config->set_name("envoy.load_balancers.dynamic_forwarding.test");
+
+  config.mutable_typed_config()->PackFrom(config_msg);
+
+  auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
+
+  auto result = factory.loadConfig(context, config_msg);
+  EXPECT_TRUE(result.ok());
+}
+
 TEST(DynamicForwardingLbonfigTest, FallbackLbCalledToChooseHost) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
   auto cluster_info = std::make_shared<NiceMock<Envoy::Upstream::MockClusterInfo>>();
@@ -74,11 +102,11 @@ TEST(DynamicForwardingLbonfigTest, FallbackLbCalledToChooseHost) {
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.dynamic_forwarding");
   DynamicForwarding config_msg;
-  Config locality_picker_config;
+  Config fallback_picker_config;
   auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
                                      ->add_policies()
                                      ->mutable_typed_extension_config();
-  typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.dynamic_forwarding.test");
   config.mutable_typed_config()->PackFrom(config_msg);
 

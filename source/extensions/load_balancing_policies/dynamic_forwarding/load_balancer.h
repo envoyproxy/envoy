@@ -67,10 +67,6 @@ public:
     return primary_endpoint_header_name_;
   }
 
-  const absl::optional<Http::LowerCaseString>& fallbackEndpointListHeaderName() const {
-    return fallback_endpoint_list_header_name_;
-  }
-
 private:
   DynamicForwardingLbConfig(const DynamicForwarding& config,
                             TypedLoadBalancerFactory* fallback_load_balancer_factory,

@@ -148,6 +148,33 @@ TEST_F(DynamicForwardingLoadBalancerTest, NoMetadatOrHeaders) {
   // Fallback LB is used.
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
+
+  EXPECT_FALSE(load_balancer_->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> out_value;
+  EXPECT_FALSE(load_balancer_->selectExistingConnection(&load_balancer_context_, *host, out_value)
+                   .has_value());
+  EXPECT_EQ(load_balancer_->peekAnotherHost(&load_balancer_context_), nullptr);
+}
+
+TEST_F(DynamicForwardingLoadBalancerTest, NullptrHeaders) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
+      0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfig());
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  // Ensure that `downstreamHeaders()` returning nullptr is handled correctly.
+  EXPECT_CALL(load_balancer_context_, downstreamHeaders()).WillRepeatedly(Return(nullptr));
+
+  // Fallback LB is used.
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
 }
 
 TEST_F(DynamicForwardingLoadBalancerTest, NullptrCrossPriorityHostMap) {
