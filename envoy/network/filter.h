@@ -91,7 +91,16 @@ public:
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
+   * Resumes the connection closure process if it was previously delayed by a filter.
    *
+   * This method must be called if a filter has returned `FilterStatus::StopIterationDontClose`
+   * to prevent an indefinite open connection. It ensures that once the filter has completed
+   * its necessary processing, the connection can proceed with closing. 
+   *
+   * This method is typically called from a filter when it has finished its work and no longer 
+   * needs to delay connection termination.
+   * 
+   * This method can be called multiple times.
    */
   virtual void continueClosing() PURE;
 };
@@ -187,7 +196,16 @@ public:
   virtual bool startUpstreamSecureTransport() PURE;
 
   /**
+   * Resumes the connection closure process if it was previously delayed by a filter.
    *
+   * This method must be called if a filter has returned `FilterStatus::StopIterationDontClose`
+   * to prevent an indefinite open connection. It ensures that once the filter has completed
+   * its necessary processing, the connection can proceed with closing. 
+   *
+   * This method is typically called from a filter when it has finished its work and no longer 
+   * needs to delay connection termination.
+   * 
+   * This method can be called multiple times.
    */
   virtual void continueClosing() PURE;
 };
