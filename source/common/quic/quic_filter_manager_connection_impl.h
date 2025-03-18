@@ -62,6 +62,10 @@ public:
     close(type);
   }
 
+  void closeConnection(ConnectionCloseAction action) override {
+    IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
+  }
+
   void enableCloseThroughFilterManager(bool) override {
     IS_ENVOY_BUG("unexpected call to enableCloseThroughFilterManager for QUIC");
   }
