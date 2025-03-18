@@ -675,8 +675,12 @@ message Http3ProtocolOptions {
   // information.
   bool allow_metadata = 6;
 
+  // [#not-implemented-hide:] Hiding until Envoy has full HTTP/3 upstream support.
+  // Still under implementation. DO NOT USE.
+  //
   // Disables QPACK compression related features for HTTP/3 including:
   // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
+  // This can be useful when an upstream HTTP/3 connection multiplexes multiple downstream connections.
   bool disable_qpack = 7;
 }
 
