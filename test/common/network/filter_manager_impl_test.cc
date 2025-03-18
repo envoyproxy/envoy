@@ -52,9 +52,10 @@ public:
   Buffer::OwnedImpl write_buffer_;
   bool read_end_stream_{};
   bool write_end_stream_{};
-  ConnectionCloseAction remote_close_action_ = ConnectionCloseAction{ConnectionEvent::RemoteClose};
+  ConnectionCloseAction remote_close_action_ =
+      ConnectionCloseAction{ConnectionEvent::RemoteClose, true};
   ConnectionCloseAction local_close_action_ =
-      ConnectionCloseAction{ConnectionEvent::LocalClose, ConnectionCloseType::FlushWrite};
+      ConnectionCloseAction{ConnectionEvent::LocalClose, false, ConnectionCloseType::FlushWrite};
 };
 
 class LocalMockFilter : public MockFilter {
@@ -466,7 +467,7 @@ TEST_F(NetworkFilterManagerTest, MultipleStopIterationDontCloseRead) {
 
   // Try to close the connection
   EXPECT_CALL(connection_, closeConnection(_)).Times(0);
-  manager.onConnectionClose(ConnectionEvent::RemoteClose);
+  manager.onConnectionClose(remote_close_action_);
 
   // Continue from first filter
   EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("hello world"), _))
@@ -512,7 +513,7 @@ TEST_F(NetworkFilterManagerTest, BothReadAndWriteFiltersHoldClose) {
 
   // Try to close the connection
   EXPECT_CALL(connection_, closeConnection(_)).Times(0);
-  manager.onConnectionClose(ConnectionEvent::RemoteClose);
+  manager.onConnectionClose(remote_close_action_);
 
   // After only read filter continues closing, we still shouldn't close
   EXPECT_CALL(connection_, closeConnection(_)).Times(0);
@@ -639,7 +640,7 @@ TEST_F(NetworkFilterManagerTest, MultipleFiltersWithDifferentStatusResponses) {
 
   // Try to close connection
   EXPECT_CALL(connection_, closeConnection(_));
-  manager.onConnectionClose(ConnectionEvent::RemoteClose);
+  manager.onConnectionClose(remote_close_action_);
 
   // Continue from stop_filter
   read_buffer_.add("more");
@@ -700,7 +701,7 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataWithStopIterationDontClose) {
 
   // Try to close the connection - should be held by filter
   EXPECT_CALL(connection_, closeConnection(_)).Times(0);
-  manager.onConnectionClose(ConnectionEvent::RemoteClose);
+  manager.onConnectionClose(remote_close_action_);
 
   // Continue reading should not affect the close status
   EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("original"), _))

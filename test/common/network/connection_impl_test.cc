@@ -2583,7 +2583,7 @@ TEST_P(ConnectionImplCloseTest, EnabledCloseGoesViaFilterManager) {
         dispatcher_->exit();
         return FilterStatus::StopIterationDontClose;
       }));
-  
+
   ENVOY_LOG_MISC(info, "boteng send data");
   // Write some data from client to server to make sure read filter is active
   Buffer::OwnedImpl data("test data");

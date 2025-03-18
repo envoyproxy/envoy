@@ -91,19 +91,22 @@ enum class DetectedCloseType {
  */
 struct ConnectionCloseAction {
   ConnectionEvent event_;
+  bool close_socket_;
   ConnectionCloseType type_;
 
+  // Constructor with proper initialization
+  ConnectionCloseAction(ConnectionEvent event_type = ConnectionEvent::Connected,
+                        bool close_socket = false,
+                        ConnectionCloseType close_type = ConnectionCloseType::NoFlush)
+      : event_(event_type), close_socket_(close_socket), type_(close_type) {}
+
   bool operator==(const ConnectionCloseAction& other) const {
-    return event_ == other.event_ && type_ == other.type_;
+    return event_ == other.event_ && type_ == other.type_ && close_socket_ == other.close_socket_;
   }
 
   bool operator!=(const ConnectionCloseAction& other) const { return !(*this == other); }
 
-  // Constructor for local close
-  ConnectionCloseAction(ConnectionEvent event_type = ConnectionEvent::Connected,
-                        ConnectionCloseType close_type = ConnectionCloseType::NoFlush)
-      : event_(event_type), type_(close_type) {}
-
+  bool closeSocket() const { return close_socket_; }
   bool isLocalClose() const { return event_ == ConnectionEvent::LocalClose; }
   bool isRemoteClose() const { return event_ == ConnectionEvent::RemoteClose; }
 };

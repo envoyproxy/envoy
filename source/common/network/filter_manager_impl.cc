@@ -147,11 +147,8 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
                  state_.pending_close_write_filter_, state_.pending_close_read_filter_);
 
   latched_close_action_ = close_action;
-  if (close_action.isLocalClose()) {
-    state_.pending_local_close_ = true;
-  } else if (close_action.isRemoteClose()) {
-    state_.pending_remote_close_ = true;
-  }
+  state_.pending_local_close_ = close_action.isLocalClose();
+  state_.pending_remote_close_ = close_action.isRemoteClose();
 
   // Only finalize if we have no pending filters
   // TODO(botengyao) this can be more intelligent to distinguish remote close and local close.

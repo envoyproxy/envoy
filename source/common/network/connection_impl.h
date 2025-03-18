@@ -123,10 +123,11 @@ public:
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
   void closeConnection(ConnectionCloseAction close_action) override {
     ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
-    if (close_action.isLocalClose()) {
-      closeInternal(close_action.type_);
-    } else {
+    if (close_action.closeSocket()) {
       closeSocket(close_action.event_);
+    } else {
+      ASSERT(close_action.isLocalClose());
+      closeInternal(close_action.type_);
     }
   }
 
@@ -175,7 +176,7 @@ protected:
   // Network::ConnectionImplBase
   void closeConnectionImmediately() final;
   void remoteCloseThroughFilterManager() {
-    closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::RemoteClose});
+    closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::RemoteClose, true});
   }
   void closeThroughFilterManager(ConnectionCloseAction close_action);
 

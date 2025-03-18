@@ -166,7 +166,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
   ASSERT(type == ConnectionCloseType::FlushWrite ||
          type == ConnectionCloseType::FlushWriteAndDelay);
-  closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::LocalClose, type});
+  closeThroughFilterManager({ConnectionEvent::LocalClose, false, type});
 }
 
 void ConnectionImpl::closeInternal(ConnectionCloseType type) {
@@ -829,11 +829,17 @@ void ConnectionImpl::onWriteReady() {
       }
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
-      ENVOY_LOG(info, "both sides half closed");
-      if (filter_manager_.closingThroughFilterManager()) {
-        return;
+      ENVOY_CONN_LOG(trace, "both sides are half closed or it is final close after flush state",
+                     *this);
+      if (delayed_close_state_ == DelayedCloseState::CloseAfterFlush) {
+        // close() is already managed by the filter manager and delayed, and this is the final
+        // close.
+        closeConnectionImmediately();
+      } else if (bothSidesHalfClosed()) {
+        // If half_close is enabled, the close should still go through the filter manager, since
+        // read is possible still pending
+        closeThroughFilterManager({ConnectionEvent::LocalClose, true});
       }
-      closeConnectionImmediately();
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
