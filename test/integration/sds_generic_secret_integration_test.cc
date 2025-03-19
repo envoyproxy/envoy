@@ -59,14 +59,7 @@ class SdsGenericSecretTestFilterConfig
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
   SdsGenericSecretTestFilterConfig()
-      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("sds-generic-secret-test") {
-    config_source_.set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    auto* api_config_source = config_source_.mutable_api_config_source();
-    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-    api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-    auto* grpc_service = api_config_source->add_grpc_services();
-    grpc_service->mutable_envoy_grpc()->set_cluster_name("sds_cluster");
-  }
+      : Extensions::HttpFilters::Common::EmptyHttpFilterConfig("sds-generic-secret-test") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
@@ -86,14 +79,26 @@ public:
         };
   }
 
-private:
+protected:
   envoy::config::core::v3::ConfigSource config_source_;
 };
 
-class SdsGenericSecretIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
-                                        public HttpIntegrationTest {
+class SdsGenericSecretApiConfigSourceTestFilterConfig : public SdsGenericSecretTestFilterConfig {
 public:
-  SdsGenericSecretIntegrationTest()
+  SdsGenericSecretApiConfigSourceTestFilterConfig() {
+    config_source_.set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source_.mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    grpc_service->mutable_envoy_grpc()->set_cluster_name("sds_cluster");
+  }
+};
+
+class SdsGenericSecretApiConfigSourceIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                                       public HttpIntegrationTest {
+public:
+  SdsGenericSecretApiConfigSourceIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
@@ -131,15 +136,15 @@ public:
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
-  SdsGenericSecretTestFilterConfig factory_;
+  SdsGenericSecretApiConfigSourceTestFilterConfig factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, SdsGenericSecretIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsGenericSecretApiConfigSourceIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that an SDS generic secret can be successfully fetched by a filter.
-TEST_P(SdsGenericSecretIntegrationTest, FilterFetchSuccess) {
+TEST_P(SdsGenericSecretApiConfigSourceIntegrationTest, FilterFetchSuccess) {
   on_server_init_function_ = [this]() {
     createSdsStream();
     sendSecret();
@@ -154,6 +159,71 @@ TEST_P(SdsGenericSecretIntegrationTest, FilterFetchSuccess) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_EQ("DUMMY_AES_128_KEY", upstream_request_->headers()
+                                     .get(Http::LowerCaseString("secret"))[0]
+                                     ->value()
+                                     .getStringView());
+}
+
+class SdsGenericSecretPathConfigSourceTestFilterConfig : public SdsGenericSecretTestFilterConfig {
+public:
+  SdsGenericSecretPathConfigSourceTestFilterConfig() {
+    TestEnvironment::writeStringToFileForTest("generic_secret.txt", "DUMMY_AES_128_KEY");
+    auto filename = TestEnvironment::temporaryPath("generic_secret.txt");
+
+    auto secret = TestEnvironment::substitute(R"EOF(
+resources:
+- "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+  name: encryption_key
+  generic_secret:
+    secret:
+      filename: "{{ test_tmpdir }}/generic_secret.txt"
+)EOF");
+    TestEnvironment::writeStringToFileForTest("generic_secret.yaml", secret);
+    auto secret_path = TestEnvironment::temporaryPath("generic_secret.yaml");
+    config_source_.mutable_path_config_source()->set_path(secret_path);
+  }
+};
+
+class SdsGenericSecretPathConfigSourceIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                                        public HttpIntegrationTest {
+public:
+  SdsGenericSecretPathConfigSourceIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
+
+  void initialize() override {
+    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
+    HttpIntegrationTest::initialize();
+  }
+
+  SdsGenericSecretPathConfigSourceTestFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsGenericSecretPathConfigSourceIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(SdsGenericSecretPathConfigSourceIntegrationTest, GenericSecretFileUpdate) {
+  initialize();
+
+  codec_client_ = makeHttpConnection((lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_EQ("DUMMY_AES_128_KEY", upstream_request_->headers()
+                                     .get(Http::LowerCaseString("secret"))[0]
+                                     ->value()
+                                     .getStringView());
+
+  // update secret
+  TestEnvironment::writeStringToFileForTest("generic_secret.txt", "dummy_aes_128_key");
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_EQ("dummy_aes_128_key", upstream_request_->headers()
                                      .get(Http::LowerCaseString("secret"))[0]
                                      ->value()
                                      .getStringView());
