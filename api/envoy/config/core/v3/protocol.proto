@@ -680,7 +680,7 @@ message Http3ProtocolOptions {
   //
   // Disables QPACK compression related features for HTTP/3 including:
   // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
-  // This can be useful when an upstream HTTP/3 connection multiplexes multiple downstream connections.
+  // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
   bool disable_qpack = 7;
 }
 
