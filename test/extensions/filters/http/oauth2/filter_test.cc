@@ -734,7 +734,7 @@ TEST_F(OAuth2Test, OAuthOkPreserveForeignAuthHeader) {
 }
 
 TEST_F(OAuth2Test, SetBearerToken) {
-  init(getConfig(false /* forward_bearer_token */));
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */));
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -776,7 +776,7 @@ TEST_F(OAuth2Test, SetBearerToken) {
       {Http::Headers::get().SetCookie.get(),
        "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure;HttpOnly"},
+       "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
@@ -1441,7 +1441,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
  * Expected behavior: Cookie domain should be set to the domain in the config.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
-  init(getConfig(true, false,
+  init(getConfig(true, true,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
                  0, false, false, true /* set_cookie_domain */));
@@ -1475,6 +1475,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   // Fail the validation to trigger the OAuth flow.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
   // Check that the redirect includes URL encoded query parameter characters.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
@@ -1527,7 +1528,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
       {Http::Headers::get().SetCookie.get(),
        "IdToken=idToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+       "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=604800;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
@@ -1545,6 +1546,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
  * the final redirect should equal the original request.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   const std::string url_with_special_characters =
       R"(/original_path?query="value"&key=val\ue#frag<ment>{data}[info]|test\^space)";
   const std::string test_encoded_state_with_special_characters =
@@ -1582,6 +1584,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   // Fail the validation to trigger the OAuth flow.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
   // Check that the redirect includes URL encoded query parameter characters.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
@@ -1632,7 +1635,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
        "BearerToken=accessToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(), "IdToken=idToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;path=/;Max-Age=10;secure;HttpOnly"},
+       "RefreshToken=refreshToken;path=/;Max-Age=604800;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com" + url_with_special_characters},
   };
@@ -1821,7 +1824,7 @@ TEST_F(DisabledTokenTests, SetCookieIgnoresTokensWhenAllTokensAreDisabled2) {
 std::string oauthHMAC;
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
-  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  oauthHMAC = "fueOhiagmqQRQSxerTj/KZ065YXYk5SOiLtEvm9qlyA=;";
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 
@@ -1844,8 +1847,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
        "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(), ""},
   };
 
@@ -2975,19 +2976,32 @@ TEST_F(OAuth2Test, CSRFSameSiteWithCookieDomain) {
             filter_->decodeHeaders(first_request_headers, false));
 }
 
-// Test that when use_refresh_token_ is set to false, the refresh token is not included in the HMAC
-// calculation and the refresh token cookie is not set.
-TEST_F(OAuth2Test, RefreshTokenNotIncludedInHmacWhenDisabled) {
+// Ensure that the token cookies are deleted when the tokens are cleared
+TEST_F(OAuth2Test, CookiesDeletedWhenTokensCleared) {
   // Initialize with use_refresh_token set to false
   init(getConfig(true /* forward_bearer_token */, false /* use_refresh_token */));
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/_oauth"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC=4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;path=/"
+       ";Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+      {Http::Headers::get().Cookie.get(),
+       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().Cookie.get(),
+       "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().Cookie.get(),
+       "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN +
+           ";path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _));
@@ -2996,26 +3010,24 @@ TEST_F(OAuth2Test, RefreshTokenNotIncludedInHmacWhenDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
-  // Expected response headers should not include the refresh token cookie
-  Http::TestResponseHeaderMapImpl expected_headers{
+  // Expect to clear the headers
+  Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(), "OauthHMAC="
-                                             "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;"
-                                             "path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthHMAC=8p68j+W60Z7OJUXYNYpVQfkb+XRUm01bM0M/xzTRVBU=;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=10;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
+       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
-       "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), ""},
   };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
-
-  // Even though we pass a refresh token, it should be ignored because use_refresh_token_ is false
-  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
-                                   std::chrono::seconds(600));
+  const std::chrono::seconds expiredTime(10);
+  filter_->onGetAccessTokenSuccess("", "", "", expiredTime);
 }
 
 } // namespace Oauth2

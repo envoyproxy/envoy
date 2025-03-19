@@ -424,6 +424,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
 
+  // Save the request headers for later modification if needed.
+  request_headers_ = &headers;
+
   // We should check if this is a sign out request.
   if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
@@ -473,8 +476,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Save the request headers for later modification if needed.
-  request_headers_ = &headers;
   // If this isn't the callback URI, redirect to acquire credentials.
   //
   // The following conditional could be replaced with a regex pattern-match,
@@ -706,7 +707,6 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
     // * omitting from HMAC computation (for setting, not for validating)
     refresh_token_ = refresh_token;
   } else {
-    // Explicitly clear the refresh token if it's not enabled
     refresh_token_ = "";
   }
 
@@ -918,22 +918,44 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                           absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
                                        BuildCookieTail(3))); // OAUTH_EXPIRES
 
+  absl::flat_hash_map<std::string, std::string> request_cookies =
+      Http::Utility::parseCookies(*request_headers_);
+  std::string cookie_domain;
+  if (!config_->cookieDomain().empty()) {
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
+  }
+
   if (!access_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.bearer_token_, "=", access_token_,
                                          BuildCookieTail(1))); // BEARER_TOKEN
+  } else if (request_cookies.contains(cookie_names.bearer_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+                     cookie_domain));
   }
 
   if (!id_token_.empty()) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.id_token_, "=", id_token_, BuildCookieTail(4))); // ID_TOKEN
+  } else if (request_cookies.contains(cookie_names.id_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+                     cookie_domain));
   }
 
   if (!refresh_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
                                          BuildCookieTail(5))); // REFRESH_TOKEN
+  } else if (request_cookies.contains(cookie_names.refresh_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                     cookie_domain));
   }
 }
 
