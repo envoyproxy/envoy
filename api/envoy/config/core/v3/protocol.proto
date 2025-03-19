@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -305,7 +306,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -417,6 +418,14 @@ message Http1ProtocolOptions {
   // <envoy_v3_api_field_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.restrict_http_methods>`
   // to reject custom methods.
   bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Ignore HTTP/1.1 upgrade values matching any of the supplied matchers.
+  //
+  // .. note::
+  //
+  //   ``h2c`` upgrades are always removed for backwards compatibility, regardless of the
+  //   value in this setting.
+  repeated type.matcher.v3.StringMatcher ignore_http_11_upgrade = 11;
 }
 
 message KeepaliveSettings {
