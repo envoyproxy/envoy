@@ -149,7 +149,7 @@ message LedsClusterLocalityConfig {
 
   // The name of the LbEndpoint collection resource.
   //
-  // If the name ends in `/*`, it indicates an LbEndpoint glob collection,
+  // If the name ends in ``/*``, it indicates an LbEndpoint glob collection,
   // which is supported only in the xDS incremental protocol variants.
   // Otherwise, it indicates an LbEndpointCollection list collection.
   //
