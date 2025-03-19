@@ -84,7 +84,7 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
   ENVOY_LOG(
       info,
       "{}: added/updated {} cluster(s) (skipped {} unmodified cluster(s)); removed {} cluster(s)",
-      name_, added_or_updated, removed, skipped);
+      name_, added_or_updated, skipped, removed);
 
   if (any_applied) {
     system_version_info_ = system_version_info;
