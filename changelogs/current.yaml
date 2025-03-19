@@ -47,6 +47,8 @@ bug_fixes:
     Fixed http parser responding to newlines between requests with 400 Bad Request; per
     RFC 9112: a server that is expecting to receive and parse a request-line SHOULD ignore
     at least one empty line (CRLF) received prior to the request-line.
+    This fix can be reverted by setting runtime guard
+    ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` to ``false``.
 - area: router
   change: |
     Fixed query parameter matcher to properly implement
