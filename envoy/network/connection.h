@@ -94,7 +94,6 @@ struct ConnectionCloseAction {
   bool close_socket_;
   ConnectionCloseType type_;
 
-  // Constructor with proper initialization
   ConnectionCloseAction(ConnectionEvent event_type = ConnectionEvent::Connected,
                         bool close_socket = false,
                         ConnectionCloseType close_type = ConnectionCloseType::NoFlush)
