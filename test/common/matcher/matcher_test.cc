@@ -643,5 +643,62 @@ TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
   EXPECT_EQ(recursive_result.match_state_, MatchState::UnableToMatch);
   EXPECT_EQ(recursive_result.result_, nullptr);
 }
+
+TEST_F(MatcherTest, ReentryWithRecursiveMatcher) {
+  auto top_matcher = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(
+      stringOnMatch<TestData>("on no match"));
+  auto parent_matcher_1 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(
+      stringOnMatch<TestData>("on no match - nested - 1"));
+  parent_matcher_1->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
+                               stringOnMatch<TestData>("match 1"));
+  parent_matcher_1->addMatcher(createSingleMatcher("string", [](auto) { return false; }),
+                               stringOnMatch<TestData>("no match 1"));
+  parent_matcher_1->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
+                               stringOnMatch<TestData>("match 2"));
+  OnMatch<TestData> on_match_1{{}, /*matcher=*/parent_matcher_1};
+  top_matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }), on_match_1);
+
+  auto parent_matcher_2 = std::make_shared<Envoy::Matcher::ListMatcher<TestData>>(std::nullopt);
+  parent_matcher_2->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
+                               stringOnMatch<TestData>("match 3"));
+  parent_matcher_2->addMatcher(createSingleMatcher("string", [](auto) { return false; }),
+                               stringOnMatch<TestData>("no match 2"));
+  parent_matcher_2->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
+                               stringOnMatch<TestData>("match 4"));
+  OnMatch<TestData> on_match_2{{}, /*matcher=*/parent_matcher_2};
+  top_matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }), on_match_2);
+
+  // Expect to hit each match once via repeated re-entry, including the recursive on-no-match.
+  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher);
+  MaybeMatchResult result_1 = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(result_1.match_state_, MatchState::MatchComplete);
+  ASSERT_NE(result_1.result_, nullptr);
+  EXPECT_EQ(result_1.result_().get()->getTyped<StringAction>().string_, "match 1");
+  MaybeMatchResult result_2 = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(result_2.match_state_, MatchState::MatchComplete);
+  ASSERT_NE(result_2.result_, nullptr);
+  EXPECT_EQ(result_2.result_().get()->getTyped<StringAction>().string_, "match 2");
+  MaybeMatchResult on_no_match_result_1 = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(on_no_match_result_1.match_state_, MatchState::MatchComplete);
+  ASSERT_NE(on_no_match_result_1.result_, nullptr);
+  EXPECT_EQ(on_no_match_result_1.result_().get()->getTyped<StringAction>().string_,
+            "on no match - nested - 1");
+  MaybeMatchResult result_3 = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(result_3.match_state_, MatchState::MatchComplete);
+  ASSERT_NE(result_3.result_, nullptr);
+  EXPECT_EQ(result_3.result_().get()->getTyped<StringAction>().string_, "match 3");
+  MaybeMatchResult result_4 = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(result_4.match_state_, MatchState::MatchComplete);
+  ASSERT_NE(result_4.result_, nullptr);
+  EXPECT_EQ(result_4.result_().get()->getTyped<StringAction>().string_, "match 4");
+  MaybeMatchResult on_no_match_result_2 = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(on_no_match_result_2.match_state_, MatchState::MatchComplete);
+  ASSERT_NE(on_no_match_result_2.result_, nullptr);
+  EXPECT_EQ(on_no_match_result_2.result_().get()->getTyped<StringAction>().string_, "on no match");
+  MaybeMatchResult no_remaining_reentrants_result = reenterable_matcher.evaluateMatch(TestData());
+  EXPECT_EQ(no_remaining_reentrants_result.match_state_, MatchState::MatchComplete);
+  EXPECT_EQ(no_remaining_reentrants_result.result_, nullptr);
+}
+
 } // namespace Matcher
 } // namespace Envoy
