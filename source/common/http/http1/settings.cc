@@ -23,6 +23,7 @@ Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOpt
 
   if (!config.ignore_http_11_upgrade().empty()) {
     std::vector<Matchers::StringMatcherPtr> matchers;
+    matchers.reserve(config.ignore_http_11_upgrade_size());
     for (const auto& matcher : config.ignore_http_11_upgrade()) {
       matchers.emplace_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
     }
