@@ -147,8 +147,8 @@ new_features:
     Added an UDP extension for tap custom sink.
 - area: tansport tap
   change: |
-    Added support to control outputing the connection information per event by
-    :ref:`the flag <envoy_v3_api_field_extensions.transport_sockets.tap.v3.tap.set_connection_per_event>`.
+    Added support to control outputing the connection information per event and refer to set_connection_per_event in
+    the message SocketTapConfig of transport socket tap.
 - area: udp_proxy
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard

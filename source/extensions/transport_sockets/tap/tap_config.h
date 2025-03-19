@@ -52,9 +52,9 @@ public:
    * @return a new per-socket tapper which is used to handle tapping of a discrete socket.
    * @param connection supplies the underlying network connection.
    */
-  virtual PerSocketTapperPtr
-  createPerSocketTapper(const envoy::extensions::transport_sockets::tap::v3::Tap& tap_config,
-                        const Network::Connection& connection) PURE;
+  virtual PerSocketTapperPtr createPerSocketTapper(
+      const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+      const Network::Connection& connection) PURE;
 
   /**
    * @return time source to use for stamping events.

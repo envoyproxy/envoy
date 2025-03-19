@@ -14,7 +14,7 @@ namespace TapCommon = Extensions::Common::Tap;
 
 PerSocketTapperImpl::PerSocketTapperImpl(
     SocketTapConfigSharedPtr config,
-    const envoy::extensions::transport_sockets::tap::v3::Tap& tap_config,
+    const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
     const Network::Connection& connection)
     : config_(std::move(config)),
       sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),

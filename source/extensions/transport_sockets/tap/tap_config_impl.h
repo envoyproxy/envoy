@@ -15,9 +15,10 @@ namespace Tap {
 
 class PerSocketTapperImpl : public PerSocketTapper {
 public:
-  PerSocketTapperImpl(SocketTapConfigSharedPtr config,
-                      const envoy::extensions::transport_sockets::tap::v3::Tap& tap_config,
-                      const Network::Connection& connection);
+  PerSocketTapperImpl(
+      SocketTapConfigSharedPtr config,
+      const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+      const Network::Connection& connection);
 
   // PerSocketTapper
   void closeSocket(Network::ConnectionEvent event) override;
@@ -63,9 +64,9 @@ public:
         time_source_(time_system) {}
 
   // SocketTapConfig
-  PerSocketTapperPtr
-  createPerSocketTapper(const envoy::extensions::transport_sockets::tap::v3::Tap& tap_config,
-                        const Network::Connection& connection) override {
+  PerSocketTapperPtr createPerSocketTapper(
+      const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+      const Network::Connection& connection) override {
     return std::make_unique<PerSocketTapperImpl>(shared_from_this(), tap_config, connection);
   }
   TimeSource& timeSource() const override { return time_source_; }

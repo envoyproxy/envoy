@@ -22,9 +22,9 @@ namespace TapCommon = Extensions::Common::Tap;
 
 class MockSocketTapConfig : public SocketTapConfig {
 public:
-  PerSocketTapperPtr
-  createPerSocketTapper(const envoy::extensions::transport_sockets::tap::v3::Tap& tap_config,
-                        const Network::Connection& connection) override {
+  PerSocketTapperPtr createPerSocketTapper(
+      const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+      const Network::Connection& connection) override {
     return PerSocketTapperPtr{createPerSocketTapper_(tap_config, connection)};
   }
 
@@ -35,7 +35,7 @@ public:
   }
 
   MOCK_METHOD(PerSocketTapper*, createPerSocketTapper_,
-              (const envoy::extensions::transport_sockets::tap::v3::Tap& tap_config,
+              (const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
                const Network::Connection& connection));
   MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
               (uint64_t trace_id));
@@ -89,7 +89,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   bool fail_match_{};
   // Add transport configurations
-  envoy::extensions::transport_sockets::tap::v3::Tap tap_config_;
+  envoy::extensions::transport_sockets::tap::v3::SocketTapConfig tap_config_;
   bool output_conn_info_per_event_{false};
 };
 
