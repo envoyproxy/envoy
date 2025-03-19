@@ -177,7 +177,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
         size_t length;
         RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
         absl::string_view pem(reinterpret_cast<const char*>(output), length);
-        return Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(pem);
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(pem);
       });
 }
 
@@ -201,8 +201,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
           RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
 
           absl::string_view pem(reinterpret_cast<const char*>(output), length);
-          absl::StrAppend(&result,
-                          Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(pem));
+          absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
         }
         return result;
       });
