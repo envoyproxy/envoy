@@ -99,6 +99,12 @@ bug_fixes:
 - area: listener
   change: |
     Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
+- area: ext_proc
+  change: |
+    Fixed a bug for the :ref:`extension
+    <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` where the
+    :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor was being saved to
+    filter state after iterating through the filter chain.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

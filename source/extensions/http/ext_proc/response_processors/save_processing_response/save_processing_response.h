@@ -37,23 +37,22 @@ public:
 
   SaveProcessingResponse(const SaveProcessingResponseProto&);
 
-  void
-  afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::ProcessingResponse& response,
-                                absl::Status processing_status,
-                                Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                     absl::Status processing_status,
+                                     Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::HeadersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   // Not implemented.
-  void afterProcessingRequestBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override{};
+  void afterProcessingRequestBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
+                                  Envoy::StreamInfo::StreamInfo&) override{};
   // Not implemented.
-  void afterProcessingResponseBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override{};
-  void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingResponseBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
+                                   Envoy::StreamInfo::StreamInfo&) override{};
+  void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
 
 private:
@@ -65,9 +64,17 @@ private:
     const bool save_on_error = false;
   };
 
-  void addToFilterState(const SaveOptions& save_options,
-                        const envoy::service::ext_proc::v3::ProcessingResponse& processing_response,
+  void addToFilterState(envoy::service::ext_proc::v3::ProcessingResponse processing_response,
                         absl::Status status, Envoy::StreamInfo::StreamInfo& stream_info);
+
+  // Answer whether the response from the external processor should be saved to
+  // filter state based on the configured save options for the response type and processing status.
+  bool shouldSaveResponse(SaveOptions save_options, absl::Status status) {
+    if (!save_options.save_response) {
+      return false;
+    }
+    return (status.ok() || save_options.save_on_error);
+  }
 
   const std::string filter_state_name_;
 
