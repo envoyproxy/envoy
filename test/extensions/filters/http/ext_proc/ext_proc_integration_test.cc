@@ -1089,6 +1089,8 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
 }
 
 TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "false"}});
   // Skip the header processing on response path.
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
