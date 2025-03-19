@@ -327,7 +327,7 @@ void removeUpgrade(RequestOrResponseHeaderMap& headers,
  * set of values. Removes the `Connection` header if it only contains `tokens_to_remove`.
  */
 void removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
-                             StringUtil::CaseUnorderedSet tokens_to_remove);
+                             const StringUtil::CaseUnorderedSet& tokens_to_remove);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.

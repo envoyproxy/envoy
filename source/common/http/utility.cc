@@ -672,7 +672,7 @@ void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
 }
 
 void Utility::removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
-                                      StringUtil::CaseUnorderedSet tokens_to_remove) {
+                                      const StringUtil::CaseUnorderedSet& tokens_to_remove) {
   if (headers.Connection()) {
     const std::string new_value =
         StringUtil::removeTokens(headers.getConnectionValue(), ",", tokens_to_remove, ",");
