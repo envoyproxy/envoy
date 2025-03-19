@@ -1286,7 +1286,7 @@ bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTab
 bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
 } // namespace
 
-std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
+std::string Utility::PercentEncoding::urlEncode(absl::string_view value) {
   std::string encoded;
   encoded.reserve(value.size());
   for (char ch : value) {
