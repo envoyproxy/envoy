@@ -699,11 +699,15 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
     // * omitting from HMAC computation (for setting, not for validating)
     id_token_ = id_token;
   }
-  if (!config_->disableRefreshTokenSetCookie()) {
+  // Only set the refresh token if use_refresh_token_ is enabled and it's not disabled by config
+  if (config_->useRefreshToken() && !config_->disableRefreshTokenSetCookie()) {
     // Preventing this here excludes all other Refresh Token functionality
     // * setting the cookie
     // * omitting from HMAC computation (for setting, not for validating)
     refresh_token_ = refresh_token;
+  } else {
+    // Explicitly clear the refresh token if it's not enabled
+    refresh_token_ = "";
   }
 
   expires_in_ = std::to_string(expires_in.count());
