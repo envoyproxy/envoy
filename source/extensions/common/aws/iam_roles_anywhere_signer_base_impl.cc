@@ -41,9 +41,6 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
 
   const auto& x509_credentials = x509_credentials_provider_->getCredentials();
 
-  ASSERT(credentials_provider_chain_ == nullptr);
-  ASSERT(x509_credentials_provider_ != nullptr);
-
   if (!x509_credentials.certificateDerB64().has_value() ||
       !x509_credentials.certificatePrivateKey().has_value() ||
       !x509_credentials.publicKeySignatureAlgorithm().has_value()) {

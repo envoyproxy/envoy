@@ -1,8 +1,5 @@
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
@@ -11,7 +8,6 @@
 #include "source/common/common/thread.h"
 
 #include "absl/types/optional.h"
-#include "openssl/evp.h"
 
 namespace Envoy {
 namespace Extensions {
