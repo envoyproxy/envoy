@@ -45,7 +45,7 @@ enum class FilterStatus {
 
   // Stops executing further filters but does not close the connection immediately.
   //
-  // When a filter returns StopIterationDontClose, it pauses further processing and
+  // When a filter returns StopIterationAndDontClose, it pauses further processing and
   // prevents the connection from closing if the connection want to close the filter chain.
   // The filter is responsible for eventually calling continueClosing() when it has finished
   // its necessary work.
@@ -53,9 +53,9 @@ enum class FilterStatus {
   // This is typically used when a filter needs to delay closure due to:
   //   - External data processing.
   //
-  // Failure to call continueClosing() after returning StopIterationDontClose
+  // Failure to call continueClosing() after returning StopIterationAndDontClose
   // will result in a stalled connection and possible resource leaks.
-  StopIterationDontClose,
+  StopIterationAndDontClose,
 };
 
 /**
@@ -105,7 +105,7 @@ public:
   /**
    * Resumes the connection closure process if it was previously delayed by a filter.
    *
-   * This method must be called if a filter has returned `FilterStatus::StopIterationDontClose`
+   * This method must be called if a filter has returned `FilterStatus::StopIterationAndDontClose`
    * to prevent an indefinite open connection. It ensures that once the filter has completed
    * its necessary processing, the connection can proceed with closing.
    *
@@ -210,7 +210,7 @@ public:
   /**
    * Resumes the connection closure process if it was previously delayed by a filter.
    *
-   * This method must be called if a filter has returned `FilterStatus::StopIterationDontClose`
+   * This method must be called if a filter has returned `FilterStatus::StopIterationAndDontClose`
    * to prevent an indefinite open connection. It ensures that once the filter has completed
    * its necessary processing, the connection can proceed with closing.
    *

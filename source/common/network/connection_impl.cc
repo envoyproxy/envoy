@@ -832,8 +832,8 @@ void ConnectionImpl::onWriteReady() {
       ENVOY_CONN_LOG(trace, "both sides are half closed or it is final close after flush state",
                      *this);
       if (delayed_close_state_ == DelayedCloseState::CloseAfterFlush) {
-        // close() is already managed by the filter manager and delayed, and this is the final
-        // close.
+        // close() is already managed by the filter manager and delayed and
+        // this is the final close.
         closeConnectionImmediately();
       } else if (bothSidesHalfClosed()) {
         // If half_close is enabled, the close should still go through the filter manager, since

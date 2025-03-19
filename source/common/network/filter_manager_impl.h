@@ -159,7 +159,7 @@ private:
       }
     }
 
-    void handleStopIterationDontClose() {
+    void handleStopIterationAndDontClose() {
       if (!pending_close_) {
         pending_close_ = true;
         parent_.state_.pending_close_read_filter_ += 1;
@@ -204,7 +204,7 @@ private:
       }
     }
 
-    void handleStopIterationDontClose() {
+    void handleStopIterationAndDontClose() {
       if (!pending_close_) {
         pending_close_ = true;
         parent_.state_.pending_close_write_filter_ += 1;

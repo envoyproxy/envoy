@@ -92,8 +92,8 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
-      } else if (status == FilterStatus::StopIterationDontClose) {
-        (*entry)->handleStopIterationDontClose();
+      } else if (status == FilterStatus::StopIterationAndDontClose) {
+        (*entry)->handleStopIterationAndDontClose();
         return;
       }
     }
@@ -121,10 +121,10 @@ void FilterManagerImpl::maybeClose() {
   }
 
   ENVOY_CONN_LOG(trace,
-    "maybeClose(): pending_remote_close_={}, pending_local_close_={}, "
-    "pending_close_write_filter_={}, pending_close_read_filter_={}",
-    connection_, state_.pending_remote_close_, state_.pending_local_close_,
-    state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+                 "maybeClose(): pending_remote_close_={}, pending_local_close_={}, "
+                 "pending_close_write_filter_={}, pending_close_read_filter_={}",
+                 connection_, state_.pending_remote_close_, state_.pending_local_close_,
+                 state_.pending_close_write_filter_, state_.pending_close_read_filter_);
 
   // Check if we need to close the connection
   if ((state_.pending_remote_close_ || state_.pending_local_close_) &&
@@ -148,6 +148,14 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
                  "pending_close_write_filter_={}, pending_close_read_filter_={}",
                  connection_, state_.pending_remote_close_, state_.pending_local_close_,
                  state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+
+  if (latched_close_action_.has_value() && close_action.closeSocket()) {
+    ENVOY_CONN_LOG(trace,
+                   "the previous close event is {} and it is going to close the socket, so don't "
+                   "change the close type.",
+                   connection_, static_cast<int>(latched_close_action_->event_));
+    return;
+  }
 
   latched_close_action_ = close_action;
   state_.pending_local_close_ = close_action.isLocalClose();
@@ -189,8 +197,8 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
     FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
       return FilterStatus::StopIteration;
-    } else if (status == FilterStatus::StopIterationDontClose) {
-      (*entry)->handleStopIterationDontClose();
+    } else if (status == FilterStatus::StopIterationAndDontClose) {
+      (*entry)->handleStopIterationAndDontClose();
       // The connection write path can still check StopIteration.
       return FilterStatus::StopIteration;
     }
