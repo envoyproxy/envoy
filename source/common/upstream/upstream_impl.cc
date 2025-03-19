@@ -1024,7 +1024,7 @@ ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
 absl::StatusOr<std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
               std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
-              ProtobufMessage::ValidationVisitor& validation_visitor) {
+              Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (options) {
     return std::move(options);
   }
@@ -1048,7 +1048,8 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                : absl::nullopt),
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-          config.has_http2_protocol_options(), validation_visitor);
+          config.has_http2_protocol_options(), factory_context.serverFactoryContext(),
+          factory_context.messageValidationVisitor());
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
@@ -1164,7 +1165,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
-                        factory_context.messageValidationVisitor()),
+                        factory_context),
           std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>)),
       tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
           "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
