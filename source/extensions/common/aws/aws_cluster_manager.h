@@ -84,7 +84,8 @@ private:
  */
 class AwsClusterManagerImpl : public AwsClusterManager,
                               public Envoy::Singleton::Instance,
-                              public Upstream::ClusterUpdateCallbacks {
+                              public Upstream::ClusterUpdateCallbacks,
+                              public Logger::Loggable<Logger::Id::aws> {
   // Friend class for testing callbacks
   friend class AwsClusterManagerFriend;
 

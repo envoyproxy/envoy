@@ -458,6 +458,7 @@ envoy_cc_test(
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

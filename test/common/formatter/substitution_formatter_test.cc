@@ -581,6 +581,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter custom_flags_format("CUSTOM_FLAGS");
+    stream_info.addCustomFlag("flag1");
+    stream_info.addCustomFlag("flag2");
+    EXPECT_EQ("flag1,flag2", custom_flags_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(custom_flags_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("flag1,flag2")));
+  }
+
+  {
     StreamInfoFormatter response_flags_format("RESPONSE_FLAGS");
     stream_info.setResponseFlag(StreamInfo::CoreResponseFlag::LocalReset);
     EXPECT_EQ("LR", response_flags_format.formatWithContext({}, stream_info));

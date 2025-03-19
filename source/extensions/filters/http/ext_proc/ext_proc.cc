@@ -741,6 +741,20 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   return result;
 }
 
+void Filter::encodeProtocolConfig(ProcessingRequest& req) {
+  ENVOY_STREAM_LOG(debug, "Trying to encode filter protocol configurations", *decoder_callbacks_);
+  if (!protocol_config_encoded_ && !config_->observabilityMode()) {
+    auto* protocol_config = req.mutable_protocol_config();
+    protocol_config->set_request_body_mode(config_->processingMode().request_body_mode());
+    protocol_config->set_response_body_mode(config_->processingMode().response_body_mode());
+    protocol_config->set_send_body_without_waiting_for_header_response(
+        config_->sendBodyWithoutWaitingForHeaderResponse());
+    protocol_config_encoded_ = true;
+    ENVOY_STREAM_LOG(debug, "Filter protocol configurations encoded {}", *decoder_callbacks_,
+                     protocol_config->DebugString());
+  }
+}
+
 ProcessingRequest Filter::buildHeaderRequest(ProcessorState& state,
                                              Http::RequestOrResponseHeaderMap& headers,
                                              bool end_stream, bool observability_mode) {
@@ -754,6 +768,8 @@ ProcessingRequest Filter::buildHeaderRequest(ProcessorState& state,
   MutationUtils::headersToProto(headers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
+  encodeProtocolConfig(req);
+
   return req;
 }
 
@@ -992,6 +1008,7 @@ ProcessingRequest Filter::setupBodyChunk(ProcessorState& state, const Buffer::In
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
   body_req->set_body(data.toString());
+  encodeProtocolConfig(req);
   return req;
 }
 
@@ -1029,6 +1046,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
                                config_->messageTimeout(), callback_state);
     ENVOY_STREAM_LOG(debug, "Sending trailers message", *decoder_callbacks_);
   }
+  encodeProtocolConfig(req);
 
   sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
