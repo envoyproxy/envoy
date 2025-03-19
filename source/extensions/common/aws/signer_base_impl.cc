@@ -183,9 +183,8 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   // These three parameters can contain characters that require URL encoding
   if (session_token.has_value()) {
     // X-Amz-Security-Token
-    query_params.add(
-        SignatureQueryParameterValues::AmzSecurityToken,
-        Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(session_token.value()));
+    query_params.add(SignatureQueryParameterValues::AmzSecurityToken,
+                     Envoy::Http::Utility::PercentEncoding::urlEncode(session_token.value()));
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameterValues::AmzCredential,
