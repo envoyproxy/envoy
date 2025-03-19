@@ -56,6 +56,8 @@ public:
       ConnectionCloseAction{ConnectionEvent::RemoteClose, true};
   ConnectionCloseAction local_close_action_ =
       ConnectionCloseAction{ConnectionEvent::LocalClose, false, ConnectionCloseType::FlushWrite};
+  ConnectionCloseAction local_close_socket_action_ =
+      ConnectionCloseAction{ConnectionEvent::LocalClose, true};
 };
 
 class LocalMockFilter : public MockFilter {
@@ -605,9 +607,38 @@ TEST_F(NetworkFilterManagerTest, LocalAndRemoteCloseRaceCondition) {
   manager.onConnectionClose(local_close_action_);
   manager.onConnectionClose(remote_close_action_);
 
-  // When filter continues, we should see connection closed with the latest event type
-  // (RemoteClose).
+  // When filter continues, we should see connection closed with
+  // the latest event type (RemoteClose).
   EXPECT_CALL(connection_, closeConnection(remote_close_action_));
+  read_filter->callbacks_->continueClosing();
+}
+
+TEST_F(NetworkFilterManagerTest, LocalCloseSocketAndRemoteCloseRace) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+
+  // Initialize filters with StopIterationAndDontClose.
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  read_buffer_.add("data");
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("data"), _))
+      .WillOnce(Return(FilterStatus::StopIterationAndDontClose));
+  manager.onRead();
+
+  // Simulate both local and remote close happening.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_socket_action_);
+  manager.onConnectionClose(remote_close_action_);
+
+  // When filter continues, we should see it is still local close.
+  EXPECT_CALL(connection_, closeConnection(local_close_socket_action_));
   read_filter->callbacks_->continueClosing();
 }
 

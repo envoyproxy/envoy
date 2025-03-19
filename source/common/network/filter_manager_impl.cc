@@ -143,17 +143,20 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
 
   ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
 
+  ENVOY_CONN_LOG(trace, "close_action: remote close:{}, local close:{}, close socket:{}",
+                 connection_, close_action.isLocalClose(), close_action.isRemoteClose(),
+                 close_action.closeSocket());
+
   ENVOY_CONN_LOG(trace,
                  "onConnectionClose: pending_remote_close_={}, pending_local_close_={}, "
                  "pending_close_write_filter_={}, pending_close_read_filter_={}",
                  connection_, state_.pending_remote_close_, state_.pending_local_close_,
                  state_.pending_close_write_filter_, state_.pending_close_read_filter_);
 
-  if (latched_close_action_.has_value() && close_action.closeSocket()) {
-    ENVOY_CONN_LOG(trace,
-                   "the previous close event is {} and it is going to close the socket, so don't "
-                   "change the close type.",
-                   connection_, static_cast<int>(latched_close_action_->event_));
+  if (latched_close_action_.has_value() && latched_close_action_->closeSocket() &&
+      latched_close_action_->isLocalClose()) {
+    // The previous close event is local close, and it is going to close the socket.
+    // We are not going to change the close event. This can only happen when half close is enabled.
     return;
   }
 
@@ -161,15 +164,15 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
   state_.pending_local_close_ = close_action.isLocalClose();
   state_.pending_remote_close_ = close_action.isRemoteClose();
 
-  // Only finalize if we have no pending filters
-  // TODO(botengyao) this can be more intelligent to distinguish remote close and local close.
+  // Only finalize if we have no pending filters.
+  // TODO(botengyao) this can be more intelligent to distinguish remote close and local
+  // close but will be more complicated.
   if (state_.pending_close_read_filter_ == 0 && state_.pending_close_write_filter_ == 0) {
     finalizeClose(close_action);
     return;
   }
 
-  // Otherwise, wait for filters to complete
-  // The close will be finalized when both filter counts reach 0
+  // Otherwise, wait for filters to complete.
   ENVOY_CONN_LOG(trace, "delaying close: pending read filters: {}, pending write filters: {}",
                  connection_, state_.pending_close_read_filter_,
                  state_.pending_close_write_filter_);
