@@ -168,7 +168,6 @@ class SdsGenericSecretPathConfigSourceTestFilterConfig : public SdsGenericSecret
 public:
   SdsGenericSecretPathConfigSourceTestFilterConfig() {
     TestEnvironment::writeStringToFileForTest("generic_secret.txt", "DUMMY_AES_128_KEY");
-    auto filename = TestEnvironment::temporaryPath("generic_secret.txt");
 
     auto secret = TestEnvironment::substitute(R"EOF(
 resources:
