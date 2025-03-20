@@ -670,10 +670,6 @@ TEST_F(NetworkFilterManagerTest, MultipleFiltersWithDifferentStatusResponses) {
   EXPECT_CALL(*stop_dont_close_filter, onData(_, _)).Times(0);
   manager.onRead();
 
-  // Try to close connection.
-  EXPECT_CALL(connection_, closeConnection(_));
-  manager.onConnectionClose(remote_close_action_);
-
   // Continue from stop_filter.
   read_buffer_.add("more");
   EXPECT_CALL(*stop_dont_close_filter, onData(BufferStringEqual("testmore"), _))
@@ -684,7 +680,7 @@ TEST_F(NetworkFilterManagerTest, MultipleFiltersWithDifferentStatusResponses) {
   EXPECT_CALL(connection_, closeConnection(_)).Times(0);
   manager.onConnectionClose(local_close_action_);
 
-  // Complete.
+  // The socket close has a higher priority than the local_close_action_.
   EXPECT_CALL(connection_, closeConnection(local_close_action_));
   stop_dont_close_filter->callbacks_->continueClosing();
 }

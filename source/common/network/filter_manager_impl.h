@@ -123,9 +123,7 @@ public:
     connection_.closeConnection(close_action);
   }
 
-  bool closingThroughFilterManager() {
-    return state_.pending_local_close_ || state_.pending_remote_close_;
-  }
+  bool pendingClose() { return state_.pending_local_close_ || state_.pending_remote_close_; }
 
 protected:
   struct State {

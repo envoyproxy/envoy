@@ -390,8 +390,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   ASSERT(dispatcher_.isThreadSafe());
   // Do not read the data from the socket if the connection is in delay closed,
   // high watermark is called, or is closing through filter manager.
-  if (inDelayedClose() || !filterChainWantsData() ||
-      filter_manager_.closingThroughFilterManager()) {
+  if (inDelayedClose() || !filterChainWantsData() || filter_manager_.pendingClose()) {
     return;
   }
   ASSERT(socket_->isOpen());
@@ -670,6 +669,10 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     // consume all available data.
     ASSERT(!(events & Event::FileReadyType::Read));
     ENVOY_CONN_LOG(debug, "remote early close", *this);
+    // If half-close is enabled, this is never activated.
+    // If half-close is disabled, there are two scenarios where this applies:
+    //    1. During the closeInternal(_) call.
+    //    2. When an early close is detected while the connection is read-disabled.
     remoteCloseThroughFilterManager();
     return;
   }
@@ -832,12 +835,12 @@ void ConnectionImpl::onWriteReady() {
       ENVOY_CONN_LOG(trace, "both sides are half closed or it is final close after flush state",
                      *this);
       if (delayed_close_state_ == DelayedCloseState::CloseAfterFlush) {
-        // close() is already managed by the filter manager and delayed and
-        // this is the final close.
+        // close() is already managed by the filter manager and delayed.
+        // This is the final close.
         closeConnectionImmediately();
       } else if (bothSidesHalfClosed()) {
         // If half_close is enabled, the close should still go through the filter manager, since
-        // read is possible still pending
+        // the read is possible still pending.
         closeThroughFilterManager({ConnectionEvent::LocalClose, true});
       }
     }

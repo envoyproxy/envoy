@@ -116,7 +116,7 @@ bool FilterManagerImpl::startUpstreamSecureTransport() {
 }
 
 void FilterManagerImpl::maybeClose() {
-  if (connection_.state() != Connection::State::Open) {
+  if (connection_.state() == Connection::State::Closed) {
     return;
   }
 
@@ -137,14 +137,14 @@ void FilterManagerImpl::maybeClose() {
 }
 
 void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
-  if (connection_.state() != Connection::State::Open) {
+  if (connection_.state() == Connection::State::Closed) {
     return;
   }
 
   ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
 
   ENVOY_CONN_LOG(trace, "close_action: remote close:{}, local close:{}, close socket:{}",
-                 connection_, close_action.isLocalClose(), close_action.isRemoteClose(),
+                 connection_, close_action.isRemoteClose(), close_action.isLocalClose(),
                  close_action.closeSocket());
 
   ENVOY_CONN_LOG(trace,
@@ -153,11 +153,13 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
                  connection_, state_.pending_remote_close_, state_.pending_local_close_,
                  state_.pending_close_write_filter_, state_.pending_close_read_filter_);
 
-  if (latched_close_action_.has_value() && latched_close_action_->closeSocket() &&
-      latched_close_action_->isLocalClose()) {
-    // The previous close event is local close, and it is going to close the socket.
-    // We are not going to change the close event. This can only happen when half close is enabled.
-    return;
+  if (latched_close_action_.has_value() && latched_close_action_->closeSocket()) {
+    if (latched_close_action_->isLocalClose() || !close_action.closeSocket()) {
+      // If the previous close event is a local close and will close the socket, which will only
+      // happen when half close is enabled, or if the current close action does not close the
+      // socket while the previous one does, we keep the previous close action.
+      return;
+    }
   }
 
   latched_close_action_ = close_action;
@@ -185,6 +187,11 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   // Filter could return status == FilterStatus::StopIteration immediately, close the connection and
   // use callback to call this function.
   if (connection_.state() != Connection::State::Open) {
+    return FilterStatus::StopIteration;
+  }
+
+  // Only inject write is allowed when the connection is pending local close.
+  if (filter ? state_.pending_remote_close_ : pendingClose()) {
     return FilterStatus::StopIteration;
   }
 
