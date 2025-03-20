@@ -41,6 +41,9 @@ message LocalityLbConfig {
     // requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
     // failing service.
     bool fail_traffic_on_panic = 3;
+
+    // If set to true, Envoy will force LocalityDirect routing if a local locality exists.
+    bool force_locality_direct_routing = 4;
   }
 
   // Configuration for :ref:`locality weighted load balancing
