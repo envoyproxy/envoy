@@ -775,10 +775,10 @@ TEST_P(IsResponseCodeAllowedTest, Validate) {
           "enabled": {{
             "default_value": true,
           }},
-          "uncompressible_response_code": [
-            {}
-          ]
-        }}
+        }},
+        "uncompressible_response_code": [
+          {}
+        ]
       }},
       "compressor_library": {{
         "name": "test",

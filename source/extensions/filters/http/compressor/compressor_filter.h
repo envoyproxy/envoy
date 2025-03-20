@@ -80,8 +80,6 @@ public:
     uint32_t minimumLength() const { return min_content_length_; }
     bool isMinimumContentLength(const Http::RequestOrResponseHeaderMap& headers) const;
     bool isContentTypeAllowed(const Http::RequestOrResponseHeaderMap& headers) const;
-    bool areAllResponseCodesCompressible() const;
-    bool isResponseCodeCompressible(uint32_t response_code) const;
 
   protected:
     const Runtime::FeatureFlag compression_enabled_;
@@ -96,12 +94,8 @@ public:
     static StringUtil::CaseUnorderedSet
     contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
-    static absl::flat_hash_set<uint32_t>
-    uncompressibleResponseCodesSet(const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes);
-
     const uint32_t min_content_length_;
     const StringUtil::CaseUnorderedSet content_type_values_;
-    const absl::flat_hash_set<uint32_t> uncompressible_response_codes_;
     const CompressorStats stats_;
   };
 
@@ -127,12 +121,17 @@ public:
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
     bool disableOnEtagHeader() const { return disable_on_etag_header_; }
     bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
+    bool areAllResponseCodesCompressible() const;
+    bool isResponseCodeCompressible(uint32_t response_code) const;
 
   private:
     static ResponseCompressorStats generateResponseStats(const std::string& prefix,
                                                          Stats::Scope& scope) {
       return ResponseCompressorStats{RESPONSE_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
     }
+
+    static absl::flat_hash_set<uint32_t>
+    uncompressibleResponseCodesSet(const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes);
 
     // TODO(rojkov): delete this translation function once the deprecated fields
     // are removed from envoy::extensions::filters::http::compressor::v3::Compressor.
@@ -141,6 +140,7 @@ public:
 
     const bool disable_on_etag_header_;
     const bool remove_accept_encoding_header_;
+    const absl::flat_hash_set<uint32_t> uncompressible_response_codes_;
     const ResponseCompressorStats response_stats_;
   };
 

@@ -44,8 +44,8 @@ static_resources:
                   content_type:
                   - text/html
                   - application/json
-                  uncompressible_response_code:
                 disable_on_etag_header: true
+                uncompressible_response_code:
               request_direction_config:
                 common_config:
                   enabled:

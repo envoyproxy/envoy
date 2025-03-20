@@ -85,10 +85,9 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type())),
-      uncompressible_response_codes_(
-          uncompressibleResponseCodesSet(proto_config.uncompressible_response_code())),
-      stats_{generateStats(stats_prefix, scope)} {}
+      content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
+                                                                             stats_prefix, scope)} {
+}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
@@ -109,16 +108,6 @@ StringUtil::CaseUnorderedSet CompressorFilterConfig::DirectionConfig::contentTyp
   return types.empty() ? StringUtil::CaseUnorderedSet(default_content_encodings.begin(),
                                                       default_content_encodings.end())
                        : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
-}
-
-absl::flat_hash_set<uint32_t>
-CompressorFilterConfig::DirectionConfig::uncompressibleResponseCodesSet(
-    const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes) {
-  absl::flat_hash_set<uint32_t> result;
-  for (const Protobuf::UInt32Value& code : codes) {
-    result.insert(code.value());
-  }
-  return result;
 }
 
 uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::uint32 length) {
@@ -147,6 +136,8 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
+      uncompressible_response_codes_(
+          uncompressibleResponseCodesSet(proto_config.response_direction_config().uncompressible_response_code())),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
@@ -174,6 +165,16 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
       new envoy::config::core::v3::RuntimeFeatureFlag(proto_config.runtime_enabled()));
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   return config;
+}
+
+absl::flat_hash_set<uint32_t>
+CompressorFilterConfig::ResponseDirectionConfig::uncompressibleResponseCodesSet(
+    const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes) {
+  absl::flat_hash_set<uint32_t> result;
+  for (const Protobuf::UInt32Value& code : codes) {
+    result.insert(code.value());
+  }
+  return result;
 }
 
 Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompressor() {
@@ -583,11 +584,11 @@ bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
   return is_etag_allowed;
 }
 
-bool CompressorFilterConfig::DirectionConfig::areAllResponseCodesCompressible() const {
+bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompressible() const {
   return uncompressible_response_codes_.empty();
 }
 
-bool CompressorFilterConfig::DirectionConfig::isResponseCodeCompressible(
+bool CompressorFilterConfig::ResponseDirectionConfig::isResponseCodeCompressible(
     uint32_t response_code) const {
   return !uncompressible_response_codes_.contains(response_code);
 }

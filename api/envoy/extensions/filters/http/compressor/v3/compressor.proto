@@ -44,10 +44,6 @@ message Compressor {
     // "application/xhtml+xml", "image/svg+xml", "text/css", "text/html", "text/plain", "text/xml"
     // and their synonyms.
     repeated string content_type = 3;
-
-    // Set of response codes for which compression is disabled, e.g. 206 Partial Content should not
-    // be compressed.
-    repeated google.protobuf.UInt32Value uncompressible_response_code = 4;
   }
 
   // Configuration for filter behavior on the request direction.
@@ -71,8 +67,11 @@ message Compressor {
     //    To avoid interfering with other compression filters in the same chain use this option in
     //    the filter closest to the upstream.
     bool remove_accept_encoding_header = 3;
-  }
 
+    // Set of response codes for which compression is disabled, e.g. 206 Partial Content should not
+    // be compressed.
+    repeated google.protobuf.UInt32Value uncompressible_response_code = 4;
+  }
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
   google.protobuf.UInt32Value content_length = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
