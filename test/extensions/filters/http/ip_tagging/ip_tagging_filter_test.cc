@@ -45,6 +45,9 @@ namespace {
 std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry;
 
 namespace {
+
+const std::string ip_tagging_prefix = "prefix.ip_tagging.";
+
 const std::string internal_request_config = R"EOF(
 request_type: internal
 ip_tags:
@@ -317,6 +320,34 @@ TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
       ip_tags_registry2->get(IpTaggingFilterConfigPeer::ipTagsPath(*config2),
                              IpTaggingFilterConfigPeer::ipTagsLoader(*config2));
   EXPECT_EQ(ip_tags1.get(), ip_tags2.get());
+}
+
+TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath) {
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
+                            proto_config1);
+  auto config1 = std::make_shared<IpTaggingFilterConfig>(proto_config1, ip_tags_registry, "prefix.",
+                                                         *stats_.rootScope(), runtime_, *api_,
+                                                         validation_visitor_);
+  const std::string config2_string = R"EOF(
+ request_type: external
+ ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.json"
+ )EOF";
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(config2_string), proto_config2);
+  auto config2 = std::make_shared<IpTaggingFilterConfig>(proto_config2, ip_tags_registry, "prefix.",
+                                                         *stats_.rootScope(), runtime_, *api_,
+                                                         validation_visitor_);
+  auto ip_tags_registry1 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config1);
+  auto ip_tags_registry2 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config2);
+  EXPECT_EQ(ip_tags_registry1.get(), ip_tags_registry2.get());
+  LcTrieSharedPtr ip_tags1 =
+      ip_tags_registry1->get(IpTaggingFilterConfigPeer::ipTagsPath(*config1),
+                             IpTaggingFilterConfigPeer::ipTagsLoader(*config1));
+  LcTrieSharedPtr ip_tags2 =
+      ip_tags_registry2->get(IpTaggingFilterConfigPeer::ipTagsPath(*config2),
+                             IpTaggingFilterConfigPeer::ipTagsLoader(*config2));
+  EXPECT_NE(ip_tags1.get(), ip_tags2.get());
 }
 
 class InternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
@@ -726,6 +757,110 @@ INSTANTIATE_TEST_CASE_P(ClearRouteCache, ClearRouteCacheTest,
                         ::testing::ValuesIn({internal_request_config,
                                              internal_request_with_json_file_config,
                                              internal_request_with_yaml_file_config}));
+
+struct IpTagsFileReloadTestCase {
+
+  IpTagsFileReloadTestCase() = default;
+  IpTagsFileReloadTestCase(const std::string& yaml_config, FilterRequestType request_type,
+                           const std::string& remote_address,
+                           const std::string& source_ip_tags_file_path,
+                           const std::string& reloaded_ip_tags_file_path,
+                           const std::string& hit_counter_prefix,
+                           const Http::TestRequestHeaderMapImpl tagged_headers,
+                           const Http::TestRequestHeaderMapImpl not_tagged_headers)
+      : yaml_config_(yaml_config), request_type_(request_type), remote_address_(remote_address),
+        source_ip_tags_file_path_(source_ip_tags_file_path),
+        reloaded_ip_tags_file_path_(reloaded_ip_tags_file_path),
+        hit_counter_prefix_(hit_counter_prefix), tagged_headers_(tagged_headers),
+        not_tagged_headers_(not_tagged_headers) {}
+  IpTagsFileReloadTestCase(const IpTagsFileReloadTestCase& rhs) = default;
+
+  std::string yaml_config_;
+  FilterRequestType request_type_;
+  std::string remote_address_;
+  std::string source_ip_tags_file_path_;
+  std::string reloaded_ip_tags_file_path_;
+  std::string hit_counter_prefix_;
+  Http::TestRequestHeaderMapImpl tagged_headers_;
+  Http::TestRequestHeaderMapImpl not_tagged_headers_;
+};
+
+class IpTagsFileReloadImplTest : public ::testing::TestWithParam<IpTagsFileReloadTestCase> {
+public:
+  IpTagsFileReloadImplTest() : api_(Api::createApiForTest()) {
+    ON_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))
+        .WillByDefault(Return(true));
+  }
+
+  static void SetUpTestSuite() { ip_tags_registry = std::make_shared<IpTagsRegistrySingleton>(); }
+
+  void initializeFilter(const std::string& yaml) {
+    envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
+    config_ = std::make_shared<IpTaggingFilterConfig>(config, ip_tags_registry, "prefix.",
+                                                      *stats_.rootScope(), runtime_, *api_,
+                                                      validation_visitor_);
+    filter_ = std::make_unique<IpTaggingFilter>(config_);
+    filter_->setDecoderFilterCallbacks(filter_callbacks_);
+  }
+
+  ~IpTagsFileReloadImplTest() override {
+    if (filter_) {
+      filter_->onDestroy();
+    }
+  }
+
+  NiceMock<Stats::MockStore> stats_;
+  IpTaggingFilterConfigSharedPtr config_;
+  std::unique_ptr<IpTaggingFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
+  Buffer::OwnedImpl data_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  Api::ApiPtr api_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+};
+
+TEST_P(IpTagsFileReloadImplTest, IpTagsFileReloaded) {
+  IpTagsFileReloadTestCase test_case = GetParam();
+  initializeFilter(test_case.yaml_config_);
+  EXPECT_EQ(test_case.request_type_, config_->requestType());
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow(test_case.remote_address_);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(stats_,
+              counter(absl::StrCat(ip_tagging_prefix, test_case.hit_counter_prefix_, ".hit")));
+  EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "total")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(test_case.tagged_headers_, false));
+  EXPECT_EQ(test_case.hit_counter_prefix_,
+            test_case.tagged_headers_.get_(Http::Headers::get().EnvoyIpTags));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(test_case.not_tagged_headers_, false));
+  EXPECT_FALSE(test_case.not_tagged_headers_.has(Http::Headers::get().EnvoyIpTags));
+  // std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
+  // std::string reloaded_db_file_path =
+  // TestEnvironment::substitute(test_case.reloaded_db_file_path_);
+  // TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
+  // TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
+}
+
+struct IpTagsFileReloadTestCase ip_tags_file_reload_test_cases[] = {
+    {internal_request_with_yaml_file_config,
+     FilterRequestType::INTERNAL,
+     "1.2.3.5",
+     "",
+     "",
+     "internal_request",
+     {{"x-envoy-internal", "true"}},
+     {}},
+};
+
+INSTANTIATE_TEST_SUITE_P(TestName, IpTagsFileReloadImplTest,
+                         ::testing::ValuesIn(ip_tags_file_reload_test_cases));
 
 } // namespace
 } // namespace IpTagging
