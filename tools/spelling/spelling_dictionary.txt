@@ -5,7 +5,6 @@
 ABI
 ACK
 ACL
-ACR
 AES
 AJAX
 AllMuxes
