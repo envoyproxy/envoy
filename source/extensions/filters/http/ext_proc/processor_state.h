@@ -299,20 +299,20 @@ private:
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 
-  absl::Status handleContinueAndReplace(
-    const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status
+  handleContinueAndReplace(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
-  absl::Status handleContinueResponse(
-    const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status
+  handleContinueResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
-  absl::Status handleCompleteBodyAvailable(
-    const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status
+  handleCompleteBodyAvailable(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
-  absl::Status handleBufferedPartialMode(
-    const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status
+  handleBufferedPartialMode(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
-  absl::Status handleTrailersAndCleanup(
-    const envoy::service::ext_proc::v3::HeadersResponse& response);
+  absl::Status
+  handleTrailersAndCleanup(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
   /**
    * Validates if the current callback state is valid for processing body responses.

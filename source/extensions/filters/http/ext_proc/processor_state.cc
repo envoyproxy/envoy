@@ -149,9 +149,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 
   ENVOY_STREAM_LOG(debug, "applying headers response. body mode = {}", *filter_callbacks_,
                    ProcessingMode::BodySendMode_Name(body_mode_));
-  
+
   const auto& common_response = response.response();
-  
+
   // Process header mutation if present
   if (common_response.has_header_mutation()) {
     const auto mut_status = processHeaderMutation(common_response);
@@ -167,7 +167,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
     return handleContinueAndReplace(response);
   }
-  
+
   return handleContinueResponse(response);
 }
 
@@ -182,7 +182,7 @@ absl::Status ProcessorState::handleContinueAndReplace(const HeadersResponse& res
     // the original one.
     headers_->removeContentLength();
     body_replaced_ = true;
-    
+
     if (bufferedData() == nullptr) {
       Buffer::OwnedImpl new_body;
       MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
@@ -201,7 +201,7 @@ absl::Status ProcessorState::handleContinueAndReplace(const HeadersResponse& res
   body_mode_ = ProcessingMode::NONE;
   send_trailers_ = false;
   clearWatermark();
-  
+
   // If we got here, then the processor doesn't care about the body or is not ready for
   // trailers, so we can just continue.
   ENVOY_STREAM_LOG(trace, "Clearing stored headers", *filter_callbacks_);
@@ -238,7 +238,7 @@ absl::Status ProcessorState::handleContinueResponse(const HeadersResponse& respo
   } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
     return handleBufferedPartialMode(response);
   }
-  
+
   return handleTrailersAndCleanup(response);
 }
 
@@ -267,7 +267,7 @@ absl::Status ProcessorState::handleCompleteBodyAvailable(const HeadersResponse& 
     filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
     return absl::OkStatus();
   }
-  
+
   return handleTrailersAndCleanup(response);
 }
 
@@ -280,15 +280,14 @@ absl::Status ProcessorState::handleBufferedPartialMode(const HeadersResponse& re
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     enqueueStreamingChunk(buffered_chunk, false);
   }
-  
+
   if (queueOverHighLimit()) {
     // We reached the limit so send what we have. This is different from the buffered
     // case because we need to be set up to handle data that might come in while
     // waiting for the callback, so the chunk needs to stay on the queue.
     const auto& all_data = consolidateStreamedChunks();
     ENVOY_STREAM_LOG(
-        debug,
-        "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
+        debug, "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
         *filter_callbacks_, chunkQueue().receivedData().length(), all_data.end_stream);
     auto req = filter_.setupBodyChunk(*this, chunkQueue().receivedData(), false);
     filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
@@ -297,7 +296,7 @@ absl::Status ProcessorState::handleBufferedPartialMode(const HeadersResponse& re
     // the headers while we buffer the body up to the limit.
     clearWatermark();
   }
-  
+
   filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
   return absl::OkStatus();
 }
