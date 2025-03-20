@@ -118,7 +118,7 @@ TEST_F(QuicFilterManagerConnectionImplTest, BufferLimit) {
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, CloseConnection) {
-  EXPECT_ENVOY_BUG(impl_.closeConnection(ConnectionCloseAction()),
+  EXPECT_ENVOY_BUG(impl_.closeConnection(Network::ConnectionCloseAction()),
                    "unexpected call to closeConnection for QUIC");
 }
 
