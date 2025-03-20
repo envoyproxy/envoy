@@ -22,6 +22,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
@@ -2137,6 +2138,84 @@ TEST_P(Http1ServerConnectionImplTest, IgnoreUpgradeH2cCloseEtc) {
                            "Upgrade, Close, HTTP2-Settings, Etc\r\nUpgrade: h2c\r\nHTTP2-Settings: "
                            "token64\r\nHost: bah\r\n\r\n");
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_P(Http1ServerConnectionImplTest, IgnoreSpecificTLSVersionUpgradeRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("TLS/1.2");
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
+
+  initialize();
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: Upgrade\r\n"
+                           "Upgrade: TLS/1.2\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_P(Http1ServerConnectionImplTest, IgnorePrefixUpgradeRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("TLS/");
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
+
+  initialize();
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: Upgrade\r\n"
+                           "Upgrade: TLS/1.1, TLS/1.2\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_P(Http1ServerConnectionImplTest, PartialIgnoreUpgradeRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("TLS/1.2");
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
+
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {"connection", "upgrade"}, {"upgrade", "TLS/1.1"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl buffer(
+      "GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: TLS/1.1, TLS/1.2\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_P(Http1ServerConnectionImplTest, NoIgnoreUpgradeRequest) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {"connection", "upgrade"}, {"upgrade", "TLS/1.2"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  ;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: TLS/1.2\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_P(Http1ServerConnectionImplTest, UpgradeRequest) {

@@ -11,6 +11,7 @@
 
 #include "source/extensions/filters/http/ext_proc/config.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
@@ -18,7 +19,9 @@
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -33,6 +36,7 @@ using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+using Envoy::Extensions::HttpFilters::ExternalProcessing::verifyMultipleHeaderValues;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 using envoy::service::ext_proc::v3::BodyResponse;
@@ -50,7 +54,9 @@ using Extensions::HttpFilters::ExternalProcessing::DEFAULT_DEFERRED_CLOSE_TIMEOU
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
+using Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
+using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
 
 using Http::LowerCaseString;
 
@@ -62,6 +68,30 @@ struct ConfigOptions {
   bool http1_codec = false;
   bool add_metadata = false;
   bool downstream_filter = true;
+  bool add_response_processor = false;
+};
+
+// A filter that sticks dynamic metadata info into headers for integration testing.
+class DynamicMetadataToHeadersFilter : public Http::PassThroughFilter {
+public:
+  constexpr static char name[] = "dynamic-metadata-to-headers-filter";
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    if (decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata_size() > 0) {
+      const auto& md = decoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+      for (const auto& md_entry : md) {
+        std::string key_prefix = md_entry.first;
+        for (const auto& field : md_entry.second.fields()) {
+          headers.addCopy(Http::LowerCaseString(key_prefix), field.first);
+        }
+      }
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
 };
 
 // These tests exercise the ext_proc filter through Envoy's integration test
@@ -176,6 +206,20 @@ protected:
         )EOF"));
       }
 
+      // Add dynamic_metadata_to_headers filter to inject dynamic metadata used for testing
+      if (config_option.add_response_processor) {
+        simple_filter_config_ =
+            std::make_unique<SimpleFilterConfig<DynamicMetadataToHeadersFilter>>();
+        registration_ = std::make_unique<
+            Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>(
+            *simple_filter_config_);
+        config_helper_.prependFilter(fmt::format(R"EOF(
+         name: dynamic-metadata-to-headers-filter
+         typed_config:
+           "@type": type.googleapis.com/google.protobuf.Struct
+        )EOF"));
+      }
+
       // Add logging test filter only in Envoy gRPC mode.
       // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
       if (clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter &&
@@ -196,6 +240,16 @@ protected:
       // Parameterize with defer processing to prevent bit rot as filter made
       // assumptions of data flow, prior relying on eager processing.
     });
+
+    if (config_option.add_response_processor) {
+      processing_response_factory_ = std::make_unique<TestOnProcessingResponseFactory>();
+      processing_response_factory_registration_ =
+          std::make_unique<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>(
+              *processing_response_factory_);
+      ProtobufWkt::Struct config;
+      proto_config_.mutable_on_processing_response()->set_name("test-on-processing-response");
+      proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
+    }
 
     if (config_option.http1_codec) {
       setUpstreamProtocol(Http::CodecType::HTTP1);
@@ -843,6 +897,13 @@ protected:
     processor_stream_->sendGrpcMessage(response_trailer);
   }
 
+  std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
+  std::unique_ptr<
+      Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>
+      registration_;
+  std::unique_ptr<TestOnProcessingResponseFactory> processing_response_factory_;
+  std::unique_ptr<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>
+      processing_response_factory_registration_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   bool protocol_config_encoded_ = false;
   ProtocolConfiguration protocol_config_{};
@@ -1748,7 +1809,9 @@ TEST_P(ExtProcIntegrationTest, MismatchedContentLengthAndBodyLength) {
 // an ext_proc server that responds to the response_headers message
 // by requesting to modify the response headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
-  initializeConfig();
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -1768,6 +1831,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
 
   verifyDownstreamResponse(*response, 201);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-response-processed", "1"));
+  // Verify that the response processor added headers to dynamic metadata
+  verifyMultipleHeaderValues(
+      response->headers(),
+      Envoy::Http::LowerCaseString("envoy-test-ext_proc-response_headers_response"), ":status",
+      "x-response-processed");
 }
 
 // Test the filter using the default configuration by connecting to
@@ -1836,7 +1904,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
 // by checking the headers and modifying the trailers
 TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
-  initializeConfig();
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -1858,6 +1928,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
   ASSERT_TRUE(response->trailers());
   EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-test-trailers", "Yes"));
   EXPECT_THAT(*(response->trailers()), SingleHeaderValueIs("x-modified-trailers", "xxx"));
+  EXPECT_THAT(
+      response->headers(),
+      SingleHeaderValueIs("envoy-test-ext_proc-response_trailers_response", "x-modified-trailers"));
 }
 
 // Test the filter using the default configuration by connecting to
@@ -1919,7 +1992,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
 // by requesting to modify the response body and headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
-  initializeConfig();
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
@@ -1952,6 +2027,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
   // Verify that the content length header in the response is set by external processor,
   EXPECT_EQ(response->headers().getContentLengthValue(), "13");
   EXPECT_EQ("Hello, World!", response->body());
+  EXPECT_THAT(
+      response->headers(),
+      SingleHeaderValueIs("envoy-test-ext_proc-response_headers_response", "content-length"));
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnResponse) {
@@ -2275,7 +2353,9 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponse) {
 // should still be seen by the downstream.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  initializeConfig();
+  ConfigOptions config_options;
+  config_options.add_response_processor = true;
+  initializeConfig(config_options);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBody("Evil content!", absl::nullopt);
   processRequestHeadersMessage(
@@ -2294,6 +2374,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
   EXPECT_EQ("{\"reason\": \"Request too evil\"}", response->body());
   // The previously added request header is not sent to the client.
   EXPECT_THAT(response->headers(), HasNoHeader("foo"));
+  EXPECT_THAT(response->headers(),
+              SingleHeaderValueIs("envoy-test-ext_proc-request_headers_response", "foo"));
 }
 
 // Test immediate_response behavior with STREAMED response body.

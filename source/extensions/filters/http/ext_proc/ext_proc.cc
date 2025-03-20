@@ -26,6 +26,7 @@ namespace ExternalProcessing {
 namespace {
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
+using envoy::config::core::v3::TrafficDirection;
 using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
@@ -1321,50 +1322,26 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingRequestHeaders(*response, processing_status,
-                                                             decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingResponseHeaders(*response, processing_status,
-                                                              decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingRequestBody(*response, processing_status,
-                                                          decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingResponseBody(*response, processing_status,
-                                                           decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingRequestTrailers(*response, processing_status,
-                                                              decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingResponseTrailers(*response, processing_status,
-                                                               decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     if (config_->disableImmediateResponse()) {
@@ -1373,11 +1350,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
                        "Treat the immediate response message as spurious response.");
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
-
-      if (on_processing_response_) {
-        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
-                                                                 decoder_callbacks_->streamInfo());
-      }
     } else {
       setDecoderDynamicMetadata(*response);
       // We won't be sending anything more to the stream after we
@@ -1387,8 +1359,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       onFinishProcessorCalls(Grpc::Status::Ok);
       closeStream();
       if (on_processing_response_) {
-        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
-                                                                 decoder_callbacks_->streamInfo());
+        on_processing_response_->afterReceivingImmediateResponse(
+            response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
       }
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
@@ -1708,6 +1680,49 @@ std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse()
     return nullptr;
   }
   return on_processing_response_factory_cb_();
+}
+
+void Filter::onProcessHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                      absl::Status status, TrafficDirection traffic_direction) {
+  if (on_processing_response_) {
+    ASSERT(traffic_direction != TrafficDirection::UNSPECIFIED);
+    if (traffic_direction == TrafficDirection::INBOUND) {
+      on_processing_response_->afterProcessingRequestHeaders(response, status,
+                                                             decoder_callbacks_->streamInfo());
+    } else {
+      on_processing_response_->afterProcessingResponseHeaders(response, status,
+                                                              encoder_callbacks_->streamInfo());
+    }
+  }
+}
+
+void Filter::onProcessTrailersResponse(
+    const envoy::service::ext_proc::v3::TrailersResponse& response, absl::Status status,
+    TrafficDirection traffic_direction) {
+  if (on_processing_response_) {
+    ASSERT(traffic_direction != TrafficDirection::UNSPECIFIED);
+    if (traffic_direction == TrafficDirection::INBOUND) {
+      on_processing_response_->afterProcessingRequestTrailers(response, status,
+                                                              decoder_callbacks_->streamInfo());
+    } else {
+      on_processing_response_->afterProcessingResponseTrailers(response, status,
+                                                               encoder_callbacks_->streamInfo());
+    }
+  }
+}
+
+void Filter::onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response,
+                                   absl::Status status, TrafficDirection traffic_direction) {
+  if (on_processing_response_) {
+    ASSERT(traffic_direction != TrafficDirection::UNSPECIFIED);
+    if (traffic_direction == TrafficDirection::INBOUND) {
+      on_processing_response_->afterProcessingRequestBody(response, status,
+                                                          decoder_callbacks_->streamInfo());
+    } else {
+      on_processing_response_->afterProcessingResponseBody(response, status,
+                                                           encoder_callbacks_->streamInfo());
+    }
+  }
 }
 
 } // namespace ExternalProcessing

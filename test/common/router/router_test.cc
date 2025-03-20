@@ -4937,7 +4937,7 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
 }
 
 // If the shadow stream watermark callbacks are invoked in the Router filter destructor,
-// it causes a potential use-after-free bug, as the FilterManger may have already been freed.
+// it causes a potential use-after-free bug, as the FilterManager may have already been freed.
 TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
   if (!streaming_shadow_) {
     GTEST_SKIP();

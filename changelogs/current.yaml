@@ -35,6 +35,10 @@ minor_behavior_changes:
     AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
     credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
     then the original behaviour with a signing failure will occur.
+- area: formatter
+  change: |
+    The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
+    substitution format string if the related extensions are linked.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -95,6 +99,12 @@ bug_fixes:
 - area: listener
   change: |
     Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
+- area: ext_proc
+  change: |
+    Fixed a bug for the :ref:`extension
+    <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` where the
+    :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor was being saved to
+    filter state after iterating through the filter chain.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -130,6 +140,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Added :ref:`ignore_http_11_upgrade
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
+    to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
 - area: http
   change: |
     Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
@@ -199,6 +214,10 @@ new_features:
 - area: formatter
   change: |
     Added ``CUSTOM_FLAGS`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
+    for more details.
+- area: formatter
+  change: |
+    Added ``PATH`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
     for more details.
 - area: http
   change: |
