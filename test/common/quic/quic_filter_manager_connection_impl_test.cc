@@ -118,11 +118,12 @@ TEST_F(QuicFilterManagerConnectionImplTest, BufferLimit) {
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, CloseConnection) {
-  EXPECT_ENVOY_BUG(impl_.closeConnection(), "unexpected call to closeConnection for QUIC");
+  EXPECT_ENVOY_BUG(impl_.closeConnection(ConnectionCloseAction()),
+                   "unexpected call to closeConnection for QUIC");
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, EnableCloseThroughFilterManager) {
-  EXPECT_ENVOY_BUG(impl_.enableCloseThroughFilterManager(1),
+  EXPECT_ENVOY_BUG(impl_.enableCloseThroughFilterManager(true),
                    "unexpected call to enableCloseThroughFilterManager for QUIC");
 }
 
