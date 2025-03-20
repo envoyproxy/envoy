@@ -314,6 +314,15 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
 
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    // Clean up the upstream_requests_.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.router_filter_resetall_on_local_reply")) {
+      resetAll();
+    }
+    return Http::LocalErrorStatus::Continue;
+  }
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
