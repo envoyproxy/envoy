@@ -118,6 +118,8 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithGracefulClose) {
   stream->closeStream();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
 }
 
 TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnRemoteClose) {
@@ -133,6 +135,8 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnRemoteClose) {
   stream->waitForRemoteCloseAndDelete();
   stream->encodeServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   runDispatcherUntilStreamDeletion();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
 }
 
 TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnTimeout) {
