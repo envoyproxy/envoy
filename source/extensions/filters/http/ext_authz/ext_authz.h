@@ -19,12 +19,17 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/resp_cache/resp_cache.h" // For response cache
+#include "source/common/resp_cache/resp_cache_factory.h"
+#include "source/common/resp_cache/simple_cache.h" // For simple cache, which is a type of response cache
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
+
+using Envoy::Common::RespCache::RespCache;
 
 namespace Envoy {
 namespace Extensions {
@@ -130,6 +135,28 @@ public:
   bool packAsBytes() const { return pack_as_bytes_; }
 
   bool headersAsBytes() const { return encode_raw_headers_; }
+
+  // Return the right response cache, based on the template type.
+  template <typename T> Envoy::Common::RespCache::RespCache<T>& responseCache() {
+    if constexpr (std::is_same_v<T, uint16_t>) {
+      return *response_cache_status_;
+    } else if constexpr (std::is_same_v<T, Filters::Common::ExtAuthz::Response>) {
+      return *response_cache_full_;
+    } else {
+      throw std::runtime_error("Unsupported type");
+    }
+  }
+
+  /*const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
+    return response_cache_header_name_;
+  }*/
+
+  // Access to response_cache_config configuration parameters.
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& responseCacheConfig() const {
+    return response_cache_config_;
+  }
+
+  bool responseCacheRememberBodyHeaders() const { return response_cache_remember_body_headers_; }
 
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
@@ -271,6 +298,21 @@ private:
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
 
+  // Private fields and methods for response cache
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> response_cache_config_;
+  bool response_cache_remember_body_headers_;
+
+  // Declare two caches. The response cache functionality has two modes:
+  //   1. Remember only the status code for a given request. This minimizes memory usage.
+  //   2. Remember the full response (headers, body, status) from external authorization server.
+  //   This maximizes functionality.
+  // Depending on configuration (response_cache_remember_body_headers_), one of the two caches are
+  // used.
+  std::unique_ptr<Envoy::Common::RespCache::RespCache<uint16_t>> response_cache_status_;
+  std::unique_ptr<Envoy::Common::RespCache::RespCache<Filters::Common::ExtAuthz::Response>>
+      response_cache_full_;
+  void initializeCache(Server::Configuration::ServerFactoryContext& factory_context);
+
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
   // (ExtAuthzFilterStats stats_).
@@ -383,6 +425,7 @@ private:
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo();
+  void onCompleteSub(Filters::Common::ExtAuthz::ResponsePtr&&);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
