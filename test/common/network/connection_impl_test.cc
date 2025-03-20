@@ -2052,8 +2052,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that remote early close can still be detected with filter manager.
-TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseWithFilterManager) {
+// Test that remote early close is not managed by the filter manager.
+TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseWithoutFilterManager) {
   setUpBasicConnection();
   connect();
 
@@ -2087,8 +2087,9 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseWithFilterManager) {
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
-        // Advance time by 50ms; delayed close timer should _not_ trigger.
-        time_system_.setMonotonicTime(std::chrono::milliseconds(50));
+        // Advance time by 1000ms; delayed close timer should _not_ trigger
+        // since the close() is gated by the filter manager.
+        time_system_.setMonotonicTime(std::chrono::milliseconds(1000));
         client_connection_->close(ConnectionCloseType::NoFlush);
         return FilterStatus::StopIteration;
       }));
@@ -2104,8 +2105,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseWithFilterManager) {
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
-
-  // Allow the early remote close.
+  // File close event is not monitored until now.
   read_filter_->callbacks_->continueClosing();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

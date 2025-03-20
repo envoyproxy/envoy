@@ -673,7 +673,9 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     // If half-close is disabled, there are two scenarios where this applies:
     //    1. During the closeInternal(_) call.
     //    2. When an early close is detected while the connection is read-disabled.
-    remoteCloseThroughFilterManager();
+    // Both situations allow the connection to bypass the filter manager's status since there will
+    // be data loss even in normal cases.
+    closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
 
