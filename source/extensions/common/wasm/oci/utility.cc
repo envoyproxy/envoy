@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "source/common/common/thread.h"
 #include "source/common/json/json_loader.h"
 
 #include "absl/strings/match.h"
@@ -44,36 +43,27 @@ absl::StatusOr<std::string> prepareAuthorizationHeader(std::string image_pull_se
     return absl::InvalidArgumentError("Empty image pull secret");
   }
 
-  Json::ObjectSharedPtr image_pull_secret;
-  TRY_ASSERT_MAIN_THREAD {
-    image_pull_secret = THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(image_pull_secret_raw),
-                                              Json::ObjectSharedPtr);
+  auto image_pull_secret_result = Json::Factory::loadFromString(image_pull_secret_raw);
+  if (!image_pull_secret_result.ok()) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to parse image pull secret: ",
+                                                   image_pull_secret_result.status().message()));
   }
-  END_TRY
-  catch (EnvoyException& e) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to parse image pull secret: ", e.what()));
-  }
+  Json::ObjectSharedPtr image_pull_secret = image_pull_secret_result.value();
 
-  Json::ObjectSharedPtr auths;
-  TRY_ASSERT_MAIN_THREAD {
-    auths = THROW_OR_RETURN_VALUE(image_pull_secret->getObject("auths"), Json::ObjectSharedPtr);
+  auto auths_result = image_pull_secret->getObject("auths");
+  if (!auths_result.ok()) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Did not find 'auths' key in the image pull secret: ", auths_result.status().message()));
   }
-  END_TRY
-  catch (EnvoyException& e) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Did not find 'auths' key in the image pull secret: ", e.what()));
-  }
+  Json::ObjectSharedPtr auths = auths_result.value();
 
-  Json::ObjectSharedPtr registry_object;
-  TRY_ASSERT_MAIN_THREAD {
-    registry_object = THROW_OR_RETURN_VALUE(auths->getObject(registry), Json::ObjectSharedPtr);
+  auto registry_result = auths->getObject(registry);
+  if (!registry_result.ok()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Did not find 'auths.", registry,
+                     "' key in the image pull secret: ", registry_result.status().message()));
   }
-  END_TRY
-  catch (EnvoyException& e) {
-    return absl::InvalidArgumentError(absl::StrCat("Did not find 'auths.", registry,
-                                                   "' key in the image pull secret: ", e.what()));
-  }
+  Json::ObjectSharedPtr registry_object = registry_result.value();
 
   auto auth = registry_object->getString("auth");
   if (!auth.ok()) {

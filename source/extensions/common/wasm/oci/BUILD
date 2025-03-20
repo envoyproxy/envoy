@@ -46,7 +46,6 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         "//source/common/json:json_loader_lib",
-        "//source/common/thread_local:thread_local_lib",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
