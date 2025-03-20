@@ -49,24 +49,33 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
-using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
-using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
-
 // Helper class to test StreamInfoFormatter.
-class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+class StreamInfoFormatter : public FormatterProvider {
 public:
   StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
-                      absl::optional<size_t> max_length = absl::nullopt)
-      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
-    for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
-      auto formatter = cmd->parse(command, sub_command, max_length);
-      if (formatter) {
-        formatter_ = std::move(formatter);
-        return;
-      }
+                      absl::optional<size_t> max_length = absl::nullopt) {
+    DefaultBuiltInStreamInfoCommandParserFactory factory;
+    auto parser = factory.createCommandParser();
+    formatter_ = parser->parse(command, sub_command, max_length);
+    if (formatter_ == nullptr) {
+      throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
     }
-    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
   }
+
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const Context& context,
+                    const StreamInfo::StreamInfo& stream_info) const override {
+    return formatter_->formatWithContext(context, stream_info);
+  }
+  ProtobufWkt::Value
+  formatValueWithContext(const Context& context,
+                         const StreamInfo::StreamInfo& stream_info) const override {
+    return formatter_->formatValueWithContext(context, stream_info);
+  }
+
+private:
+  FormatterProviderPtr formatter_;
 };
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
@@ -569,6 +578,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("15", duration_format.formatWithContext({}, stream_info));
     EXPECT_THAT(duration_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(15.0)));
+  }
+
+  {
+    StreamInfoFormatter custom_flags_format("CUSTOM_FLAGS");
+    stream_info.addCustomFlag("flag1");
+    stream_info.addCustomFlag("flag2");
+    EXPECT_EQ("flag1,flag2", custom_flags_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(custom_flags_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("flag1,flag2")));
   }
 
   {
@@ -4529,6 +4547,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       plain_string: plain_string_value
       protocol: '%PROTOCOL%'
     request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+    key: {}
   )EOF",
                             key_mapping);
 
@@ -4548,7 +4567,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       "plain_string": "plain_string_value",
       "protocol": "HTTP/1.1"
     },
-    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_",
+    "key": null
   })EOF";
 
   JsonFormatterImpl formatter(key_mapping, false);
@@ -4972,8 +4992,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%START_TIME(%4On%)%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_THROW(THROW_OR_RETURN_VALUE(parser.parse(test_case),
-                                       std::vector<FormatterProviderBasePtr<HttpFormatterContext>>),
+    EXPECT_THROW(THROW_OR_RETURN_VALUE(parser.parse(test_case), std::vector<FormatterProviderPtr>),
                  EnvoyException)
         << test_case;
   }
@@ -5079,6 +5098,59 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
     ASSERT_EQ(providers.size(), 1);
 
     EXPECT_EQ("te", providers[0]->formatWithContext({}, stream_info));
+  }
+}
+
+TEST(SubstitutionFormatterTest, PathTest) {
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
+                              EnvoyException,
+                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
+        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/path/to/something"}};
+    Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/path/to/something?query=123"}};
+    Http::TestRequestHeaderMapImpl request_headers_3{{":path", "/path/to/something"},
+                                                     {"x-envoy-original-path", "/original/path"}};
+    Http::TestRequestHeaderMapImpl request_headers_4{
+        {":path", "/path/to/something?query=123"},
+        {"x-envoy-original-path", "/original/path?query=123"}};
+
+    StreamInfo::MockStreamInfo stream_info;
+
+    for (absl::string_view query : {"", "WQ", "NQ"}) {
+      for (absl::string_view orig : {"", "ORIG", "PATH", "ORIG_OR_PATH"}) {
+        auto providers =
+            *SubstitutionFormatParser::parse(absl::StrCat("%PATH(", query, ":", orig, ")%"));
+        ASSERT_EQ(providers.size(), 1);
+
+        std::string expected_1 = orig != "ORIG" ? "/path/to/something" : "-";
+        std::string expected_2 =
+            fmt::format("{}", orig != "ORIG" ? fmt::format("/path/to/something{}",
+                                                           query != "NQ" ? "?query=123" : "")
+                                             : "-");
+        std::string expected_3 = orig != "PATH" ? "/original/path" : "/path/to/something";
+        std::string expected_4 =
+            fmt::format("{}{}", orig != "PATH" ? "/original/path" : "/path/to/something",
+                        query != "NQ" ? "?query=123" : "");
+
+        EXPECT_EQ(expected_1,
+                  providers[0]->formatWithContext({&request_headers_1}, stream_info).value_or("-"));
+        EXPECT_EQ(expected_2,
+                  providers[0]->formatWithContext({&request_headers_2}, stream_info).value_or("-"));
+        EXPECT_EQ(expected_3,
+                  providers[0]->formatWithContext({&request_headers_3}, stream_info).value_or("-"));
+        EXPECT_EQ(expected_4,
+                  providers[0]->formatWithContext({&request_headers_4}, stream_info).value_or("-"));
+      }
+    }
   }
 }
 

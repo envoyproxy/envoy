@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.ext_proc.v3;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.ext_proc.v3";
+option java_outer_classname = "ExtProcProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/ext_proc/v3;ext_procv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: External Processing Filter]
+// [#not-implemented-hide:]
+// External Processing Filter: Process network traffic using an external service.
+// [#extension: envoy.filters.network.ext_proc]
+
+// The Network External Processing filter allows an external service to process raw TCP/UDP traffic
+// in a flexible way using a bidirectional gRPC stream. Unlike the HTTP External Processing filter,
+// this filter operates at the L4 (transport) layer, giving access to raw network traffic.
+//
+// The filter communicates with an external gRPC service that can:
+// * Inspect traffic in both directions
+// * Modify the network traffic
+// * Control connection lifecycle (continue, close, or reset)
+//
+// By using the filter's processing mode, you can selectively choose which data
+// directions to process (read, write or both), allowing for efficient processing.
+message NetworkExternalProcessor {
+  // The gRPC service that will process network traffic.
+  // This service must implement the NetworkExternalProcessor service
+  // defined in the proto file /envoy/service/network_ext_proc/v3/external_processor.proto.
+  config.core.v3.GrpcService grpc_service = 1;
+
+  // By default, if the gRPC stream cannot be established, or if it is closed
+  // prematurely with an error, the filter will fail, leading to the close of connection.
+  // With this parameter set to true, however, then if the gRPC stream is prematurely closed
+  // or could not be opened, processing continues without error.
+  // [#not-implemented-hide:]
+  bool failure_mode_allow = 2;
+
+  // Options for controlling processing behavior.
+  // [#not-implemented-hide:]
+  ProcessingMode processing_mode = 3;
+
+  // Specifies the timeout for each individual message sent on the stream and
+  // when the filter is running in synchronous mode. Whenever
+  // the proxy sends a message on the stream that requires a response, it will
+  // reset this timer, and will stop processing and return an error (subject
+  // to the processing mode) if the timer expires. Default is 200 ms.
+  // [#not-implemented-hide:]
+  google.protobuf.Duration message_timeout = 4 [(validate.rules).duration = {
+    lte {seconds: 3600}
+    gte {}
+  }];
+}
+
+// Options for controlling processing behavior.
+// Filter will reject the config if both read and write are SKIP mode.
+message ProcessingMode {
+  // Defines how traffic should be handled by the external processor.
+  enum DataSendMode {
+    // Send the data to the external processor for processing whenever the data is ready.
+    STREAMED = 0;
+
+    // Skip sending the data to the external processor.
+    SKIP = 1;
+  }
+
+  // Controls whether inbound (read) data from the client is sent to the external processor.
+  // Default: STREAMED
+  DataSendMode process_read = 1;
+
+  // Controls whether outbound (write) data to the client is sent to the external processor.
+  // Default: STREAMED
+  DataSendMode process_write = 2;
+}

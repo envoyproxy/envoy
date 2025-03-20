@@ -201,6 +201,12 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
+
+  /// This is called when the stream is complete.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  ///
+  /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
+  fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
@@ -501,6 +507,22 @@ pub trait EnvoyHttpFilter {
   /// This is useful when the filter wants to force a re-evaluation of the route selection after
   /// modifying the request headers, etc that affect the routing decision.
   fn clear_route_cache(&mut self);
+
+  /// Get the value of the attribute with the given ID as a string.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_string<'a>(
+    &'a self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the value of the attribute with the given ID as an integer.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -907,6 +929,46 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     }
   }
+
+  fn get_attribute_string(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer> {
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_string(
+        self.raw_ptr,
+        attribute_id,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64> {
+    let mut result: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_int(
+        self.raw_ptr,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1157,6 +1219,16 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
   drop_wrapped_c_void_ptr!(filter_ptr, HttpFilter<EnvoyHttpFilterImpl>);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
 #[no_mangle]

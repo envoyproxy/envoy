@@ -131,13 +131,7 @@ struct SupportedCommands {
     return !writeCommands().contains(command);
   }
 
-  static bool isSupportedCommand(const std::string& command) {
-    return (simpleCommands().contains(command) || evalCommands().contains(command) ||
-            hashMultipleSumResultCommands().contains(command) ||
-            transactionCommands().contains(command) || auth() == command || echo() == command ||
-            mget() == command || mset() == command || keys() == command || ping() == command ||
-            time() == command || quit() == command || select() == command);
-  }
+  static bool isSupportedCommand(const std::string& command);
 };
 
 } // namespace Redis

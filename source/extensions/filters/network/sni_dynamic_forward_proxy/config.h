@@ -18,12 +18,13 @@ using FilterConfig =
  * Config registration for the sni_dynamic_forward_proxy filter. @see
  * NamedNetworkFilterConfigFactory.
  */
-class SniDynamicForwardProxyNetworkFilterConfigFactory : public Common::FactoryBase<FilterConfig> {
+class SniDynamicForwardProxyNetworkFilterConfigFactory
+    : public Common::ExceptionFreeFactoryBase<FilterConfig> {
 public:
   SniDynamicForwardProxyNetworkFilterConfigFactory();
 
 private:
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
                                     Server::Configuration::FactoryContext& context) override;
 };

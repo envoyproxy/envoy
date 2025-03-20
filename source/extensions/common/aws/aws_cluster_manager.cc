@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
-#include <memory>
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -31,7 +29,7 @@ absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
 AwsClusterManagerImpl::addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
                                                         AwsManagedClusterUpdateCallbacks& cb) {
   auto it = managed_clusters_.find(cluster_name);
-  ENVOY_LOG_MISC(debug, "Adding callback for cluster {}", cluster_name);
+  ENVOY_LOG(debug, "Adding callback for cluster {}", cluster_name);
   if (it == managed_clusters_.end()) {
     return absl::InvalidArgumentError("Cluster not found");
   }
@@ -39,8 +37,7 @@ AwsClusterManagerImpl::addManagedClusterUpdateCallbacks(absl::string_view cluste
   // If the cluster is already alive, signal the callback immediately to start retrieving
   // credentials
   if (!managed_cluster->is_creating_) {
-    ENVOY_LOG_MISC(debug, "Managed cluster {} is ready immediately, calling callback",
-                   cluster_name);
+    ENVOY_LOG(debug, "Managed cluster {} is ready immediately, calling callback", cluster_name);
     cb.onClusterAddOrUpdate();
     return absl::AlreadyExistsError("Cluster already online");
   }
@@ -56,7 +53,7 @@ void AwsClusterManagerImpl::onClusterAddOrUpdate(absl::string_view cluster_name,
     auto managed_cluster = it->second.get();
     managed_cluster->is_creating_.store(false);
     for (auto& cb : managed_cluster->update_callbacks_) {
-      ENVOY_LOG_MISC(debug, "Managed cluster {} is ready, calling callback", cluster_name);
+      ENVOY_LOG(debug, "Managed cluster {} is ready, calling callback", cluster_name);
       cb->onClusterAddOrUpdate();
     }
   }
@@ -74,8 +71,8 @@ void AwsClusterManagerImpl::createQueuedClusters() {
     auto cluster = Utility::createInternalClusterStatic(cluster_name, cluster_type, uri);
     auto status = context_.clusterManager().addOrUpdateCluster(cluster, "", true);
     if (!status.ok()) {
-      ENVOY_LOG_MISC(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
-                     status.status().ToString());
+      ENVOY_LOG(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
+                status.status().ToString());
       failed_clusters.push_back(cluster_name);
     }
   }
@@ -95,15 +92,15 @@ absl::Status AwsClusterManagerImpl::addManagedCluster(
     if (inserted.second) {
       it = inserted.first;
       it->second->is_creating_.store(true);
-      ENVOY_LOG_MISC(debug, "Added cluster {} to list, cluster list len {}", cluster_name,
-                     managed_clusters_.size());
+      ENVOY_LOG(debug, "Added cluster {} to list, cluster list len {}", cluster_name,
+                managed_clusters_.size());
 
       auto cluster = Utility::createInternalClusterStatic(cluster_name, cluster_type, uri);
       if (!queue_clusters_) {
         auto status = context_.clusterManager().addOrUpdateCluster(cluster, "", true);
         if (!status.ok()) {
-          ENVOY_LOG_MISC(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
-                         status.status().ToString());
+          ENVOY_LOG(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
+                    status.status().ToString());
           managed_clusters_.erase(cluster_name);
           return status.status();
         }
@@ -111,7 +108,7 @@ absl::Status AwsClusterManagerImpl::addManagedCluster(
     }
     return absl::OkStatus();
   } else {
-    ENVOY_LOG_MISC(debug, "Cluster {} already exists, not readding", cluster_name);
+    ENVOY_LOG(debug, "Cluster {} already exists, not readding", cluster_name);
     return absl::AlreadyExistsError("Cluster already exists");
   }
 }

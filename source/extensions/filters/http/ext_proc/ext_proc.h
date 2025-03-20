@@ -466,6 +466,16 @@ public:
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
   void onError() override;
 
+  void onProcessHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                absl::Status status,
+                                envoy::config::core::v3::TrafficDirection traffic_direction);
+  void onProcessTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response,
+                                 absl::Status status,
+                                 envoy::config::core::v3::TrafficDirection traffic_direction);
+  void onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response,
+                             absl::Status status,
+                             envoy::config::core::v3::TrafficDirection traffic_direction);
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
@@ -515,6 +525,8 @@ private:
 
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
 
+  void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   ExtProcFilterStats stats_;
@@ -549,6 +561,9 @@ private:
 
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
+
+  // If true, the protocol configurations are already sent to the server.
+  bool protocol_config_encoded_ = false;
 };
 
 extern std::string responseCaseToString(
