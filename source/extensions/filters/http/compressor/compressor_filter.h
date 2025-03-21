@@ -209,9 +209,6 @@ private:
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
-  bool
-  isResponseCodeCompressible(const Http::ResponseHeaderMap& headers,
-                             const CompressorFilterConfig::ResponseDirectionConfig& config) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
   void insertVaryHeader(Http::ResponseHeaderMap& headers);

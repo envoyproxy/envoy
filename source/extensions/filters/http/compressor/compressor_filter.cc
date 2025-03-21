@@ -284,6 +284,21 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   }
 }
 
+bool isResponseCodeCompressible(
+    const Http::ResponseHeaderMap& headers,
+    const CompressorFilterConfig::ResponseDirectionConfig& config) {
+  if (config.areAllResponseCodesCompressible()) {
+    return true;
+  }
+
+  absl::optional<uint64_t> response_code = Http::Utility::getResponseStatusOrNullopt(headers);
+  if (!response_code.has_value()) {
+    return true;
+  }
+
+  return config.isResponseCodeCompressible(response_code.value());
+}
+
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
@@ -586,21 +601,6 @@ bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompres
 bool CompressorFilterConfig::ResponseDirectionConfig::isResponseCodeCompressible(
     uint32_t response_code) const {
   return !uncompressible_response_codes_.contains(response_code);
-}
-
-bool CompressorFilter::isResponseCodeCompressible(
-    const Http::ResponseHeaderMap& headers,
-    const CompressorFilterConfig::ResponseDirectionConfig& config) const {
-  if (config.areAllResponseCodesCompressible()) {
-    return true;
-  }
-
-  absl::optional<uint64_t> response_code = Http::Utility::getResponseStatusOrNullopt(headers);
-  if (!response_code.has_value()) {
-    return true;
-  }
-
-  return config.isResponseCodeCompressible(response_code.value());
 }
 
 bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
