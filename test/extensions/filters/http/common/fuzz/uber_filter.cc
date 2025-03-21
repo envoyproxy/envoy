@@ -20,6 +20,8 @@ using ::testing::ReturnRef;
 UberFilterFuzzer::UberFilterFuzzer()
     : async_request_{&cluster_manager_.thread_local_cluster_.async_client_},
       thread_factory_(Thread::threadFactoryForTest()) {
+  ON_CALL(factory_context_.server_factory_context_, getTransportSocketFactoryContext())
+      .WillByDefault(ReturnRef(transport_socket_factory_context_));
   ON_CALL(api_, threadFactory()).WillByDefault(ReturnRef(thread_factory_));
   worker_thread_dispatcher_ =
       std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
