@@ -121,6 +121,11 @@ CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
                       stats_prefix + "request.", scope, runtime),
       is_set_{proto_config.has_request_direction_config()} {}
 
+absl::flat_hash_set<uint32_t>
+uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes) {
+  return {codes.begin(), codes.end()};
+}
+
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
@@ -165,12 +170,6 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
       new envoy::config::core::v3::RuntimeFeatureFlag(proto_config.runtime_enabled()));
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   return config;
-}
-
-absl::flat_hash_set<uint32_t>
-CompressorFilterConfig::ResponseDirectionConfig::uncompressibleResponseCodesSet(
-    const Protobuf::RepeatedField<uint32_t>& codes) {
-  return {codes.begin(), codes.end()};
 }
 
 Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompressor() {

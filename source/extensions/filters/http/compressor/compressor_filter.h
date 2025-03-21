@@ -130,9 +130,6 @@ public:
       return ResponseCompressorStats{RESPONSE_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
     }
 
-    static absl::flat_hash_set<uint32_t>
-    uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes);
-
     // TODO(rojkov): delete this translation function once the deprecated fields
     // are removed from envoy::extensions::filters::http::compressor::v3::Compressor.
     static const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
