@@ -320,9 +320,11 @@ TEST_P(CompressorIntegrationTest, SkipOnUncompressibleResponseCode) {
                                                            {":path", "/test/long/url"},
                                                            {":scheme", "http"},
                                                            {":authority", "host"},
-                                                           {"accept-encoding", "deflate, gzip"}},
+                                                           {"accept-encoding", "deflate, gzip"},
+                                                           {"range", "bytes=100-227"}},
                             Http::TestResponseHeaderMapImpl{{":status", "206"},
                                                             {"content-length", "128"},
+                                                            {"content-range", "bytes=100-227/567"},
                                                             {"content-type", "application/xml"}});
 }
 

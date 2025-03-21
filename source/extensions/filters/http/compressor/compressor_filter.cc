@@ -284,9 +284,8 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   }
 }
 
-bool isResponseCodeCompressible(
-    const Http::ResponseHeaderMap& headers,
-    const CompressorFilterConfig::ResponseDirectionConfig& config) {
+bool isResponseCodeCompressible(const Http::ResponseHeaderMap& headers,
+                                const CompressorFilterConfig::ResponseDirectionConfig& config) {
   if (config.areAllResponseCodesCompressible()) {
     return true;
   }
