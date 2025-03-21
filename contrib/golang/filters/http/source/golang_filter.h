@@ -92,7 +92,6 @@ public:
   CAPIStatus incrementMetric(uint32_t metric_id, int64_t offset);
   CAPIStatus getMetric(uint32_t metric_id, uint64_t* value);
   CAPIStatus recordMetric(uint32_t metric_id, uint64_t value);
-  CAPIStatus getSecret(absl::string_view key, uint64_t* value_data, int* value_len);
 
 private:
   const std::string plugin_name_;
@@ -111,10 +110,7 @@ private:
   // filter level config is created in C++ side, and freed by Golang GC finalizer.
   httpConfigInternal* config_{nullptr};
 
-  Event::Dispatcher& event_dispatcher_;
   std::shared_ptr<SecretReader> secret_reader_;
-  // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string str_value_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

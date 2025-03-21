@@ -14,15 +14,8 @@ type filter struct {
 }
 
 func (f *filter) DecodeHeaders(_ api.RequestHeaderMap, _ bool) api.StatusType {
-	if f.config.path == "/config" {
-		f.callbacks.DecoderFilterCallbacks().SendLocalReply(200, f.config.secretValue, nil, 0, "")
-		return api.LocalReply
-	}
 	fun := func() {
 		secretManager := f.callbacks.SecretManager()
-		if strings.Contains(f.config.path, "config") {
-			secretManager = f.config.secretManager
-		}
 		secret, ok := secretManager.GetGenericSecret(f.config.secretKey)
 		statusCode := http.StatusOK
 		if !ok {

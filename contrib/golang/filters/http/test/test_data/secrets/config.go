@@ -1,8 +1,6 @@
 package secrets
 
 import (
-	"fmt"
-
 	xds "github.com/cncf/xds/go/xds/type/v3"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -17,10 +15,9 @@ func init() {
 }
 
 type config struct {
-	secretManager api.SecretManager
-	secretKey     string
-	secretValue   string
-	path          string
+	secretKey   string
+	secretValue string
+	path        string
 }
 
 type parser struct {
@@ -38,17 +35,10 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 	if !ok {
 		secretValue = ""
 	}
-	if path == "/config" {
-		actualSecret, _ := callbacks.SecretManager().GetGenericSecret(secretKey)
-		if secretValue != actualSecret {
-			panic(fmt.Sprintf("expected secret %s got %s", secretValue, actualSecret))
-		}
-	}
 	conf := &config{
-		secretManager: callbacks.SecretManager(),
-		secretKey:     secretKey,
-		secretValue:   secretValue,
-		path:          path,
+		secretKey:   secretKey,
+		secretValue: secretValue,
+		path:        path,
 	}
 	return conf, nil
 }

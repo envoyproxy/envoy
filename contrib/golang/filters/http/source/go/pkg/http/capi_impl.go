@@ -518,17 +518,3 @@ func (c *httpCApiImpl) HttpRecordMetric(cc unsafe.Pointer, metricId uint32, valu
 	res := C.envoyGoFilterHttpRecordMetric(unsafe.Pointer(cfg.config), C.uint32_t(metricId), C.uint64_t(value))
 	handleCApiStatus(res)
 }
-
-func (c *httpCApiImpl) HttpConfigGetStringSecret(cc unsafe.Pointer, key string) (string, bool) {
-	cfg := (*httpConfig)(cc)
-	cfg.mutex.Lock()
-	defer cfg.mutex.Unlock()
-	var valueData C.uint64_t
-	var valueLen C.int
-	res := C.envoyGoFilterHttpConfigGetStringSecret(unsafe.Pointer(cfg.config), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
-	handleCApiStatus(res)
-	if valueLen == -1 {
-		return "", false
-	}
-	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
-}

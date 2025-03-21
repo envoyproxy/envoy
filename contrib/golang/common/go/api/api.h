@@ -132,8 +132,6 @@ CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* na
 CAPIStatus envoyGoFilterHttpIncrementMetric(void* c, uint32_t metric_id, int64_t offset);
 CAPIStatus envoyGoFilterHttpGetMetric(void* c, uint32_t metric_id, uint64_t* value);
 CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t value);
-CAPIStatus envoyGoFilterHttpConfigGetStringSecret(void* c, void* key_data, int key_len,
-                                                  uint64_t* value_data, int* value_len);
 
 // downstream
 CAPIStatus envoyGoFilterDownstreamClose(void* wrapper, int close_type);

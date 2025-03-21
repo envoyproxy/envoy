@@ -67,7 +67,6 @@ type HttpCAPI interface {
 	HttpGetMetric(c unsafe.Pointer, metricId uint32) uint64
 	HttpRecordMetric(c unsafe.Pointer, metricId uint32, value uint64)
 	HttpConfigFinalize(c unsafe.Pointer)
-	HttpConfigGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
 	/* These APIs have nothing to do with request */
 	HttpLog(level LogType, message string)

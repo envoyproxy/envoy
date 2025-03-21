@@ -331,13 +331,6 @@ type ConfigCallbacks interface {
 	DefineCounterMetric(name string) CounterMetric
 	DefineGaugeMetric(name string) GaugeMetric
 	// TODO Histogram
-
-	// Get secret manager.
-	// Secrets should be defined in the plugin configuration.
-	// Use this secret manager only in the Parse and Merge config threads.
-	// Otherwize, it will always return missing secrets.
-	// Only serves static secrets (not using SDS)
-	SecretManager() SecretManager
 }
 
 type ConfigCallbackHandler interface {

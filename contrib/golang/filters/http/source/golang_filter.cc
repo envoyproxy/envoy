@@ -1526,7 +1526,6 @@ FilterConfig::FilterConfig(
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
-      event_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)){};
 
 void FilterConfig::newGoPluginConfig() {
@@ -1654,26 +1653,6 @@ CAPIStatus FilterConfig::recordMetric(uint32_t metric_id, uint64_t value) {
     if (it != metric_store_->histograms_.end()) {
       it->second->recordValue(value);
     }
-  }
-  return CAPIStatus::CAPIOK;
-}
-
-CAPIStatus FilterConfig::getSecret(const absl::string_view name, uint64_t* value_data,
-                                   int* value_len) {
-  if (!event_dispatcher_.isThreadSafe()) {
-    ENVOY_LOG(debug, "golang config getSecret not in main thread");
-    *value_len = -1;
-    return CAPIStatus::CAPIOK;
-  }
-  ENVOY_LOG(debug, "golang config getSecret '{}'", name);
-  // No need to lock as we are sure to run in the main thread
-  auto maybe_secret = secret_reader_->secret(std::string(name));
-  if (!maybe_secret.has_value()) {
-    *value_len = -1;
-  } else {
-    str_value_ = maybe_secret.value();
-    *value_data = reinterpret_cast<uint64_t>(str_value_.data());
-    *value_len = str_value_.length();
   }
   return CAPIStatus::CAPIOK;
 }

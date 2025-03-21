@@ -402,8 +402,6 @@ func (f *filterState) GetString(key string) string {
 
 type httpConfig struct {
 	config *C.httpConfig
-	// protect c->str_value in the C++ side from being used concurrently.
-	mutex sync.Mutex
 }
 
 func (c *httpConfig) DefineCounterMetric(name string) api.CounterMetric {
@@ -420,14 +418,6 @@ func (c *httpConfig) DefineGaugeMetric(name string) api.GaugeMetric {
 		config:   c,
 		metricId: id,
 	}
-}
-
-func (c *httpConfig) SecretManager() api.SecretManager {
-	return c
-}
-
-func (c *httpConfig) GetGenericSecret(name string) (string, bool) {
-	return cAPI.HttpConfigGetStringSecret(unsafe.Pointer(c), name)
 }
 
 func (c *httpConfig) Finalize() {

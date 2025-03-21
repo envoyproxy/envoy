@@ -1752,46 +1752,22 @@ TEST_P(GolangIntegrationTest, DynamicSecret) {
   testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/");
 }
 
-TEST_P(GolangIntegrationTest, DynamicConfigSecret) {
-  testSecrets("dynamic_secret", "", "200", "/config");
-}
-
 TEST_P(GolangIntegrationTest, DynamicSecretGoRoutine) {
   testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/async");
-}
-
-TEST_P(GolangIntegrationTest, DynamicConfigSecretGoRoutine) {
-  testSecrets("dynamic_secret", "", "404", "/config/async");
 }
 
 TEST_P(GolangIntegrationTest, StaticSecret) {
   testSecrets("static_secret", "static_secret_value", "200", "/");
 }
 
-TEST_P(GolangIntegrationTest, StaticConfigSecret) {
-  testSecrets("static_secret", "static_secret_value", "200", "/config");
-}
-
 TEST_P(GolangIntegrationTest, StaticSecretGoRoutine) {
   testSecrets("static_secret", "static_secret_value", "200", "/async");
 }
 
-TEST_P(GolangIntegrationTest, StaticConfigSecretGoRoutine) {
-  testSecrets("static_secret", "", "404", "/config/async");
-}
-
 TEST_P(GolangIntegrationTest, MissingSecret) { testSecrets("missing_secret", "", "404", "/"); }
-
-TEST_P(GolangIntegrationTest, MissingConfigSecret) {
-  testSecrets("missing_secret", "", "200", "/config");
-}
 
 TEST_P(GolangIntegrationTest, MissingSecretGoRoutine) {
   testSecrets("missing_secret", "", "404", "/async");
-}
-
-TEST_P(GolangIntegrationTest, MissingConfigSecretGoRoutine) {
-  testSecrets("missing_secret", "", "404", "/config/async");
 }
 
 } // namespace Envoy
