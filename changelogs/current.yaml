@@ -304,6 +304,11 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
+- area: tls
+  change: |
+    Added :ref:`per-upstream session cache <<envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsPerHostSessionCacheConfig>`
+    support to allow the TLS session manager to cache and use session keys by upstream host. This is useful when different
+    upstream hosts serving the same destination use distinct TLS configurations (keys).
 - area: rate_limit
   change: |
     Added the explict runtime switch
