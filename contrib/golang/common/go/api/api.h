@@ -118,6 +118,8 @@ CAPIStatus envoyGoFilterHttpGetStringFilterState(void* r, void* key_data, int ke
                                                  uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_len,
                                               uint64_t* value_data, int* value_len, int* rc);
+CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
+                                            uint64_t* value_data, int* value_len);
 
 /* These APIs have nothing to do with request */
 void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);

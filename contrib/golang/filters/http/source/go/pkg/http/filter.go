@@ -284,6 +284,14 @@ func (r *httpRequest) Finalize(reason int) {
 	cAPI.HttpFinalize(unsafe.Pointer(r), reason)
 }
 
+func (r *httpRequest) SecretManager() api.SecretManager {
+	return r
+}
+
+func (r *httpRequest) GetGenericSecret(name string) (string, bool) {
+	return cAPI.HttpGetStringSecret(unsafe.Pointer(r), name)
+}
+
 type streamInfo struct {
 	request *httpRequest
 }

@@ -11,8 +11,11 @@
 #include "source/common/common/thread.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/secret/secret_provider_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 #include "contrib/golang/filters/http/source/stats.h"
@@ -56,6 +59,16 @@ using MetricStoreSharedPtr = std::shared_ptr<MetricStore>;
 
 struct httpConfigInternal;
 
+class SecretReader {
+public:
+  SecretReader(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+               Server::Configuration::FactoryContext& context);
+  absl::optional<const std::string> secret(const std::string& name) const;
+
+private:
+  absl::flat_hash_map<std::string, std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>>
+      secrets_;
+};
 /**
  * Configuration for the HTTP golang extension filter.
  */
@@ -72,6 +85,7 @@ public:
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
   GolangFilterStats& stats() { return stats_; }
+  const SecretReader& getSecretReader() const { return *secret_reader_; }
 
   void newGoPluginConfig();
   CAPIStatus defineMetric(uint32_t metric_type, absl::string_view name, uint32_t* metric_id);
@@ -95,6 +109,8 @@ private:
   MetricStoreSharedPtr metric_store_ ABSL_GUARDED_BY(mutex_);
   // filter level config is created in C++ side, and freed by Golang GC finalizer.
   httpConfigInternal* config_{nullptr};
+
+  std::shared_ptr<SecretReader> secret_reader_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -296,6 +312,7 @@ public:
   CAPIStatus getStringFilterState(absl::string_view key, uint64_t* value_data, int* value_len);
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
+  CAPIStatus getSecret(absl::string_view key, uint64_t* value_data, int* value_len);
 
   bool isProcessingInGo() {
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();

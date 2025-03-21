@@ -453,6 +453,26 @@ func (c *httpCApiImpl) HttpGetStringProperty(r unsafe.Pointer, key string) (stri
 	return "", capiStatusToErr(res)
 }
 
+func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string, bool) {
+	req := (*httpRequest)(r)
+	var valueData C.uint64_t
+	var valueLen C.int
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+	req.markMayWaitingCallback()
+	res := C.envoyGoFilterHttpGetStringSecret(unsafe.Pointer(req.req), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	if res == C.CAPIYield {
+		req.checkOrWaitCallback()
+	} else {
+		req.markNoWaitingCallback()
+		handleCApiStatus(res)
+	}
+	if valueLen == -1 {
+		return "", false
+	}
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
+}
+
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }
