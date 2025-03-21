@@ -223,7 +223,7 @@ TEST_P(SdsGenericSecretPathConfigSourceIntegrationTest, GenericSecretFileUpdate)
                                      ->value()
                                      .getStringView());
 
-  // update secret
+  // Update contents of the file specified in the secret.
   TestEnvironment::writeStringToFileForTest("generic_secret.txt", "dummy_aes_128_key");
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
@@ -295,7 +295,7 @@ TEST_P(SdsGenericSecretsPathConfigSourceIntegrationTest, GenericSecretFileUpdate
                             ->value()
                             .getStringView());
 
-  // update secret
+  // Update contents of all files specified in the secret.
   TestEnvironment::writeStringToFileForTest("encryption_key.txt", "dummy_aes_128_key");
   TestEnvironment::writeStringToFileForTest("credential.txt", "password");
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
