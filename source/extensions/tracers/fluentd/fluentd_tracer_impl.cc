@@ -14,9 +14,6 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
-using MessagePackBuffer = msgpack::sbuffer;
-using MessagePackPacker = msgpack::packer<msgpack::sbuffer>;
-
 // Handle Span and Trace context extraction and validation
 // Adapted from OpenTelemetry tracer extension @alexanderellis @yanavlasov
 // See https://www.w3.org/TR/trace-context/#traceparent-header
@@ -336,9 +333,7 @@ Tracing::SpanPtr FluentdTracerImpl::startSpan(Tracing::TraceContext& trace_conte
   return std::make_unique<Span>(new_span);
 }
 
-MessagePackBuffer FluentdTracerImpl::packMessage() {
-  MessagePackBuffer buffer;
-  MessagePackPacker packer(buffer);
+void FluentdTracerImpl::packMessage(MessagePackPacker& packer) {
   packer.pack_array(3); // 1 - tag field, 2 - entries array, 3 - options map.
   packer.pack(tag_);
   packer.pack_array(entries_.size());
@@ -354,7 +349,6 @@ MessagePackBuffer FluentdTracerImpl::packMessage() {
   }
 
   packer.pack(option_);
-  return buffer;
 }
 
 } // namespace Fluentd

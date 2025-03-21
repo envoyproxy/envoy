@@ -89,7 +89,7 @@ public:
                              const std::string& operation_name, Tracing::Decision tracing_decision,
                              const SpanContext& previous_span_context);
 
-  MessagePackBuffer packMessage();
+  void packMessage(MessagePackPacker& packer);
 
 private:
   std::map<std::string, std::string> option_;

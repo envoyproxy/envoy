@@ -69,7 +69,9 @@ void FluentdBase::flush() {
   }
 
   // Pack the message using the derived class implementation
-  MessagePackBuffer buffer = packMessage();
+  MessagePackBuffer buffer;
+  MessagePackPacker packer(buffer);
+  packMessage(packer);
   Buffer::OwnedImpl data(buffer.data(), buffer.size());
 
   client_->write(data, false);

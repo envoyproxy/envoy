@@ -141,8 +141,7 @@ TEST_F(FluentdAccessLoggerImplTest, LogSingleEntry) {
         EXPECT_EQ(expected_payload, buffer.toString());
       }));
 
-  std::vector<uint8_t> data_copy = data_;
-  logger_->log(std::make_unique<Entry>(time_, std::move(data_copy)));
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
 
 TEST_F(FluentdAccessLoggerImplTest, LogTwoEntries) {
@@ -154,8 +153,7 @@ TEST_F(FluentdAccessLoggerImplTest, LogTwoEntries) {
   EXPECT_CALL(*async_client_, connected()).Times(0);
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
 
-  std::vector<uint8_t> data_copy = data_;
-  logger_->log(std::make_unique<Entry>(time_, std::move(data_copy)));
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 
   // Expect second entry to cause all entries to flush.
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
@@ -170,8 +168,7 @@ TEST_F(FluentdAccessLoggerImplTest, LogTwoEntries) {
         EXPECT_EQ(expected_payload, buffer.toString());
       }));
 
-  data_copy = data_;
-  logger_->log(std::make_unique<Entry>(time_, std::move(data_copy)));
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
 }
 
 TEST_F(FluentdAccessLoggerImplTest, CallbacksTest) {
@@ -212,8 +209,8 @@ TEST_F(FluentdAccessLoggerImplTest, SuccessfulReconnect) {
         std::string expected_payload = getExpectedMsgpackPayload(1);
         EXPECT_EQ(expected_payload, buffer.toString());
       }));
-  std::vector<uint8_t> data_copy = data_;
-  logger_->log(std::make_unique<Entry>(time_, std::move(data_copy)));
+
+  logger_->log(std::make_unique<Entry>(time_, std::move(data_)));
   retry_timer_->invokeCallback();
 }
 

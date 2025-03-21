@@ -9,9 +9,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Fluentd {
 
-using MessagePackBuffer = msgpack::sbuffer;
-using MessagePackPacker = msgpack::packer<msgpack::sbuffer>;
-
 FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& cluster,
                                                  Tcp::AsyncTcpClientPtr client,
                                                  Event::Dispatcher& dispatcher,
@@ -27,11 +24,9 @@ FluentdAccessLoggerImpl::FluentdAccessLoggerImpl(Upstream::ThreadLocalCluster& c
           PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)) {}
 
-MessagePackBuffer FluentdAccessLoggerImpl::packMessage() {
+void FluentdAccessLoggerImpl::packMessage(MessagePackPacker& packer) {
   // Creating a Fluentd Forward Protocol Specification (v1) forward mode event as specified in:
   // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode
-  MessagePackBuffer buffer;
-  MessagePackPacker packer(buffer);
   packer.pack_array(2); // 1 - tag field, 2 - entries array.
   packer.pack(tag_);
   packer.pack_array(entries_.size());
@@ -42,8 +37,6 @@ MessagePackBuffer FluentdAccessLoggerImpl::packMessage() {
     const char* record_bytes = reinterpret_cast<const char*>(&entry->vector_record_[0]);
     packer.pack_bin_body(record_bytes, entry->vector_record_.size());
   }
-
-  return buffer;
 }
 
 FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatterPtr&& formatter,

@@ -34,9 +34,9 @@ public:
   Entry(const Entry&) = delete;
   Entry& operator=(const Entry&) = delete;
   Entry(uint64_t time, std::map<std::string, std::string>&& record)
-      : time_(time), record_(std::move(record)) {}
+      : time_(time), record_(record) {}
   Entry(uint64_t time, std::vector<uint8_t>&& vector_record)
-      : time_(time), vector_record_(std::move(vector_record)) {}
+      : time_(time), vector_record_(vector_record) {}
 
   const uint64_t time_;
   const std::map<std::string, std::string> record_;
@@ -66,6 +66,9 @@ public:
   virtual void log(EntryPtr&& entry) PURE;
 };
 
+using MessagePackBuffer = msgpack::sbuffer;
+using MessagePackPacker = msgpack::packer<msgpack::sbuffer>;
+
 class FluentdBase : public Tcp::AsyncTcpClientCallbacks,
                     public FluentdService,
                     public Logger::Loggable<Logger::Id::client> {
@@ -94,7 +97,7 @@ protected:
   void onBackoffCallback();
   void setDisconnected();
   void clearBuffer();
-  virtual MessagePackBuffer packMessage() = 0;
+  virtual void packMessage(MessagePackPacker& packer) = 0;
 
   bool disconnected_ = false;
   bool connecting_ = false;
