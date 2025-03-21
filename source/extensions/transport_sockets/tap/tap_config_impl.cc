@@ -12,11 +12,14 @@ namespace Tap {
 
 namespace TapCommon = Extensions::Common::Tap;
 
-PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
-                                         const Network::Connection& connection)
+PerSocketTapperImpl::PerSocketTapperImpl(
+    SocketTapConfigSharedPtr config,
+    const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+    const Network::Connection& connection)
     : config_(std::move(config)),
       sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),
-      connection_(connection), statuses_(config_->createMatchStatusVector()) {
+      connection_(connection), statuses_(config_->createMatchStatusVector()),
+      should_output_conn_info_per_event_(tap_config.set_connection_per_event()) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
     // TODO(mattklein123): For IP client connections, local address will not be populated until
@@ -46,7 +49,7 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
   if (config_->streaming()) {
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
-    initEvent(event);
+    initStreamingEvent(event);
     event.mutable_closed();
     sink_handle_->submitTrace(std::move(trace));
   } else {
@@ -69,6 +72,13 @@ void PerSocketTapperImpl::initEvent(envoy::data::tap::v3::SocketEvent& event) {
           .count()));
 }
 
+void PerSocketTapperImpl::initStreamingEvent(envoy::data::tap::v3::SocketEvent& event) {
+  initEvent(event);
+  if (should_output_conn_info_per_event_) {
+    fillConnectionInfo(*event.mutable_connection());
+  }
+}
+
 void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
   if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
@@ -77,7 +87,7 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
   if (config_->streaming()) {
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
-    initEvent(event);
+    initStreamingEvent(event);
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(),
                                               config_->maxBufferedRxBytes(), data,
                                               data.length() - bytes_read, bytes_read);
@@ -109,7 +119,7 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
   if (config_->streaming()) {
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
-    initEvent(event);
+    initStreamingEvent(event);
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(),
                                               config_->maxBufferedTxBytes(), data, 0,
                                               bytes_written);

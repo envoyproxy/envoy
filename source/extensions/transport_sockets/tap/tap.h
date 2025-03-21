@@ -15,7 +15,9 @@ namespace Tap {
 
 class TapSocket : public TransportSockets::PassthroughSocket {
 public:
-  TapSocket(SocketTapConfigSharedPtr config, Network::TransportSocketPtr&& transport_socket);
+  TapSocket(SocketTapConfigSharedPtr config,
+            const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& socket_tap_config,
+            Network::TransportSocketPtr&& transport_socket);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -26,6 +28,7 @@ public:
 private:
   SocketTapConfigSharedPtr config_;
   PerSocketTapperPtr tapper_;
+  const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig socket_tap_config_;
 };
 
 class TapSocketFactory : public Common::Tap::ExtensionConfigBase, public PassthroughFactory {
@@ -40,6 +43,9 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
                         Upstream::HostDescriptionConstSharedPtr host) const override;
+
+private:
+  const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig ts_tap_config_;
 };
 
 class DownstreamTapSocketFactory : public Common::Tap::ExtensionConfigBase,
@@ -54,6 +60,9 @@ public:
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr createDownstreamTransportSocket() const override;
+
+private:
+  const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig ds_ts_tap_config_;
 };
 
 } // namespace Tap
