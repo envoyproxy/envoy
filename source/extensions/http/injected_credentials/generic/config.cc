@@ -28,13 +28,13 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 Common::CredentialInjectorSharedPtr
 GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const Generic& config, const std::string& /*stats_prefix*/,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) {
   const auto& credential_secret = config.credential();
   auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider = secretsProvider(credential_secret, secret_manager,
-                                         transport_socket_factory, context.initManager());
+  auto secret_provider =
+      secretsProvider(credential_secret, secret_manager, transport_socket_factory, init_manager);
 
   auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
       std::move(secret_provider), context.threadLocal(), context.api());
