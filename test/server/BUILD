@@ -363,7 +363,6 @@ envoy_cc_test(
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
