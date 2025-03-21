@@ -319,6 +319,22 @@ public:
   virtual bool aboveHighWatermark() const PURE;
 
   /**
+   * @return ConnectionSocketPtr& To get socket from current connection.
+   */
+  virtual ConnectionSocketPtr& getSocket() PURE;
+
+  /**
+   *  Mark a connection as a reverse connection. The socket
+   *  is cached and re-used for serving downstream requests.
+   */
+  virtual void setConnectionReused(bool value) PURE;
+
+  /**
+   *  return true if active connection (listener) is reused.
+   */
+  virtual bool isConnectionReused() PURE;
+
+  /**
    * Get the socket options set on this connection.
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;

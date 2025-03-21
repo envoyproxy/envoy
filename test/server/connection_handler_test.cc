@@ -149,6 +149,11 @@ public:
       return socket_factories_;
     }
     bool bindToPort() const override { return bind_to_port_; }
+    Network::ReverseConnectionListenerConfigOptRef
+    reverseConnectionListenerConfig() const override {
+      ENVOY_LOG_MISC(info, "Reverse connection config is not supported for TestListenerBase.");
+      return Network::ReverseConnectionListenerConfigOptRef();
+    }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -162,6 +167,9 @@ public:
     Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
+    const std::string& versionInfo() const override {
+      PANIC("Not implemented for TestListenerBase.");
+    }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
     Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
