@@ -103,6 +103,14 @@ bug_fixes:
     Before the :scheme header was always 'http'.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
+- area: ext_proc
+  change: |
+    Implemented graceful close of gRPC side streams, where the client half-closes its stream and waits
+    (with timeout) for the server to half-close its stream.
+    This behavioral change is disabled by default and can be enabled by setting runtime guard
+    ``envoy.reloadable_features.ext_proc_graceful_grpc_close`` to true.
+    The remote close timeout is 1 second by default and can be changed by setting the
+    ``envoy.filters.http.ext_proc.remote_close_timeout_milliseconds`` runtime value.
 - area: listener
   change: |
     Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
