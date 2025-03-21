@@ -21,6 +21,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/upstream_address.h"
 
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -697,6 +698,17 @@ virtual_hosts:
       append_x_forwarded_host: true
   - match:
       prefix: "/"
+      filter_state:
+      - key: envoy.address
+        address_match:
+          ranges:
+          - address_prefix: 10.0.0.0
+            prefix_len: 8
+    route:
+      cluster: filter_state_cluster
+      timeout: 30s
+  - match:
+      prefix: "/"
     route:
       cluster: instant-server
       timeout: 30s
@@ -759,7 +771,8 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters(
       {"www2", "root_www2", "www2_staging", "wildcard", "wildcard2", "clock", "sheep",
-       "three_numbers", "four_numbers", "regex_default", "ats", "locations", "instant-server"},
+       "three_numbers", "four_numbers", "regex_default", "ats", "locations", "instant-server",
+       "filter_state_cluster"},
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
@@ -1126,6 +1139,19 @@ virtual_hosts:
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/four/6472/endpoint/xx/yy?test=foo", headers.get_(Http::Headers::get().Path));
     EXPECT_EQ("/xx/yy/6472?test=foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Filter state matching
+  {
+    auto address_obj = std::make_unique<Network::Address::InstanceAccessor>(
+        Envoy::Network::Utility::parseInternetAddressNoThrow("10.0.0.1", 443, false));
+    stream_info.filterState()->setData("envoy.address", std::move(address_obj),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::Request);
+    EXPECT_EQ("filter_state_cluster",
+              config.route(genHeaders("foo.com", "/", "GET"), stream_info, 0)
+                  ->routeEntry()
+                  ->clusterName());
   }
 
   // Virtual cluster testing.
