@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: March 21, 2025
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: connection pool
   change: |
     Fixed a bug in :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>` where established connection
@@ -24,10 +17,3 @@ bug_fixes:
     Fixes an Envoy crash issue when a local reply is sent.
     This change can be temporarily reverted by setting runtime guard
     ``envoy_reloadable_features_router_filter_resetall_on_local_reply`` to ``false``.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
