@@ -208,6 +208,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsGenericSecretPathConfigSourceIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// This test verifies that a file specified in a SDS generic secret is watched and the secret
+// provider is up-to-date.
 TEST_P(SdsGenericSecretPathConfigSourceIntegrationTest, GenericSecretFileUpdate) {
   initialize();
 
@@ -276,6 +278,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsGenericSecretsPathConfigSourceIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// This test verifies that multiple files specified in a SDS generic secret are watched and the
+// secret provider is up-to-date.
 TEST_P(SdsGenericSecretsPathConfigSourceIntegrationTest, GenericSecretFileUpdate) {
   initialize();
 
