@@ -19,6 +19,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//contrib/golang/filters/http/source:config",
+        "//contrib/golang/filters/http/test/test_data/destroyconfig:destroyconfig_test_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
