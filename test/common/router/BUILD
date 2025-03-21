@@ -36,6 +36,7 @@ envoy_cc_test_library(
         "//source/common/router:config_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/stream_info:upstream_address_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/router:router_mocks",
