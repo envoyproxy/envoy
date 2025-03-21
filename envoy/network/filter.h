@@ -41,7 +41,22 @@ enum class FilterStatus {
   // Continue to further filters.
   Continue,
   // Stop executing further filters.
-  StopIteration
+  StopIteration,
+
+  // Stops executing further filters but does not close the connection immediately.
+  //
+  // When a filter returns StopIterationAndDontClose, it pauses further processing and
+  // prevents the connection from closing if the connection want to close the filter chain.
+  // The filter is responsible for eventually calling continueClosing() when it has finished
+  // its necessary work. Calling close() with Abort, NoFlush, and AbortReset will also close
+  // the socket and bypass this filter status.
+  //
+  // This is typically used when a filter needs to delay closure due to:
+  //   - External data processing.
+  //
+  // Failure to call continueClosing() after returning StopIterationAndDontClose
+  // will result in a stalled connection and possible resource leaks.
+  StopIterationAndDontClose,
 };
 
 /**
@@ -87,6 +102,20 @@ public:
    *                   in the filter chain.
    */
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Resumes the connection closure process if it was previously delayed by a filter.
+   *
+   * This method must be called if a filter has returned `FilterStatus::StopIterationAndDontClose`
+   * to prevent an indefinite open connection for normal situation. It ensures that once the filter
+   * has completed its necessary processing, the connection can proceed with closing.
+   *
+   * This method is typically called from a filter when it has finished its work and no longer
+   * needs to delay connection termination.
+   *
+   * This method can be called multiple times.
+   */
+  virtual void continueClosing() PURE;
 };
 
 /**
@@ -178,6 +207,20 @@ public:
    * mode to secure mode.
    */
   virtual bool startUpstreamSecureTransport() PURE;
+
+  /**
+   * Resumes the connection closure process if it was previously delayed by a filter.
+   *
+   * This method must be called if a filter has returned `FilterStatus::StopIterationAndDontClose`
+   * to prevent an indefinite open connection for normal situation. It ensures that once the filter
+   * has completed its necessary processing, the connection can proceed with closing.
+   *
+   * This method is typically called from a filter when it has finished its work and no longer
+   * needs to delay connection termination.
+   *
+   * This method can be called multiple times.
+   */
+  virtual void continueClosing() PURE;
 };
 
 /**

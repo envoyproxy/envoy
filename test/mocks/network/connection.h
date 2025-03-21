@@ -57,6 +57,7 @@ public:
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));                               \
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
+  MOCK_METHOD(void, enableCloseThroughFilterManager, (bool enabled));                              \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
   MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
   MOCK_METHOD(DetectedCloseType, detectedCloseType, (), (const));                                  \
@@ -147,6 +148,7 @@ public:
   MOCK_METHOD(StreamBuffer, getReadBuffer, ());
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
   MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, closeConnection, (ConnectionCloseAction close_action));
 };
 
 } // namespace Network

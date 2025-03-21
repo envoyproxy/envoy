@@ -1330,6 +1330,7 @@ stderr
 stdev
 stdin
 stdout
+StopIterationAndDontClose
 stmt
 str
 streambuf
