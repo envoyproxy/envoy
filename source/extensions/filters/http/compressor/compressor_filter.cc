@@ -136,8 +136,8 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
-      uncompressible_response_codes_(
-          uncompressibleResponseCodesSet(proto_config.response_direction_config().uncompressible_response_code())),
+      uncompressible_response_codes_(uncompressibleResponseCodesSet(
+          proto_config.response_direction_config().uncompressible_response_code())),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
@@ -169,12 +169,8 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
 
 absl::flat_hash_set<uint32_t>
 CompressorFilterConfig::ResponseDirectionConfig::uncompressibleResponseCodesSet(
-    const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes) {
-  absl::flat_hash_set<uint32_t> result;
-  for (const Protobuf::UInt32Value& code : codes) {
-    result.insert(code.value());
-  }
-  return result;
+    const Protobuf::RepeatedField<uint32_t>& codes) {
+  return {codes.begin(), codes.end()};
 }
 
 Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompressor() {

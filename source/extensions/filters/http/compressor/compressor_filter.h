@@ -131,7 +131,7 @@ public:
     }
 
     static absl::flat_hash_set<uint32_t>
-    uncompressibleResponseCodesSet(const Protobuf::RepeatedPtrField<Protobuf::UInt32Value>& codes);
+    uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes);
 
     // TODO(rojkov): delete this translation function once the deprecated fields
     // are removed from envoy::extensions::filters::http::compressor::v3::Compressor.

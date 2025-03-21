@@ -70,7 +70,7 @@ message Compressor {
 
     // Set of response codes for which compression is disabled, e.g. 206 Partial Content should not
     // be compressed.
-    repeated google.protobuf.UInt32Value uncompressible_response_code = 4;
+    repeated uint32 uncompressible_response_code = 4 [(validate.rules).repeated.items.uint32 = {lt: 600 gte: 200}];
   }
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
   google.protobuf.UInt32Value content_length = 1
