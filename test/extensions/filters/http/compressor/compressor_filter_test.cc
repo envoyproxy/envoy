@@ -791,14 +791,9 @@ TEST_P(IsResponseCodeAllowedTest, Validate) {
     response_stats_prefix_ = "response.";
   }
 
-  auto filter_state = decoder_callbacks_.streamInfo().filterState();
-  ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
-  ON_CALL(stream_info_, filterState()).WillByDefault(testing::ReturnRef(filter_state));
-  ON_CALL(stream_info_, responseCode())
-      .WillByDefault(Return(absl::optional<uint32_t>(response_code)));
-
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test, deflate"}});
-  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  Http::TestResponseHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {":status", std::to_string(response_code)}};
   doResponse(headers, should_compress);
 
   EXPECT_EQ(should_compress, headers.has("vary"));

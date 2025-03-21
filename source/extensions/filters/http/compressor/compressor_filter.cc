@@ -300,7 +300,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
       config.isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle()) &&
-      isResponseCodeCompressible(config);
+      isResponseCodeCompressible(headers, config);
   if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
@@ -590,12 +590,13 @@ bool CompressorFilterConfig::ResponseDirectionConfig::isResponseCodeCompressible
 }
 
 bool CompressorFilter::isResponseCodeCompressible(
+    const Http::ResponseHeaderMap& headers,
     const CompressorFilterConfig::ResponseDirectionConfig& config) const {
   if (config.areAllResponseCodesCompressible()) {
     return true;
   }
 
-  absl::optional<uint32_t> response_code = decoder_callbacks_->streamInfo().responseCode();
+  absl::optional<uint64_t> response_code = Http::Utility::getResponseStatusOrNullopt(headers);
   if (!response_code.has_value()) {
     return true;
   }
