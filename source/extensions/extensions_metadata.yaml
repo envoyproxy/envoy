@@ -1720,6 +1720,13 @@ envoy.load_balancing_policies.client_side_weighted_round_robin:
   status: wip
   type_urls:
   - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+envoy.load_balancing_policies.dynamic_forwarding:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.dynamic_forwarding.v3.DynamicForwarding
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
