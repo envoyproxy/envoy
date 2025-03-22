@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    The ``isp_db_path`` field was previously assigned the ASN database path. The ASN database path should
+    now be assigned to the new ``asn_db_path`` field.
 - area: http2
   change: |
     Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
@@ -165,6 +169,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.dns_nodata_noname_is_success`` and legacy code paths.
 
 new_features:
+- area: geoip
+  change: |
+    Added options on the geoip filter ``envoy.extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.isp``
+    that contains the isp name and ``envoy.extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.is_apple_private_relay``
+    that has ``true`` or ``false`` depending if the isp name is ``iCloud Private Relay``.
+    Performs a lookup on the IP address to get the ISP name from the Maxmind database provider and check if it is iCloud Private Relay.
 - area: http
   change: |
     Added :ref:`ignore_http_11_upgrade
