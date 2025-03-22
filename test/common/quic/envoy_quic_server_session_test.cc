@@ -1105,6 +1105,17 @@ TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
   EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
 }
 
+TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_disable_qpack(true);
+
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  EXPECT_EQ(envoy_quic_session_.qpack_maximum_dynamic_table_capacity(), 0);
+
+  installReadFilter();
+}
+
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
   void SetUp() override {}
   void TearDown() override {
