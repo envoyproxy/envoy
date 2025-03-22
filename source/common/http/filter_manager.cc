@@ -1946,7 +1946,7 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
 
 void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host) {
-  parent_.upstream_override_host_ = upstream_override_host;
+  parent_.upstream_override_host_ = std::move(upstream_override_host);
 }
 
 absl::optional<Upstream::LoadBalancerContext::OverrideHost>

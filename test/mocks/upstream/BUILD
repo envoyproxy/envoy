@@ -387,3 +387,13 @@ envoy_cc_mock(
         "//envoy/common:resource_interface",
     ],
 )
+
+envoy_cc_mock(
+    name = "override_host_policy_mock",
+    srcs = ["override_host_policy.cc"],
+    hdrs = ["override_host_policy.h"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:override_host_policy_interface",
+    ],
+)

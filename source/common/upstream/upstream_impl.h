@@ -706,7 +706,7 @@ using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
  */
 class PrioritySetImpl : public PrioritySet {
 public:
-  PrioritySetImpl() : batch_update_(false) {}
+  PrioritySetImpl() = default;
   // From PrioritySet
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const override {
@@ -771,7 +771,7 @@ private:
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
-  bool batch_update_ : 1;
+  bool batch_update_ : 1 {};
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage
@@ -864,6 +864,9 @@ public:
   }
   const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const override {
     return *common_lb_config_;
+  }
+  OptRef<const OverrideHostPolicy> overrideHostPolicy() const override {
+    return makeOptRefFromPtr<const OverrideHostPolicy>(override_host_policy_.get());
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
 
@@ -1136,6 +1139,7 @@ private:
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
       common_lb_config_;
+  OverrideHostPolicySharedPtr override_host_policy_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   // TODO(ohadvano): http_filter_config_provider_manager_ and
   // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as
