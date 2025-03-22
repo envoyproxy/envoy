@@ -559,7 +559,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -676,6 +676,13 @@ message Cluster {
     // If this is unset then [UNKNOWN, HEALTHY, DEGRADED] will be applied by default. If this is
     // set with an empty set of statuses then host overrides will be ignored by the load balancing.
     core.v3.HealthStatusSet override_host_status = 8;
+
+    // This controls what policy is used to extract the override host from the downstream context
+    // like request headers, cookies, dynamic metadata, etc.
+    // If the the override host is evaluated as valid host based on the ``override_host_status``,
+    // the host will be selected directly and the load balancing will be skipped.
+    // [#extension-category: envoy.override_host_policies]
+    core.v3.TypedExtensionConfig override_host_policy = 9;
   }
 
   message RefreshRate {

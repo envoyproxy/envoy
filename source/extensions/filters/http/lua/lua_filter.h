@@ -567,7 +567,8 @@ private:
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
     void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
-      callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
+      callbacks_->setUpstreamOverrideHost(
+          Upstream::OverrideHost{std::move(host_and_strict.first), host_and_strict.second});
     }
     void clearRouteCache() override {
       if (auto cb = callbacks_->downstreamCallbacks(); cb.has_value()) {

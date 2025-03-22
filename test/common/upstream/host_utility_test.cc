@@ -6,6 +6,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/override_host_policy.h"
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/test_runtime.h"
 
@@ -151,8 +152,8 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
 }
 
 TEST(HostUtilityTest, SelectOverrideHostTest) {
-
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<Upstream::MockOverrideHostPolicy> policy;
 
   const HostUtility::HostStatusSet all_health_statuses = UnknownStatus | HealthyStatus |
                                                          UnhealthyStatus | DrainingStatus |
@@ -160,20 +161,38 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
   {
     // No valid host map.
-    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(nullptr, all_health_statuses, &context));
+    auto result = HostUtility::selectOverrideHost(nullptr, all_health_statuses, nullptr, &context);
+    EXPECT_EQ(nullptr, result.first);
+    EXPECT_FALSE(result.second);
   }
+
   {
     // No valid load balancer context.
     auto host_map = std::make_shared<HostMap>();
-    EXPECT_EQ(nullptr,
-              HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, nullptr));
+    auto result =
+        HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, nullptr, nullptr);
+    EXPECT_EQ(nullptr, result.first);
+    EXPECT_FALSE(result.second);
   }
+
   {
-    // No valid expected host.
+    // No override host is provided by the context.
     EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
     auto host_map = std::make_shared<HostMap>();
-    EXPECT_EQ(nullptr,
-              HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
+    auto result =
+        HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, nullptr, &context);
+    EXPECT_EQ(nullptr, result.first);
+    EXPECT_FALSE(result.second);
+  }
+
+  {
+    // No override host is provided by the policy.
+    EXPECT_CALL(policy, overrideHostToSelect(&context)).WillOnce(Return(absl::nullopt));
+    auto host_map = std::make_shared<HostMap>();
+    auto result =
+        HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &policy, &context);
+    EXPECT_EQ(nullptr, result.first);
+    EXPECT_FALSE(result.second);
   }
 
   // Test overriding host in strict and non-strict mode.
@@ -181,10 +200,12 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
     {
       // The host map does not contain the expected host.
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
-      EXPECT_CALL(context, overrideHostToSelect())
-          .WillOnce(Return(absl::make_optional(override_host)));
+      EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(override_host));
       auto host_map = std::make_shared<HostMap>();
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
+      auto result =
+          HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, nullptr, &context);
+      EXPECT_EQ(nullptr, result.first);
+      EXPECT_EQ(result.second, strict_mode);
     }
     {
       auto mock_host = std::make_shared<NiceMock<MockHost>>();
@@ -198,40 +219,65 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
 
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context));
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
-
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context));
+      for (auto status : {UnhealthyStatus, all_health_statuses}) {
+        auto result = HostUtility::selectOverrideHost(host_map.get(), status, nullptr, &context);
+        EXPECT_EQ(mock_host, result.first);
+        EXPECT_EQ(result.second, strict_mode);
+      }
+      for (auto status :
+           {HealthyStatus, DegradedStatus, TimeoutStatus, DrainingStatus, UnknownStatus}) {
+        auto result = HostUtility::selectOverrideHost(host_map.get(), status, nullptr, &context);
+        EXPECT_EQ(nullptr, result.first);
+        EXPECT_EQ(result.second, strict_mode);
+      }
     }
+
     {
       auto mock_host = std::make_shared<NiceMock<MockHost>>();
       EXPECT_CALL(*mock_host, healthStatus())
           .WillRepeatedly(Return(envoy::config::core::v3::HealthStatus::DEGRADED));
 
-      LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
-      EXPECT_CALL(context, overrideHostToSelect())
+      auto mock_host_2 = std::make_shared<NiceMock<MockHost>>();
+
+      // Multiple hosts are provided and will be tried in order.
+      LoadBalancerContext::OverrideHost override_host{"4.3.2.1,1.2.3.4,3.3.3.3", strict_mode};
+      EXPECT_CALL(policy, overrideHostToSelect(&context))
           .WillRepeatedly(Return(absl::make_optional(override_host)));
 
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context));
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
+      host_map->insert({"3.3.3.3", mock_host_2});
 
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
-      EXPECT_EQ(nullptr,
-                HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context));
+      for (auto status : {DegradedStatus, all_health_statuses}) {
+        auto result = HostUtility::selectOverrideHost(host_map.get(), status, &policy, &context);
+        EXPECT_EQ(mock_host, result.first);
+        EXPECT_EQ(result.second, strict_mode);
+      }
+      for (auto status :
+           {HealthyStatus, UnhealthyStatus, TimeoutStatus, DrainingStatus, UnknownStatus}) {
+        EXPECT_CALL(*mock_host_2, healthStatus())
+            .WillOnce(Return(envoy::config::core::v3::UNKNOWN));
+
+        auto result = HostUtility::selectOverrideHost(host_map.get(), status, &policy, &context);
+        EXPECT_EQ(status == UnknownStatus ? mock_host_2 : nullptr, result.first);
+        EXPECT_EQ(result.second, strict_mode);
+      }
     }
+  }
+
+  {
+    // Override host will be ignored if the attempt count is greater or equal to 2.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    EXPECT_CALL(context, requestStreamInfo()).WillOnce(Return(&stream_info));
+    EXPECT_CALL(stream_info, attemptCount()).WillOnce(Return(2));
+    EXPECT_CALL(context, overrideHostToSelect()).Times(0);
+
+    auto host_map = std::make_shared<HostMap>();
+    auto result =
+        HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, nullptr, &context);
+
+    EXPECT_EQ(nullptr, result.first);
+    EXPECT_FALSE(result.second);
   }
 }
 

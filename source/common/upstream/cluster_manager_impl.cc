@@ -2211,13 +2211,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                            override_host_statuses_, context);
-  if (host != nullptr) {
-    return {std::move(host)};
+  auto override_host =
+      HostUtility::selectOverrideHost(cross_priority_host_map.get(), override_host_statuses_,
+                                      cluster_info_->overrideHostPolicy().ptr(), context);
+  if (override_host.first != nullptr) {
+    return {std::move(override_host.first)};
   }
 
-  if (HostUtility::allowLBChooseHost(context)) {
+  if (!override_host.second) {
     Upstream::HostSelectionResponse host_selection = lb_->chooseHost(context);
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
@@ -2235,12 +2236,18 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                            override_host_statuses_, context);
-  if (host != nullptr) {
-    return host;
+  auto override_host =
+      HostUtility::selectOverrideHost(cross_priority_host_map.get(), override_host_statuses_,
+                                      cluster_info_->overrideHostPolicy().ptr(), context);
+  if (override_host.first != nullptr) {
+    return std::move(override_host.first);
   }
-  return lb_->peekAnotherHost(context);
+
+  if (!override_host.second) {
+    return lb_->peekAnotherHost(context);
+  }
+
+  return nullptr;
 }
 
 Tcp::ConnectionPool::Instance*

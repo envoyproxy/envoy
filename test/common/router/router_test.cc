@@ -6698,8 +6698,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
-      .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("1.2.3.4", false))));
+      .WillOnce(Return(absl::make_optional<Upstream::OverrideHost>("1.2.3.4", false)));
 
   auto override_host = router_->overrideHostToSelect();
   EXPECT_EQ("1.2.3.4", override_host.value().first);

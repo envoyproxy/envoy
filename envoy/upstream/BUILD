@@ -149,6 +149,7 @@ envoy_cc_library(
     deps = [
         ":health_check_host_monitor_interface",
         ":locality_lib",
+        ":override_host_policy_interface",
         ":resource_manager_interface",
         "//envoy/common:callback",
         "//envoy/config:subscription_interface",
@@ -194,5 +195,13 @@ envoy_cc_library(
     name = "scheduler_interface",
     hdrs = ["scheduler.h"],
     deps = [
+    ],
+)
+
+envoy_cc_library(
+    name = "override_host_policy_interface",
+    hdrs = ["override_host_policy.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
     ],
 )

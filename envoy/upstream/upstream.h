@@ -25,6 +25,7 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/override_host_policy.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
@@ -1004,6 +1005,12 @@ public:
    * balancer factory if it is created successfully.
    */
   virtual TypedLoadBalancerFactory& loadBalancerFactory() const PURE;
+
+  /**
+   * @return the optional override host policy which can be used to bypass the load balancer and
+   * directly select a host based on the downstream context.
+   */
+  virtual OptRef<const OverrideHostPolicy> overrideHostPolicy() const PURE;
 
   /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
