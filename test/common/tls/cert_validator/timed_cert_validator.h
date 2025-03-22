@@ -30,7 +30,11 @@ public:
                     const CertValidator::ExtraValidationContext& validation_context, bool is_server,
                     absl::string_view host_name) override;
 
-  bool validationPending() const { return validation_timer_->enabled(); }
+  bool validationPending() const {
+    // If the validation timer hasn't been set yet, it means the doVerifyCertChain method hasn't
+    // been called yet.
+    return validation_timer_ == nullptr || validation_timer_->enabled();
+  }
   void setExpectedLocalAddress(absl::string_view expected_local_address) {
     expected_local_address_ = expected_local_address;
   }
