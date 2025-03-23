@@ -225,7 +225,8 @@ new_features:
     control the route cache clearing behavior in the Lua filter.
 - area: compressor
   change: |
-    Added (:ref:`uncompressible_response_codes <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.uncompressible_response_codes>`)
+    Added
+    (:ref:`uncompressible_response_codes <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.uncompressible_response_codes>`)
     to Compressor Filter which allows configuration of a list of response codes for which the compression will be skipped.
 - area: jwt_authn
   change: |
