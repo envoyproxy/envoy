@@ -1434,5 +1434,56 @@ typed_config:
   EXPECT_TRUE(response->complete());
 }
 
+TEST_P(LuaIntegrationTest, RemoveStatusHeader) {
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        local response_headers = response_handle:headers()
+        response_headers:remove(":status")
+        response_handle:body(true):setBytes("hello world")
+      end
+)EOF";
+
+  std::string route_config =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/"
+    direct_response:
+      status: 200
+      body:
+        inline_string: "hello"
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Lua code defined in 'default_source_code' will be executed by default.
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("missing required header: :status"));
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy
