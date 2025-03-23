@@ -223,6 +223,11 @@ new_features:
   change: |
     Added :ref:`clear_route_cache <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.clear_route_cache>` support to
     control the route cache clearing behavior in the Lua filter.
+- area: compressor
+  change: |
+    Compressor Filter now allows configuration of a list of response codes for which the compression will be skipped
+    (:ref:`uncompressible_response_codes <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.uncompressible_response_codes>`).
+    Adding 206 (Partial Content) to the list prevents content-encoding change after a range of the original content was received.
 - area: jwt_authn
   change: |
     Added :ref:`jwt_max_token_size <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtCacheConfig.jwt_max_token_size>` to make
