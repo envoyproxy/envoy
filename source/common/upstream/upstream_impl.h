@@ -771,7 +771,7 @@ private:
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
-  bool batch_update_ : 1 {};
+  bool batch_update_ : 1;
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage
