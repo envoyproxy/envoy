@@ -299,18 +299,55 @@ private:
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 
+  /**
+   * Handles header response with CONTINUE_AND_REPLACE action from external processor.
+   *
+   * @param response HeadersResponse with replace directives
+   * @return Status of the operation
+   */
   absl::Status
-  handleContinueAndReplace(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  handleHeaderContinueAndReplace(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
-  absl::Status
-  handleContinueResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  /**
+   * Handles header response with CONTINUE action from external processor.
+   * Routes to appropriate handler based on body state and processing mode
+   * (none, buffered, streamed, partial, or full-duplex).
+   *
+   * @param response HeadersResponse with continue action
+   * @return Status of the operation
+   */
+  absl::Status handleHeaderContinue(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
+  /**
+   * Handles header response when complete body is already available.
+   * Sends buffered body to processor based on callback state,
+   * manages streamed data, and continues filter chain when appropriate.
+   *
+   * @param response HeadersResponse from processor
+   * @return Status of the operation
+   */
   absl::Status
   handleCompleteBodyAvailable(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
+  /**
+   * Handle partial body buffering with watermark control when geting a header response.
+   * Enqueues buffered data, sends chunks when high watermark is reached,
+   * and holds headers during buffering phase.
+   *
+   * @param response HeadersResponse from processor
+   * @return Status of the operation
+   */
   absl::Status
   handleBufferedPartialMode(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
+  /**
+   * Finalizes processing by handling trailers and cleanup.
+   * Either sends available trailers to processor or cleans up resources
+   * by clearing headers, notifying filter, and continuing the chain.
+   *
+   * @param response HeadersResponse from processor
+   * @return Status of the operation
+   */
   absl::Status
   handleTrailersAndCleanup(const envoy::service::ext_proc::v3::HeadersResponse& response);
 

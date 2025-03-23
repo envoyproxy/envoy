@@ -165,13 +165,13 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
 
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
-    return handleContinueAndReplace(response);
+    return handleHeaderContinueAndReplace(response);
   }
 
-  return handleContinueResponse(response);
+  return handleHeaderContinue(response);
 }
 
-absl::Status ProcessorState::handleContinueAndReplace(const HeadersResponse& response) {
+absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersResponse& response) {
   ENVOY_STREAM_LOG(debug, "Replacing complete message", *filter_callbacks_);
   const auto& common_response = response.response();
 
@@ -212,7 +212,7 @@ absl::Status ProcessorState::handleContinueAndReplace(const HeadersResponse& res
   return absl::OkStatus();
 }
 
-absl::Status ProcessorState::handleContinueResponse(const HeadersResponse& response) {
+absl::Status ProcessorState::handleHeaderContinue(const HeadersResponse& response) {
   if (no_body_) {
     // Fall through if there was never a body in the first place.
     ENVOY_STREAM_LOG(debug, "The message had no body", *filter_callbacks_);
