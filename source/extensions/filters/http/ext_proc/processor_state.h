@@ -300,7 +300,7 @@ private:
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 
   /**
-   * Handles header response with CONTINUE_AND_REPLACE action from external processor.
+   * Handle the header response with CONTINUE_AND_REPLACE action from external processor.
    *
    * @param response HeadersResponse with replace directives
    * @return Status of the operation
@@ -309,7 +309,7 @@ private:
   handleHeaderContinueAndReplace(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
   /**
-   * Handles header response with CONTINUE action from external processor.
+   * Handle the header response with CONTINUE action from external processor.
    * Routes to appropriate handler based on body state and processing mode
    * (none, buffered, streamed, partial, or full-duplex).
    *
@@ -319,7 +319,7 @@ private:
   absl::Status handleHeaderContinue(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
   /**
-   * Handles header response when complete body is already available.
+   * Handle the body when the complete body is already available.
    * Sends buffered body to processor based on callback state,
    * manages streamed data, and continues filter chain when appropriate.
    *
