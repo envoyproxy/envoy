@@ -80,6 +80,23 @@ bool ExternalProcessorStreamImpl::close() {
   return false;
 }
 
+bool ExternalProcessorStreamImpl::halfCloseAndDeleteOnRemoteClose() {
+  if (!stream_closed_) {
+    ENVOY_LOG(debug, "Closing gRPC stream");
+    // Unregister the watermark callbacks, if any exist (e.g., filter is not destroyed yet)
+    if (grpc_side_stream_flow_control_ && callbacks_.has_value()) {
+      stream_.removeWatermarkCallbacks();
+    }
+    // half close client side of the stream
+    stream_.closeStream();
+    stream_closed_ = true;
+    // schedule deletion when server half-closes or remote close timer expires
+    stream_.waitForRemoteCloseAndDelete();
+    return true;
+  }
+  return false;
+}
+
 void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& response) {
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
