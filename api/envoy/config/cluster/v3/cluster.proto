@@ -681,7 +681,6 @@ message Cluster {
     // like request headers, cookies, dynamic metadata, etc.
     // If the the override host is evaluated as valid host based on the ``override_host_status``,
     // the host will be selected directly and the load balancing will be skipped.
-    // [#extension-category: envoy.override_host_policies]
     core.v3.TypedExtensionConfig override_host_policy = 9;
   }
 
