@@ -2990,6 +2990,8 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_mem_slice",
+        ":quiche_common_platform",
     ],
 )
 
@@ -4931,6 +4933,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_mem_slice",
+    srcs = ["quiche/common/platform/api/quiche_mem_slice.cc"],
+    hdrs = ["quiche/common/platform/api/quiche_mem_slice.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        ":quiche_common_text_utils_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform",
     hdrs = [
         "quiche/common/platform/api/quiche_bug_tracker.h",
@@ -5038,6 +5054,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_mem_slice",
         ":quiche_common_platform",
         ":quiche_common_platform_test",
     ],
