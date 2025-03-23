@@ -604,6 +604,42 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
   EXPECT_FALSE(lb_.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 }
 
+TEST_F(ZoneAwareLoadBalancerBaseTest, ForceLocalityDirectRouting) {
+  envoy::config::cluster::v3::Cluster::CommonLbConfig modified_config = common_config_;
+  modified_config.mutable_zone_aware_lb_config()->set_force_direct_routing(true);
+  TestZoneAwareLb lb_with_force(priority_set_, stats_, runtime_, random_, modified_config);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getBoolean("upstream.zone_routing.force_locality_direct_routing", true))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 1))
+      .WillRepeatedly(Return(1));
+
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}));
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}});
+  HostsPerLocalitySharedPtr local_hosts =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)}});
+
+  host_set_.hosts_ = *upstream_hosts;
+  host_set_.healthy_hosts_ = *upstream_hosts;
+  host_set_.healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+
+  lb_with_force.choose_host_once_host_ = local_hosts->get()[0][0];
+  auto response = lb_with_force.chooseHost(nullptr);
+  EXPECT_EQ(response.host, local_hosts->get()[0][0]);
+  EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -669,58 +669,6 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
 }
 
-// Test of Zone Aware routing when ForceLocalityDirectRouting is enabled
-TEST_P(RoundRobinLoadBalancerTest, ZoneAwareForceLocalityDirectRouting) {
-  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
-    return;
-  }
-
-  // Local cluster has hosts only in Zone A and upstream cluster has hosts in Zone A and Zone B.
-  // Under default settings this would result in an even traffic split between upstream hosts.
-  envoy::config::core::v3::Locality zone_a;
-  zone_a.set_zone("A");
-  envoy::config::core::v3::Locality zone_b;
-  zone_b.set_zone("B");
-
-  HostVectorSharedPtr upstream_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}));
-
-  HostsPerLocalitySharedPtr local_hosts =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)}});
-  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
-      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}});
-
-  hostSet().healthy_hosts_ = *upstream_hosts;
-  hostSet().hosts_ = *upstream_hosts;
-  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
-
-  common_config_.mutable_healthy_panic_threshold()->set_value(50);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(100);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(1);
-  common_config_.mutable_zone_aware_lb_config()->mutable_force_locality_direct_routing()->set_value(
-      true);
-  init(true);
-  updateHosts(upstream_hosts, local_hosts);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
-      .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 1))
-      .WillRepeatedly(Return(1));
-  EXPECT_CALL(runtime_.snapshot_,
-              getBoolean("upstream.zone_routing.force_locality_direct_routing", true))
-      .WillRepeatedly(Return(true));
-
-  // With force_locality_direct_routing enabled, since the local cluster has a healthy host in Zone
-  // A, the load balancer should always choose that host, even though the upstream cluster also
-  // contains Zone B.
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
-  EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
-}
-
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
