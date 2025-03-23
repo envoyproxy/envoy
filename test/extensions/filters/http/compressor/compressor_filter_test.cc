@@ -776,7 +776,7 @@ TEST_P(IsResponseCodeAllowedTest, Validate) {
             "default_value": true,
           }},
         }},
-        "uncompressible_response_code": [
+        "uncompressible_response_codes": [
           {}
         ]
       }},

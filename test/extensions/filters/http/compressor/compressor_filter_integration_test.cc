@@ -118,7 +118,7 @@ public:
             content_type:
               - text/html
               - application/json
-          uncompressible_response_code:
+          uncompressible_response_codes:
             - 206
         request_direction_config:
           common_config:

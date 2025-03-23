@@ -142,7 +142,7 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
       uncompressible_response_codes_(uncompressibleResponseCodesSet(
-          proto_config.response_direction_config().uncompressible_response_code())),
+          proto_config.response_direction_config().uncompressible_response_codes())),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
