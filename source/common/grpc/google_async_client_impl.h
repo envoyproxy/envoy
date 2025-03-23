@@ -229,6 +229,7 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
+  void waitForRemoteCloseAndDelete() override;
   // While the Google-gRPC code doesn't use Envoy watermark buffers, the logical
   // analog is to make sure that the aren't too many bytes in the pending write
   // queue.
@@ -297,7 +298,7 @@ private:
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
-  const Http::AsyncClient::StreamOptions& options_;
+  const Http::AsyncClient::StreamOptions options_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -315,6 +316,7 @@ private:
   // Have we entered CQ draining state? If so, we're just waiting for all our
   // ops on the CQ to drain away before freeing the stream.
   bool draining_cq_{};
+  bool waiting_to_delete_on_remote_close_{};
   // Count of the tags in-flight. This must hit zero before the stream can be
   // freed.
   uint32_t inflight_tags_{};
@@ -328,6 +330,7 @@ private:
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
       completed_ops_ ABSL_GUARDED_BY(completed_ops_lock_);
   Thread::MutexBasicLockable completed_ops_lock_;
+  Event::TimerPtr remote_close_timer_;
 
   friend class GoogleAsyncClientImpl;
   friend class GoogleAsyncClientThreadLocal;
