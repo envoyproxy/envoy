@@ -710,8 +710,8 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareForceLocalityDirectRouting) {
       .WillRepeatedly(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 1))
       .WillRepeatedly(Return(1));
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("upstream.zone_routing.force_locality_direct_routing",
-                                             force_locality_direct_routing_))
+  EXPECT_CALL(runtime_.snapshot_,
+              getBoolean("upstream.zone_routing.force_locality_direct_routing", true))
       .WillRepeatedly(Return(true));
 
   // With force_locality_direct_routing enabled, since the local cluster has a healthy host in Zone
