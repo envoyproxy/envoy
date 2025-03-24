@@ -113,6 +113,8 @@ func capiStatusToErr(status C.CAPIStatus) error {
 	return errors.New("unknown status")
 }
 
+// This require go1.22 which include https://go-review.googlesource.com/c/go/+/527156
+// Passed header strings are not garanteed to be backed by go allocated array
 func goHeadersToCHeaders(headers map[string][]string) ([]string, func()) {
 	var pinner runtime.Pinner
 	hLen := len(headers)
