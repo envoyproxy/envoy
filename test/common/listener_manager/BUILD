@@ -74,6 +74,7 @@ envoy_cc_test(
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "6gig",
     shard_count = 5,
+    tags = ["no-remote-exec"],
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",

@@ -330,6 +330,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     shard_count = 5,
+    tags = ["no-remote-exec"],
     deps = [
         ":router_test_base_lib",
         "//source/common/buffer:buffer_lib",
