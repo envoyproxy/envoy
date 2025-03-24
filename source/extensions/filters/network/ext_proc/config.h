@@ -15,13 +15,15 @@ namespace ExtProc {
  * Config registration for the network external filter. @see NamedNetworkFilterConfigFactory.
  */
 class NetworkExtProcConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor> {
+    : public Common::FactoryBase<
+          envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor> {
 public:
-NetworkExtProcConfigFactory() : FactoryBase(NetworkFilterNames::get().NetworkExternalProcessor) {}
+  NetworkExtProcConfigFactory() : FactoryBase(NetworkFilterNames::get().NetworkExternalProcessor) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& proto_config,
+      const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor&
+          proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
