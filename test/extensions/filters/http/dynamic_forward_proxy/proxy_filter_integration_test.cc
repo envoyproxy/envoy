@@ -1454,7 +1454,6 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
 
 // Verify that we expire sub clusters and not remove on CDS.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   const std::string cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
