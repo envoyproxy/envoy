@@ -425,9 +425,7 @@ void GenericSecretSdsApi::validateConfig(
 std::vector<std::string> GenericSecretSdsApi::getDataSourceFilenames() {
   std::vector<std::string> files;
 
-  if (!generic_secret_) {
-    return files;
-  }
+  ASSERT(generic_secret_ != nullptr);
 
   if (generic_secret_->secret().has_filename()) {
     files.push_back(generic_secret_->secret().filename());
