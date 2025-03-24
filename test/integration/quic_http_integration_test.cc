@@ -1236,7 +1236,7 @@ TEST_P(QuicHttpIntegrationTest, DisableQpack) {
   initialize();
 
   codec_client_ = makeRawHttp3Connection(makeClientConnection(lookupPort("http")), absl::nullopt,
-                                         /*wait_for_1rtt_key*/ true, /*disable_qpack*/true);
+                                         /*wait_for_1rtt_key*/ true, /*disable_qpack*/ true);
   auto headers = default_request_headers_;
   headers.addCopy("cookie", "x;y");
   auto response = codec_client_->makeHeaderOnlyRequest(headers);

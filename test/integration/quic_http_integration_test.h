@@ -276,8 +276,7 @@ public:
   IntegrationCodecClientPtr makeRawHttp3Connection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      bool wait_for_1rtt_key,
-      absl::optional<bool> disable_qpack = absl::nullopt) {
+      bool wait_for_1rtt_key, absl::optional<bool> disable_qpack = absl::nullopt) {
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {
