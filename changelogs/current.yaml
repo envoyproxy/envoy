@@ -291,6 +291,9 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
+- area: adaptive concurrency
+  change: |
+    Allow fixing the minimum RTT by introducing ``fixed_value``.
 - area: lua
   change: |
     Added :ref:`clear_route_cache <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.clear_route_cache>` support to

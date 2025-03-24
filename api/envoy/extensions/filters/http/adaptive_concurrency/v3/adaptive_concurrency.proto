@@ -47,18 +47,19 @@ message GradientControllerConfig {
   }
 
   // Parameters controlling the periodic minRTT recalculation.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message MinimumRTTCalculationParams {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
         "MinimumRTTCalculationParams";
 
     // The time interval between recalculating the minimum request round-trip time. Has to be
-    // positive.
-    google.protobuf.Duration interval = 1 [(validate.rules).duration = {
-      required: true
-      gte {nanos: 1000000}
-    }];
+    // positive. If set to zero, dynamic sampling of the minRTT is disabled.
+    google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // The fixed value for the minRTT. This value is used when minRTT is not sampled dynamically.
+    // If dynamic sampling of the minRTT is disabled, this field must be set.
+    google.protobuf.Duration fixed_value = 6 [(validate.rules).duration = {gt {}}];
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before
     // updating. Defaults to 50.
