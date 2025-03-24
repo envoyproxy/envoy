@@ -99,9 +99,6 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
   // case2 format PROTO_BINARY_LENGTH_DELIMITED
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED);
-  // case3 format PROTO_TEXT
-  local_handle->submitTrace(std::move(local_buffered_trace),
-                            envoy::config::tap::v3::OutputSink::PROTO_TEXT);
 }
 
 // In order to control the return value of writePacket, then
@@ -147,7 +144,7 @@ public:
   }
 };
 
-TEST_F(UdpTapSinkTest, TestSubmitTraceSendOk) {
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsString) {
   // Construct UdpTapSink object
   envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
@@ -170,7 +167,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOk) {
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
 }
 
-TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOk) {
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOkForJsonBodyAsString) {
   // Construct UdpTapSink object
   envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
@@ -191,6 +188,29 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOk) {
       Extensions::Common::Tap::makeTraceWrapper();
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkforProtoText) {
+  // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  TapCommon::PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::PROTO_TEXT);
 }
 
 } // namespace UDP

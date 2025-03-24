@@ -182,6 +182,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
   mobile-android-all:
     paths:
@@ -192,6 +193,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
     push: never
   mobile-android-tests:
@@ -259,6 +261,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
   mobile-ios-all:
     paths:
@@ -269,6 +272,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
     push: never
   mobile-ios-tests:

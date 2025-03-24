@@ -451,7 +451,7 @@ stat_prefix: test
     TestScopedRuntime scoped_runtime;
 
     if (draining) {
-      EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
+      EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
     }
 
     initializeFilter(defaultYamlConfig(true));
@@ -2176,7 +2176,7 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   TestScopedRuntime scoped_runtime;
 
   // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
-  EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
 
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);

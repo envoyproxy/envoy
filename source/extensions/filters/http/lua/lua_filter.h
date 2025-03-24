@@ -416,6 +416,7 @@ public:
     }
     return nullptr;
   }
+  bool clearRouteCache() const { return clear_route_cache_; }
 
   const LuaFilterStats& stats() const { return stats_; }
 
@@ -428,6 +429,7 @@ private:
     return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
+  const bool clear_route_cache_{};
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
@@ -547,7 +549,14 @@ private:
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
-    void onHeadersModified() override { callbacks_->downstreamCallbacks()->clearRouteCache(); }
+    void onHeadersModified() override {
+      // Do not clear route cache if clear_route_cache is false or if no downstream callbacks are
+      // available.
+      if (!parent_.config_->clearRouteCache() || !callbacks_->downstreamCallbacks()) {
+        return;
+      }
+      callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 

@@ -10,6 +10,7 @@
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
@@ -309,6 +310,110 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
 
             return nullptr;
           }));
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderHttps) {
+  // Setup
+  setupFetcher(R"(
+    http_uri:
+      uri: https://pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect the :scheme header to be 'https' according to the configured uri.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_THAT(message->headers(),
+                        HeaderHasValueRef(Http::Headers::get().Scheme, "https"));
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderHttp) {
+  // Setup
+  setupFetcher(R"(
+    http_uri:
+      uri: http://pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect the :scheme header to be 'http' according to the configured uri.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_THAT(message->headers(), HeaderHasValueRef(Http::Headers::get().Scheme, "http"));
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderLegacy) {
+  // Setup
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri", "false"}});
+  setupFetcher(R"(
+    http_uri:
+      uri: https://pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect no :scheme header due to the disabled runtime guard.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_TRUE(message->headers().get(Http::Headers::get().Scheme).empty());
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderUriWithoutScheme) {
+  // Setup
+  setupFetcher(R"(
+    http_uri:
+      uri: pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect no :scheme header since the configured URI does not have a scheme.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_TRUE(message->headers().get(Http::Headers::get().Scheme).empty());
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
 
   // Act
   fetcher_->fetch(parent_span_, receiver);
