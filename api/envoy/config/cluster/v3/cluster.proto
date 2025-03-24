@@ -527,6 +527,7 @@ message Cluster {
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
   // [#extension: envoy.clusters.original_dst]
+  // [#next-free-field: 6]
   message OriginalDstLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.OriginalDstLbConfig";
@@ -556,6 +557,13 @@ message Cluster {
     // The dynamic metadata key to override destination address.
     // First the request metadata is considered, then the connection one.
     type.metadata.v3.MetadataKey metadata_key = 4;
+
+    // Enables batching of multiple host updates that are received across callbacks into a
+    // single update at the specified interval. This batching helps prevent performance
+    // bottlenecks caused by frequent cluster updates, especially for large clusters with
+    // frequent new hosts.
+    // If not specified, batching is disabled.
+    google.protobuf.Duration batch_update_interval = 5;
   }
 
   // Common configuration for all load balancer implementations.

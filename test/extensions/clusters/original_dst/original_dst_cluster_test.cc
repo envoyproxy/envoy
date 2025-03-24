@@ -72,6 +72,7 @@ public:
 
   void setupFromYaml(const std::string& yaml, bool expect_success = true) {
     if (expect_success) {
+      batch_update_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
       cleanup_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
       EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
     }
@@ -107,6 +108,7 @@ public:
     if (init_complete_) {
       EXPECT_CALL(server_context_.dispatcher_, post(_));
       EXPECT_CALL(*cleanup_timer_, disableTimer());
+      EXPECT_CALL(*batch_update_timer_, disableTimer());
     }
   }
 
@@ -119,6 +121,7 @@ public:
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   Event::MockTimer* cleanup_timer_;
+  Event::MockTimer* batch_update_timer_;
   Common::CallbackHandlePtr priority_update_cb_;
   bool init_complete_{false};
 };
@@ -308,6 +311,98 @@ TEST_F(OriginalDstClusterTest, AddressCollision) {
   // Mock the cluster manager by recreating the load balancer with the new host map
   HostConstSharedPtr host4 = OriginalDstCluster::LoadBalancer(handle_).chooseHost(&lb_context).host;
   post_cb1();
+  EXPECT_NE(host4, nullptr);
+  EXPECT_NE(host4, host1);
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+TEST_F(OriginalDstClusterTest, BatchedUpdates) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      batch_update_interval: 2s
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  // Host gets the local address of the downstream connection.
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  // Mock the cluster manager by recreating the load balancer each time to get a fresh host map.
+  auto lb1 = OriginalDstCluster::LoadBalancer(handle_);
+  auto lb2 = OriginalDstCluster::LoadBalancer(handle_);
+
+  // Simulate concurrent request for the same address from two workers.
+  Event::PostCb post_cb1;
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb1](Event::PostCb cb) {
+    post_cb1 = std::move(cb);
+  });
+  HostConstSharedPtr host1 = lb1.chooseHost(&lb_context).host;
+  ASSERT_NE(host1, nullptr);
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host1->address());
+
+  Event::PostCb post_cb2;
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb2](Event::PostCb cb) {
+    post_cb2 = std::move(cb);
+  });
+  HostConstSharedPtr host2 = lb2.chooseHost(&lb_context).host;
+  ASSERT_NE(host2, nullptr);
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host2->address());
+
+  EXPECT_CALL(*batch_update_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*batch_update_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  post_cb1();
+
+  EXPECT_CALL(*batch_update_timer_, enabled()).WillOnce(Return(true));
+  post_cb2();
+
+  // No hosts are added yet as batch update was not triggered yet.
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+
+  EXPECT_CALL(membership_updated_, ready());
+  batch_update_timer_->invokeCallback();
+
+  // Hosts are added after batch update is triggered.
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+
+  // First host is returned on the 3rd call.
+  HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(handle_).chooseHost(&lb_context).host;
+  EXPECT_EQ(host3, host1);
+
+  // Make host time out, no membership changes happen on the first timeout.
+  ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  cleanup_timer_->invokeCallback();
+
+  // Both hosts get removed on the 2nd timeout.
+  ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  cleanup_timer_->invokeCallback();
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb1](Event::PostCb cb) {
+    post_cb1 = std::move(cb);
+  });
+  // Mock the cluster manager by recreating the load balancer with the new host map.
+  HostConstSharedPtr host4 = OriginalDstCluster::LoadBalancer(handle_).chooseHost(&lb_context).host;
+
+  EXPECT_CALL(*batch_update_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*batch_update_timer_, enableTimer(std::chrono::milliseconds(2000), _));
+  post_cb1();
+
+  // New host gets created once again.
+  EXPECT_CALL(membership_updated_, ready());
+  batch_update_timer_->invokeCallback();
   EXPECT_NE(host4, nullptr);
   EXPECT_NE(host4, host1);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
