@@ -44,6 +44,7 @@ private:
   Stats::StatNameSetPtr& stat_name_set_;
 };
 
+//todo nezdolik move to impl file
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
@@ -90,6 +91,8 @@ private:
   const Singleton::InstanceSharedPtr owner_;
 };
 
+using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
+
 /**
  * A singleton for file based loading of ip tags and looking up parsed trie data structures with Ip
  * tags. When given equivalent file paths to the Ip tags, the singleton returns pointers to the same
@@ -98,7 +101,8 @@ private:
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
   IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
-  LcTrieSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader);
+  IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                    Api::Api& api, Event::Dispatcher& dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
   absl::Mutex mu_;
@@ -106,7 +110,7 @@ private:
   //  using that trie. Each provider stores shared_ptrs to this singleton, which keeps the singleton
   //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
   //  shared_ptr is *only* held by driver instances.)
-  absl::flat_hash_map<size_t, std::weak_ptr<Network::LcTrie::LcTrie<std::string>>>
+  absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProviderSharedPtr>>
       ip_tags_registry_ ABSL_GUARDED_BY(mu_);
 };
 
@@ -128,7 +132,7 @@ public:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry,
                         const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime, Api::Api& api,
+                        Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
                         ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }

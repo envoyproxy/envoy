@@ -48,6 +48,12 @@ namespace {
 
 const std::string ip_tagging_prefix = "prefix.ip_tagging.";
 
+const std::string internal_request_file_path =
+    "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml";
+
+const std::string updated_internal_request_file_path =
+    "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_updated_internal_request.yaml";
+
 const std::string internal_request_config = R"EOF(
 request_type: internal
 ip_tags:
@@ -234,8 +240,26 @@ public:
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     config_ = std::make_shared<IpTaggingFilterConfig>(config, ip_tags_registry, "prefix.",
-                                                      *stats_.rootScope(), runtime_, *api_,
+                                                      *stats_.rootScope(), runtime_, *api_, dispatcher_,
                                                       validation_visitor_);
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
+        .WillRepeatedly(Invoke([this, &conditional] {
+          Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+          EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+              .WillRepeatedly(Invoke([this, &conditional](absl::string_view, uint32_t,
+                                                          Filesystem::Watcher::OnChangedCb cb) {
+                {
+                  absl::WriterMutexLock lock(&mutex_);
+                  on_changed_cbs_.reserve(1);
+                  on_changed_cbs_.emplace_back(std::move(cb));
+                }
+                if (conditional.has_value()) {
+                  conditional->setReady();
+                }
+                return absl::OkStatus();
+              }));
+          return mock_watcher;
+        }));
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -246,6 +270,7 @@ public:
     }
   }
 
+  Event::MockDispatcher dispatcher_;
   NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;
@@ -841,11 +866,10 @@ TEST_P(IpTagsFileReloadImplTest, IpTagsFileReloaded) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(test_case.not_tagged_headers_, false));
   EXPECT_FALSE(test_case.not_tagged_headers_.has(Http::Headers::get().EnvoyIpTags));
-  // std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
-  // std::string reloaded_db_file_path =
-  // TestEnvironment::substitute(test_case.reloaded_db_file_path_);
-  // TestEnvironment::renameFile(source_db_file_path, source_db_file_path + "1");
-  // TestEnvironment::renameFile(reloaded_db_file_path, source_db_file_path);
+  std::string source_ip_tags_file_path = TestEnvironment::substitute(test_case.source_ip_tags_file_path_);
+  std::string reloaded_db_file_path = TestEnvironment::substitute(test_case.reloaded_db_file_path_);
+  TestEnvironment::renameFile(source_ip_tags_file_path, source_ip_tags_file_path + "1");
+  TestEnvironment::renameFile(reloaded_db_file_path, source_ip_tags_file_path);
 }
 
 struct IpTagsFileReloadTestCase ip_tags_file_reload_test_cases[] = {

@@ -24,6 +24,7 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
   IpTaggingFilterConfigSharedPtr config(new IpTaggingFilterConfig(
       proto_config, ip_tags_registry, stat_prefix, context.scope(),
       context.serverFactoryContext().runtime(), context.serverFactoryContext().api(),
+      context.serverFactoryContext().mainThreadDispatcher(),
       context.messageValidationVisitor()));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

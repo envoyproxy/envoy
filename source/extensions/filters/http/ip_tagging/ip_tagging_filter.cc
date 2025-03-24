@@ -44,7 +44,6 @@ LcTrieSharedPtr IpTagsLoader::parseIpTags(
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
     for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
-
       absl::StatusOr<Network::Address::CidrRange> cidr_or_error =
           Network::Address::CidrRange::create(entry);
       if (cidr_or_error.status().ok()) {
@@ -61,25 +60,26 @@ LcTrieSharedPtr IpTagsLoader::parseIpTags(
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
-LcTrieSharedPtr IpTagsRegistrySingleton::get(const std::string& ip_tags_path,
-                                             IpTagsLoader& tags_loader) {
-  LcTrieSharedPtr ip_tags;
+IpTagsProviderSharedPtr IpTagsRegistrySingleton::get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                    Api::Api& api, Event::Dispatcher& dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+  IpTagsProviderSharedPtr ip_tags_provider;
   const size_t key = std::hash<std::string>()(ip_tags_path);
   absl::MutexLock lock(&mu_);
   auto it = ip_tags_registry_.find(key);
   if (it != ip_tags_registry_.end()) {
-    ip_tags = it->second.lock();
+    ip_tags_provider = it->second.lock();
   } else {
-    ip_tags = tags_loader.loadTags(ip_tags_path);
-    ip_tags_registry_[key] = ip_tags;
+    ip_tags_provider = std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, dispatcher, api, singleton);
+    ip_tags_registry_[key] = ip_tags_provider;
   }
-  return ip_tags;
+  return ip_tags_provider;
 }
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry, const std::string& stat_prefix,
     Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
+    Event::Dispatcher& dispatcher,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
@@ -110,7 +110,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
-    trie_ = ip_tags_registry_->get(ip_tags_path_, tags_loader_);
+    trie_ = ip_tags_registry_->get(ip_tags_path_, tags_loader_, dispatcher, api, ip_tags_registry_);
   }
 }
 
