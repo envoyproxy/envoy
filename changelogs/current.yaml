@@ -282,7 +282,7 @@ new_features:
     default socket interface to support io_uring.
 - area: http3
   change: |
-    Added :ref:`disable_qpack <envoy_v3_api_field_config.core.v3.Http3ProtocolOptions.disable_qpack>`, an experimental support for
+    Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_qpack, an experimental support for
     disabling QPACK compression.
 
 
