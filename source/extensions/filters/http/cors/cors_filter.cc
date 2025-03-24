@@ -194,6 +194,11 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
 
   headers.setInline(access_control_allow_origin_handle.handle(), latched_origin_);
 
+  // Add Vary: Origin header when origin is not "*"
+  if (latched_origin_ != "*") {
+    headers.appendCopy(Http::CustomHeaders::get().Vary, Http::CustomHeaders::get().Origin);
+  }
+
   if (allowCredentials()) {
     headers.setReferenceInline(access_control_allow_credentials_handle.handle(),
                                Http::CustomHeaders::get().CORSValues.True);
