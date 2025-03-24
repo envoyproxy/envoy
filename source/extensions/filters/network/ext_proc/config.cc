@@ -3,14 +3,11 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/config/utility.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
 
 namespace Envoy {

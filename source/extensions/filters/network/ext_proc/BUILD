@@ -16,8 +16,6 @@ envoy_cc_library(
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
-        "//envoy/runtime:runtime_interface",
-        "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/ext_proc/v3:pkg_cc_proto",
@@ -31,8 +29,6 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ext_proc:ext_proc_lib",
