@@ -47,3 +47,33 @@ platform(
     },
     parents = ["@local_config_platform//:host"],
 )
+
+toolchain(
+    name = "cc-toolchain-arm64",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    toolchain = "//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:cc-compiler-aarch64",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+platform(
+    name = "platform-arm64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+    exec_properties = {
+        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:b4bc62cde8bc10ebc7e91e93fcf92e6e0737b705363478bfd14d86c92d80db2c",
+        "OSFamily": "Linux",
+        "Pool": "arm",
+    },
+    parents = ["@local_config_platform//:host"],
+)
