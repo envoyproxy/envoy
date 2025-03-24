@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -249,7 +250,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
       bool can_process_v6 =
           (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
-      int32_t min_ttl = INT_MAX; // [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
+      int32_t min_ttl = std::numeric_limits<
+          int32_t>::max(); // [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
       // Loop through CNAME and get min_ttl
       for (const ares_addrinfo_cname* cname = addrinfo->cnames; cname != nullptr;
            cname = cname->next) {
