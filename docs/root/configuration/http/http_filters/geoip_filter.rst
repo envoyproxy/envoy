@@ -48,8 +48,8 @@ Configuration example
               region: "x-geo-region"
               city: "x-geo-city"
               asn: "x-geo-asn"
-          city_db_path: "geoip/GeoLite2-City-Test.mmdb"
-          isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
+          db_path_city: "geoip/GeoLite2-City-Test.mmdb"
+          db_path_isp: "geoip/GeoIP2-ISP-Test.mmdb"
 
 
 Statistics

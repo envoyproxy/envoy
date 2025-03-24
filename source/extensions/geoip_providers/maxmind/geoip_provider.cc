@@ -28,13 +28,13 @@ static constexpr absl::string_view ASN_DB_TYPE = "asn_db";
 GeoipProviderConfig::GeoipProviderConfig(
     const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
     const std::string& stat_prefix, Stats::Scope& scope)
-    : city_db_path_(!config.city_db_path().empty() ? absl::make_optional(config.city_db_path())
+    : db_path_city_(!config.db_path_city().empty() ? absl::make_optional(config.db_path_city())
                                                    : absl::nullopt),
-      isp_db_path_(!config.isp_db_path().empty() ? absl::make_optional(config.isp_db_path())
+      db_path_isp_(!config.db_path_isp().empty() ? absl::make_optional(config.db_path_isp())
                                                  : absl::nullopt),
-      anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
+      db_path_anon_(!config.db_path_anon().empty() ? absl::make_optional(config.db_path_anon())
                                                    : absl::nullopt),
-      asn_db_path_(!config.asn_db_path().empty() ? absl::make_optional(config.asn_db_path())
+      db_path_asn_(!config.db_path_asn().empty() ? absl::make_optional(config.db_path_asn())
                                                  : absl::nullopt),
       stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
@@ -70,20 +70,20 @@ GeoipProviderConfig::GeoipProviderConfig(
       !geo_headers_to_add.isp().empty()
           ? absl::make_optional(geo_headers_to_add.is_apple_private_relay())
           : absl::nullopt;
-  if (!city_db_path_ && !anon_db_path_ && !asn_db_path_ && !isp_db_path_) {
+  if (!db_path_city_ && !db_path_anon_ && !db_path_asn_ && !db_path_isp_) {
     throw EnvoyException("At least one geolocation database path needs to be configured: "
-                         "city_db_path, isp_db_path, asn_db_path or anon_db_path");
+                         "db_path_city, db_path_isp, db_path_asn or db_path_anon");
   }
-  if (city_db_path_) {
+  if (db_path_city_) {
     registerGeoDbStats(CITY_DB_TYPE);
   }
-  if (isp_db_path_) {
+  if (db_path_isp_) {
     registerGeoDbStats(ISP_DB_TYPE);
   }
-  if (anon_db_path_) {
+  if (db_path_anon_) {
     registerGeoDbStats(ANON_DB_TYPE);
   }
-  if (asn_db_path_) {
+  if (db_path_asn_) {
     registerGeoDbStats(ASN_DB_TYPE);
   }
 };
