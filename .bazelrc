@@ -224,6 +224,7 @@ build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 build:clang-libc++ --config=libc++
 build:clang-libc++ --action_env=ARFLAGS=r
+build:arm64-clang-libc++ --config=clang-libc++
 
 build:libc++20 --config=libc++
 # gRPC has a lot of deprecated-enum-enum-conversion warning. Remove once it is addressed
@@ -294,6 +295,16 @@ build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
+build:rbe-toolchain-arm64-clang-libc++ --config=rbe-toolchain
+build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
+build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
+build:rbe-toolchain-arm64-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
+build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64
+build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
+build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
+
 build:rbe-toolchain-asan --config=clang-asan
 build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
@@ -337,6 +348,9 @@ build:remote-clang --config=rbe-toolchain-clang
 
 build:remote-clang-libc++ --config=remote
 build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:remote-arm64-clang-libc++ --config=remote
+build:remote-arm64-clang-libc++ --config=rbe-toolchain-arm64-clang-libc++
 
 build:remote-gcc --config=remote
 build:remote-gcc --config=gcc
