@@ -196,7 +196,7 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
 
   // Add Vary: Origin header when origin is not "*"
   if (latched_origin_ != "*") {
-    headers.appendCopy(Http::CustomHeaders::get().Vary, Http::CustomHeaders::get().Origin);
+    headers.appendCopy(Http::CustomHeaders::get().Vary, "origin");
   }
 
   if (allowCredentials()) {
