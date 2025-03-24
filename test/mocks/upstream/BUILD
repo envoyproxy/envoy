@@ -389,7 +389,7 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
-    name = "override_host_policy_mock",
+    name = "override_host_policy_mocks",
     srcs = ["override_host_policy.cc"],
     hdrs = ["override_host_policy.h"],
     deps = [

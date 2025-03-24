@@ -18,6 +18,8 @@
 #include "test/mocks/local_reply/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/overload_manager.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/override_host_policy.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
@@ -425,6 +427,34 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
   auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
   EXPECT_EQ(override_host.value().hosts, "1.2.3.4");
   EXPECT_TRUE(override_host.value().strict);
+
+  filter_manager_->destroyFilters();
+};
+
+TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHostWhenUpstreamHasOverrideHostPolicy) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        manager.applyFilterFactoryCb({}, decoder_factory);
+        return true;
+      }));
+  filter_manager_->createDownstreamFilterChain();
+
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  auto override_host_policy = std::make_shared<NiceMock<Upstream::MockOverrideHostPolicy>>();
+
+  EXPECT_CALL(filter_manager_callbacks_, clusterInfo()).WillOnce(Return(cluster_info));
+  EXPECT_CALL(*cluster_info, overrideHostPolicy())
+      .WillOnce(Return(makeOptRefFromPtr(override_host_policy.get())));
+
+  decoder_filter->callbacks_->setUpstreamOverrideHost(Upstream::OverrideHost{"1.2.3.4", true});
+
+  auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
+  EXPECT_FALSE(override_host.has_value());
 
   filter_manager_->destroyFilters();
 };

@@ -1946,7 +1946,13 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
 
 void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
     Upstream::LoadBalancerContext::OverrideHost upstream_override_host) {
-  parent_.upstream_override_host_ = std::move(upstream_override_host);
+  const auto cluster = clusterInfo();
+  if (cluster == nullptr || !cluster->overrideHostPolicy()) {
+    parent_.upstream_override_host_ = std::move(upstream_override_host);
+  }
+  ENVOY_LOG_FIRST_N(
+      warn, 20, "Cluster {} has override host policy and setUpstreamOverrideHost() will be no-op",
+      cluster->name());
 }
 
 absl::optional<Upstream::LoadBalancerContext::OverrideHost>
