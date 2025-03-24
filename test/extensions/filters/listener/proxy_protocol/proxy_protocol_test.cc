@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/data/core/v3/tlv_metadata.pb.h"
+#include "envoy/extensions/filters/udp/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
 
@@ -21,7 +22,6 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "envoy/extensions/filters/udp/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -2885,7 +2885,7 @@ public:
     filter_ = std::make_unique<UdpFilter>(callbacks_, config_);
   }
 
-  ~ProxyProtocolUdpTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()).Times(1); }
+  ~ProxyProtocolUdpTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
   void setup(const std::string& yaml) {
     envoy::extensions::filters::udp::proxy_protocol::v3::ProxyProtocol proto;

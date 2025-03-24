@@ -1,7 +1,7 @@
 .. _config_udp_listener_filters_proxy_protocol:
 
 PROXY Protocol UDP Filter
-====================
+=========================
 
 .. attention::
 
