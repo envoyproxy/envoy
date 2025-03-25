@@ -26,6 +26,7 @@
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
@@ -280,12 +281,21 @@ public:
     return grpc_service_;
   }
 
+  bool gracefulGrpcClose() const { return graceful_grpc_close_; }
+
+  std::chrono::milliseconds remoteCloseTimeout() const { return remote_close_timeout_; }
+
+  std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
+  static std::function<std::unique_ptr<OnProcessingResponse>()> createOnProcessingResponseCb(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+      Envoy::Server::Configuration::CommonFactoryContext& context, const std::string& stats_prefix);
   const bool failure_mode_allow_;
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
@@ -311,6 +321,7 @@ private:
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
   // is_upstream_ is true if ext_proc filter is in the upstream filter chain.
   const bool is_upstream_;
+  const bool graceful_grpc_close_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
@@ -319,7 +330,11 @@ private:
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;
+
+  const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
+
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
+  const std::chrono::milliseconds remote_close_timeout_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -398,7 +413,8 @@ public:
         encoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces()) {}
+                        config->untypedReceivingMetadataNamespaces()),
+        on_processing_response_(config->createOnProcessingResponse()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
@@ -431,7 +447,7 @@ public:
   // ExternalProcessorCallbacks
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
-  void onGrpcError(Grpc::Status::GrpcStatus error) override;
+  void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void onGrpcClose() override;
   void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
   void logStreamInfo() override;
@@ -456,10 +472,33 @@ public:
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
   void onError() override;
 
+  void onProcessHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                absl::Status status,
+                                envoy::config::core::v3::TrafficDirection traffic_direction);
+  void onProcessTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response,
+                                 absl::Status status,
+                                 envoy::config::core::v3::TrafficDirection traffic_direction);
+  void onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response,
+                             absl::Status status,
+                             envoy::config::core::v3::TrafficDirection traffic_direction);
+
+  Envoy::Http::LocalErrorStatus
+  onLocalReply(const Envoy::Http::StreamFilterBase::LocalReplyData&) override {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
+      ENVOY_STREAM_LOG(debug,
+                       "When onLocalReply() is called, set processing_complete_ to true to skip "
+                       "external processing",
+                       *decoder_callbacks_);
+      processing_complete_ = true;
+    }
+    return ::Envoy::Http::LocalErrorStatus::Continue;
+  }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
+  void halfCloseAndWaitForRemoteClose();
 
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState();
@@ -505,6 +544,8 @@ private:
 
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
 
+  void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   ExtProcFilterStats stats_;
@@ -516,9 +557,17 @@ private:
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
 
+  std::vector<std::string> untyped_forwarding_namespaces_{};
+  std::vector<std::string> typed_forwarding_namespaces_{};
+  std::vector<std::string> untyped_receiving_namespaces_{};
+  Http::StreamFilterCallbacks* filter_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
+
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
   ExternalProcessorStream* stream_ = nullptr;
+
+  std::unique_ptr<OnProcessingResponse> on_processing_response_;
 
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has
@@ -532,11 +581,8 @@ private:
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
 
-  std::vector<std::string> untyped_forwarding_namespaces_{};
-  std::vector<std::string> typed_forwarding_namespaces_{};
-  std::vector<std::string> untyped_receiving_namespaces_{};
-  Http::StreamFilterCallbacks* filter_callbacks_;
-  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
+  // If true, the protocol configurations are already sent to the server.
+  bool protocol_config_encoded_ = false;
 };
 
 extern std::string responseCaseToString(

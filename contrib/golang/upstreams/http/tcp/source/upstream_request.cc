@@ -264,7 +264,7 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     break;
 
   case HttpTcpBridgeStatus::HttpTcpBridgeStopAndBuffer:
-    // every data trigger will call go side, and go side get whloe buffered data ever since at every
+    // every data trigger will call go side, and go side get whole buffered data ever since at every
     // time.
     //
     // if onUpstreamData is called streaming multiple times, data is gradually appended by default,

@@ -602,6 +602,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_lib",
         ":socket_interface_swap_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
@@ -894,6 +895,16 @@ envoy_cc_test(
     ],
     deps = [
         ":protocol_integration_test_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "parser_integration_test",
+    srcs = ["parser_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
     ],
 )
 
@@ -1887,6 +1898,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stream_info:bool_accessor_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/access_loggers/file:config",
@@ -2561,6 +2573,40 @@ envoy_cc_test(
     }),
 )
 
+envoy_cc_test_library(
+    name = "quic_http_integration_test_lib",
+    hdrs = [
+        "quic_http_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":socket_interface_swap_lib",
+        "//source/common/quic:client_connection_factory_lib",
+        "//source/common/quic:envoy_quic_client_connection_lib",
+        "//source/common/quic:envoy_quic_client_session_lib",
+        "//source/common/quic:envoy_quic_connection_helper_lib",
+        "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/common/quic:quic_server_factory_lib",
+        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
+        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/common/quic:test_utils_lib",
+        "//test/common/tls/cert_validator:timed_cert_validator",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/integration/filters:test_listener_filter_lib",
+        "//test/integration/filters:test_network_filter_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
 # TODO(mattklein123): Use target_compatible_with when we switch to Bazel 4.0 instead of multiple
 # selects.
 envoy_cc_test(
@@ -2587,31 +2633,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
-        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
-        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
-        "//test/common/config:dummy_config_proto_cc_proto",
-        "//test/common/tls/cert_validator:timed_cert_validator",
-        ":http_integration_lib",
-        ":socket_interface_swap_lib",
-        "//source/common/quic:client_connection_factory_lib",
-        "//source/common/quic:envoy_quic_client_connection_lib",
-        "//source/common/quic:envoy_quic_client_session_lib",
-        "//source/common/quic:envoy_quic_connection_helper_lib",
-        "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/common/quic:quic_client_factory_lib",
-        "//source/common/quic:quic_server_factory_lib",
-        "//test/common/quic:test_utils_lib",
-        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
-        "//test/integration/filters:stream_info_to_headers_filter_lib",
-        "//test/integration/filters:test_network_filter_lib",
-        "//test/integration/filters:test_listener_filter_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
-        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        ":quic_http_integration_test_lib",
     ]),
 )
 
@@ -2645,6 +2667,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/formatter/cel:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],

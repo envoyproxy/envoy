@@ -29,6 +29,9 @@ else
 fi
 
 setup_clang_toolchain() {
+    if [[ -n "${CLANG_TOOLCHAIN_SETUP}" ]]; then
+        return
+    fi
     CONFIG_PARTS=()
     if [[ -n "${ENVOY_RBE}" ]]; then
         CONFIG_PARTS+=("remote")
@@ -63,12 +66,15 @@ function bazel_with_collection() {
   declare BAZEL_STATUS="${PIPESTATUS[0]}"
   if [ "${BAZEL_STATUS}" != "0" ]
   then
-    pushd bazel-testlogs
-    failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
-    while read -r f; do
-      cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
-    done <<< "$failed_logs"
-    popd
+    if [ -d bazel-testlogs ]
+    then
+        pushd bazel-testlogs
+        failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
+        while read -r f; do
+        cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
+        done <<< "$failed_logs"
+        popd
+    fi
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
@@ -142,9 +148,6 @@ function bazel_binary_build() {
   ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   echo "ENVOY_BIN=${ENVOY_BIN}"
 
-  # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
-  [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
-
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
@@ -209,9 +212,7 @@ function bazel_envoy_api_build() {
 }
 
 function bazel_envoy_api_go_build() {
-    if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
-        setup_clang_toolchain
-    fi
+    setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
     GO_TARGETS=(@envoy_api//...)
     read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"

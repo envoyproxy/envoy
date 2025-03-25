@@ -29,6 +29,7 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 constexpr char ExtAuthzFilterName[] = "envoy.filters.http.ext_authz";
 
 struct GrpcInitializeConfigOpts {
+  bool filter_disabled_by_default = false;
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
@@ -153,9 +154,10 @@ public:
 
       *bootstrap.mutable_node()->mutable_metadata() = metadata;
 
-      envoy::config::listener::v3::Filter ext_authz_filter;
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name(ExtAuthzFilterName);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
+      ext_authz_filter.set_disabled(opts.filter_disabled_by_default);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
 
       if (emitFilterStateStats()) {
@@ -826,7 +828,7 @@ public:
           Protobuf::util::TimeUtil::MillisecondsToDuration(timeout_ms));
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
-      envoy::config::listener::v3::Filter ext_authz_filter;
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
@@ -1031,6 +1033,48 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
+}
+
+// If the filter is default-disabled in the chain with no per-route config, the filter
+// doesn't run at all.
+TEST_P(ExtAuthzGrpcIntegrationTest, HttpFilterDefaultDisabledAllow) {
+  GrpcInitializeConfigOpts opts;
+  opts.filter_disabled_by_default = true;
+  // Request is never sent; stats will not be emitted.
+  opts.expect_stats_override = false;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(4);
+  waitForSuccessfulUpstreamResponse("200");
+  cleanup();
+}
+
+// If the filter is default-disabled in the chain but the per-route config enables it,
+// a normal ext_authz request is expected.
+TEST_P(ExtAuthzGrpcIntegrationTest, HttpFilterDefaultDisabledPerRouteEnabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route;
+        per_route.set_disabled(false);
+        auto* per_filter_typed_config = hcm.mutable_route_config()
+                                            ->mutable_virtual_hosts(0)
+                                            ->mutable_routes(0)
+                                            ->mutable_typed_per_filter_config();
+        (*per_filter_typed_config)["envoy.filters.http.ext_authz"].PackFrom(per_route);
+      });
+  GrpcInitializeConfigOpts opts;
+  // Request is never sent; stats will not be emitted.
+  opts.filter_disabled_by_default = true;
+  initializeConfig(opts);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(4);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP2));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {});
+  waitForSuccessfulUpstreamResponse("200");
+  cleanup();
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, CheckAfterBufferingComplete) {
@@ -1558,7 +1602,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
   )EOF";
     TestUtility::loadFromYaml(ext_authz_config, proto_config);
 
-    envoy::config::listener::v3::Filter ext_authz_filter;
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
@@ -1642,7 +1686,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, AsyncClientSendLocalReply) {
   )EOF";
     TestUtility::loadFromYaml(ext_authz_config, proto_config);
 
-    envoy::config::listener::v3::Filter ext_authz_filter;
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));

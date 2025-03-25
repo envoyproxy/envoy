@@ -12,7 +12,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -377,32 +376,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now that the async-client manager is set, the xDS-Manager can be initialized.
-  absl::Status status = xds_manager_.initialize(this);
+  absl::Status status = xds_manager_.initialize(bootstrap, this);
   SET_AND_RETURN_IF_NOT_OK(status, creation_status);
-
-  // TODO(adisuissa): refactor and move the following data members to the
-  // xDS-manager class.
-  // Initialize the XdsResourceDelegate extension, if set on the bootstrap config.
-  if (bootstrap.has_xds_delegate_extension()) {
-    auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
-        bootstrap.xds_delegate_extension());
-    xds_resources_delegate_ = factory.createXdsResourcesDelegate(
-        bootstrap.xds_delegate_extension().typed_config(),
-        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
-  }
-
-  if (bootstrap.has_xds_config_tracker_extension()) {
-    auto& tracer_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTrackerFactory>(
-        bootstrap.xds_config_tracker_extension());
-    xds_config_tracker_ = tracer_factory.createXdsConfigTracker(
-        bootstrap.xds_config_tracker_extension().typed_config(),
-        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
-  }
-
-  subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
-      makeOptRefFromPtr(xds_config_tracker_.get()));
 }
 
 absl::Status
@@ -501,11 +476,10 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
           factory->create(std::move(primary_client), std::move(failover_client), dispatcher_,
                           random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
                           std::move(custom_config_validators), std::move(backoff_strategy),
-                          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+                          xds_manager_.xdsConfigTracker(), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
-      auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
       std::string name;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         name = "envoy.config_mux.sotw_grpc_mux_factory";
@@ -531,11 +505,11 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       Grpc::RawAsyncClientPtr failover_client;
       RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
                                      primary_client, failover_client));
-      ads_mux_ = factory->create(
-          std::move(primary_client), std::move(failover_client), dispatcher_, random_,
-          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
+      ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client), dispatcher_,
+                                 random_, *stats_.rootScope(), dyn_resources.ads_config(),
+                                 local_info_, std::move(custom_config_validators),
+                                 std::move(backoff_strategy), xds_manager_.xdsConfigTracker(),
+                                 xds_manager_.xdsResourcesDelegate(), use_eds_cache);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -591,7 +565,10 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       cds_resources_locator =
           std::make_unique<xds::core::v3::ResourceLocator>(std::move(url_or_error.value()));
     }
-    cds_api_ = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
+    auto cds_or_error =
+        factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
+    RETURN_IF_NOT_OK_REF(cds_or_error.status())
+    cds_api_ = std::move(*cds_or_error);
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1729,7 +1706,7 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
   return cluster_manager.addClusterUpdateCallbacks(cb);
 }
 
-OdCdsApiHandlePtr
+absl::StatusOr<OdCdsApiHandlePtr>
 ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
                                      const envoy::config::core::v3::ConfigSource& odcds_config,
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -1737,9 +1714,10 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds = creation_function(odcds_config, odcds_resources_locator, *this, *this,
-                                 *stats_.rootScope(), validation_visitor);
-  return OdCdsApiHandleImpl::create(*this, std::move(odcds));
+  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, *this, *this,
+                                          *stats_.rootScope(), validation_visitor);
+  RETURN_IF_NOT_OK_REF(odcds_or_error.status());
+  return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }
 
 ClusterDiscoveryCallbackHandlePtr
@@ -2238,6 +2216,9 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
     }
+    cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+    ENVOY_LOG(debug, "no healthy host");
+    return host_selection;
   }
 
   cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -2463,13 +2444,14 @@ ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cl
                                         ssl_context_manager_, outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr
+absl::StatusOr<CdsApiPtr>
 ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
-                            context_.messageValidationContext().dynamicValidationVisitor());
+                            context_.messageValidationContext().dynamicValidationVisitor(),
+                            context_);
 }
 
 } // namespace Upstream

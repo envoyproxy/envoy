@@ -11,9 +11,8 @@
 #include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
@@ -68,8 +67,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // factory context.
 
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            context.api(), absl::nullopt /*Empty factory context*/, context.singletonManager(),
-            region, Common::Aws::Utility::fetchMetadataWithCurl);
+            context.api(), absl::nullopt /*Empty factory context*/, region,
+            Common::Aws::Utility::fetchMetadataWithCurl);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
             config.service_name(), region, credentials_provider, context,
             // TODO: extend API to allow specifying header exclusion. ref:

@@ -29,7 +29,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/config/subscription_factory_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -87,9 +86,9 @@ public:
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                      ClusterManager& cm) override;
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
+                                      ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   Singleton::Manager& singletonManager() override { return context_.singletonManager(); }
 
@@ -319,7 +318,7 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  OdCdsApiHandlePtr
+  absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
                    const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -327,7 +326,11 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
-  Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
+  // TODO(adisuissa): remove this method, and switch all the callers to invoke
+  // it directly via the XdsManger.
+  Config::SubscriptionFactory& subscriptionFactory() override {
+    return xds_manager_.subscriptionFactory();
+  }
 
   absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -951,11 +954,7 @@ private:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>
       common_lb_config_pool_;
 
-  std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;
-
-  std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
-  std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
 
   bool initialized_{};
   bool ads_mux_initialized_{};
