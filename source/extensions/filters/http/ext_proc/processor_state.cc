@@ -258,6 +258,7 @@ absl::Status ProcessorState::handleCompleteBodyAvailable(const HeadersResponse& 
       filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
       return absl::OkStatus();
     }
+    return handleTrailersAndCleanup(response);
   } else {
     // StreamedBodyCallback state. There is pending body response.
     // Check whether there is buffered data. If there is, send them.
@@ -267,8 +268,6 @@ absl::Status ProcessorState::handleCompleteBodyAvailable(const HeadersResponse& 
     filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
     return absl::OkStatus();
   }
-
-  return handleTrailersAndCleanup(response);
 }
 
 absl::Status ProcessorState::handleBufferedPartialMode(const HeadersResponse& response) {
