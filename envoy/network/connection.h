@@ -180,7 +180,7 @@ public:
    * When enabled, the connection will verify the closure status of both read and write filters
    * before completing the close operation.
    *
-   * @param enabled True to enable closure via the filter manager; false to disable.
+   * @param enabled True to enable closure via the filter manager; false is the default.
    */
   virtual void enableCloseThroughFilterManager(bool enabled) PURE;
 
