@@ -134,7 +134,7 @@ TEST(GolangFilterConfigTest, GolangFilterDestroyConfig) {
   delete config_;
   cleanup();
 }
-  
+
 TEST(GolangFilterConfigTest, GolangFilterWithMissingSecretProvider) {
   const auto yaml_fmt = R"EOF(
   library_id: %s
