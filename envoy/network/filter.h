@@ -56,6 +56,36 @@ enum class FilterStatus {
   //
   // Failure to call continueClosing() after returning StopIterationAndDontClose
   // will result in a stalled connection and possible resource leaks.
+  //
+  // The filter may resume processing by calling continueReading(). If continueClosing() is
+  // not called, the filter remains marked as pending closure, and the closure will take
+  // effect once the actual close occurs.
+  //
+  // Typical usage pattern:
+  //
+  //   // Initially stop iteration without closing the connection.
+  //   FilterStatus onData(data) {
+  //     internal_processing(data);
+  //     return FilterStatus::StopIterationAndDontClose;
+  //   }
+  //
+  //   // Later, resume filter processing explicitly.
+  //   continueReading();
+  //   continueClosing();
+  //
+  //   // Another onData invocation that stops iteration.
+  //   FilterStatus onData(data) {
+  //     do_external_processing(data);
+  //     return FilterStatus::StopIterationAndDontClose;
+  //   }
+  //
+  //   // Inject additional data chunks into the filter chain.
+  //   injectReadDataToFilterChain(data_chunk_1);
+  //   injectReadDataToFilterChain(data_chunk_2);
+  //
+  //   // Finally, explicitly mark that the close is allowed for
+  //   // this filter.
+  //   continueClosing();
   StopIterationAndDontClose,
 };
 

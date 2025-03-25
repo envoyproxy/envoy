@@ -76,7 +76,7 @@ public:
     }
     close(type);
   }
-  void closeInternal(ConnectionCloseType type);
+
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   ReadDisableStatus readDisable(bool disable) override;
@@ -234,6 +234,8 @@ private:
 
   // Set the detected close type for this connection.
   void setDetectedCloseType(DetectedCloseType close_type);
+
+  void closeInternal(ConnectionCloseType type);
 
   static std::atomic<uint64_t> next_global_id_;
 

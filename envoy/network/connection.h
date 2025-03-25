@@ -175,6 +175,13 @@ public:
    */
   virtual bool isHalfCloseEnabled() const PURE;
 
+  /**
+   * Enables or disables connection closure management via the filter manager.
+   * When enabled, the connection will verify the closure status of both read and write filters
+   * before completing the close operation.
+   *
+   * @param enabled True to enable closure via the filter manager; false to disable.
+   */
   virtual void enableCloseThroughFilterManager(bool enabled) PURE;
 
   /**

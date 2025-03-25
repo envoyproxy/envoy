@@ -126,11 +126,18 @@ public:
   bool pendingClose() { return state_.pending_local_close_ || state_.pending_remote_close_; }
 
 protected:
-  struct State {
-    uint32_t pending_close_write_filter_{0};
-    uint32_t pending_close_read_filter_{0};
-    bool pending_remote_close_{false};
-    bool pending_local_close_{false};
+  struct ConnectionCloseState {
+    // Number of pending write filters awaiting closure.
+    uint32_t pending_write_filter_closures_{0};
+
+    // Number of pending read filters awaiting closure.
+    uint32_t pending_read_filter_closures_{0};
+
+    // True if a RemoteClose is currently pending.
+    bool remote_close_pending_{false};
+
+    // True if a LocalClose is currently pending.
+    bool local_close_pending_{false};
   };
 
 private:
