@@ -345,10 +345,10 @@ public:
 TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetadata) {
   // Pre-populate the filter state with an address.
   const auto pre_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 443);
-  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
-  address_obj->address_ = pre_address;
   connection_.streamInfo().filterState()->setData(
-      StreamInfo::UpstreamAddress::key(), std::move(address_obj),
+      StreamInfo::UpstreamAddress::key(),
+      std::make_unique<StreamInfo::UpstreamAddress>(
+          Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 443)),
       StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 
   InSequence s;
@@ -379,8 +379,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
           StreamInfo::UpstreamAddress::key());
 
   // Verify the data
-  EXPECT_TRUE(updated_address_obj->address_);
-  EXPECT_EQ(updated_address_obj->address_->asStringView(), host_info->address_->asStringView());
+  EXPECT_TRUE(updated_address_obj->getIp());
+  EXPECT_EQ(updated_address_obj->getIp()->asStringView(), host_info->address_->asStringView());
 }
 
 // Tests if address set is populated in the filter state when an upstream host is resolved

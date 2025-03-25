@@ -3,6 +3,7 @@
 #include <openssl/stack.h>
 
 #include "source/common/common/hex.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -176,8 +177,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
         size_t length;
         RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
         absl::string_view pem(reinterpret_cast<const char*>(output), length);
-        return absl::StrReplaceAll(
-            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(pem);
       });
 }
 
@@ -201,10 +201,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
           RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
 
           absl::string_view pem(reinterpret_cast<const char*>(output), length);
-          absl::StrAppend(
-              &result,
-              absl::StrReplaceAll(
-                  pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
+          absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
         }
         return result;
       });

@@ -733,22 +733,22 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
-  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
+  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
   auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setExpectedPeerAddress(fmt::format(
           "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
-  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
   // validation is pending.
   quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(500 * TIMEOUT_FACTOR);
+      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -775,19 +775,19 @@ typed_config:
   )EOF"),
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
-  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
+  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
   auto cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
   // validation is pending.
   quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(500 * TIMEOUT_FACTOR);
+      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);

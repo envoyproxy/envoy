@@ -105,7 +105,7 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
   std::string result = "";
   for (const auto& resource : resources_protos) {
-    result += "&resource=" + Http::Utility::PercentEncoding::urlEncodeQueryParameter(resource);
+    result += "&resource=" + Http::Utility::PercentEncoding::urlEncode(resource);
   }
   return result;
 }
@@ -164,8 +164,7 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
   query_params.overwrite("client_id", proto_config.credentials().client_id());
   query_params.overwrite("response_type", "code");
   std::string scopes_list = absl::StrJoin(authScopesList(proto_config.auth_scopes()), " ");
-  query_params.overwrite("scope",
-                         Http::Utility::PercentEncoding::urlEncodeQueryParameter(scopes_list));
+  query_params.overwrite("scope", Http::Utility::PercentEncoding::urlEncode(scopes_list));
   return query_params;
 }
 
@@ -786,8 +785,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
-  const std::string escaped_redirect_uri =
-      Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
+  const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
 
   // Generate a PKCE code verifier and challenge for the OAuth flow.

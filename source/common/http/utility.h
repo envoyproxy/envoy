@@ -149,7 +149,7 @@ public:
    *
    * NOTE: the space character is encoded as %20, NOT as the + character
    */
-  static std::string urlEncodeQueryParameter(absl::string_view value);
+  static std::string urlEncode(absl::string_view value);
 
   /**
    * Exactly the same as above, but returns false when it finds a character that should be %-encoded
@@ -327,7 +327,7 @@ void removeUpgrade(RequestOrResponseHeaderMap& headers,
  * set of values. Removes the `Connection` header if it only contains `tokens_to_remove`.
  */
 void removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
-                             StringUtil::CaseUnorderedSet tokens_to_remove);
+                             const StringUtil::CaseUnorderedSet& tokens_to_remove);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.

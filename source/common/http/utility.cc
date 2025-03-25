@@ -672,7 +672,7 @@ void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
 }
 
 void Utility::removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
-                                      StringUtil::CaseUnorderedSet tokens_to_remove) {
+                                      const StringUtil::CaseUnorderedSet& tokens_to_remove) {
   if (headers.Connection()) {
     const std::string new_value =
         StringUtil::removeTokens(headers.getConnectionValue(), ",", tokens_to_remove, ",");
@@ -1321,7 +1321,7 @@ bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTab
 bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
 } // namespace
 
-std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
+std::string Utility::PercentEncoding::urlEncode(absl::string_view value) {
   std::string encoded;
   encoded.reserve(value.size());
   for (char ch : value) {
