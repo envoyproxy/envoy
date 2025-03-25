@@ -1198,8 +1198,7 @@ TEST_P(DnsImplTest, ReinitializeChannelOnRefused) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // The reinitialized channel retains original settings. Therefore it should still be able
-  // This means that resolution will return `ARES_ENOTFOUND`. This should not reinitialize
-  // the channel again.
+  // to resolve correctly.
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              1 /*get_addr_failure*/, 0 /*timeouts*/, 1 /*reinits*/);
 }
