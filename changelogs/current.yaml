@@ -46,6 +46,13 @@ bug_fixes:
   change: |
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
+- area: http
+  change: |
+    Fixed http parser responding to newlines between requests with 400 Bad Request; per
+    RFC 9112: a server that is expecting to receive and parse a request-line SHOULD ignore
+    at least one empty line (CRLF) received prior to the request-line.
+    This fix can be reverted by setting runtime guard
+    ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` to ``false``.
 - area: router
   change: |
     Fixed query parameter matcher to properly implement
@@ -96,6 +103,14 @@ bug_fixes:
     Before the :scheme header was always 'http'.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
+- area: ext_proc
+  change: |
+    Implemented graceful close of gRPC side streams, where the client half-closes its stream and waits
+    (with timeout) for the server to half-close its stream.
+    This behavioral change is disabled by default and can be enabled by setting runtime guard
+    ``envoy.reloadable_features.ext_proc_graceful_grpc_close`` to true.
+    The remote close timeout is 1 second by default and can be changed by setting the
+    ``envoy.filters.http.ext_proc.remote_close_timeout_milliseconds`` runtime value.
 - area: listener
   change: |
     Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
@@ -105,6 +120,16 @@ bug_fixes:
     <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` where the
     :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor was being saved to
     filter state after iterating through the filter chain.
+- area: ext_proc
+  change: |
+    Fixes a bug where local replies were incorrectly sent to the ext_proc server for external processing.
+    This change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_skip_ext_proc_on_local_reply``
+    to ``false``.
+- area: router
+  change: |
+    Fixes an Envoy crash issue when a local reply is sent.
+    This change can be temporarily reverted by setting runtime guard
+    ``envoy_reloadable_features_router_filter_resetall_on_local_reply`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -178,6 +203,10 @@ new_features:
 - area: tap
   change: |
     Added an UDP extension for tap custom sink.
+- area: tansport tap
+  change: |
+    Added support to control outputing the connection information per event and refer to set_connection_per_event in
+    the message SocketTapConfig of transport socket tap.
 - area: udp_proxy
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
@@ -266,10 +295,18 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
+- area: adaptive concurrency
+  change: |
+    Allow fixing the minimum RTT by introducing ``fixed_value``.
 - area: lua
   change: |
     Added :ref:`clear_route_cache <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.clear_route_cache>` support to
     control the route cache clearing behavior in the Lua filter.
+- area: compressor
+  change: |
+    Added (:ref:`uncompressible_response_codes
+    <envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.uncompressible_response_codes>`)
+    to Compressor Filter which allows configuration of a list of response codes for which the compression will be skipped.
 - area: jwt_authn
   change: |
     Added :ref:`jwt_max_token_size <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtCacheConfig.jwt_max_token_size>` to make
@@ -295,6 +332,10 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: dns
+  change: |
+    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
+    among several other new features, bug-fixes, etc.
 - area: golang
   change: |
     added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the

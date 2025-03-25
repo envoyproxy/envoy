@@ -1167,6 +1167,89 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
   verifyDownstreamResponse(*response, 500);
 }
 
+TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "false"}});
+  // Skip the header processing on response path.
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("body", absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The response does not really matter, it just needs to be non-empty.
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(upstream_request_->bodyLength(), 4);
+
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  verifyDownstreamResponse(*response, 200);
+
+  // By default ext_proc will close and reset side stream when it finished processing downstream
+  // request.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+  // In case of Envoy gRPC client the cluster reset stat will be incremented
+  if (IsEnvoyGrpc()) {
+    test_server_->waitForCounterGe("cluster.ext_proc_server_0.upstream_rq_tx_reset", 1);
+  }
+}
+
+TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersGracefulClose) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  // Make remote close timeout long, so that test times out and fails if it is hit.
+  scoped_runtime_.mergeValues(
+      {{"envoy.filters.http.ext_proc.remote_close_timeout_milliseconds", "60000"}});
+  // Skip the header processing on response path.
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("body", absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The response does not really matter, it just needs to be non-empty.
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(upstream_request_->bodyLength(), 4);
+
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  verifyDownstreamResponse(*response, 200);
+
+  // With graceful gRPC  close enabled, the client sends END_STREAM and waits for server to send
+  // trailers.
+  EXPECT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+  if (IsEnvoyGrpc()) {
+    // There should be no resets
+    EXPECT_EQ(test_server_->counter("cluster.ext_proc_server_0.upstream_rq_tx_reset")->value(), 0);
+  }
+}
+
 TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
   // Skip the header processing on response path.
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
@@ -2279,7 +2362,6 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
 
   // ext_proc will immediately close side stream in this case, which causes it to be reset,
   // since side stream codec had not yet observed server trailers.
-  // TODO(yanavlasov): Separate lifetimes of ext_proc and sidestream.
   EXPECT_TRUE(processor_stream_->waitForReset());
 
   verifyDownstreamResponse(*response, 401);
@@ -2287,6 +2369,78 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
+
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  // Make remote close timeout long, so that test times out and fails if it is hit.
+  scoped_runtime_.mergeValues(
+      {{"envoy.filters.http.ext_proc.remote_close_timeout_milliseconds", "60000"}});
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_header()->set_key("x-failure-reason");
+    hdr1->mutable_header()->set_raw_value("testing");
+    auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_header()->set_key("content-type");
+    hdr2->mutable_header()->set_raw_value("application/json");
+  });
+
+  // ext_proc will immediately half close side stream in this case. Server can then send trailers to
+  // fully close the stream.
+  EXPECT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+  if (IsEnvoyGrpc()) {
+    // There should be no resets
+    EXPECT_EQ(test_server_->counter("cluster.ext_proc_server_0.upstream_rq_tx_reset")->value(), 0);
+  }
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulCloseNoServerTrailers) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
+  // Make remote close timeout short, so that test does not time out.
+  scoped_runtime_.mergeValues(
+      {{"envoy.filters.http.ext_proc.remote_close_timeout_milliseconds", "100"}});
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_header()->set_key("x-failure-reason");
+    hdr1->mutable_header()->set_raw_value("testing");
+    auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_header()->set_key("content-type");
+    hdr2->mutable_header()->set_raw_value("application/json");
+  });
+
+  // ext_proc will immediately half close side stream in this case.
+  EXPECT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+  // However server fails to send trailers
+
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+
+  // Since the server did not send trailers, gRPC client will reset the stream after remote close
+  // timer expires.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+}
+
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithLogging) {
   ConfigOptions config_option = {};
   config_option.add_logging_filter = true;
