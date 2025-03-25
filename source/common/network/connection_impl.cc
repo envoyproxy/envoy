@@ -699,6 +699,13 @@ void ConnectionImpl::onReadReady() {
 
   ASSERT(!connecting_);
 
+  // If it is closing through the filter manager, we either need to close the socket or go
+  // through the close(), so we prevent further reading from the socket when we are waiting
+  // for the connection close.
+  if (filter_manager_.pendingClose()) {
+    return;
+  }
+
   // We get here while read disabled in two ways.
   // 1) There was a call to setTransportSocketIsReadable(), for example if a raw buffer socket ceded
   //    due to shouldDrainReadBuffer(). In this case we defer the event until the socket is read
