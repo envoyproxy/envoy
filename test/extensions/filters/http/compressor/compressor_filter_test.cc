@@ -1,11 +1,15 @@
+#include <sys/types.h>
+
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -181,6 +185,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 enum class PerRouteConfig { None, Empty, Enabled, Disabled };
@@ -737,6 +742,60 @@ TEST_P(IsContentTypeAllowedTest, Validate) {
   doResponse(headers, should_compress, false);
   EXPECT_EQ(should_compress ? 0 : 1,
             stats_.counter("test.compressor.test.test.header_not_valid").value());
+  EXPECT_EQ(should_compress, headers.has("vary"));
+}
+
+class IsResponseCodeAllowedTest
+    : public CompressorFilterTest,
+      public testing::WithParamInterface<std::tuple<uint32_t, bool, bool, std::vector<uint32_t>>> {
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IsResponseCodeAllowedTestSuite, IsResponseCodeAllowedTest,
+    testing::Values(std::make_tuple(200, true, true, std::vector<uint32_t>{206}),
+                    std::make_tuple(206, false, true, std::vector<uint32_t>{206}),
+                    std::make_tuple(200, true, false, std::vector<uint32_t>{}),
+                    std::make_tuple(200, true, true, std::vector<uint32_t>{}),
+                    std::make_tuple(206, true, false, std::vector<uint32_t>{}),
+                    std::make_tuple(206, true, true, std::vector<uint32_t>{}),
+                    std::make_tuple(206, false, true, std::vector<uint32_t>{404, 206}),
+                    std::make_tuple(200, true, true, std::vector<uint32_t>{404, 206})));
+
+TEST_P(IsResponseCodeAllowedTest, Validate) {
+  const uint32_t response_code = std::get<0>(GetParam());
+  const bool should_compress = std::get<1>(GetParam());
+  const bool is_custom_config = std::get<2>(GetParam());
+  const std::vector<uint32_t>& uncompressible_response_codes = std::get<3>(GetParam());
+
+  if (is_custom_config) {
+    setUpFilter(fmt::format(R"EOF(
+    {{
+      "response_direction_config": {{
+        "common_config": {{
+          "enabled": {{
+            "default_value": true,
+          }},
+        }},
+        "uncompressible_response_codes": [
+          {}
+        ]
+      }},
+      "compressor_library": {{
+        "name": "test",
+        "typed_config": {{
+          "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+        }}
+      }}
+    }})EOF",
+                            absl::StrJoin(uncompressible_response_codes, ", ")));
+    response_stats_prefix_ = "response.";
+  }
+
+  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "test, deflate"}});
+  Http::TestResponseHeaderMapImpl headers{
+      {":method", "get"}, {"content-length", "256"}, {":status", std::to_string(response_code)}};
+  doResponse(headers, should_compress);
+
   EXPECT_EQ(should_compress, headers.has("vary"));
 }
 
