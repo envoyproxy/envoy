@@ -341,5 +341,9 @@ new_features:
     added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the
     Destroy function on the config instance. config should implement the new
     github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config interface, implementing the Destroy function.
+- area: http3
+  change: |
+    Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_qpack, an experimental support for
+    disabling QPACK compression.
 
 deprecated:
