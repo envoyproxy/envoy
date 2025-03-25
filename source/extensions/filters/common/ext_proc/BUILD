@@ -1,8 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_extension_package",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 envoy_package()
 
@@ -16,13 +21,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "grpc_client_lib",
-    srcs = [
-        "grpc_client.cc",
-        "grpc_stream.cc",
-    ],
     hdrs = [
         "grpc_client.h",
-        "grpc_stream.h",
     ],
     tags = ["skip_on_windows"],
     deps = [
