@@ -1163,7 +1163,6 @@ TEST_P(DnsImplTest, ReinitChannelOnResetNetworking) {
 // Validate that the c-ares channel is re-initialized when c-ares returns
 // ARES_ECONNREFUSED as its callback status.
 TEST_P(DnsImplTest, ReinitializeChannelOnRefused) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   // See https://github.com/envoyproxy/envoy/issues/28504.
   DISABLE_UNDER_WINDOWS;
 
