@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -125,6 +126,10 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.optmask_ |= ARES_OPT_NOROTATE;
   }
 
+  // Disable query cache by default.
+  options.optmask_ |= ARES_OPT_QUERY_CACHE;
+  options.options_.qcache_max_ttl = 0;
+
   return options;
 }
 
@@ -150,7 +155,8 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
-  ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
+  int result = ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
+  RELEASE_ASSERT(result == ARES_SUCCESS, "ares_init_options failed");
 
   if (resolvers_csv_.has_value()) {
     bool use_resolvers = true;
@@ -186,7 +192,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
     if (!isResponseWithNoRecords(status)) {
       ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
-                      "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+                      "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
+                      status, ares_strerror(status));
     } else {
       ENVOY_LOG_EVENT(debug, "cares_resolution_no_records", "dns resolution without records for {}",
                       dns_name_);
@@ -243,7 +250,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
       bool can_process_v6 =
           (!parent_.filter_unroutable_families_ || available_interfaces_.v6_available_);
 
-      int min_ttl = INT_MAX; // [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
+      int32_t min_ttl = std::numeric_limits<
+          int32_t>::max(); // [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181)
       // Loop through CNAME and get min_ttl
       for (const ares_addrinfo_cname* cname = addrinfo->cnames; cname != nullptr;
            cname = cname->next) {
@@ -323,8 +331,8 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
-                  "dns resolution for {} completed with status {}", dns_name_,
-                  static_cast<int>(pending_response_.status_));
+                  "dns resolution for {} completed with status {} and details {}", dns_name_,
+                  static_cast<int>(pending_response_.status_), pending_response_.details_);
 
   if (!cancelled_) {
     // Use a raw try here because it is used in both main thread and filter.
@@ -426,6 +434,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
     // example, localhost lookup.
+    ENVOY_LOG_EVENT(debug, "cares_resolution_completed",
+                    "dns resolution for {} completed with no async or network events", dns_name);
     return nullptr;
   } else {
     // Enable timer to wake us up if the request times out.

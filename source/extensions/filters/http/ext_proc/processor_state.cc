@@ -151,6 +151,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     if (common_response.has_header_mutation()) {
       const auto mut_status = processHeaderMutation(common_response);
       if (!mut_status.ok()) {
+        filter_.onProcessHeadersResponse(response, mut_status, trafficDirection());
         return mut_status;
       }
     }
@@ -202,6 +203,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
             auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
             filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
             clearWatermark();
+            filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
             return absl::OkStatus();
           }
         } else {
@@ -210,6 +212,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           // Do not continue filter chain here so the pending body response have chance to be
           // served.
           sendBufferedDataInStreamedMode(trailers_ == nullptr);
+          filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
           return absl::OkStatus();
         }
       } else if (body_mode_ == ProcessingMode::BUFFERED) {
@@ -217,13 +220,16 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // we won't be able to modify the headers any more, so do nothing and
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
+        filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::STREAMED) {
         sendBufferedDataInStreamedMode(false);
+        filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
         continueIfNecessary();
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
         // There is no buffered data in this mode.
+        filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
         continueIfNecessary();
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
@@ -253,6 +259,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           // the headers while we buffer the body up to the limit.
           clearWatermark();
         }
+        filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
         return absl::OkStatus();
       }
       if (send_trailers_ && trailers_ != nullptr) {
@@ -260,6 +267,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // is not interested in the body, so send them now.
         filter_.sendTrailers(*this, *trailers_);
         clearWatermark();
+        filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
         return absl::OkStatus();
       }
     }
@@ -268,6 +276,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     // trailers, so we can just continue.
     ENVOY_STREAM_LOG(trace, "Clearing stored headers", *filter_callbacks_);
     headers_ = nullptr;
+    filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
     continueIfNecessary();
     clearWatermark();
     return absl::OkStatus();
@@ -302,6 +311,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   }
 
   if (!result.ok()) {
+    filter_.onProcessBodyResponse(response, result.status(), trafficDirection());
     return result.status();
   }
 
@@ -309,6 +319,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   clearRouteCache(common_response);
   finalizeBodyResponse(*result);
 
+  filter_.onProcessBodyResponse(response, absl::OkStatus(), trafficDirection());
   return absl::OkStatus();
 }
 
@@ -466,11 +477,13 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
           filter_.stats().rejected_header_mutations_);
       if (!mut_status.ok()) {
+        filter_.onProcessTrailersResponse(response, mut_status, trafficDirection());
         return mut_status;
       }
     }
     trailers_ = nullptr;
     onFinishProcessorCall(Grpc::Status::Ok);
+    filter_.onProcessTrailersResponse(response, absl::OkStatus(), trafficDirection());
     continueIfNecessary();
     return absl::OkStatus();
   }

@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_toolchain", "cc_toolchain_suite")
+load(":aarch64_cc_toolchain_config.bzl", aarch64_cc_toolchain_config = "cc_toolchain_config")
 load(":armeabi_cc_toolchain_config.bzl", "armeabi_cc_toolchain_config")
 load(":cc_toolchain_config.bzl", "cc_toolchain_config")
 
@@ -44,6 +45,14 @@ filegroup(
     ) + [":builtin_include_directory_paths"],
 )
 
+filegroup(
+    name = "compiler_deps_aarch64",
+    srcs = glob(
+        ["extra_tools/**"],
+        allow_empty = True,
+    ) + [":builtin_include_directory_paths_aarch64"],
+)
+
 # This is the entry point for --crosstool_top.  Toolchains are found
 # by lopping off the name of --crosstool_top and searching for
 # the "${CPU}" entry in the toolchains attribute.
@@ -54,6 +63,8 @@ cc_toolchain_suite(
         "k8": ":cc-compiler-k8",
         "armeabi-v7a|compiler": ":cc-compiler-armeabi-v7a",
         "armeabi-v7a": ":cc-compiler-armeabi-v7a",
+        "aarch64|clang": ":cc-compiler-aarch64",
+        "aarch64": ":cc-compiler-aarch64",
     },
 )
 
@@ -172,3 +183,102 @@ cc_toolchain(
 )
 
 armeabi_cc_toolchain_config(name = "stub_armeabi-v7a")
+
+aarch64_cc_toolchain_config(
+    name = "arm64-local",
+    abi_libc_version = "arm64-local",
+    abi_version = "arm64-local",
+    compile_flags = [
+        "-fstack-protector",
+        "-Wall",
+        "-Wthread-safety",
+        "-Wself-assign",
+        "-Wunused-but-set-parameter",
+        "-Wno-free-nonheap-object",
+        "-fcolor-diagnostics",
+        "-fno-omit-frame-pointer",
+    ],
+    compiler = "clang",
+    coverage_compile_flags = [
+        "-fprofile-instr-generate",
+        "-fcoverage-mapping",
+    ],
+    coverage_link_flags = ["-fprofile-instr-generate"],
+    cpu = "aarch64",
+    cxx_builtin_include_directories = [
+        "/opt/llvm/lib/clang/14.0.0/include",
+        "/usr/local/include",
+        "/usr/include/aarch64-linux-gnu",
+        "/usr/include",
+        "/opt/llvm/lib/clang/14.0.0/share",
+        # "/opt/llvm/include/aarch64-unknown-linux-gnu/c++/v1",
+        "/opt/llvm/include/c++/v1",
+    ],
+
+    cxx_flags = ["-stdlib=libc++"],
+    dbg_compile_flags = ["-g"],
+    host_system_name = "local",
+    link_flags = [
+        "-fuse-ld=/opt/llvm/bin/ld.lld",
+        "-Wl,-no-as-needed",
+        "-Wl,-z,relro,-z,now",
+        "-B/opt/llvm/bin",
+        "-lm",
+        "-pthread",
+        "-fuse-ld=lld",
+    ],
+    link_libs = [
+        "-l:libc++.a",
+        "-l:libc++abi.a",
+    ],
+    opt_compile_flags = [
+        "-g0",
+        "-O2",
+        "-D_FORTIFY_SOURCE=1",
+        "-DNDEBUG",
+        "-ffunction-sections",
+        "-fdata-sections",
+    ],
+    opt_link_flags = ["-Wl,--gc-sections"],
+    supports_start_end_lib = True,
+    target_libc = "local",
+    target_system_name = "local",
+    tool_paths = {
+        "ar": "/usr/bin/ar",
+        "ld": "/usr/bin/ld",
+        "llvm-cov": "/opt/llvm/bin/llvm-cov",
+        "llvm-profdata": "/opt/llvm/bin/llvm-profdata",
+        "cpp": "/usr/bin/cpp",
+        "gcc": "/opt/llvm/bin/clang-14",
+        "dwp": "/usr/bin/dwp",
+        "gcov": "/opt/llvm/bin/llvm-profdata",
+        "nm": "/usr/bin/nm",
+        "objcopy": "/usr/bin/objcopy",
+        "objdump": "/usr/bin/objdump",
+        "strip": "/usr/bin/strip",
+    },
+    toolchain_identifier = "local",
+    unfiltered_compile_flags = [
+        "-no-canonical-prefixes",
+        "-Wno-builtin-macro-redefined",
+        "-D__DATE__=\"redacted\"",
+        "-D__TIMESTAMP__=\"redacted\"",
+        "-D__TIME__=\"redacted\"",
+    ],
+)
+
+cc_toolchain(
+    name = "cc-compiler-aarch64",
+    all_files = ":compiler_deps_aarch64",
+    ar_files = ":compiler_deps_aarch64",
+    as_files = ":compiler_deps_aarch64",
+    compiler_files = ":compiler_deps_aarch64",
+    dwp_files = ":empty",
+    linker_files = ":compiler_deps_aarch64",
+    module_map = ":arm64.module.modulemap",
+    objcopy_files = ":empty",
+    strip_files = ":empty",
+    supports_param_files = 1,
+    toolchain_config = ":arm64-local",
+    toolchain_identifier = "arm64-local",
+)
