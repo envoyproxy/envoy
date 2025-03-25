@@ -19,6 +19,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
+using Envoy::Protobuf::util::MessageDifferencer;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -501,9 +503,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponse) {
                                              {"content-type", "application/grpc"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(req_headers, false));
 
-  std::string book_str = "{\"id\":123,\"author\":\"John Doe\",\"title\":\"A Book\"}";
-  Buffer::OwnedImpl buffer;
-  buffer.add(book_str);
+  Buffer::OwnedImpl buffer{"{\"id\":123,\"author\":\"John Doe\",\"title\":\"A Book\"}"};
 
   Http::TestResponseTrailerMapImpl trailers;
   EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
@@ -514,12 +514,20 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(res_headers, false));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(buffer, true));
+
+  bookstore::Book expected_book;
+  expected_book.set_id(123);
+  expected_book.set_author("John Doe");
+  expected_book.set_title("A Book");
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(buffer, frames);
+
   bookstore::Book book;
-  book.set_id(123);
-  book.set_author("John Doe");
-  book.set_title("A Book");
-  auto book_buffer = Grpc::Common::serializeToGrpcFrame(book);
-  EXPECT_EQ(buffer.toString(), book_buffer.get()->toString());
+  book.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0"); // OK
 }
 
@@ -530,18 +538,23 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseWithTrailer) {
                                              {"content-type", "application/grpc"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(req_headers, false));
 
-  std::string book_str = "{\"id\":123,\"author\":\"John Doe\",\"title\":\"A Book\"}";
-  Buffer::OwnedImpl buffer;
-  buffer.add(book_str);
+  Buffer::OwnedImpl buffer{"{\"id\":123,\"author\":\"John Doe\",\"title\":\"A Book\"}"};
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillOnce(Invoke([](Buffer::Instance& data, bool) {
+        bookstore::Book expected_book;
+        expected_book.set_id(123);
+        expected_book.set_author("John Doe");
+        expected_book.set_title("A Book");
+
+        Grpc::Decoder decoder;
+        std::vector<Grpc::Frame> frames;
+        std::ignore = decoder.decode(data, frames);
+
         bookstore::Book book;
-        book.set_id(123);
-        book.set_author("John Doe");
-        book.set_title("A Book");
-        auto book_buffer = Grpc::Common::serializeToGrpcFrame(book);
-        EXPECT_EQ(data.toString(), book_buffer.get()->toString());
+        book.ParseFromString(frames[0].data_->toString());
+
+        EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
       }));
 
   Http::TestResponseHeaderMapImpl res_headers{{":status", "200"},
@@ -576,11 +589,18 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponse) {
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(buffer, true));
 
+  google::api::HttpBody expected_body;
+  expected_body.set_content_type("application/json");
+  expected_body.set_data(book_str);
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(buffer, frames);
+
   google::api::HttpBody body;
-  body.set_content_type("application/json");
-  body.set_data(book_str);
-  auto body_buffer = Grpc::Common::serializeToGrpcFrame(body);
-  EXPECT_EQ(buffer.toString(), body_buffer.get()->toString());
+  body.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_body, body));
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0");
 }
 
@@ -619,11 +639,18 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponseWithTrailer) {
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
       .WillOnce(Invoke([&book_str](Buffer::Instance& data, bool) {
+        google::api::HttpBody expected_body;
+        expected_body.set_content_type("application/json");
+        expected_body.set_data(book_str);
+
+        Grpc::Decoder decoder;
+        std::vector<Grpc::Frame> frames;
+        std::ignore = decoder.decode(data, frames);
+
         google::api::HttpBody body;
-        body.set_content_type("application/json");
-        body.set_data(book_str);
-        auto body_buffer = Grpc::Common::serializeToGrpcFrame(body);
-        EXPECT_EQ(data.toString(), body_buffer.get()->toString());
+        body.ParseFromString(frames[0].data_->toString());
+
+        EXPECT_TRUE(MessageDifferencer::Equals(expected_body, body));
       }));
 
   Http::TestResponseHeaderMapImpl res_headers{{":status", "200"},
@@ -715,7 +742,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, MiscEncodingAndDecoding) {
 TEST_F(GrpcJsonReverseTranscoderFilterTest, ParseInvalidConfig) {
   envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder
       config;
-  config.set_descriptor_path("test/proto/bookstore.proto");
+  config.set_descriptor_path(TestEnvironment::runfilesPath("test/proto/bookstore.proto"));
   EXPECT_THROW_WITH_MESSAGE(GrpcJsonReverseTranscoderConfig(config, *api_), EnvoyException,
                             "Unable to parse proto descriptor");
 }

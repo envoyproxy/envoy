@@ -770,6 +770,14 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "engflow_rbe_x86_64",
+    match_all = [
+        ":engflow_rbe",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple",
     match_any = [
         ":darwin",
