@@ -9,6 +9,7 @@
 #include "absl/strings/str_format.h"
 #include "contrib/golang/filters/http/source/config.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
+#include "contrib/golang/filters/http/test/test_data/destroyconfig/destroyconfig.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -102,6 +103,35 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   EXPECT_TRUE(plugin_config.SerializeToString(&str));
   cb(filter_callback);
 
+  cleanup();
+}
+
+TEST(GolangFilterConfigTest, GolangFilterDestroyConfig) {
+  const auto yaml_fmt = R"EOF(
+  library_id: %s
+  library_path: %s
+  plugin_name: %s
+  )EOF";
+
+  const std::string DESTROYCONFIG{"destroyconfig"};
+  auto yaml_string = absl::StrFormat(yaml_fmt, DESTROYCONFIG, genSoPath(), DESTROYCONFIG);
+  envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(
+      proto_config.library_id(), proto_config.library_path(), proto_config.plugin_name());
+  auto config_ = new httpDestroyableConfig();
+  config_->plugin_name_ptr = reinterpret_cast<unsigned long long>(DESTROYCONFIG.data());
+  config_->plugin_name_len = DESTROYCONFIG.length();
+  config_->config_ptr = 0;
+  config_->config_len = 0;
+  config_->is_route_config = 0;
+  config_->concurrency = 0;
+  config_->destroyed = 0;
+  auto config_id_ = dso_lib->envoyGoFilterNewHttpPluginConfig(config_);
+  dso_lib->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
+  EXPECT_TRUE(config_->destroyed);
+  delete config_;
   cleanup();
 }
 
