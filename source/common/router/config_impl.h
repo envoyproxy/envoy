@@ -662,17 +662,7 @@ protected:
 public:
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
-  bool isRedirect() const {
-    if (!isDirectResponse()) {
-      return false;
-    }
-    if (redirect_config_ == nullptr) {
-      return false;
-    }
-    return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
-           !redirect_config_->prefix_rewrite_redirect_.empty() ||
-           redirect_config_->regex_rewrite_redirect_ != nullptr;
-  }
+  bool isRedirect() const;
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
