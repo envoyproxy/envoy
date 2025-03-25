@@ -1895,7 +1895,9 @@ envoy.generic_proxy.codecs.http1:
 envoy.filters.http.dynamic_modules:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter

@@ -6,7 +6,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"

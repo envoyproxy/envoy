@@ -75,11 +75,11 @@ extensions/filters/common/original_src @klarose @mattklein123
 # UDP packet writer
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
-/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @weisisea
-/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @weisisea
-/*/extensions/health_checkers/redis @weisisea @mattklein123
-/*/extensions/filters/network/redis_proxy @weisisea @mattklein123
-/*/extensions/filters/network/common/redis @weisisea @mattklein123
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+/*/extensions/common/redis @msukalski @henryyyang @mattklein123
+/*/extensions/health_checkers/redis @mattklein123 @UNOWNED
+/*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
+/*/extensions/filters/network/common/redis @mattklein123 @UNOWNED
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist

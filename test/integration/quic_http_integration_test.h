@@ -276,7 +276,7 @@ public:
   IntegrationCodecClientPtr makeRawHttp3Connection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      bool wait_for_1rtt_key) {
+      bool wait_for_1rtt_key, absl::optional<bool> disable_qpack = absl::nullopt) {
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {
@@ -284,6 +284,9 @@ public:
           http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
     *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
+    if (disable_qpack.has_value()) {
+      cluster->http3_options_.set_disable_qpack(*disable_qpack);
+    }
     Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
         cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
         timeSystem())};

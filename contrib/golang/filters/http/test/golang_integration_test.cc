@@ -318,6 +318,53 @@ typed_config:
     initialize();
   }
 
+  void initializeSecretsConfig(std::string config_secret_key = "",
+                               std::string config_secret_value = "", std::string path = "") {
+    const auto yaml_fmt = R"EOF(
+      name: golang
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+        library_id: %s
+        library_path: %s
+        plugin_name: %s
+        plugin_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          value:
+            path: %s
+            secret_key: %s
+            secret_value: %s
+        generic_secrets:
+          - name: static_secret
+          - name: dynamic_secret
+            sds_config:
+              path_config_source:
+                path: "{{ test_tmpdir }}/dynamic_secret.yaml"
+      )EOF";
+    // dynamic secret using SDS
+    TestEnvironment::writeStringToFileForTest("dynamic_secret.yaml", R"EOF(
+      resources:
+        - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+          name: dynamic_secret
+          generic_secret:
+            secret:
+              inline_string: "dynamic_secret_value")EOF",
+                                              false);
+    // static secret in bootstrap file
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("static_secret");
+      auto* generic = secret->mutable_generic_secret();
+      generic->mutable_secret()->set_inline_string("static_secret_value");
+    });
+    auto yaml_string = absl::StrFormat(yaml_fmt, SECRETS, genSoPath(), SECRETS, path,
+                                       config_secret_key, config_secret_value);
+    config_helper_.prependFilter(TestEnvironment::substitute(yaml_string));
+    config_helper_.skipPortUsageValidation();
+
+    initialize();
+    registerTestServerPorts({"http"});
+  }
+
   void testBasic(std::string path) {
     initializeBasicFilter(BASIC, "test.com");
 
@@ -800,6 +847,23 @@ typed_config:
     cleanup();
   }
 
+  void testSecrets(const std::string secret_key, const std::string expected_secret_value,
+                   const std::string status_code, std::string path) {
+    initializeSecretsConfig(secret_key, expected_secret_value, path);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    auto response = std::move(encoder_decoder.second);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_EQ(status_code, response->headers().getStatusValue());
+    EXPECT_EQ(expected_secret_value, response->body());
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
@@ -811,6 +875,7 @@ typed_config:
   const std::string ACTION{"action"};
   const std::string ADDDATA{"add_data"};
   const std::string BUFFERINJECTDATA{"bufferinjectdata"};
+  const std::string SECRETS{"secrets"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1681,6 +1746,28 @@ TEST_P(GolangIntegrationTest, RefreshRouteCache) {
   EXPECT_EQ("second_matched", getHeader(response->headers(), "add-header-from"));
 
   cleanup();
+}
+
+TEST_P(GolangIntegrationTest, DynamicSecret) {
+  testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/");
+}
+
+TEST_P(GolangIntegrationTest, DynamicSecretGoRoutine) {
+  testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/async");
+}
+
+TEST_P(GolangIntegrationTest, StaticSecret) {
+  testSecrets("static_secret", "static_secret_value", "200", "/");
+}
+
+TEST_P(GolangIntegrationTest, StaticSecretGoRoutine) {
+  testSecrets("static_secret", "static_secret_value", "200", "/async");
+}
+
+TEST_P(GolangIntegrationTest, MissingSecret) { testSecrets("missing_secret", "", "404", "/"); }
+
+TEST_P(GolangIntegrationTest, MissingSecretGoRoutine) {
+  testSecrets("missing_secret", "", "404", "/async");
 }
 
 } // namespace Envoy

@@ -899,6 +899,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "parser_integration_test",
+    srcs = ["parser_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+    ],
+)
+
+envoy_cc_test(
     name = "multi_envoy_test",
     size = "large",
     srcs = envoy_select_admin_functionality([
@@ -1957,9 +1967,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":tcp_tunneling_integration_lib",
-        "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/extensions/http/injected_credentials/generic:config",
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
@@ -1967,7 +1975,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/credential_injector/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
     ],
@@ -2619,6 +2626,7 @@ envoy_cc_test(
     #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
+    shard_count = 5,
     tags = [
         "cpu:3",
         "fails_on_clang_cl",
@@ -2660,6 +2668,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/formatter/cel:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],

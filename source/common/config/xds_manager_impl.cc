@@ -24,13 +24,16 @@ absl::Status XdsManagerImpl::initialize(const envoy::config::bootstrap::v3::Boot
 
   // Initialize the XdsConfigTracker extension, if set on the bootstrap config.
   if (bootstrap.has_xds_config_tracker_extension()) {
-    auto& tracker_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTrackerFactory>(
+    auto& tracker_factory = Config::Utility::getAndCheckFactory<XdsConfigTrackerFactory>(
         bootstrap.xds_config_tracker_extension());
     xds_config_tracker_ = tracker_factory.createXdsConfigTracker(
         bootstrap.xds_config_tracker_extension().typed_config(),
         validation_context_.dynamicValidationVisitor(), api_, main_thread_dispatcher_);
   }
 
+  subscription_factory_ = std::make_unique<SubscriptionFactoryImpl>(
+      local_info_, main_thread_dispatcher_, *cm_, validation_context_.dynamicValidationVisitor(),
+      api_, server_, xdsResourcesDelegate(), xdsConfigTracker());
   return absl::OkStatus();
 }
 

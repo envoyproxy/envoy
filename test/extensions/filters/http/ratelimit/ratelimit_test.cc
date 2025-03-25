@@ -131,6 +131,24 @@ public:
   stat_prefix: with_stat_prefix
   )EOF";
 
+  const std::string filter_config_with_filter_enabled_ = R"EOF(
+  domain: foo
+  filter_enabled:
+    runtime_key: test_enabled
+    default_value:
+      numerator: 30
+      denominator: HUNDRED
+  )EOF";
+
+  const std::string filter_config_with_filter_enforced_ = R"EOF(
+    domain: foo
+    filter_enforced:
+      runtime_key: test_enforced
+      default_value:
+        numerator: 50
+        denominator: HUNDRED
+    )EOF";
+
   Filters::Common::RateLimit::MockClient* client_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Stats::StatNamePool pool_{filter_callbacks_.clusterInfo()->statsScope().symbolTable()};
@@ -224,6 +242,29 @@ TEST_F(HttpRateLimitFilterTest, RuntimeDisabled) {
   EXPECT_CALL(factory_context_.runtime_loader_.snapshot_,
               featureEnabled("ratelimit.http_filter_enabled", 100))
       .WillOnce(Return(false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+}
+
+TEST_F(HttpRateLimitFilterTest, RuntimeDisabledFromFilterConfig) {
+  setUpTest(filter_config_with_filter_enabled_);
+
+  EXPECT_CALL(
+      factory_context_.runtime_loader_.snapshot_,
+      featureEnabled(absl::string_view("test_enabled"),
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(30))))
+      .WillOnce(testing::Return(false));
+
+  // Explicit configuration in the filter config should override the default runtime key.
+  EXPECT_CALL(factory_context_.runtime_loader_.snapshot_,
+              featureEnabled("ratelimit.http_filter_enabled", 100))
+      .Times(0);
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
@@ -1019,6 +1060,56 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
   EXPECT_CALL(factory_context_.runtime_loader_.snapshot_,
               featureEnabled("ratelimit.http_filter_enforcing", 100))
       .WillOnce(Return(false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::move(h), nullptr, "", nullptr);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
+}
+
+TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabledFromFilterConfig) {
+  setUpTest(filter_config_with_filter_enforced_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(
+      factory_context_.runtime_loader_.snapshot_,
+      featureEnabled(absl::string_view("test_enforced"),
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
+      .WillOnce(testing::Return(false));
+
+  // Explicit configuration in the filter config should override the default runtime key.
+  EXPECT_CALL(factory_context_.runtime_loader_.snapshot_,
+              featureEnabled("ratelimit.http_filter_enforcing", 100))
+      .Times(0);
+
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
