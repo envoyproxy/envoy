@@ -108,7 +108,7 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
     rbe_pool = "4core",
-    shard_count = 4,
+    shard_count = 6,
     tags = [
         "cpu:3",
         "skip_on_windows",
