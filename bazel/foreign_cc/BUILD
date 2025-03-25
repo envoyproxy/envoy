@@ -72,6 +72,10 @@ make(
         "MOREFLAGS='-fPIC'",
         "BUILD_SHARED=no",
     ],
+    env = select({
+        "@platforms//os:macos": {"AR": "ar"},
+        "//conditions:default": {},
+    }),
     lib_source = "@com_github_lz4_lz4//:all",
     out_static_libs = [
         "liblz4.a",
@@ -201,9 +205,11 @@ configure_make(
     env = {
         "CXXFLAGS": "-fPIC -DU_CHARSET_IS_UTF8=1 -DU_USING_ICU_NAMESPACE=0 -DUCONFIG_ONLY_HTML_CONVERSION=1 -DUCONFIG_NO_LEGACY_CONVERSION=1 -DUCONFIG_NO_BREAK_ITERATION=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_REGULAR_EXPRESSIONS=1",
         "CFLAGS": "-fPIC",
-        "LIBS": "-l:libstdc++.a",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
-    },
+    } | select({
+        "@platforms//os:macos": {"AR": "ar"},
+        "//conditions:default": {"LIBS": "-l:libstdc++.a"},
+    }),
     lib_source = "@com_github_unicode_org_icu//:all",
     out_static_libs = [
         "libicuuc.a",
@@ -443,6 +449,10 @@ envoy_cmake(
         # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
         "UNALIGNED_OK": "off",
     },
+    env = select({
+        "@platforms//os:macos": {"CFLAGS": "-Wno-implicit-function-declaration"},
+        "//conditions:default": {},
+    }),
     lib_source = select({
         "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
         "//conditions:default": "@net_zlib//:all",

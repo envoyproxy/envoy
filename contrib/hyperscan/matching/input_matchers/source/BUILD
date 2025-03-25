@@ -93,8 +93,8 @@ envoy_cc_contrib_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     defines = select({
-        "//bazel:linux_x86_64": [],
-        "//bazel:linux_aarch64": [],
+        "@platforms//cpu:x86_64": [],
+        "@platforms//cpu:aarch64": [],
         "//conditions:default": [
             "HYPERSCAN_DISABLED=1",
         ],
@@ -106,10 +106,10 @@ envoy_cc_contrib_extension(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg_cc_proto",
     ] + select({
-        "//bazel:linux_x86_64": [
+        "@platforms//cpu:x86_64": [
             ":hyperscan_matcher_lib",
         ],
-        "//bazel:linux_aarch64": [
+        "@platforms//cpu:aarch64": [
             ":vectorscan_matcher_lib",
         ],
         "//conditions:default": [
