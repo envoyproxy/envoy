@@ -38,11 +38,11 @@ message MaxMindConfig {
   // Database file is expected to have .mmdb extension.
   string db_path_anon = 3 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
-  // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
-  common.v3.CommonGeoipProviderConfig common_provider_config = 4
-      [(validate.rules).message = {required: true}];
-
   // Full file path to the Maxmind ISP database, e.g. /etc/GeoLite2-ISP.mmdb.
   // Database file is expected to have .mmdb extension.
   string db_path_isp = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+
+  // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
+  common.v3.CommonGeoipProviderConfig common_provider_config = 4
+      [(validate.rules).message = {required: true}];
 }
