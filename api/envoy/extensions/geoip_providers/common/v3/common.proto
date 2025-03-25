@@ -66,7 +66,7 @@ message CommonGeoipProviderConfig {
     string isp = 10
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay.
+    // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
     string is_apple_private_relay = 11
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
