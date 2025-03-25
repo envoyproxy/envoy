@@ -21,6 +21,7 @@ go_binary(
         "//contrib/golang/filters/http/test/test_data/basic",
         "//contrib/golang/filters/http/test/test_data/buffer",
         "//contrib/golang/filters/http/test/test_data/bufferinjectdata",
+        "//contrib/golang/filters/http/test/test_data/destroyconfig",
         "//contrib/golang/filters/http/test/test_data/echo",
         "//contrib/golang/filters/http/test/test_data/metric",
         "//contrib/golang/filters/http/test/test_data/passthrough",
