@@ -27,6 +27,7 @@ go_binary(
         "//contrib/golang/filters/http/test/test_data/passthrough",
         "//contrib/golang/filters/http/test/test_data/property",
         "//contrib/golang/filters/http/test/test_data/routeconfig",
+        "//contrib/golang/filters/http/test/test_data/secrets",
         "//contrib/golang/filters/http/test/test_data/websocket",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/structpb",

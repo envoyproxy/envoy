@@ -186,6 +186,11 @@ type StreamFilterCallbacks interface {
 	// * ErrValueNotFound
 	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
+
+	// Get secret manager.
+	// Secrets should be defined in the plugin configuration.
+	// It is safe to use this secret manager from any goroutine.
+	SecretManager() SecretManager
 }
 
 // FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
@@ -312,6 +317,12 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type SecretManager interface {
+	// Get generic secret from secret manager.
+	// bool is false on missing secret
+	GetGenericSecret(name string) (string, bool)
 }
 
 type MetricType uint32
