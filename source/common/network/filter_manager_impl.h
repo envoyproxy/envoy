@@ -95,6 +95,10 @@ public:
    */
   virtual void rawWrite(Buffer::Instance& data, bool end_stream) PURE;
 
+  /**
+   * Close the connection based on the ConnectionCLoseAction.
+   * @param action for how the connection will be closed.
+   */
   virtual void closeConnection(ConnectionCloseAction action) PURE;
 };
 
@@ -118,20 +122,20 @@ public:
   void onConnectionClose(ConnectionCloseAction close_action);
 
   void finalizeClose(ConnectionCloseAction close_action) {
-    state_.pending_local_close_ = false;
-    state_.pending_remote_close_ = false;
+    state_.local_close_pending_ = false;
+    state_.remote_close_pending_ = false;
     connection_.closeConnection(close_action);
   }
 
-  bool pendingClose() { return state_.pending_local_close_ || state_.pending_remote_close_; }
+  bool pendingClose() { return state_.local_close_pending_ || state_.remote_close_pending_; }
 
 protected:
-  struct ConnectionCloseState {
+  struct State {
     // Number of pending write filters awaiting closure.
-    uint32_t pending_write_filter_closures_{0};
+    uint32_t write_filter_pending_close_count_{0};
 
     // Number of pending read filters awaiting closure.
-    uint32_t pending_read_filter_closures_{0};
+    uint32_t read_filter_pending_close_count_{0};
 
     // True if a RemoteClose is currently pending.
     bool remote_close_pending_{false};
@@ -156,10 +160,10 @@ private:
     void continueClosing() override {
       if (pending_close_) {
         pending_close_ = false;
-        parent_.state_.pending_close_read_filter_ -= 1;
+        parent_.state_.read_filter_pending_close_count_ -= 1;
       }
 
-      if (parent_.state_.pending_close_read_filter_ == 0) {
+      if (parent_.state_.read_filter_pending_close_count_ == 0) {
         parent_.maybeClose();
       }
     }
@@ -167,7 +171,7 @@ private:
     void handleStopIterationAndDontClose() {
       if (!pending_close_) {
         pending_close_ = true;
-        parent_.state_.pending_close_read_filter_ += 1;
+        parent_.state_.read_filter_pending_close_count_ += 1;
       }
     }
 
@@ -201,10 +205,10 @@ private:
     void continueClosing() override {
       if (pending_close_) {
         pending_close_ = false;
-        parent_.state_.pending_close_write_filter_ -= 1;
+        parent_.state_.write_filter_pending_close_count_ -= 1;
       }
 
-      if (parent_.state_.pending_close_write_filter_ == 0) {
+      if (parent_.state_.write_filter_pending_close_count_ == 0) {
         parent_.maybeClose();
       }
     }
@@ -212,7 +216,7 @@ private:
     void handleStopIterationAndDontClose() {
       if (!pending_close_) {
         pending_close_ = true;
-        parent_.state_.pending_close_write_filter_ += 1;
+        parent_.state_.write_filter_pending_close_count_ += 1;
       }
     }
 

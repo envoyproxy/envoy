@@ -121,14 +121,15 @@ void FilterManagerImpl::maybeClose() {
   }
 
   ENVOY_CONN_LOG(trace,
-                 "maybeClose(): pending_remote_close_={}, pending_local_close_={}, "
-                 "pending_close_write_filter_={}, pending_close_read_filter_={}",
-                 connection_, state_.pending_remote_close_, state_.pending_local_close_,
-                 state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+                 "maybeClose(): remote_close_pending_={}, local_close_pending_={}, "
+                 "write_filter_pending_close_count_={}, read_filter_pending_close_count_={}",
+                 connection_, state_.remote_close_pending_, state_.local_close_pending_,
+                 state_.write_filter_pending_close_count_, state_.read_filter_pending_close_count_);
 
   // Check if we need to close the connection
-  if ((state_.pending_remote_close_ || state_.pending_local_close_) &&
-      (state_.pending_close_read_filter_ == 0 && state_.pending_close_write_filter_ == 0)) {
+  if ((state_.remote_close_pending_ || state_.local_close_pending_) &&
+      (state_.read_filter_pending_close_count_ == 0 &&
+       state_.write_filter_pending_close_count_ == 0)) {
     if (latched_close_action_.has_value()) {
       finalizeClose(latched_close_action_.value());
     }
@@ -148,10 +149,10 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
                  close_action.closeSocket());
 
   ENVOY_CONN_LOG(trace,
-                 "onConnectionClose: pending_remote_close_={}, pending_local_close_={}, "
-                 "pending_close_write_filter_={}, pending_close_read_filter_={}",
-                 connection_, state_.pending_remote_close_, state_.pending_local_close_,
-                 state_.pending_close_write_filter_, state_.pending_close_read_filter_);
+                 "onConnectionClose: remote_close_pending_={}, local_close_pending_={}, "
+                 "write_filter_pending_close_count_={}, read_filter_pending_close_count_={}",
+                 connection_, state_.remote_close_pending_, state_.local_close_pending_,
+                 state_.write_filter_pending_close_count_, state_.read_filter_pending_close_count_);
 
   if (latched_close_action_.has_value() && latched_close_action_->closeSocket()) {
     if (latched_close_action_->isLocalClose() || !close_action.closeSocket()) {
@@ -163,21 +164,22 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
   }
 
   latched_close_action_ = close_action;
-  state_.pending_local_close_ = close_action.isLocalClose();
-  state_.pending_remote_close_ = close_action.isRemoteClose();
+  state_.local_close_pending_ = close_action.isLocalClose();
+  state_.remote_close_pending_ = close_action.isRemoteClose();
 
   // Only finalize if we have no pending filters.
   // TODO(botengyao) this can be more intelligent to distinguish remote close and local
   // close but will be more complicated.
-  if (state_.pending_close_read_filter_ == 0 && state_.pending_close_write_filter_ == 0) {
+  if (state_.read_filter_pending_close_count_ == 0 &&
+      state_.write_filter_pending_close_count_ == 0) {
     finalizeClose(close_action);
     return;
   }
 
   // Otherwise, wait for filters to complete.
   ENVOY_CONN_LOG(trace, "delaying close: pending read filters: {}, pending write filters: {}",
-                 connection_, state_.pending_close_read_filter_,
-                 state_.pending_close_write_filter_);
+                 connection_, state_.read_filter_pending_close_count_,
+                 state_.write_filter_pending_close_count_);
 }
 
 FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_); }
@@ -191,7 +193,7 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   }
 
   // Only inject write is allowed when the connection is pending local close.
-  if (filter ? state_.pending_remote_close_ : pendingClose()) {
+  if (filter ? state_.remote_close_pending_ : pendingClose()) {
     return FilterStatus::StopIteration;
   }
 

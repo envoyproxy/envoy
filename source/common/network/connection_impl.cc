@@ -289,6 +289,7 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
   if (!enable_close_through_filter_manager_) {
     ENVOY_CONN_LOG(trace, "connection is closing not through the filter manager", *this);
     closeConnection(close_action);
+    return;
   }
 
   ENVOY_CONN_LOG(trace, "connection is closing through the filter manager", *this);
