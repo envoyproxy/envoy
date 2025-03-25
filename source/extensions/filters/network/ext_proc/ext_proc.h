@@ -20,8 +20,6 @@ namespace ExtProc {
  * Global configuration for Network ExtProc filter.
  */
 class Config {
-  using LabelsMap = Protobuf::Map<std::string, std::string>;
-
 public:
   Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config)
       : failure_mode_allow_(config.failure_mode_allow()),
