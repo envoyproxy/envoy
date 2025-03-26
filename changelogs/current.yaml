@@ -39,6 +39,9 @@ minor_behavior_changes:
   change: |
     The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
     substitution format string if the related extensions are linked.
+- area: oauth2
+  change: |
+    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -134,6 +137,13 @@ bug_fixes:
   change: |
     Strips empty cookie header, making HTTP2 and HTTP3 consistent. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.http3_remove_empty_cookie`` to ``false``.
+- area: wasm
+  change: |
+    Fixed a bug where the wasm context deletion may result in a crash when the VM is paniced.
+- area: sds
+  change: |
+    Fixed a bug where a :ref:`GenericSecret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`
+    stored in a file was not watched by SDS API.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
