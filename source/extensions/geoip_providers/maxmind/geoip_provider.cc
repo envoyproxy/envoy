@@ -66,10 +66,9 @@ GeoipProviderConfig::GeoipProviderConfig(
                            : absl::nullopt;
   isp_header_ = !geo_headers_to_add.isp().empty() ? absl::make_optional(geo_headers_to_add.isp())
                                                   : absl::nullopt;
-  apple_private_relay_header_ =
-      !geo_headers_to_add.isp().empty()
-          ? absl::make_optional(geo_headers_to_add.is_apple_private_relay())
-          : absl::nullopt;
+  apple_private_relay_header_ = !geo_headers_to_add.isp().empty()
+                                    ? absl::make_optional(geo_headers_to_add.apple_private_relay())
+                                    : absl::nullopt;
   if (!db_path_city_ && !db_path_anon_ && !db_path_asn_ && !db_path_isp_) {
     throw EnvoyException("At least one geolocation database path needs to be configured: "
                          "db_path_city, db_path_isp, db_path_asn or db_path_anon");

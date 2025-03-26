@@ -241,7 +241,7 @@ TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
     common_provider_config:
       geo_headers_to_add:
         isp: "x-geo-isp"
-        is_apple_private_relay: "x-geo-apple-private-relay"
+        apple_private_relay: "x-geo-apple-private-relay"
     db_path_isp: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);

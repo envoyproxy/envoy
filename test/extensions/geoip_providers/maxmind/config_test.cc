@@ -326,7 +326,7 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
         isp: "x-geo-isp"
-        is_apple_private_relay: "x-geo-apple-private-relay"
+        apple_private_relay: "x-geo-apple-private-relay"
     db_path_city: %s
     db_path_isp: %s
     db_path_anon: %s

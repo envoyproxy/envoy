@@ -71,7 +71,7 @@ const std::string ConfigIspAndAsn = R"EOF(
             city: "x-geo-city"
             asn: "x-geo-asn"
             isp: "x-geo-isp"
-            is_apple_private_relay: "x-geo-apple-private-relay"
+            apple_private_relay: "x-geo-apple-private-relay"
         db_path_city: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
         db_path_isp: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
         db_path_asn: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"

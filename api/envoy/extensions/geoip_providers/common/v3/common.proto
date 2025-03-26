@@ -37,6 +37,7 @@ message CommonGeoipProviderConfig {
     string asn = 4
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
+    // TODO(ldamata): Create a new field called anon with the same behaviour and deprecate this field to remove the is_ prefix.
     // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
     // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.
     string is_anon = 5
@@ -68,7 +69,7 @@ message CommonGeoipProviderConfig {
 
     // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
-    string is_apple_private_relay = 11
+    string apple_private_relay = 11
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
