@@ -1,9 +1,10 @@
 #pragma once
 
 #include "envoy/extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.pb.h"
+
+#include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 #include "source/extensions/filters/common/rbac/principal_extension.h"
-#include "source/common/tls/cert_validator/san_matcher.h"
 
 namespace Envoy {
 namespace Extensions {

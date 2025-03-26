@@ -421,7 +421,7 @@ TEST(MtlsAuthenticatedMatcher, CustomPrincipalValidatesTypedConfig) {
   principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   EXPECT_THROW_WITH_MESSAGE(
       { Matcher::create(principal, factory_context); }, EnvoyException,
-      "Proto constraint validation failed (field: \"type\", reason: is required)");
+      ": Proto constraint validation failed (field: \"type\", reason: is required)");
 }
 
 // This matcher will not match in any configuration if the connection is not ssl.
