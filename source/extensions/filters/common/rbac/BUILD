@@ -23,16 +23,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "matchers_interface",
     hdrs = [
-        "matcher_interface.h",
         "matcher_extension.h",
+        "matcher_interface.h",
         "principal_extension.h",
     ],
     deps = [
-        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:utility_lib",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
     ],
 )
 
@@ -53,6 +53,7 @@ envoy_cc_library(
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
