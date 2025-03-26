@@ -832,9 +832,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
-          return {-1, ENAMETOOLONG};
-        }));
+        .WillOnce(
+            Invoke([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; }));
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
@@ -1159,13 +1158,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter upstream_format("COMMON_DURATION"); },
-                              EnvoyException, "COMMON_DURATION requires parameters");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter upstream_format("COMMON_DURATION"); }, EnvoyException,
+        "COMMON_DURATION requires parameters");
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a"); },
-                              EnvoyException, "Invalid common duration configuration: a.");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a"); }, EnvoyException,
+        "Invalid common duration configuration: a.");
   }
 
   {
@@ -1175,8 +1176,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); },
-                              EnvoyException, "Invalid common duration precision: zs.");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); }, EnvoyException,
+        "Invalid common duration precision: zs.");
   }
 
   {

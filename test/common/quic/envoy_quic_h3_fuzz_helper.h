@@ -19,7 +19,7 @@ namespace Quic {
 class H3Serializer {
 public:
   static constexpr size_t kMaxPacketSize = 1024;
-  H3Serializer(std::set<uint32_t>& streams) : open_unidirectional_streams_(streams){};
+  H3Serializer(std::set<uint32_t>& streams) : open_unidirectional_streams_(streams) {};
   // This method serializes an `HTTP/3` frame given by `h3frame` to `std::string`.
   // If `unidirectional` is true, `type` will give the type of unidirectional
   // stream to be opened. `id` identifies an `HTTP/3` frame and is used to track
@@ -78,7 +78,7 @@ private:
 // a hash of the data for each packet, which is unnecessary in fuzzing.
 class FuzzEncrypter : public quic::NullEncrypter {
 public:
-  explicit FuzzEncrypter(quic::Perspective perspective) : NullEncrypter(perspective){};
+  explicit FuzzEncrypter(quic::Perspective perspective) : NullEncrypter(perspective) {};
   bool EncryptPacket(uint64_t, absl::string_view, absl::string_view plaintext, char* output,
                      size_t* output_length, size_t max_output_length) override {
     ASSERT(plaintext.length() <= max_output_length);
@@ -92,7 +92,7 @@ public:
 
 class FuzzDecrypter : public quic::NullDecrypter {
 public:
-  explicit FuzzDecrypter(quic::Perspective perspective) : NullDecrypter(perspective){};
+  explicit FuzzDecrypter(quic::Perspective perspective) : NullDecrypter(perspective) {};
   bool DecryptPacket(uint64_t, absl::string_view, absl::string_view ciphertext, char* output,
                      size_t* output_length, size_t max_output_length) override {
     ASSERT(ciphertext.length() <= max_output_length);

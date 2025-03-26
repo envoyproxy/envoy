@@ -1654,7 +1654,7 @@ UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
-      uri_template_(path_matcher_->uriTemplate()){};
+      uri_template_(path_matcher_->uriTemplate()) {};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                          bool insert_envoy_original_path) const {

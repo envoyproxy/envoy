@@ -76,7 +76,7 @@ public:
 
   void expectConnectionCreation(size_t id) {
     EXPECT_CALL(*connection_provider_, createNextConnection(_))
-        .WillOnce(testing::Invoke([ this, id ](uint64_t conn_id) -> auto{
+        .WillOnce(testing::Invoke([this, id](uint64_t conn_id) -> auto {
           EXPECT_EQ(connection_provider_->nextConnection(), id);
           return connection_provider_->getNextConnection(conn_id);
         }));
