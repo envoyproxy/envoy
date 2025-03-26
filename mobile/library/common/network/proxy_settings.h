@@ -122,9 +122,9 @@ public:
   bool operator!=(ProxySettings const& rhs) const;
 
 private:
-  Envoy::Network::Address::InstanceConstSharedPtr address_;
   std::string hostname_;
   uint16_t port_;
+  Envoy::Network::Address::InstanceConstSharedPtr address_;
 };
 
 /**

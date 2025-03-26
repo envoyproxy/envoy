@@ -8,8 +8,8 @@ namespace Envoy {
 namespace Network {
 
 ProxySettings::ProxySettings(absl::string_view host, const uint16_t port)
-    : address_(Envoy::Network::Utility::parseInternetAddressNoThrow(host, port)), hostname_(host),
-      port_(port) {}
+    : hostname_(host), port_(port),
+      address_(Envoy::Network::Utility::parseInternetAddressNoThrow(hostname_, port_)) {}
 
 /*static*/
 ProxySettingsConstSharedPtr ProxySettings::parseHostAndPort(absl::string_view host,
