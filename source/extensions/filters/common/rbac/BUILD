@@ -26,6 +26,7 @@ envoy_cc_library(
     hdrs = [
         "matcher_extension.h",
         "matchers.h",
+        "principal_extension.h",
     ],
     tags = ["skip_on_windows"],
     deps = [

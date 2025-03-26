@@ -5,7 +5,6 @@ package envoy.config.rbac.v3;
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
-import "envoy/extensions/transport_sockets/tls/v3/common.proto";
 import "envoy/type/matcher/v3/filter_state.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
@@ -329,7 +328,7 @@ message Principal {
   }
 
   // Authentication attributes for a downstream.
-  // This type is superseded by :ref:`MTlsAuthenticated <envoy_v3_api_msg_config.rbac.v3.Principal.MTlsAuthenticated>`,
+  // This type is superseded by :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
   // which should be used for most use cases due to it's improved security.
   message Authenticated {
     option (udpa.annotations.versioning).previous_message_type =
@@ -347,20 +346,6 @@ message Principal {
     type.matcher.v3.StringMatcher principal_name = 2;
   }
 
-  // Authentication attributes for a downstream mTLS connection. All modes require that a peer certificate
-  // was presented and validated using the ValidationContext in the DownstreamTlsContext configuration.
-  message MTlsAuthenticated {
-    oneof type {
-      option (validate.required) = true;
-
-      // Specifies a SAN that must be present in the validated peer certificate.
-      envoy.extensions.transport_sockets.tls.v3.SubjectAltNameMatcher san_matcher = 1;
-
-      // Only validate that the peer certificate is valid.
-      bool any_validated_client_certificate = 2 [(validate.rules).bool = {const: true}];
-    }
-  }
-
   oneof identifier {
     option (validate.required) = true;
 
@@ -376,12 +361,10 @@ message Principal {
     bool any = 3 [(validate.rules).bool = {const: true}];
 
     // Authenticated attributes that identify the downstream.
-    // This field is superseded by :ref:`mtls_authenticated <envoy_v3_api_field_config.rbac.v3.Principal.mtls_authenticated>`,
+    // This field is superseded by :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
+    // configured via :ref:`mtls_authenticated <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
     // which should be used for most use cases due to its improved security.
     Authenticated authenticated = 4;
-
-    // Authenticated attributes that identify the downstream mTLS peer certificate.
-    MTlsAuthenticated mtls_authenticated = 14;
 
     // A CIDR block that describes the downstream IP.
     // This address will honor proxy protocol, but will not honor XFF.
@@ -433,6 +416,10 @@ message Principal {
     // Matches against metadata from either dynamic state or route configuration. Preferred over the
     // ``metadata`` field as it provides more flexibility in metadata source selection.
     SourcedMetadata sourced_metadata = 13;
+
+    // Extension for configuring custom principals for RBAC.
+    // [#extension-category: envoy.rbac.principals]
+    core.v3.TypedExtensionConfig custom = 14;
   }
 }
 

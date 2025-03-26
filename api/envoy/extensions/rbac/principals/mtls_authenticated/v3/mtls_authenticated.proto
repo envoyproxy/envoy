@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.extensions.rbac.principals.mtls_authenticated.v3;
+
+import "envoy/extensions/transport_sockets/tls/v3/common.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.rbac.principals.mtls_authenticated.v3";
+option java_outer_classname = "MtlsAuthenticatedProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/rbac/principals/mtls_authenticated/v3;mtls_authenticatedv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: RBAC MTls Authenticated Principal]
+// [#extension: envoy.rbac.principals.mtls_authenticated]
+
+// Authentication attributes for a downstream mTLS connection. All modes require that a peer certificate
+// was presented and validated using the ValidationContext in the DownstreamTlsContext configuration.
+message Config {
+  oneof type {
+    option (validate.required) = true;
+
+    // Specifies a SAN that must be present in the validated peer certificate.
+    transport_sockets.tls.v3.SubjectAltNameMatcher san_matcher = 1;
+
+    // Only validate that the peer certificate is valid.
+    bool any_validated_client_certificate = 2 [(validate.rules).bool = {const: true}];
+  }
+}
