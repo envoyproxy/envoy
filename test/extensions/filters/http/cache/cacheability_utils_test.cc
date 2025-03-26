@@ -3,6 +3,7 @@
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -12,6 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace {
+
+using StatusHelpers::HasStatus;
+using testing::HasSubstr;
 
 class CanServeRequestFromCacheTest : public testing::Test {
 protected:
@@ -50,47 +54,55 @@ protected:
 };
 
 TEST_F(CanServeRequestFromCacheTest, CacheableRequest) {
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
 TEST_F(CanServeRequestFromCacheTest, PathHeader) {
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removePath();
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("no path")));
 }
 
 TEST_F(CanServeRequestFromCacheTest, HostHeader) {
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removeHost();
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("no host")));
 }
 
 TEST_F(CanServeRequestFromCacheTest, MethodHeader) {
   const Http::HeaderValues& header_values = Http::Headers::get();
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setMethod(header_values.MethodValues.Post);
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("POST")));
   request_headers_.setMethod(header_values.MethodValues.Put);
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("PUT")));
   request_headers_.setMethod(header_values.MethodValues.Head);
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.removeMethod();
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("no method")));
 }
 
 TEST_F(CanServeRequestFromCacheTest, SchemeHeader) {
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setScheme("ftp");
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("scheme")));
   request_headers_.removeScheme();
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("scheme")));
 }
 
 TEST_F(CanServeRequestFromCacheTest, AuthorizationHeader) {
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setReferenceKey(Http::CustomHeaders::get().Authorization,
                                    "basic YWxhZGRpbjpvcGVuc2VzYW1l");
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("authorization")));
 }
 
 INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
@@ -103,9 +115,10 @@ INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
                          });
 
 TEST_P(RequestConditionalHeadersTest, ConditionalHeaders) {
-  EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_OK(CacheabilityUtils::canServeRequestFromCache(request_headers_));
   request_headers_.setCopy(Http::LowerCaseString{conditionalHeader()}, "test-value");
-  EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
+  EXPECT_THAT(CacheabilityUtils::canServeRequestFromCache(request_headers_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr(conditionalHeader())));
 }
 
 TEST_F(IsCacheableResponseTest, CacheableResponse) {

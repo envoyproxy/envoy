@@ -22,23 +22,37 @@ struct ResponseMetadata {
   // calculations at: https://httpwg.org/specs/rfc7234.html#age.calculations
   Envoy::SystemTime response_time_;
 };
-using ResponseMetadataPtr = std::unique_ptr<ResponseMetadata>;
 
 // Whether a given cache entry is good for the current request.
 enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate response to the request.
-  Ok,
-  // No usable entry was found. If this was generated for a cache entry, the
-  // cache should delete that entry.
-  Unusable,
-  // This entry is stale, but appropriate for validating
-  RequiresValidation,
+  Hit,
+  // The request was cacheable and was not already in the cache. This also means
+  // the cache was populated by this request.
+  Miss,
+  // The entry was being inserted when this request was made - it's like a
+  // hit, but streamed from the same request as the original "Miss", so still
+  // potentially subject to upstream reset because the cache entry isn't fully
+  // populated yet.
+  Follower,
+  // The request was not cacheable. All matching requests will go to the
+  // upstream.
+  Uncacheable,
+  // This entry required validation, and validated successfully.
+  Validated,
+  // This entry required validation while another entry was already validating,
+  // so it validated successfully without its own lookup.
+  ValidatedFree,
+  // This entry required validation, and did not validate.
+  FailedValidation,
   // This entry is fresh, and an appropriate basis for a 304 Not Modified
   // response.
   FoundNotModified,
   // The cache lookup failed, e.g. because the cache was unreachable or an RPC
-  // timed out. The caller shouldn't use this lookup's context for an insert.
+  // timed out. Mostly behaves the same as Uncacheable but will retry each time.
   LookupError,
+  // The cache attempted to read from upstream for insert, but upstream reset.
+  UpstreamReset,
 };
 
 absl::string_view cacheEntryStatusString(CacheEntryStatus s);
