@@ -22,9 +22,10 @@ public:
       : CredentialInjectorFactoryBase("envoy.http.injected_credentials.generic") {}
 
 private:
-  Common::CredentialInjectorSharedPtr createCredentialInjectorFromProtoTyped(
-      const Generic& config, const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+  Common::CredentialInjectorSharedPtr
+  createCredentialInjectorFromProtoTyped(const Generic& config, const std::string& stats_prefix,
+                                         Server::Configuration::ServerFactoryContext& context,
+                                         Init::Manager& init_manager) override;
 };
 
 DECLARE_FACTORY(GenericCredentialInjectorFactory);
