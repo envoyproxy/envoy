@@ -16,7 +16,7 @@ class GenericCredentialInjector : public Common::CredentialInjector {
 public:
   GenericCredentialInjector(const std::string& header,
                             Common::SecretReaderConstSharedPtr secret_reader)
-      : header_(header), secret_reader_(secret_reader){};
+      : header_(header), secret_reader_(secret_reader) {};
 
   absl::Status inject(Envoy::Http::RequestHeaderMap& headers, bool overwrite) override;
 

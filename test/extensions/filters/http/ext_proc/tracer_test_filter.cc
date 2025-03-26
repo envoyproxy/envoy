@@ -83,10 +83,8 @@ public:
     context_injected_ = true;
     ENVOY_LOG_MISC(trace, "TestTracer context injected");
   }
-  void setBaggage(absl::string_view, absl::string_view) override { /* not implemented */
-  }
-  void log(SystemTime, const std::string&) override { /* not implemented */
-  }
+  void setBaggage(absl::string_view, absl::string_view) override { /* not implemented */ }
+  void log(SystemTime, const std::string&) override { /* not implemented */ }
   std::string getBaggage(absl::string_view) override {
     /* not implemented */
     return EMPTY_STRING;

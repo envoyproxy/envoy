@@ -1526,7 +1526,7 @@ FilterConfig::FilterConfig(
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
       metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
-      secret_reader_(std::make_shared<SecretReader>(proto_config, context)){};
+      secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
 void FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");

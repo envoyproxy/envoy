@@ -1,6 +1,6 @@
 #include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/config.h"
 
-//#include "testing/base/public/gunit.h"
+// #include "testing/base/public/gunit.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"

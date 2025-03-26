@@ -914,9 +914,8 @@ public:
             }));
       } else {
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
-              return {-1, 1};
-            }));
+            .WillOnce(Invoke(
+                [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
       }
     }
 
@@ -971,7 +970,7 @@ protected:
   // Should the TestDnsServer cause c-ares queries to timeout, by not responding?
   virtual bool queryTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
-  virtual void updateDnsResolverOptions(){};
+  virtual void updateDnsResolverOptions() {};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual bool setRotateNameservers() const { return false; }

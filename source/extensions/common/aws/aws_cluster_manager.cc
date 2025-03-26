@@ -60,7 +60,7 @@ void AwsClusterManagerImpl::onClusterAddOrUpdate(absl::string_view cluster_name,
 }
 
 // No removal handler required, as we are using avoid_cds_removal flag
-void AwsClusterManagerImpl::onClusterRemoval(const std::string&){};
+void AwsClusterManagerImpl::onClusterRemoval(const std::string&) {};
 
 void AwsClusterManagerImpl::createQueuedClusters() {
   std::vector<std::string> failed_clusters;
