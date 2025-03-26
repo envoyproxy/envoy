@@ -136,6 +136,10 @@ bug_fixes:
 - area: wasm
   change: |
     Fixed a bug where the wasm context deletion may result in a crash when the VM is paniced.
+- area: sds
+  change: |
+    Fixed a bug where a :ref:`GenericSecret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`
+    stored in a file was not watched by SDS API.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
