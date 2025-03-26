@@ -568,11 +568,16 @@ public:
   TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(
-            priority_set, nullptr, lb_stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
+      : locality_lb_config_(
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)),
+        ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random,
+                                  PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                      common_config, healthy_panic_threshold, 100, 50),
+                                  locality_lb_config_) {}
+
+  envoy::config::cluster::v3::Cluster::ZoneAwareLbConfig& mutableLocalityLbConfig() {
+    return locality_lb_config_;
+  }
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;
@@ -580,6 +585,9 @@ public:
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
   HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
+
+private:
+  envoy::config::cluster::v3::Cluster::ZoneAwareLbConfig locality_lb_config_;
 };
 
 // Used to test common functions of ZoneAwareLoadBalancerBase.
@@ -606,8 +614,8 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, ForceLocalityDirectRouting) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig modified_config = common_config_;
-  modified_config.mutable_zone_aware_lb_config()->set_force_direct_routing(true);
-  TestZoneAwareLb lb_with_force(priority_set_, stats_, runtime_, random_, modified_config);
+  TestZoneAwareLb lb(priority_set_, stats_, runtime_, random_, modified_config);
+  lb.mutableLocalityLbConfig().set_force_direct_routing(true);
 
   EXPECT_CALL(runtime_.snapshot_,
               getBoolean("upstream.zone_routing.force_locality_direct_routing", true))
