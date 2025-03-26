@@ -37,5 +37,14 @@ private:
   const StringMatcherPtr string_matcher_;
 };
 
+class FilterStateStringListMatcher : public FilterStateObjectMatcher {
+public:
+FilterStateStringListMatcher(StringMatcherPtr&& string_matcher);
+  bool match(const StreamInfo::FilterState::Object& object) const override;
+
+private:
+  const StringMatcherPtr string_matcher_;
+};
+
 } // namespace Matchers
 } // namespace Envoy
