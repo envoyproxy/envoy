@@ -3,4 +3,4 @@
 External Processor
 ======================
 
-WIP
+This extension is currently in the alpha status the doc will be completed when it is stabilized.
