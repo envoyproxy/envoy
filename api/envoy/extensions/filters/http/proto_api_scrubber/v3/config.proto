@@ -3,9 +3,11 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_api_scrubber.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "udpa/annotations/status.proto";
+
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
 option java_outer_classname = "ConfigProto";
@@ -18,7 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.proto_api_scrubber]
 // Overview
 // --------
-// ProtoApiScrubber (the proposed filter) supports filtering of the request and
+// ProtoApiScrubber filter supports filtering of the request and
 // response payloads based on the configured field restrictions. A field
 // restriction can be defined using a CEL expression string or via a unified
 // matcher API. The filter evaluates the configured restriction for each field
@@ -31,6 +33,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // ----------
 //
 // The design doc for this filter is available at:
+// https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8/edit?usp=sharing
 //
 // Assumptions
 // -----------
@@ -184,7 +187,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Note that the fields `debug_info` and `book.debug_info` are filtered out from
 // the response since it the configured restrictions (i.e., the CEL expressions)
 // for these fields are not satisfied.
-// [#next-free-field: 4]
 message ProtoApiScrubberConfig {
   // Specifies the filtering mode of this filter.
   // Currently only ``OVERRIDE`` mode is supported.
