@@ -198,3 +198,18 @@ _envoy_repo = repository_rule(
 def envoy_repo():
     if "envoy_repo" not in native.existing_rules().keys():
         _envoy_repo(name = "envoy_repo")
+
+def _detect_arch_impl(repository_ctx):
+    result = repository_ctx.execute(["uname", "-m"])
+    is_ppc64le = result.stdout.strip() == "ppc64le"
+
+    repository_ctx.file("BUILD", "")
+    repository_ctx.file(
+        "arch_info.bzl",
+        content = "IS_PPC64LE = {}".format(str(is_ppc64le)),
+    )
+
+detect_arch = repository_rule(
+    implementation = _detect_arch_impl,
+    local = True,
+)

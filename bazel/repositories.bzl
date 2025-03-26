@@ -1,3 +1,4 @@
+load("@arch_info//:arch_info.bzl", "IS_PPC64LE")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
@@ -109,9 +110,12 @@ def _go_deps(skip_targets):
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():
+    patches = ["@envoy//bazel:rules_rust.patch"]
+    if IS_PPC64LE:
+        patches.append("@envoy//bazel:rules_rust_ppc64le.patch")
     external_http_archive(
         "rules_rust",
-        patches = ["@envoy//bazel:rules_rust.patch", "@envoy//bazel:rules_rust_ppc64le.patch"],
+        patches = patches,
     )
 
 def envoy_dependencies(skip_targets = []):
