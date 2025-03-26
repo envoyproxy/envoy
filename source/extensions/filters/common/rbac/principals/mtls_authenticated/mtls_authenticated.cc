@@ -14,7 +14,12 @@ MtlsAuthenticatedMatcher::MtlsAuthenticatedMatcher(
     Server::Configuration::CommonFactoryContext& context)
     : matcher_(auth.has_san_matcher() ? Extensions::TransportSockets::Tls::createStringSanMatcher(
                                             auth.san_matcher(), context)
-                                      : nullptr) {}
+                                      : nullptr) {
+  if (!auth.has_san_matcher() && !auth.any_validated_client_certificate()) {
+    throw EnvoyException("envoy.rbac.principals.mtls_authenticated did not have any configured "
+                         "validation. At least one configuration field must be set.");
+  }
+}
 
 bool MtlsAuthenticatedMatcher::matches(const Network::Connection& connection,
                                        const Envoy::Http::RequestHeaderMap&,

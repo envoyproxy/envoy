@@ -412,16 +412,16 @@ TEST(AuthenticatedMatcher, NoSSL) {
   checkMatcher(AuthenticatedMatcher({}, factory_context), false, conn);
 }
 
-TEST(MtlsAuthenticatedMatcher, CustomPrincipalValidatesTypedConfig) {
+TEST(MtlsAuthenticatedMatcher, ValidateConfig) {
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
   envoy::extensions::rbac::principals::mtls_authenticated::v3::Config
       mtls_authenticated; // Leave empty which is invalid.
   envoy::config::rbac::v3::Principal principal;
   principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
-  EXPECT_THROW_WITH_MESSAGE(
-      { Matcher::create(principal, factory_context); }, EnvoyException,
-      ": Proto constraint validation failed (field: \"type\", reason: is required)");
+  EXPECT_THROW_WITH_MESSAGE({ Matcher::create(principal, factory_context); }, EnvoyException,
+                            "envoy.rbac.principals.mtls_authenticated did not have any configured "
+                            "validation. At least one configuration field must be set.");
 }
 
 // This matcher will not match in any configuration if the connection is not ssl.
