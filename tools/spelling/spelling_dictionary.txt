@@ -1216,10 +1216,10 @@ regexes
 reified
 reify
 reimplements
-reinit
+reinitialization
+reinitializations
 reinitialize
 reinitializes
-reinits
 rele
 releasor
 reloadable
