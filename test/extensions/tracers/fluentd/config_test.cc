@@ -32,7 +32,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerMinimalConfig) {
       http:
         name: envoy.tracers.fluentd
         typed_config:
-          "@type": type.googleapis.com/envoy.config.trace.v3.FluentdConfig
+          "@type": type.googleapis.com/envoy.extensions.tracers.fluentd.v3.FluentdConfig
           cluster: "fake_cluster"
           tag: "fake_tag"
           stat_prefix: "envoy.tracers.fluentd"
@@ -64,7 +64,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
       http:
         name: envoy.tracers.fluentd
         typed_config:
-          "@type": type.googleapis.com/envoy.config.trace.v3.FluentdConfig
+          "@type": type.googleapis.com/envoy.extensions.tracers.fluentd.v3.FluentdConfig
           cluster: "fake_cluster"
           tag: "fake_tag"
           stat_prefix: "envoy.tracers.fluentd"

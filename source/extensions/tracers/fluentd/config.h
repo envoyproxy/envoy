@@ -14,7 +14,8 @@ namespace Fluentd {
 /**
  * Config registration for the Fluentd tracer. @see TracerFactory.
  */
-class FluentdTracerFactory : public Common::FactoryBase<envoy::config::trace::v3::FluentdConfig> {
+class FluentdTracerFactory
+    : public Common::FactoryBase<envoy::extensions::tracers::fluentd::v3::FluentdConfig> {
 public:
   FluentdTracerFactory();
 
@@ -23,9 +24,9 @@ public:
 
 private:
   // FactoryBase
-  Tracing::DriverSharedPtr
-  createTracerDriverTyped(const envoy::config::trace::v3::FluentdConfig& proto_config,
-                          Server::Configuration::TracerFactoryContext& context) override;
+  Tracing::DriverSharedPtr createTracerDriverTyped(
+      const envoy::extensions::tracers::fluentd::v3::FluentdConfig& proto_config,
+      Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace Fluentd
