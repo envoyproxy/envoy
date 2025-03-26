@@ -17,7 +17,7 @@ envoy_cc_extension(
         "mtls_authenticated.h",
     ],
     deps = [
-        "//source/common/common:logger_lib",
+        "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "@envoy_api//envoy/extensions/rbac/principals/mtls_authenticated/v3:pkg_cc_proto",
     ],
