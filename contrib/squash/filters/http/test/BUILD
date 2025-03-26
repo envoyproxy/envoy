@@ -11,7 +11,6 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "squash_filter_test",
     srcs = ["squash_filter_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//contrib/squash/filters/http/source:squash_filter_lib",
         "//envoy/event:dispatcher_interface",
@@ -28,7 +27,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "squash_filter_integration_test",
     srcs = ["squash_filter_integration_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//contrib/squash/filters/http/source:config",
         "//test/integration:http_integration_lib",
@@ -39,7 +37,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//contrib/squash/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",

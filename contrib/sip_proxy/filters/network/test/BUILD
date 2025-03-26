@@ -54,7 +54,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":mocks",
         "//contrib/sip_proxy/filters/network/source:config",
@@ -68,7 +67,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_manager_test",
     srcs = ["conn_manager_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -88,7 +86,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "tra_test",
     srcs = ["tra_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -109,7 +106,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "decoder_test",
     srcs = ["decoder_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -130,7 +126,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
