@@ -238,20 +238,37 @@ void ProcessorStreamImpl<RequestType, ResponseType>::onRemoteClose(Grpc::Status:
 }
 
 /**
- * Implementation of ProcessorClient that uses a gRPC service.
+ * A client for an external processing server.
  */
 template <typename RequestType, typename ResponseType>
 class ProcessorClient : public ClientBase<RequestType, ResponseType> {
 public:
-  ProcessorClient(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope,
-                  const std::string& service_method)
+  virtual ~ProcessorClient() = default;
+  virtual ProcessorStreamPtr<RequestType, ResponseType>
+  start(ProcessorCallbacks<ResponseType>& callbacks,
+        const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+        Http::AsyncClient::StreamOptions& options,
+        Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) PURE;
+};
+
+template <typename RequestType, typename ResponseType>
+using ProcessorClientPtr = std::unique_ptr<ProcessorClient<RequestType, ResponseType>>;
+
+/**
+ * Implementation of ProcessorClient that uses a gRPC service.
+ */
+template <typename RequestType, typename ResponseType>
+class ProcessorClientImpl : public ProcessorClient<RequestType, ResponseType> {
+public:
+  ProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope,
+                      const std::string& service_method)
       : client_manager_(client_manager), scope_(scope), service_method_(service_method) {}
 
   ProcessorStreamPtr<RequestType, ResponseType>
   start(ProcessorCallbacks<ResponseType>& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         Http::AsyncClient::StreamOptions& options,
-        Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) {
+        Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override {
     auto client_or_error =
         client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
     THROW_IF_NOT_OK_REF(client_or_error.status());

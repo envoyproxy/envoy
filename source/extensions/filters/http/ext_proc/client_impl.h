@@ -20,10 +20,7 @@ namespace CommonExtProc = Envoy::Extensions::Common::ExternalProcessing;
 using ProcessingRequest = envoy::service::ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::ext_proc::v3::ProcessingResponse;
 
-class ExternalProcessorCallbacks : public CommonExtProc::ProcessorCallbacks<ProcessingResponse> {
-public:
-  ~ExternalProcessorCallbacks() override = default;
-};
+using ExternalProcessorCallbacks = CommonExtProc::ProcessorCallbacks<ProcessingResponse>;
 
 using ExternalProcessorStream =
     CommonExtProc::ProcessorStream<ProcessingRequest, ProcessingResponse>;
@@ -38,7 +35,8 @@ using ClientBasePtr = CommonExtProc::ClientBasePtr<ProcessingRequest, Processing
 inline ExternalProcessorClientPtr
 createExternalProcessorClient(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope) {
   static constexpr char kExternalMethod[] = "envoy.service.ext_proc.v3.ExternalProcessor.Process";
-  return std::make_unique<CommonExtProc::ProcessorClient<ProcessingRequest, ProcessingResponse>>(
+  return std::make_unique<
+      CommonExtProc::ProcessorClientImpl<ProcessingRequest, ProcessingResponse>>(
       client_manager, scope, kExternalMethod);
 }
 
