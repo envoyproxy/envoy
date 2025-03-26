@@ -9,11 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace ExternalProcessing {
 
-// Forward declarations for templated classes
-template <typename ResponseType> class RequestCallbacks;
-
-template <typename RequestType, typename ResponseType> class ClientBase;
-
 /**
  * Stream base class used during external processing.
  */
