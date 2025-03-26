@@ -3,10 +3,9 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_api_scrubber.v3;
 
 import "envoy/config/core/v3/base.proto";
-
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
 option java_outer_classname = "ConfigProto";
@@ -19,20 +18,19 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.proto_api_scrubber]
 // Overview
 // --------
-// ProtoApiScrubber filter supports filtering the request and response payloads
-// based on configured restrictions and request entitlements. Restrictions are
-// simple strings which can be applied to any proto elements (eg, API, method,
-// message, field, etc.) and are provided as part of the filter configuration.
-// Entitlements are also simple strings which are fetched from the request. The
-// filter matches the request entitlements with the restrictions configured to
-// produce the filtered output.
+// ProtoApiScrubber (the proposed filter) supports filtering of the request and
+// response payloads based on the configured field restrictions. A field
+// restriction can be defined using a CEL expression string or via a unified
+// matcher API. The filter evaluates the configured restriction for each field
+// to produce the filtered output. This filter currently supports only field
+// level restrictions. Restriction support for other proto elements (eg, message
+// level restriction, method level restriction, etc.) are planned to be
+// implemented in future.
 //
-// This filter currently supports only field level restrictions. Support for
-// other proto elements are planned to be implemented in future.
+// Design Doc
+// ----------
 //
-// The source of entitlements for a request can be configured in the filter
-// config. As of now, it supports ``REQUEST_HEADER`` and ``FILTER_STATE`` as
-// sources.
+// The design doc for this filter is available at:
 //
 // Assumptions
 // -----------
@@ -43,19 +41,19 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // Process Flow
 // ------------
-// (I) Request Path
+// (I) Filter Initialization
+// 1. Parse and check the CEL expressions in the filter config.
+// 2. Store the filter config along with parsed CEL expressions (AST) in the
+// filter class.
 //
-// 1. Fetch the request `entitlements` from the configured sources. Note that
-// these entitlements would be stored and used for the corresponding response as
-// well.
+// (II) Request Path
+// 1. Bind envoy attributes to variables of the AST.
 // 2. Buffer the incoming data to build the complete request body.
-// 3. Filter the request body as per the configured restrictions using the
-// request entitlements.
+// 3. Filter each field of the request by evaluating the corresponding AST.
 //
-// (II) Response Path
+// (III) Response Path
 // 1. Buffer the incoming data to build the complete response body.
-// 2. Filter the response body as per the configured restrictions using request
-// entitlements stored in the request flow.
+// 2. Filter each field of the response by evaluating the corresponding AST.
 //
 // Example
 // -------
@@ -109,13 +107,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // .. code-block:: json
 //
 // {
-//   "data_source": {...},
-//   "request_entitlement_sources": {
-//     "USER_TYPE": {
-//       "source": REQUEST_HEADER,
-//       "key": "X-User-Type"
-//     }
-//   },
+//   "descriptor_set": {...},
 //   "restrictions": {
 //     "method_restrictions": {
 //       "library.BookService.GetBook": {
@@ -123,20 +115,12 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //         "response_field_restrictions": {
 //           "debug_info": {
 //             "restrictions":{
-//               "USER_TYPE": {
-//                 "any": {
-//                   "restrictions": [{"value": "DEV"}]
-//                 }
-//               }
+//               "cel_expr": "request.headers['X-User-Type'] == 'DEV'"
 //             }
 //           },
 //           "book.debug_info": {
 //             "restrictions":{
-//               "USER_TYPE": {
-//                 "any": {
-//                   "restrictions": [{"value": "DEV"}]
-//                 }
-//               }
+//               "cel_expr": "request.headers['X-User-Type'] == 'DEV'"
 //             }
 //           }
 //         }
@@ -144,6 +128,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //     }
 //   }
 // }
+//
 //
 // Request and Response
 // --------------------
@@ -197,71 +182,35 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // }
 //
 // Note that the fields `debug_info` and `book.debug_info` are filtered out from
-// the response since the request entitlement of type "USER_TYPE" is PROD while
-// the restrictions on the fields `debug_info` and `book.debug_info` is DEV.
-
-// [#next-free-field: 6]
+// the response since it the configured restrictions (i.e., the CEL expressions)
+// for these fields are not satisfied.
+// [#next-free-field: 4]
 message ProtoApiScrubberConfig {
   // Specifies the filtering mode of this filter.
   // Currently only ``OVERRIDE`` mode is supported.
   enum FilteringMode {
-    // If unspecified, falls back to ``OVERRIDE``.
-    FILTERING_MODE_UNSPECIFIED = 0;
-
     // Override the original request/response body with the filtered
     // request/response body.
-    OVERRIDE = 1;
+    OVERRIDE = 0;
   }
 
   // The proto descriptor set for the proto services.
-  oneof descriptor_set {
-    // It could be passed by a local file through ``Datasource.filename`` or
-    // embedded in the ``Datasource.inline_bytes``.
-    config.core.v3.DataSource data_source = 1;
+  DescriptorSet descriptor_set = 1;
 
-    // Unimplemented, the key of proto descriptor TypedMetadata.
-    // Among filters depending on the proto descriptor, we can have a
-    // TypedMetadata for proto descriptors, so that these filters can share one
-    // copy of proto descriptor in memory.
-    string proto_descriptor_typed_metadata = 2;
-  }
+  // Contains the restrictions for the supported proto elements.
+  Restrictions restrictions = 2;
 
-  // Data sources for the request entitlements.
-  // Entitlements are matched with restrictions of the same name at runtime.
-  // Make sure that the entitlement source is present for each of the
-  // corresponding restrictions.
-  // Key - entitlement name
-  // Value - entitlement source
-  map<string, RequestEntitlementSource> request_entitlement_sources = 3;
-
-  // Contains the restrictions for the API, methods, messages, fields, etc.
-  Restrictions restrictions = 4;
-
-  FilteringMode filtering_mode = 5;
+  FilteringMode filtering_mode = 3;
 }
 
-// Specifies the source of entitlements for a request.
-// The value for each entitlement is expected to be a comma separated list of
-// strings.
-message RequestEntitlementSource {
-  enum Source {
-    // If unspecified, the entitlement will be empty string.
-    SOURCE_UNSPECIFIED = 0;
-
-    // The entitlement will be fetched from the request header ``key``.
-    REQUEST_HEADER = 1;
-
-    // The entitlement will be fetched from the filter state ``key``.
-    FILTER_STATE = 2;
-  }
-
-  Source source = 1;
-
-  // The key to lookup the entitlement from the specified ``source``.
-  string key = 2;
+// Specifies the descriptor set for proto services.
+message DescriptorSet {
+  // It could be passed by a local file through ``Datasource.filename`` or
+  // embedded in the ``Datasource.inline_bytes``.
+  config.core.v3.DataSource data_source = 1;
 }
 
-// Contains the restrictions for the API, methods, messages, fields, etc.
+// Contains the restrictions for the methods.
 message Restrictions {
   // Specifies the method restrictions.
   // Key - Fully qualified method name.
@@ -271,53 +220,37 @@ message Restrictions {
   map<string, MethodRestrictions> method_restrictions = 1;
 }
 
-// Contains the method restrictions which include the method level restrictions
-// as well as the field level restrictions for the request and response fields.
+// Contains the method restrictions which include the field level restrictions
+// for the request and response fields.
 message MethodRestrictions {
-  // Maps restriction types to its values.
-  message RestrictionMap {
-    // Key - Restriction type.
-    // Value - Restriction values.
-    map<string, Restriction> restrictions = 1;
-  }
-
   // Restrictions that apply to request fields of the method.
   // Key - field mask like path of the field eg, foo.bar.baz
-  // Value - Restrictions map containing the mapping from restriction type to
+  // Value - Restrictions map containing the mapping from restriction name to
   // the restriction values.
-  map<string, RestrictionMap> request_field_restrictions = 1;
+  map<string, RestrictionConfig> request_field_restrictions = 1;
 
   // Restrictions that apply to response fields of the method.
   // Key - field mask like path of the field eg, foo.bar.baz
-  // Value - Restrictions map containing the mapping from restriction type to
+  // Value - Restrictions map containing the mapping from restriction name to
   // the restriction values.
-  map<string, RestrictionMap> response_field_restrictions = 2;
+  map<string, RestrictionConfig> response_field_restrictions = 2;
 }
 
-// Represents a singular or composite restriction.
-message Restriction {
-  oneof kind {
-    // A composite restriction.
-    CompositeRestriction composite = 1;
+// The restriction configuration.
+// Note that only one of the matching techniques declared in this message would
+// be used for restriction matching as per the following ordering: If `cel_expr`
+// is not empty, it will be used. If `cel_expr` is empty, `restriction_matcher`
+// would be used.
+message RestrictionConfig {
+  // A CEL (https://cel.dev/overview/cel-overview) expression denoting
+  // the restriction. e.g., request.headers['X-User-Type'] == 'DEV'
+  // For the list of all available attributes of Envoy, please refer to
+  // https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
+  string cel_expr = 1;
 
-    // The restriction value.
-    string value = 2;
-  }
-}
-
-// Represents a composite restriction combined with an operator.
-message CompositeRestriction {
-  enum Combinator {
-    // All of the ``restrictions`` must be satisfied.
-    ALL = 0;
-
-    // At least one of the ``restrictions`` must be satisfied.
-    ANY = 1;
-  }
-
-  // The operator to combine the ``restrictions``.
-  Combinator combinator = 1;
-
-  // The list of restrictions.
-  repeated Restriction restrictions = 2;
+  // NOT IMPLEMENTED
+  // A restriction matcher which contains pluggable matchers eg, CEL matcher,
+  // regex matcher, string matcher, etc. It is planned to be implemented in
+  // future iterations of the filter.
+  xds.type.matcher.v3.Matcher restriction_matcher = 2;
 }
