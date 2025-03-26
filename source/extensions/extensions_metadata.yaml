@@ -1490,7 +1490,7 @@ envoy.rbac.principals.mtls_authenticated:
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
-  - envoy.extensions.rbac.principals.mtls_authenticated.v3.MTlsAuthenticated
+  - envoy.extensions.rbac.principals.mtls_authenticated.v3.Config
 envoy.http.stateful_session.cookie:
   categories:
   - envoy.http.stateful_session

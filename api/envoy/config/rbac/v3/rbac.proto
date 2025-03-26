@@ -329,7 +329,7 @@ message Principal {
 
   // Authentication attributes for a downstream.
   // This type is superseded by :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
-  // which should be used for most use cases due to it's improved security.
+  // which should be used for most use cases due to its improved security.
   message Authenticated {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.rbac.v2.Principal.Authenticated";
@@ -362,7 +362,7 @@ message Principal {
 
     // Authenticated attributes that identify the downstream.
     // This field is superseded by :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
-    // configured via :ref:`mtls_authenticated <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
+    // configured via :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
     // which should be used for most use cases due to its improved security.
     Authenticated authenticated = 4;
 
