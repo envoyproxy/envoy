@@ -422,7 +422,22 @@ void GenericSecretSdsApi::validateConfig(
   THROW_IF_NOT_OK(validation_callback_manager_.runCallbacks(secret.generic_secret()));
 }
 
-std::vector<std::string> GenericSecretSdsApi::getDataSourceFilenames() { return {}; }
+std::vector<std::string> GenericSecretSdsApi::getDataSourceFilenames() {
+  std::vector<std::string> files;
+
+  ASSERT(generic_secret_ != nullptr);
+
+  if (generic_secret_->secret().has_filename()) {
+    files.push_back(generic_secret_->secret().filename());
+  } else {
+    for (const auto& entry : generic_secret_->secrets()) {
+      if (entry.second.has_filename()) {
+        files.push_back(entry.second.filename());
+      }
+    }
+  }
+  return files;
+}
 
 } // namespace Secret
 } // namespace Envoy

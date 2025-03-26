@@ -18,7 +18,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
-    rbe_pool = "6gig",
+    size = "large",
     deps = [":config_impl_test_lib"],
 )
 

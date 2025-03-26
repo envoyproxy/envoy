@@ -417,7 +417,9 @@ public:
     // determinism.
     options.ndomains = 0;
     options.timeout = 0;
+    options.qcache_max_ttl = 0;
     resolver_->initializeChannel(&options, ARES_OPT_FLAGS | ARES_OPT_DOMAINS |
+                                               ARES_OPT_QUERY_CACHE |
                                                (zero_timeout ? ARES_OPT_TIMEOUTMS : 0));
   }
   bool isCaresDefaultTheOnlyNameserver() { return resolver_->isCaresDefaultTheOnlyNameserver(); }
@@ -799,6 +801,11 @@ public:
     return address;
   }
 
+  static bool isAddressLocal(const std::string& address) {
+    auto addr = Network::Utility::parseInternetAddressNoThrow(address);
+    return Network::Utility::isLoopbackAddress(*addr) || Network::Utility::isInternalAddress(*addr);
+  }
+
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
                                           const DnsResolver::ResolutionStatus expected_status,
@@ -816,8 +823,12 @@ public:
           // If the coverage job is moved from circle, this can be simplified to only the exact
           // list match.
           // https://github.com/envoyproxy/envoy/pull/10137#issuecomment-592525544
-          if (address == "localhost" && lookup_family == DnsLookupFamily::V4Only) {
+          // For localhost, test inclusion of expected results as well as every returned address
+          // is link-local.
+          if (address == "localhost") {
             EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
+            for_each(address_as_string_list.begin(), address_as_string_list.end(),
+                     [&](std::string addr) { EXPECT_TRUE(isAddressLocal(addr)); });
           } else {
             EXPECT_THAT(address_as_string_list, UnorderedElementsAreArray(expected_results));
           }
@@ -829,7 +840,7 @@ public:
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
             for (const auto& address : results) {
-              EXPECT_EQ(address.addrInfo().ttl_, expected_ttl.value());
+              EXPECT_EQ(address.addrInfo().ttl_.count(), expected_ttl.value().count());
             }
           }
 
@@ -1264,7 +1275,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Completed,
-                                             {"201.134.56.7"}, {}, std::chrono::seconds(0)));
+                                             {"201.134.56.7"}, {}, std::chrono::seconds::zero()));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Case 2: TTL Overflow
@@ -1273,7 +1284,7 @@ TEST_P(DnsImplTest, CNameARecordLookupV4InvalidTTL) {
 
   EXPECT_NE(nullptr, resolveWithExpectations("root.cnam.domain", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Completed,
-                                             {"201.134.56.7"}, {}, std::chrono::seconds(0)));
+                                             {"201.134.56.7"}, {}, std::chrono::seconds::zero()));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Case 3: Max TTL
@@ -1445,7 +1456,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
   if (GetParam() == Address::IpVersion::v4) {
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V4Only,
                                                DnsResolver::ResolutionStatus::Completed,
-                                               {"127.0.0.1"}, {}, std::chrono::seconds(0)));
+                                               {"127.0.0.1"}, {}, std::chrono::seconds::zero()));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1455,7 +1466,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
   if (GetParam() == Address::IpVersion::v6) {
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V6Only,
                                                DnsResolver::ResolutionStatus::Completed, {"::1"},
-                                               {}, std::chrono::seconds(0)));
+                                               {}, std::chrono::seconds::zero()));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1463,7 +1474,7 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
                                                DnsResolver::ResolutionStatus::Completed, {"::1"},
-                                               {}, std::chrono::seconds(0)));
+                                               {}, std::chrono::seconds::zero()));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1526,7 +1537,8 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "", *stats_store_.rootScope());
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, "127.0.0.1:53",
+                                                *stats_store_.rootScope());
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
@@ -1957,7 +1969,17 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 1 /*timeouts*/);
+             0 /*get_addr_failure*/, 3 /*timeouts*/);
+}
+
+// Validate that c-ares query cache is disabled by default.
+TEST_P(DnsImplTest, DnsImplAresQCacheDisabled) {
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_QUERY_CACHE) == ARES_OPT_QUERY_CACHE);
+  EXPECT_EQ(0, opts.qcache_max_ttl);
+  ares_destroy_options(&opts);
 }
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
