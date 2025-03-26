@@ -46,7 +46,7 @@ load("@envoy//bazel:api_repositories.bzl", "envoy_api_dependencies")
 
 envoy_api_dependencies()
 
-load("@envot//bazel:repo.bzl", "detect_arch", "envoy_repo")
+load("@envoy//bazel:repo.bzl", "detect_arch", "envoy_repo")
 
 envoy_repo()
 
