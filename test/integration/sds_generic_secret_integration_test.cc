@@ -27,7 +27,7 @@ public:
       : api_(api), config_provider_(config_provider) {}
 
   // Http::StreamFilterBase
-  void onDestroy() override{};
+  void onDestroy() override {};
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {

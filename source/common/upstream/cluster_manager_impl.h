@@ -521,8 +521,8 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
-                                                                                    host)} {}
+          : host_handle_(host->acquireHandle()),
+            pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 

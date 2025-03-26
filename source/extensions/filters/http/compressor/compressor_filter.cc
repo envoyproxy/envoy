@@ -85,9 +85,8 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
-                                                                             stats_prefix, scope)} {
-}
+      content_type_values_(contentTypeSet(proto_config.content_type())),
+      stats_{generateStats(stats_prefix, scope)} {}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,

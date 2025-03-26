@@ -152,7 +152,7 @@ private:
   public:
     DFPHostSelectionHandle(Upstream::LoadBalancerContext* context, const Cluster& cluster,
                            std::string hostname)
-        : context_(context), cluster_(cluster), hostname_(hostname){};
+        : context_(context), cluster_(cluster), hostname_(hostname) {};
 
     virtual void cancel() {
       // Cancels the DNS callback.

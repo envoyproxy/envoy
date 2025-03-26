@@ -13,9 +13,8 @@ QatzstdCompressorImpl::QatzstdCompressorImpl(uint32_t compression_level, bool en
                                              void* sequenceProducerState)
     : ZstdCompressorImplBase(compression_level, enable_checksum, strategy, chunk_size),
       enable_qat_zstd_(enable_qat_zstd), qat_zstd_fallback_threshold_(qat_zstd_fallback_threshold),
-      sequenceProducerState_(sequenceProducerState), input_ptr_{std::make_unique<uint8_t[]>(
-                                                         chunk_size)},
-      input_len_(0), chunk_size_(chunk_size) {
+      sequenceProducerState_(sequenceProducerState),
+      input_ptr_{std::make_unique<uint8_t[]>(chunk_size)}, input_len_(0), chunk_size_(chunk_size) {
   size_t result;
   result = ZSTD_CCtx_setParameter(cctx_.get(), ZSTD_c_compressionLevel, compression_level_);
   RELEASE_ASSERT(!ZSTD_isError(result), "");

@@ -9,7 +9,7 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module)
     : filter_name_(filter_name), filter_config_(filter_config),
-      dynamic_module_(std::move(dynamic_module)){};
+      dynamic_module_(std::move(dynamic_module)) {};
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
   (*on_http_filter_config_destroy_)(in_module_config_);
