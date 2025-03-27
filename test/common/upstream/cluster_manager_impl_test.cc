@@ -763,7 +763,7 @@ dynamic_warming_clusters:
 )EOF");
 
   Matchers::MockStringMatcher mock_matcher;
-  EXPECT_CALL(mock_matcher, match("http12_cluster")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("http12_cluster", _)).WillOnce(Return(false));
   checkConfigDump(R"EOF(
 static_clusters:
 dynamic_active_clusters:

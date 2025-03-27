@@ -496,8 +496,7 @@ TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameURIMatched) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
                                                            "spiffe://lyft.com/test-team"};
-  EXPECT_TRUE(DefaultCertValidator::verifySubjectAltName(cert.get(), nullptr,
-                                                         verify_subject_alt_name_list));
+  EXPECT_TRUE(DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltMultiDomain) {
