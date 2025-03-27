@@ -9,6 +9,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
 #include "library/common/network/proxy_api.h"
@@ -321,7 +322,7 @@ InternalEngine::~InternalEngine() {
   }
 }
 
-envoy_status_t InternalEngine::setProxySettings(const char* hostname, const uint16_t port) {
+envoy_status_t InternalEngine::setProxySettings(absl::string_view hostname, const uint16_t port) {
   return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
     connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
   });
