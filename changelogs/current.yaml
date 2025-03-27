@@ -41,7 +41,7 @@ minor_behavior_changes:
     substitution format string if the related extensions are linked.
 - area: formatter
   change: |
-    The formatter ``%RESPONSE_CODE_DETAILS%`` takes an optional parameter ``ALLOW_WHITESPACES`` to allow whitespaces in output 
+    The formatter ``%RESPONSE_CODE_DETAILS%`` takes an optional parameter ``ALLOW_WHITESPACES`` to allow whitespaces in output
     string. By default all whitespaces will be replaced by underscore.
 - area: oauth2
   change: |
