@@ -868,7 +868,6 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   absl::flat_hash_map<std::string, std::string> cookies =
       Http::Utility::parseCookies(*request_headers_);
 
-  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
   cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
 
   if (!access_token_.empty()) {
@@ -879,7 +878,13 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   }
   if (!refresh_token_.empty()) {
     cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
+  } else if (cookies.contains(cookie_names.refresh_token_)) {
+    // If we actually went through the refresh token flow, but we didn't get a new refresh token, we
+    // want to still ensure that the old one is set if it was sent in a cookie
+    refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
+
+  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);

@@ -2658,6 +2658,74 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   EXPECT_EQ(cookies.at("RefreshToken"), "refreshToken");
 }
 
+// When a refresh flow succeeds, but a new refresh token isn't received from the OAuth server, the
+// previously received refresh token should be set in the response cookies.
+TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) {
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
+
+  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) - 10;
+
+  std::string legit_refresh_token{"legit_refresh_token"};
+  // the third request to the oauth filter with URI parameters.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), fmt::format("OauthExpires={}", expires_at_s)},
+      {Http::Headers::get().Cookie.get(), fmt::format("RefreshToken={}", legit_refresh_token)},
+      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken"},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=dCu0otMcLoaGF73jrT+R8rGA0pnWyMgNf4+GivGrHEI="},
+  };
+
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  const std::chrono::seconds expiredTime(10);
+  filter_->updateTokens("accessToken", "idToken", "", expiredTime);
+
+  filter_->finishRefreshAccessTokenFlow();
+
+  Http::TestResponseHeaderMapImpl response_headers{};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{
+      {Http::Headers::get().SetCookie.get(), "OauthHMAC="
+                                             "AWc2PEcPGGXlOtGGLOsT6rFnW9qxOVk0NvfBpZHRY3I=;"
+                                             "path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=10;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=accessToken;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "IdToken=idToken;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       fmt::format("RefreshToken={};path=/;Max-Age=604800;secure;HttpOnly", legit_refresh_token)},
+  };
+
+  EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
+
+  auto cookies = Http::Utility::parseCookies(request_headers);
+  EXPECT_EQ(cookies.at("OauthHMAC"), "AWc2PEcPGGXlOtGGLOsT6rFnW9qxOVk0NvfBpZHRY3I=");
+  EXPECT_EQ(cookies.at("OauthExpires"), "10");
+  EXPECT_EQ(cookies.at("BearerToken"), "accessToken");
+  EXPECT_EQ(cookies.at("IdToken"), "idToken");
+  EXPECT_EQ(cookies.at("RefreshToken"), legit_refresh_token);
+}
+
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
