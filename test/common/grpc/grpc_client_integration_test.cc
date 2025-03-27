@@ -109,6 +109,58 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   stream->waitForReset();
 }
 
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithGracefulClose) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->closeStream();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnRemoteClose) {
+  setOnDeleteCallback();
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->runDispatcherUntilResponseReceived();
+
+  stream->closeStream();
+  stream->waitForRemoteCloseAndDelete();
+  stream->encodeServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  runDispatcherUntilStreamDeletion();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnTimeout) {
+  // Make remote close timeout small, so that the test does not timeout.
+  remote_close_timeout_ = std::chrono::milliseconds(100);
+  setOnDeleteCallback();
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->runDispatcherUntilResponseReceived();
+
+  stream->closeStream();
+  stream->waitForRemoteCloseAndDelete();
+  runDispatcherUntilStreamDeletion();
+  // Stream is reset if remote close timer expires.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+  }
+}
+
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStreamGracefulClose) {
   initialize();

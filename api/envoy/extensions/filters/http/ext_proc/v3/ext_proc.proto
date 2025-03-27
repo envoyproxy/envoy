@@ -331,9 +331,14 @@ message ExternalProcessor {
   repeated ProcessingMode allowed_override_modes = 22;
 
   // Decorator to introduce custom logic that runs after a message received from
-  // the External Processor is processed.
+  // the External Processor is processed, but before continuing filter chain iteration.
+  //
+  // .. note::
+  //   Response processors are currently in alpha.
+  //
   // [#extension-category: envoy.http.ext_proc.response_processors]
-  config.core.v3.TypedExtensionConfig on_processing_response = 23;
+  config.core.v3.TypedExtensionConfig on_processing_response = 23
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

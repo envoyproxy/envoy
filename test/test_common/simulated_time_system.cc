@@ -113,8 +113,8 @@ public:
 
 private:
   void waitForNoRunningCallbacksLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    mutex_.Await(absl::Condition(
-        +[](bool* running_cbs) -> bool { return !*running_cbs; }, &running_cbs_));
+    mutex_.Await(
+        absl::Condition(+[](bool* running_cbs) -> bool { return !*running_cbs; }, &running_cbs_));
   }
 
   void disableAlarmLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);

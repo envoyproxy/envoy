@@ -378,12 +378,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   // Now that the async-client manager is set, the xDS-Manager can be initialized.
   absl::Status status = xds_manager_.initialize(bootstrap, this);
   SET_AND_RETURN_IF_NOT_OK(status, creation_status);
-
-  // TODO(adisuissa): refactor and move the following data members to the
-  // xDS-manager class.
-  subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, xds_manager_.xdsResourcesDelegate(), xds_manager_.xdsConfigTracker());
 }
 
 absl::Status
@@ -2456,7 +2450,8 @@ ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
-                            context_.messageValidationContext().dynamicValidationVisitor());
+                            context_.messageValidationContext().dynamicValidationVisitor(),
+                            context_);
 }
 
 } // namespace Upstream
