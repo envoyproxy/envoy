@@ -77,7 +77,7 @@ private:
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
                                      test::integration::filters::LoggingTestFilterConfig> {
 public:
-  LoggingTestFilterFactory() : FactoryBase("logging-test-filter"){};
+  LoggingTestFilterFactory() : FactoryBase("logging-test-filter") {};
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::LoggingTestFilterConfig& proto_config, const std::string&,

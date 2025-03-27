@@ -8,7 +8,7 @@ namespace ThriftFilters {
 
 class DelegateDecoderFilter final : public DecoderFilter {
 public:
-  DelegateDecoderFilter(BidirectionalFilterSharedPtr filter) : parent_(filter){};
+  DelegateDecoderFilter(BidirectionalFilterSharedPtr filter) : parent_(filter) {};
   // ThriftBaseFilter
   void onDestroy() override { throw EnvoyException(fmt::format("should not be called")); }
 
@@ -104,7 +104,7 @@ using DelegateDecoderFilterSharedPtr = std::shared_ptr<DelegateDecoderFilter>;
 
 class DelegateEncoderFilter final : public EncoderFilter {
 public:
-  DelegateEncoderFilter(BidirectionalFilterSharedPtr filter) : parent_(filter){};
+  DelegateEncoderFilter(BidirectionalFilterSharedPtr filter) : parent_(filter) {};
   // ThriftBaseFilter
   void onDestroy() override { throw EnvoyException(fmt::format("should not be called")); }
 

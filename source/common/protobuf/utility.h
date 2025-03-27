@@ -677,7 +677,7 @@ public:
  */
 class HashedValue {
 public:
-  HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)){};
+  HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)) {};
   HashedValue(const HashedValue& v) = default;
 
   const ProtobufWkt::Value& value() const { return value_; }

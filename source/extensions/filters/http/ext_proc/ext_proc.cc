@@ -26,6 +26,7 @@ namespace ExternalProcessing {
 namespace {
 
 using envoy::config::common::mutation_rules::v3::HeaderMutationRules;
+using envoy::config::core::v3::TrafficDirection;
 using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
 using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
@@ -47,6 +48,9 @@ using Http::ResponseTrailerMap;
 constexpr absl::string_view ErrorPrefix = "ext_proc_error";
 constexpr int DefaultImmediateStatus = 200;
 constexpr absl::string_view FilterName = "envoy.filters.http.ext_proc";
+constexpr absl::string_view RemoteCloseTimeout =
+    "envoy.filters.http.ext_proc.remote_close_timeout_milliseconds";
+constexpr int32_t DefaultRemoteCloseTimeoutMilliseconds = 1000;
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -214,7 +218,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       disable_immediate_response_(config.disable_immediate_response()),
       allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
       disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
-      is_upstream_(is_upstream),
+      is_upstream_(is_upstream), graceful_grpc_close_(Runtime::runtimeFeatureEnabled(
+                                     "envoy.reloadable_features.ext_proc_graceful_grpc_close")),
       untyped_forwarding_namespaces_(
           config.metadata_options().forwarding_namespaces().untyped().begin(),
           config.metadata_options().forwarding_namespaces().untyped().end()),
@@ -231,7 +236,9 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       immediate_mutation_checker_(context.regexEngine()),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
-      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+      thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
+      remote_close_timeout_(context.runtime().snapshot().getInteger(
+          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)) {
 
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -408,7 +415,8 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy())
-                       .setSampled(absl::nullopt);
+                       .setSampled(absl::nullopt)
+                       .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
@@ -437,6 +445,23 @@ void Filter::closeStream() {
   if (stream_) {
     ENVOY_STREAM_LOG(debug, "Calling close on stream", *decoder_callbacks_);
     if (stream_->close()) {
+      stats_.streams_closed_.inc();
+    }
+    config_->threadLocalStreamManager().erase(stream_);
+    stream_ = nullptr;
+  } else {
+    ENVOY_STREAM_LOG(debug, "Stream already closed", *decoder_callbacks_);
+  }
+}
+
+void Filter::halfCloseAndWaitForRemoteClose() {
+  if (!config_->grpcService().has_value()) {
+    return;
+  }
+
+  if (stream_) {
+    ENVOY_STREAM_LOG(debug, "Calling half-close on stream", *decoder_callbacks_);
+    if (stream_->halfCloseAndDeleteOnRemoteClose()) {
       stats_.streams_closed_.inc();
     }
     config_->threadLocalStreamManager().erase(stream_);
@@ -478,8 +503,12 @@ void Filter::onDestroy() {
     // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
-    // Perform immediate close on the stream otherwise.
-    closeStream();
+    if (config_->gracefulGrpcClose()) {
+      halfCloseAndWaitForRemoteClose();
+    } else {
+      // Perform immediate close on the stream otherwise.
+      closeStream();
+    }
   }
 }
 
@@ -1321,50 +1350,26 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingRequestHeaders(*response, processing_status,
-                                                             decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingResponseHeaders(*response, processing_status,
-                                                              decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingRequestBody(*response, processing_status,
-                                                          decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingResponseBody(*response, processing_status,
-                                                           decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingRequestTrailers(*response, processing_status,
-                                                              decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
-    if (on_processing_response_) {
-      on_processing_response_->afterProcessingResponseTrailers(*response, processing_status,
-                                                               decoder_callbacks_->streamInfo());
-    }
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     if (config_->disableImmediateResponse()) {
@@ -1373,11 +1378,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
                        "Treat the immediate response message as spurious response.");
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
-
-      if (on_processing_response_) {
-        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
-                                                                 decoder_callbacks_->streamInfo());
-      }
     } else {
       setDecoderDynamicMetadata(*response);
       // We won't be sending anything more to the stream after we
@@ -1385,10 +1385,14 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       ENVOY_STREAM_LOG(debug, "Sending immediate response", *decoder_callbacks_);
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
-      closeStream();
+      if (config_->gracefulGrpcClose()) {
+        halfCloseAndWaitForRemoteClose();
+      } else {
+        closeStream();
+      }
       if (on_processing_response_) {
-        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
-                                                                 decoder_callbacks_->streamInfo());
+        on_processing_response_->afterReceivingImmediateResponse(
+            response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
       }
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
@@ -1708,6 +1712,49 @@ std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse()
     return nullptr;
   }
   return on_processing_response_factory_cb_();
+}
+
+void Filter::onProcessHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                      absl::Status status, TrafficDirection traffic_direction) {
+  if (on_processing_response_) {
+    ASSERT(traffic_direction != TrafficDirection::UNSPECIFIED);
+    if (traffic_direction == TrafficDirection::INBOUND) {
+      on_processing_response_->afterProcessingRequestHeaders(response, status,
+                                                             decoder_callbacks_->streamInfo());
+    } else {
+      on_processing_response_->afterProcessingResponseHeaders(response, status,
+                                                              encoder_callbacks_->streamInfo());
+    }
+  }
+}
+
+void Filter::onProcessTrailersResponse(
+    const envoy::service::ext_proc::v3::TrailersResponse& response, absl::Status status,
+    TrafficDirection traffic_direction) {
+  if (on_processing_response_) {
+    ASSERT(traffic_direction != TrafficDirection::UNSPECIFIED);
+    if (traffic_direction == TrafficDirection::INBOUND) {
+      on_processing_response_->afterProcessingRequestTrailers(response, status,
+                                                              decoder_callbacks_->streamInfo());
+    } else {
+      on_processing_response_->afterProcessingResponseTrailers(response, status,
+                                                               encoder_callbacks_->streamInfo());
+    }
+  }
+}
+
+void Filter::onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response,
+                                   absl::Status status, TrafficDirection traffic_direction) {
+  if (on_processing_response_) {
+    ASSERT(traffic_direction != TrafficDirection::UNSPECIFIED);
+    if (traffic_direction == TrafficDirection::INBOUND) {
+      on_processing_response_->afterProcessingRequestBody(response, status,
+                                                          decoder_callbacks_->streamInfo());
+    } else {
+      on_processing_response_->afterProcessingResponseBody(response, status,
+                                                           encoder_callbacks_->streamInfo());
+    }
+  }
 }
 
 } // namespace ExternalProcessing

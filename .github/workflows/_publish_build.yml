@@ -74,9 +74,9 @@ jobs:
           name: Release (arm64)
           arch: arm64
           bazel-extra: >-
-            --config=remote-cache-envoy-engflow
-          rbe: false
-          runs-on: envoy-arm64-medium
+            --config=remote-envoy-engflow
+          rbe: true
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
 
   distribution:
     permissions:
@@ -120,7 +120,7 @@ jobs:
           name: Package debs (arm64)
           arch: arm64
           cache-build-image-key-suffix: -arm64
-          runs-on: github-arm64-2c-8gb
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
 
   docker:
     permissions:

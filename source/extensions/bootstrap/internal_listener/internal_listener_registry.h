@@ -47,7 +47,7 @@ public:
 
   // Server::Configuration::BootstrapExtension
   void onServerInitialized() override;
-  void onWorkerThreadInitialized() override{};
+  void onWorkerThreadInitialized() override {};
 
 private:
   Server::Configuration::ServerFactoryContext& server_context_;
