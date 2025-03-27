@@ -17,13 +17,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_client_interface",
+    hdrs = ["grpc_client.h"],
+    deps = [
+        ":client_base",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_client_lib",
     hdrs = [
-        "grpc_client.h",
+        "grpc_client_impl.h",
     ],
     tags = ["skip_on_windows"],
     deps = [
-        ":client_base",
+        ":grpc_client_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",

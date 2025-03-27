@@ -9,6 +9,7 @@
 
 #include "source/common/http/sidestream_watermark.h"
 #include "source/extensions/filters/common/ext_proc/grpc_client.h"
+#include "source/extensions/filters/common/ext_proc/grpc_client_impl.h"
 
 namespace Envoy {
 namespace Extensions {
