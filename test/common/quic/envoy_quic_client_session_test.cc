@@ -681,6 +681,15 @@ TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
   stream.resetStream(Http::StreamResetReason::LocalReset);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, DisableQpack) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_disable_qpack(true);
+
+  envoy_quic_session_->setHttp3Options(http3_options);
+
+  EXPECT_EQ(envoy_quic_session_->qpack_maximum_dynamic_table_capacity(), 0);
+}
+
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags),

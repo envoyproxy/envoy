@@ -34,7 +34,7 @@ CredentialInjectorFilterFactory::createFilterFactoryFromProtoTyped(
       *config_factory);
   CredentialInjectorSharedPtr credential_injector =
       config_factory->createCredentialInjectorFromProto(
-          *message, stats_prefix + "credential_injector.", context);
+          *message, stats_prefix + "credential_injector.", context, dual_info.init_manager);
 
   FilterConfigSharedPtr config =
       std::make_shared<FilterConfig>(std::move(credential_injector), proto_config.overwrite(),

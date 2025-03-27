@@ -188,9 +188,9 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageRandomData) {
   }
 }
 
-// Test processing messages which map 1:1 with buffer.
-// The buffer contains just a single entire message and
-// nothing more.
+//  Test processing messages which map 1:1 with buffer.
+//  The buffer contains just a single entire message and
+//  nothing more.
 TEST_F(PostgresProxyDecoderTest, ReadingBufferSingleMessages) {
   decoder_->state(DecoderImpl::State::InSyncState);
   // Feed empty buffer - should not crash.

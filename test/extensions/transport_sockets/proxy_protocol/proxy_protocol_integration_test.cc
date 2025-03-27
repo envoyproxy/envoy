@@ -409,7 +409,7 @@ class ProxyProtocolTLVsIntegrationTest : public testing::TestWithParam<Network::
                                          public BaseIntegrationTest {
 public:
   ProxyProtocolTLVsIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()){};
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {};
 
   void TearDown() override {
     test_server_.reset();
