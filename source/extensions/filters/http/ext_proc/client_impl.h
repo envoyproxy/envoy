@@ -57,6 +57,7 @@ public:
   // Close the stream. This is idempotent and will return true if we
   // actually closed it.
   bool close() override;
+  bool halfCloseAndDeleteOnRemoteClose() override;
 
   void notifyFilterDestroy() override {
     // When the filter object is being destroyed,  `callbacks_` (which is a OptRef to filter object)

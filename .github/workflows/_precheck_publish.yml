@@ -68,10 +68,8 @@ jobs:
           name: Release (arm64)
           target-suffix: arm64
           arch: arm64
-          bazel-extra: >-
-            --config=remote-cache-envoy-engflow
-          rbe: false
-          runs-on: envoy-arm64-large
+          rbe: true
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
           timeout-minutes: 180
         - target: docs
           name: Docs

@@ -1,7 +1,3 @@
-#include <chrono>
-#include <cstddef>
-#include <thread>
-
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -16,6 +12,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using Envoy::Extensions::HttpFilters::Common::MockUpstream;
 using testing::_;

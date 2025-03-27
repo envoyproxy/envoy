@@ -69,20 +69,20 @@ public:
   using HeaderPair = std::pair<absl::string_view, absl::string_view>;
   static absl::StatusOr<HeaderPair> parseSubcommandHeaders(absl::string_view subcommand);
 
-  /* Variadic function template to parse the
-     subcommand and assign found tokens to sequence of params.
-     subcommand must be a sequence
-     of tokens separated by the same separator, like: header1:header2 or header1?header2?header3.
-     params must be a sequence of std::string& with optional container storing std::string. Here are
-     examples of params:
-     - std::string& token1
-     - std::string& token1, std::string& token2
-     - std::string& token1, std::string& token2, std::vector<std::string>& remaining
-
-     If command contains more tokens than number of passed params, unassigned tokens will be
-     ignored. If command contains less tokens than number of passed params, some params will be left
-     untouched.
-  */
+  /**
+   * Variadic function template to parse the subcommand and assign found tokens to sequence of
+   * params. subcommand must be a sequence of tokens separated by the same separator, like:
+   * header1:header2 or header1?header2?header3.
+   * params must be a sequence of absl::string_view& with optional container storing
+   * absl::string_view. Here are examples of params:
+   *  - absl::string_view& token1
+   *  - absl::string_view& token1, absl::string_view& token2
+   *  - absl::string_view& token1, absl::string_view& token2, std::vector<absl::string_view>& others
+   *
+   * If command contains more tokens than number of passed params, unassigned tokens will be
+   * ignored. If command contains less tokens than number of passed params, some params will be left
+   * untouched.
+   */
   template <typename... Tokens>
   static void parseSubcommand(absl::string_view subcommand, const char separator,
                               Tokens&&... params) {

@@ -888,6 +888,18 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   return matches;
 }
 
+bool RouteEntryImplBase::isRedirect() const {
+  if (!isDirectResponse()) {
+    return false;
+  }
+  if (redirect_config_ == nullptr) {
+    return false;
+  }
+  return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
+         !redirect_config_->prefix_rewrite_redirect_.empty() ||
+         redirect_config_->regex_rewrite_redirect_ != nullptr;
+}
+
 bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
@@ -1642,7 +1654,7 @@ UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
-      uri_template_(path_matcher_->uriTemplate()){};
+      uri_template_(path_matcher_->uriTemplate()) {};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                          bool insert_envoy_original_path) const {

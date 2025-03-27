@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "absl/strings/string_view.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
 
@@ -25,6 +26,7 @@ public:
   void onDefaultNetworkChanged(int network);
   void onDefaultNetworkUnavailable();
   void onDefaultNetworkAvailable();
+  envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
 
   envoy_status_t terminate();
   Envoy::InternalEngine* engine() { return engine_; }

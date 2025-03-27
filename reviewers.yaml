@@ -2,6 +2,12 @@ adisuissa:
   maintainer: true
   opsgenie: Adi
   slack: UT17EMMTP
+agrawroh:
+  first-pass: true
+  slack: U025KC9D7T5
+antoniovleonti:
+  first-pass: true
+  slack: U06DHAS4FDF
 botengyao:
   maintainer: true
   opsgenie: Boteng
@@ -40,6 +46,9 @@ nezdolik:
   maintainer: true
   opsgenie: Kateryna
   slack: UDYUWRL13
+paul-r-gall:
+  first-pass: true
+  slack: U0246MUEE9F
 phlax:
   maintainer: true
   opsgenie: phlax
@@ -55,6 +64,10 @@ RyanTheOptimist:
 silverstar194:
   first-pass: true
   slack: U03LNPC8JN9
+tonya11en:
+  maintainer: true
+  opsgenie: Tony
+  slack: U989BG2CW
 tyxia:
   maintainer: true
   opsgenie: Tianyu
@@ -67,11 +80,10 @@ yanavlasov:
   maintainer: true
   opsgenie: Yan
   slack: UJHLR5KFS
+yanjunxiang-google:
+  first-pass: true
+  slack: U0210Q3SUKX
 zuercher:
   maintainer: true
   opsgenie: Stephan
   slack: U78J72Q82
-tonya11en:
-  maintainer: true
-  opsgenie: Tony
-  slack: U989BG2CW

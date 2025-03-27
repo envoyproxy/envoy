@@ -18,7 +18,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
-    rbe_pool = "6gig",
+    size = "large",
     deps = [":config_impl_test_lib"],
 )
 
@@ -266,7 +266,7 @@ envoy_directory_genrule(
         "$(location //test/common/router:config_impl_test_static)",
     ]),
     exec_properties = select({
-        "//bazel:engflow_rbe": {"Pool": "6gig"},
+        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
         "//conditions:default": {},
     }),
     tools = [":corpus_from_config_impl_sh"],
