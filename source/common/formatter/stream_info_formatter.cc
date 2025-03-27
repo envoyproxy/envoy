@@ -857,6 +857,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     if (downstream && upstream) {
                       result = downstream.value() - upstream.value();
                     }
+
                     return result;
                   });
             }}},
