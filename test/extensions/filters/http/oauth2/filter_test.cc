@@ -3212,8 +3212,7 @@ TEST_F(OAuth2Test, CookiesDeletedWhenTokensCleared) {
       {Http::Headers::get().Cookie.get(),
        "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Lax"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_CSRF_TOKEN +
-           ";path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _));

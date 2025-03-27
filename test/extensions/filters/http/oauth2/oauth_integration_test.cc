@@ -761,53 +761,6 @@ TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1", /* expect_failure */ true);
 }
 
-// Test that verifies when a refresh token is returned from the authorization server
-// but use_refresh_token_ is set to false, it is ignored and not included in the HMAC calculation.
-TEST_P(OauthUseRefreshTokenDisabled, RefreshTokenIgnoredInHmac) {
-  on_server_init_function_ = [&]() {
-    createLdsStream();
-    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
-  };
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},
-      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
-      {":scheme", "http"},
-      {"x-forwarded-proto", "http"},
-      {":authority", "authority"},
-      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)}};
-
-  auto encoder_decoder = codec_client_->startRequest(headers);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  waitForOAuth2Response("token_secret");
-
-  // We should get an immediate redirect back.
-  response->waitForHeaders();
-
-  // Check if the refresh token cookie is not set when use_refresh_token_ is false
-  std::string refresh_token =
-      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.refresh_token_);
-
-  // After the fix, the refresh token cookie should not be set when use_refresh_token_ is false
-  EXPECT_TRUE(refresh_token.empty());
-
-  // Verify that the HMAC is valid, which means the refresh token was not included in the HMAC
-  // calculation
-  EXPECT_TRUE(
-      validateHmac(response->headers(), headers.Host()->value().getStringView(), "hmac_secret"));
-
-  EXPECT_EQ("302", response->headers().getStatusValue());
-
-  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
-  cleanup();
-}
-
 } // namespace
 } // namespace Oauth2
 } // namespace HttpFilters
