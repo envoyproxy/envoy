@@ -1596,6 +1596,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.compression.qatzip.compressor"],
         cpe = "N/A",
     ),
+    platforms = dict(
+        project_name = "platforms",
+        project_desc = "Constraint values for specifying platforms and toolchains",
+        project_url = "https://github.com/bazelbuild/platforms",
+        version = "0.0.11",
+        sha256 = "29742e87275809b5e598dc2f04d86960cc7a55b3067d97221c9abbc9926bff0f",
+        urls = ["https://github.com/bazelbuild/platforms/releases/download/{version}/platforms-{version}.tar.gz"],
+        use_category = ["build", "dataplane_core", "controlplane"],
+        release_date = "2025-01-10",
+        cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):

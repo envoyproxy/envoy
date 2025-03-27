@@ -127,6 +127,8 @@ def envoy_dependencies(skip_targets = []):
     # Setup Bazel shell rules
     external_http_archive(name = "rules_shell")
 
+    external_http_archive("platforms")
+
     # Setup Bazel C++ rules
     external_http_archive("rules_cc")
 
