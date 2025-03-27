@@ -24,7 +24,6 @@ toolchain(
     exec_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
-        "@bazel_tools//tools/cpp:clang",
     ],
     target_compatible_with = [
         "@platforms//os:linux",
@@ -39,7 +38,6 @@ platform(
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
-        "@bazel_tools//tools/cpp:clang",
     ],
     exec_properties = {
         "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:56b66cc84065c88a141963cedbbe4198850ffae0dacad769f516d0e9081439da",

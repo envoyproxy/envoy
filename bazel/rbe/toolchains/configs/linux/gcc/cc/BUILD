@@ -97,7 +97,7 @@ cc_toolchain_config(
         "/usr/include/x86_64-linux-gnu/c++/11",
         "/usr/include/c++/11/backward",
     ],
-    cxx_flags = ["-std=c++0x"],
+    cxx_flags = ["-std=c++20"],
     dbg_compile_flags = ["-g"],
     host_system_name = "local",
     link_flags = [
