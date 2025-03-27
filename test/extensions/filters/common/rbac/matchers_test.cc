@@ -428,6 +428,8 @@ TEST(MtlsAuthenticatedMatcher, ValidateConfig) {
 // This matcher will not match in any configuration if the connection is not ssl.
 TEST(MtlsAuthenticatedMatcher, NoSSL) {
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  ON_CALL(factory_context, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getNullValidationVisitor()));
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
 
