@@ -18,7 +18,7 @@ envoy_cc_extension(
     ],
     deps = [
         "//source/common/tls/cert_validator:cert_validator_lib",
-        "//source/extensions/filters/common/rbac:matchers_lib",
+        "//source/extensions/filters/common/rbac:matchers_interface",
         "@envoy_api//envoy/extensions/rbac/principals/mtls_authenticated/v3:pkg_cc_proto",
     ],
 )
