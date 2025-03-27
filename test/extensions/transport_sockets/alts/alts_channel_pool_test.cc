@@ -50,7 +50,7 @@ public:
 
 class AltsChannelPoolTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  AltsChannelPoolTest() : version_(GetParam()){};
+  AltsChannelPoolTest() : version_(GetParam()) {};
   void startFakeHandshakerService() {
     server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     testing::internal::Notification notification;

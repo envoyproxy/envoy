@@ -1232,6 +1232,22 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, DisableQpack) {
+  initialize();
+
+  codec_client_ = makeRawHttp3Connection(makeClientConnection(lookupPort("http")), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ true, /*disable_qpack*/ true);
+  auto headers = default_request_headers_;
+  headers.addCopy("cookie", "x;y");
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  waitForNextUpstreamRequest(0);
+  // Cookie crumbling is disabled along with QPACK.
+  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("cookie", "x;y"));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {

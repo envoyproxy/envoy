@@ -39,6 +39,9 @@ minor_behavior_changes:
   change: |
     The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
     substitution format string if the related extensions are linked.
+- area: oauth2
+  change: |
+    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -130,6 +133,17 @@ bug_fixes:
     Fixes an Envoy crash issue when a local reply is sent.
     This change can be temporarily reverted by setting runtime guard
     ``envoy_reloadable_features_router_filter_resetall_on_local_reply`` to ``false``.
+- area: quic
+  change: |
+    Strips empty cookie header, making HTTP2 and HTTP3 consistent. This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.http3_remove_empty_cookie`` to ``false``.
+- area: wasm
+  change: |
+    Fixed a bug where the wasm context deletion may result in a crash when the VM is paniced.
+- area: sds
+  change: |
+    Fixed a bug where a :ref:`GenericSecret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`
+    stored in a file was not watched by SDS API.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -332,5 +346,25 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: golang
+  change: |
+    Expose generic secrets to :ref:`lua <envoy_v3_api_msg_extensions.filters.http.golang.v3alpha.Config>`
+    Add SecretManager interface in the go envoy sdk.
+- area: dns
+  change: |
+    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
+    among several other new features, bug-fixes, etc.
+- area: golang
+  change: |
+    added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the
+    Destroy function on the config instance. config should implement the new
+    github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config interface, implementing the Destroy function.
+- area: http3
+  change: |
+    Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_qpack, an experimental support for
+    disabling QPACK compression.
+- area: cares
+  change: |
+    Implemented ``ares_reinit()`` to optimally handle the situation where DNS resolver needs to be re-initialized.
 
 deprecated:

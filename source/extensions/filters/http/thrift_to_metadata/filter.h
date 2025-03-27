@@ -177,7 +177,7 @@ class Filter : public Http::PassThroughFilter,
                public PassThroughDecoderEventHandler,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(std::shared_ptr<FilterConfig> config) : config_(config){};
+  Filter(std::shared_ptr<FilterConfig> config) : config_(config) {};
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;

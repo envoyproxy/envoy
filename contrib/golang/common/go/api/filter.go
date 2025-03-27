@@ -108,14 +108,22 @@ func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
+type Config interface {
+	// Called when the current config is deleted due to an update or removal of plugin.
+	// You can use this method is you store some resources in the config to be released later.
+	Destroy()
+}
+
 type StreamFilterConfigParser interface {
 	// Parse the proto message to any Go value, and return error to reject the config.
 	// This is called when Envoy receives the config from the control plane.
 	// Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
+	// You can return a config implementing the Config interface if you need fine control over its lifecycle.
 	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
 	// Merge the two configs(filter level config or route level config) into one.
 	// May merge multi-level configurations, i.e. filter level, virtualhost level, router level and weighted cluster level,
 	// into a single one recursively, by invoking this method multiple times.
+	// You can return a config implementing the Config interface if you need fine control over its lifecycle.
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -178,6 +186,11 @@ type StreamFilterCallbacks interface {
 	// * ErrValueNotFound
 	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
+
+	// Get secret manager.
+	// Secrets should be defined in the plugin configuration.
+	// It is safe to use this secret manager from any goroutine.
+	SecretManager() SecretManager
 }
 
 // FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
@@ -304,6 +317,12 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type SecretManager interface {
+	// Get generic secret from secret manager.
+	// bool is false on missing secret
+	GetGenericSecret(name string) (string, bool)
 }
 
 type MetricType uint32
