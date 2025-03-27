@@ -133,10 +133,6 @@ filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMat
     return std::make_unique<FilterStateStringMatcher>(
         std::make_unique<const StringMatcherImpl>(matcher.string_match(), context));
     break;
-  case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kStringListMatch:
-    return std::make_unique<FilterStateStringListMatcher>(
-    std::make_unique<const StringMatcherImpl>(matcher.string_match(), context));
-    break;
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
     auto ip_list = Network::Address::IpList::create(matcher.address_match().ranges());
     RETURN_IF_NOT_OK_REF(ip_list.status());

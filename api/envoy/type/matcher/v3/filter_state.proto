@@ -29,8 +29,5 @@ message FilterStateMatcher {
 
     // Matches the filter state object as a ip Instance.
     AddressMatcher address_match = 3;
-
-    // Matches the filter state object as a list of strings.
-    StringMatcher string_list_match = 4;
   }
 }
