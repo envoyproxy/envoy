@@ -21,7 +21,6 @@ envoy_cc_test(
     data = envoy_select_wasm_rust_tests([
         "//test/extensions/common/wasm/test_data:test_rust.wasm",
     ]),
-    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
@@ -71,7 +70,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "plugin_test",
     srcs = ["plugin_test.cc"],
-    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/wasm:wasm_lib",
@@ -82,7 +80,6 @@ envoy_cc_test(
 envoy_cc_test_binary(
     name = "wasm_speed_test",
     srcs = ["wasm_speed_test.cc"],
-    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -113,7 +110,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "wasm_runtime_factory_test",
     srcs = ["wasm_runtime_factory_test.cc"],
-    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -125,7 +121,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
-    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:base_includes",
@@ -149,7 +144,6 @@ envoy_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",
     ]),
-    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":wasm_runtime",
@@ -172,7 +166,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "remote_async_datasource_test",
     srcs = ["remote_async_datasource_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/common:empty_string",
         "//source/common/crypto:utility_lib",
