@@ -133,6 +133,10 @@ bug_fixes:
     Fixes an Envoy crash issue when a local reply is sent.
     This change can be temporarily reverted by setting runtime guard
     ``envoy_reloadable_features_router_filter_resetall_on_local_reply`` to ``false``.
+- area: quic
+  change: |
+    Strips empty cookie header, making HTTP2 and HTTP3 consistent. This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.http3_remove_empty_cookie`` to ``false``.
 - area: wasm
   change: |
     Fixed a bug where the wasm context deletion may result in a crash when the VM is paniced.
@@ -359,5 +363,13 @@ new_features:
   change: |
     Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_qpack, an experimental support for
     disabling QPACK compression.
+- area: cares
+  change: |
+    Implemented ``ares_reinit()`` to optimally handle the situation where DNS resolver needs to be re-initialized.
+- area: cluster
+  change: |
+    Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
+    :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
+    :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
 
 deprecated:

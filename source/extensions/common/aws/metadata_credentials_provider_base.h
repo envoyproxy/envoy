@@ -63,7 +63,7 @@ public:
 
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()){};
+    ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()) {};
 
     // The credentials object.
     CredentialsConstSharedPtr credentials_;

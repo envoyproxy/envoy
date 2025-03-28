@@ -57,7 +57,7 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
-  void onDestroy() override{};
+  void onDestroy() override {};
   Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
 };
 
