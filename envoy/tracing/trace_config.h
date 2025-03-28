@@ -91,6 +91,11 @@ public:
   virtual bool spawnUpstreamSpan() const PURE;
 
   /**
+   * @return whether to propagate span information for unsampled requests.
+   */
+  virtual bool propagateUnsampled() const PURE;
+
+  /**
    * @return true if spans should be annotated with more detailed information.
    */
   virtual bool verbose() const PURE;
