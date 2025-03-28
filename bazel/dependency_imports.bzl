@@ -211,7 +211,7 @@ def envoy_download_go_sdks(go_version):
 def crates_repositories():
     crates_repository(
         name = "dynamic_modules_rust_sdk_crate_index",
-        cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
-        lockfile = Label("//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
-        manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+        cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+        lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
+        manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )
