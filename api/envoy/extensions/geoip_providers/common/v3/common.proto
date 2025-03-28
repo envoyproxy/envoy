@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message CommonGeoipProviderConfig {
   // The set of geolocation headers to add to request. If any of the configured headers is present
   // in the incoming request, it will be overridden by the :ref:`Geoip filter <config_http_filters_geoip>`.
-  // [#next-free-field: 10]
+  // [#next-free-field: 12]
   message GeolocationHeadersToAdd {
     // If set, the header will be used to populate the country ISO code associated with the IP address.
     string country = 1
@@ -37,6 +37,7 @@ message CommonGeoipProviderConfig {
     string asn = 4
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
+    // TODO(ldamata): Create a new field called anon with the same behaviour and deprecate this field to remove the prefix in its name.
     // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
     // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.
     string is_anon = 5
@@ -60,6 +61,15 @@ message CommonGeoipProviderConfig {
     // If set, the IP address will be checked if it belongs to a public proxy and header will be populated with the check result.
     // Header value will be set to either "true" or "false" depending on the check result.
     string anon_proxy = 9
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the header will be used to populate the ISP associated with the IP address.
+    string isp = 10
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
+    string apple_private_relay = 11
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 

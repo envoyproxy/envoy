@@ -58,38 +58,41 @@ public:
   static const absl::optional<std::string>& anonHostingHeader(const GeoipProvider& provider) {
     return provider.config_->anonHostingHeader();
   }
+  static const absl::optional<std::string>& ispHeader(const GeoipProvider& provider) {
+    return provider.config_->ispHeader();
+  }
 };
 
 MATCHER_P(HasCityDbPath, expected_db_path, "") {
   auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto city_db_path = GeoipProviderPeer::cityDbPath(*provider);
-  if (city_db_path && testing::Matches(expected_db_path)(city_db_path.value())) {
+  auto db_path_city = GeoipProviderPeer::cityDbPath(*provider);
+  if (db_path_city && testing::Matches(expected_db_path)(db_path_city.value())) {
     return true;
   }
-  *result_listener << "expected city_db_path=" << expected_db_path
-                   << " but city_db_path was not found in provider config";
+  *result_listener << "expected db_path_city=" << expected_db_path
+                   << " but db_path_city was not found in provider config";
   return false;
 }
 
 MATCHER_P(HasIspDbPath, expected_db_path, "") {
   auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto isp_db_path = GeoipProviderPeer::ispDbPath(*provider);
-  if (isp_db_path && testing::Matches(expected_db_path)(isp_db_path.value())) {
+  auto db_path_isp = GeoipProviderPeer::ispDbPath(*provider);
+  if (db_path_isp && testing::Matches(expected_db_path)(db_path_isp.value())) {
     return true;
   }
-  *result_listener << "expected isp_db_path=" << expected_db_path
-                   << " but isp_db_path was not found in provider config";
+  *result_listener << "expected db_path_isp=" << expected_db_path
+                   << " but db_path_isp was not found in provider config";
   return false;
 }
 
 MATCHER_P(HasAnonDbPath, expected_db_path, "") {
   auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto anon_db_path = GeoipProviderPeer::anonDbPath(*provider);
-  if (anon_db_path && testing::Matches(expected_db_path)(anon_db_path.value())) {
+  auto db_path_anon = GeoipProviderPeer::anonDbPath(*provider);
+  if (db_path_anon && testing::Matches(expected_db_path)(db_path_anon.value())) {
     return true;
   }
-  *result_listener << "expected anon_db_path=" << expected_db_path
-                   << " but anon_db_path was not found in provider config";
+  *result_listener << "expected db_path_anon=" << expected_db_path
+                   << " but db_path_anon was not found in provider config";
   return false;
 }
 
@@ -181,6 +184,17 @@ MATCHER_P(HasAnonHostingHeader, expected_header, "") {
   return false;
 }
 
+MATCHER_P(HasIspHeader, expected_header, "") {
+  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
+  auto isp_header = GeoipProviderPeer::ispHeader(*provider);
+  if (isp_header && testing::Matches(expected_header)(isp_header.value())) {
+    return true;
+  }
+  *result_listener << "expected isp header=" << expected_header
+                   << " but header was not found in provider config with expected value";
+  return false;
+}
+
 std::string genGeoDbFilePath(std::string db_name) {
   return TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/" + db_name);
@@ -228,26 +242,27 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
-    city_db_path: %s
-    isp_db_path: %s
-    anon_db_path: %s
+        isp: "x-geo-isp"
+    db_path_city: %s
+    db_path_isp: %s
+    db_path_anon: %s
   )EOF";
   MaxmindProviderConfig provider_config;
-  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
-  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
-  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto db_path_city = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto db_path_asn = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto db_path_anon = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
   auto processed_provider_config_yaml =
-      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml, db_path_city, db_path_asn, db_path_anon);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
       factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
-  EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(asn_db_path),
-                            HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
+  EXPECT_THAT(driver, AllOf(HasCityDbPath(db_path_city), HasIspDbPath(db_path_asn),
+                            HasAnonDbPath(db_path_anon), HasCountryHeader("x-geo-country"),
                             HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
                             HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
                             HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
-                            HasAnonHostingHeader("x-anon-hosting")));
+                            HasAnonHostingHeader("x-anon-hosting"), HasIspHeader("x-geo-isp")));
 }
 
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
@@ -264,12 +279,12 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   EXPECT_THROW_WITH_MESSAGE(factory.createGeoipProviderDriver(provider_config, "maxmind", context),
                             Envoy::EnvoyException,
                             "At least one geolocation database path needs to be configured: "
-                            "city_db_path, isp_db_path or anon_db_path");
+                            "db_path_city, db_path_isp, db_path_asn or db_path_anon");
 }
 
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
   std::string provider_config_yaml = R"EOF(
-    isp_db_path: "/geoip2/Isp.mmdb"
+    db_path_isp: "/geoip2/Isp.mmdb"
   )EOF";
   MaxmindProviderConfig provider_config;
   TestUtility::loadFromYaml(provider_config_yaml, provider_config);
@@ -283,7 +298,10 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
 
 TEST_F(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
   std::string provider_config_yaml = R"EOF(
-    isp_db_path: "/geoip2/Isp.exe"
+    common_provider_config:
+      geo_headers_to_add:
+        isp: "x-geo-isp"
+    db_path_isp: "/geoip2/Isp.exe"
   )EOF";
   MaxmindProviderConfig provider_config;
   TestUtility::loadFromYaml(provider_config_yaml, provider_config);
@@ -307,16 +325,18 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
-    city_db_path: %s
-    isp_db_path: %s
-    anon_db_path: %s
+        isp: "x-geo-isp"
+        apple_private_relay: "x-geo-apple-private-relay"
+    db_path_city: %s
+    db_path_isp: %s
+    db_path_anon: %s
   )EOF";
   MaxmindProviderConfig provider_config;
-  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
-  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
-  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto db_path_city = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto db_path_asn = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto db_path_anon = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
   auto processed_provider_config_yaml =
-      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml, db_path_city, db_path_asn, db_path_anon);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
@@ -337,9 +357,9 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
-    city_db_path: %s
-    isp_db_path: %s
-    anon_db_path: %s
+    db_path_city: %s
+    db_path_isp: %s
+    db_path_anon: %s
   )EOF";
   const auto provider_config_yaml2 = R"EOF(
     common_provider_config:
@@ -350,18 +370,18 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
-    city_db_path: %s
-    anon_db_path: %s
+    db_path_city: %s
+    db_path_anon: %s
   )EOF";
   MaxmindProviderConfig provider_config1;
   MaxmindProviderConfig provider_config2;
-  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
-  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
-  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto db_path_city = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto db_path_asn = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto db_path_anon = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
   auto processed_provider_config_yaml1 =
-      absl::StrFormat(provider_config_yaml1, city_db_path, asn_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml1, db_path_city, db_path_asn, db_path_anon);
   auto processed_provider_config_yaml2 =
-      absl::StrFormat(provider_config_yaml2, city_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml2, db_path_city, db_path_anon);
   TestUtility::loadFromYaml(processed_provider_config_yaml1, provider_config1);
   TestUtility::loadFromYaml(processed_provider_config_yaml2, provider_config2);
   MaxmindProviderFactory factory;
