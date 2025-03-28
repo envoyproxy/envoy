@@ -366,5 +366,10 @@ new_features:
 - area: cares
   change: |
     Implemented ``ares_reinit()`` to optimally handle the situation where DNS resolver needs to be re-initialized.
+- area: cluster
+  change: |
+    Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
+    :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
+    :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
 
 deprecated:
