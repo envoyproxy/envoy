@@ -23,7 +23,7 @@ class Config {
 public:
   Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config)
       : failure_mode_allow_(config.failure_mode_allow()),
-        processing_mode_(config.processing_mode()){};
+        processing_mode_(config.processing_mode()) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
