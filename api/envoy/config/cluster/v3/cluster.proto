@@ -47,7 +47,7 @@ message ClusterCollection {
 // Configuration for a single upstream cluster.
 // [#next-free-field: 59]
 message Cluster {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
+  option (udpa.annotations.versioning).prev.api.v2.Cluster"ious_message_type = "envoy;
 
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.

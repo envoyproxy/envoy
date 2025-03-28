@@ -303,5 +303,60 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(AggregateIntegrationTest, CircuitBreakerTest) {
+  // 1. setup two circuit breakers
+  //    - one at the aggregate_cluster level
+  //    - one at cluster1 level
+  // and then we can confirm that the aggregate_cluster circuit breaker does not get used   [this WILL get used for "retries" because that mechanic lives there]
+
+  // 2. send one request through to /aggregate_cluster (and prevent it from completing)
+  
+  // 3. check the circuit breaker states
+  //    - aggregate_cluster should be 0 (default or normal state == "closed")
+  //    - cluster1 should be 1 (which means triggered == "open")
+
+  // 4. send another request through (and prevent it from completing) 
+  //    - this request should fail
+
+  // 5. send another request but this time to the /cluster1 route
+  //    - this request should also fail (because the cluster1 circuit breaker is 1 (open))
+
+  initialize();
+
+  // cluster1_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(1);
+  // cluster2_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(1);
+
+  std::cout << "cluster1_ Has Circuit Breakers: " << cluster1_.has_circuit_breakers() << std::endl;
+
+  //  circuit_breakers:
+  //   thresholds:
+  //   - priority: DEFAULT
+  //     max_connections: 1
+  //   - priority: HIGH
+  //     max_connections: 1
+
+  auto* threshold = cluster1_.mutable_circuit_breakers()->mutable_thresholds()->Add();
+  threshold->set_priority(envoy::config::core::v3::RoutingPriority::DEFAULT);
+  threshold->mutable_max_connections()->set_value(1);
+  threshold->mutable_max_pending_requests()->set_value(1);
+  threshold->mutable_max_requests()->set_value(1);
+  threshold->mutable_max_retries()->set_value(1);
+
+  std::cout << "cluster1_ Thresholds Size: " << cluster1_.mutable_circuit_breakers()->thresholds_size() << std::endl;
+
+  std::cout << "cluster1_ Threshold DEFAULT Max Connections: " << threshold->max_connections().value() << std::endl;
+  std::cout << "cluster1_ Threshold DEFAULT Max Pending Requests: " << threshold->max_pending_requests().value() << std::endl;
+  std::cout << "cluster1_ Threshold DEFAULT Max Requests: " << threshold->max_requests().value() << std::endl;
+  std::cout << "cluster1_ Threshold DEFAULT Max Retries: " << threshold->max_retries().value() << std::endl;
+
+  // auto* cluster1_circuit_breaker_settings = cluster1_.mutable_circuit_breakers();
+  // auto* cluster2_circuit_breaker_settings = cluster2_.mutable_circuit_breakers();
+
+  // auto* cluster1_circuit_breaker_default_priority =
+  // cluster1_circuit_breaker_settings->add_thresholds();
+  // cluster1_circuit_breaker_default_priority->set_priority(envoy::config::core::v3::RoutingPriority::DEFAULT);
+  // cluster1_circuit_breaker_default_priority->mutable_max_connections;
+}
+
 } // namespace
 } // namespace Envoy
