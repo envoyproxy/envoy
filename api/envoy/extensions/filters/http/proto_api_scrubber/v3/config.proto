@@ -17,7 +17,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Proto API Scrubber]
+//
 // [#extension: envoy.filters.http.proto_api_scrubber]
+//
 // Overview
 // --------
 // ProtoApiScrubber filter supports filtering of the request and
@@ -215,7 +217,7 @@ message DescriptorSet {
 // Contains the restrictions for the methods.
 message Restrictions {
   // Specifies the method restrictions.
-  // Key - Fully qualified method name e.g., ``endpoints.examples.bookstore.BookStore.GetShelf``
+  // Key - Fully qualified method name e.g., ``endpoints.examples.bookstore.BookStore.GetShelf``.
   // Value - Method restrictions.
   map<string, MethodRestrictions> method_restrictions = 1;
 }
