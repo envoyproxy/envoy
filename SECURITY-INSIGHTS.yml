@@ -29,6 +29,7 @@ project-lifecycle:
   - github:nezdolik
   - github:tonya11en
   - github:tyxia
+  - github:mathetake
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true
