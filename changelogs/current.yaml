@@ -187,6 +187,9 @@ new_features:
 - area: http
   change: |
     Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
+- area: http
+  change: |
+    Added filter state matcher for router matcher.
 - area: dfp
   change: |
     The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
