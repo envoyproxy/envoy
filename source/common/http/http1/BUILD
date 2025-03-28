@@ -36,7 +36,6 @@ envoy_cc_library(
         ":balsa_parser_lib",
         ":codec_stats_lib",
         ":header_formatter_lib",
-        ":legacy_parser_lib",
         ":parser_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/common:scope_tracker_interface",
@@ -108,17 +107,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:statusor_lib",
         "//source/common/http:status_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "legacy_parser_lib",
-    srcs = ["legacy_parser_impl.cc"],
-    hdrs = ["legacy_parser_impl.h"],
-    deps = [
-        ":parser_interface",
-        "//bazel/external/http_parser",
-        "//source/common/common:assert_lib",
     ],
 )
 

@@ -25,7 +25,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:balsa_parser_lib",
-        "//source/common/http/http1:legacy_parser_lib",
         "//source/common/http/http1:parser_interface",
     ],
 )

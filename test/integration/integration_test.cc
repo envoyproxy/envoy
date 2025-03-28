@@ -58,19 +58,11 @@ void setAllowHttp10WithDefaultHost(
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
-std::string testParamToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
-        params) {
-  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
-                      TestUtility::http1ParserImplToString(std::get<1>(params.param)));
-}
-
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, IntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-                         testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipVersionToString);
 
 // Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
@@ -1960,10 +1952,9 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-                         testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipVersionToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();

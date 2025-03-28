@@ -398,18 +398,8 @@ message Http1ProtocolOptions {
   // (from first line or :path header).
   bool send_fully_qualified_url = 8;
 
-  // [#not-implemented-hide:] Hiding so that field can be removed after BalsaParser is rolled out.
-  // If set, force HTTP/1 parser: BalsaParser if true, http-parser if false.
-  // If unset, HTTP/1 parser is selected based on
-  // envoy.reloadable_features.http1_use_balsa_parser.
-  // See issue #21245.
-  google.protobuf.BoolValue use_balsa_parser = 9
-      [(xds.annotations.v3.field_status).work_in_progress = true];
-
   // [#not-implemented-hide:] Hiding so that field can be removed.
-  // If true, and BalsaParser is used (either `use_balsa_parser` above is true,
-  // or `envoy.reloadable_features.http1_use_balsa_parser` is true and
-  // `use_balsa_parser` is unset), then every non-empty method with only valid
+  // If true, then every non-empty method with only valid
   // characters is accepted. Otherwise, methods not on the hard-coded list are
   // rejected.
   // Once UHV is enabled, this field should be removed, and BalsaParser should

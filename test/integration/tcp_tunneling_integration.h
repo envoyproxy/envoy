@@ -79,7 +79,6 @@ public:
   BaseTcpTunnelingIntegrationTest(const std::string config)
       : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
         use_universal_header_validator_(GetParam().use_universal_header_validator) {
-    setupHttp1ImplOverrides(GetParam().http1_implementation);
     setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
                                       GetParam().use_universal_header_validator ? "true" : "false");

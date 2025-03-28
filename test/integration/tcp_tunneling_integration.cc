@@ -70,7 +70,6 @@ std::string BaseTcpTunnelingIntegrationTest::protocolTestParamsToString(
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
                       upstreamToString(params.param.upstream_protocol),
-                      TestUtility::http1ParserImplToString(params.param.http1_implementation),
                       http2ImplementationToString(params.param.http2_implementation),
                       params.param.use_universal_header_validator ? "Uhv" : "Legacy",
                       params.param.tunneling_with_upstream_filters ? "WithUpstreamHttpFilters"

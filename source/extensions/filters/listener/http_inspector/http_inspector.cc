@@ -27,15 +27,9 @@ Filter::Filter(const ConfigSharedPtr config)
     : config_(config), no_op_callbacks_(),
       requested_read_bytes_(Config::DEFAULT_INITIAL_BUFFER_SIZE) {
   // Filter for only Request Message types with NoOp Parser callbacks.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_inspector_use_balsa_parser")) {
-    // Set both allow_custom_methods and enable_trailers to true with BalsaParser.
-    parser_ = std::make_unique<Http::Http1::BalsaParser>(
-        Http::Http1::MessageType::Request, &no_op_callbacks_, Config::MAX_INSPECT_SIZE + 1024, true,
-        true);
-  } else {
-    parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
-                                                                  &no_op_callbacks_);
-  }
+  parser_ = std::make_unique<Http::Http1::BalsaParser>(Http::Http1::MessageType::Request,
+                                                       &no_op_callbacks_,
+                                                       Config::MAX_INSPECT_SIZE + 1024, true, true);
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
