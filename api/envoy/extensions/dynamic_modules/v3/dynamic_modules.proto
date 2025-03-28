@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.dynamic_modules.v3;
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
