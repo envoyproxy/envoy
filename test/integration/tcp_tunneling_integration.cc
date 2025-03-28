@@ -21,12 +21,6 @@ std::vector<TcpTunnelingTestParams> BaseTcpTunnelingIntegrationTest::getProtocol
         }
 #endif
 
-        std::vector<Http1ParserImpl> http1_implementations = {Http1ParserImpl::HttpParser};
-        if (downstream_protocol == Http::CodecType::HTTP1 ||
-            upstream_protocol == Http::CodecType::HTTP1) {
-          http1_implementations.push_back(Http1ParserImpl::BalsaParser);
-        }
-
         std::vector<Http2Impl> http2_implementations = {Http2Impl::Nghttp2};
         if ((!handled_http2_special_cases_downstream &&
              downstream_protocol == Http::CodecType::HTTP2) ||
@@ -49,13 +43,11 @@ std::vector<TcpTunnelingTestParams> BaseTcpTunnelingIntegrationTest::getProtocol
         use_header_validator_values.push_back(false);
 #endif
         for (const bool tunneling_with_upstream_filters : {false, true}) {
-          for (Http1ParserImpl http1_implementation : http1_implementations) {
-            for (Http2Impl http2_implementation : http2_implementations) {
-              for (bool use_header_validator : use_header_validator_values) {
-                ret.push_back(TcpTunnelingTestParams{
-                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                    http2_implementation, use_header_validator, tunneling_with_upstream_filters});
-              }
+          for (Http2Impl http2_implementation : http2_implementations) {
+            for (bool use_header_validator : use_header_validator_values) {
+              ret.push_back(TcpTunnelingTestParams{
+                  ip_version, downstream_protocol, upstream_protocol, http2_implementation,
+                  use_header_validator, tunneling_with_upstream_filters});
             }
           }
         }

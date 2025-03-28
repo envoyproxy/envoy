@@ -11,7 +11,6 @@ struct TcpTunnelingTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
-  Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
   bool use_universal_header_validator;
   bool tunneling_with_upstream_filters;

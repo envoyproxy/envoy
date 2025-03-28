@@ -23,8 +23,5 @@ public:
           return Network::Utility::parseInternetAddressNoThrow(
               Network::Test::getLoopbackAddressString(GetParam()), 0);
         }) {}
-
-protected:
-  const Http1ParserImpl http1_implementation_;
 };
 } // namespace Envoy
