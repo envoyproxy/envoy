@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.proto_api_scrubber.v3;
 import "envoy/config/core/v3/base.proto";
 
 import "xds/annotations/v3/status.proto";
-import "xds/type/matcher/v3/matcher.proto";
+import "xds/type/v3/cel.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -16,7 +16,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#not-implemented-hide:]
 // [#protodoc-title: Proto API Scrubber]
 // [#extension: envoy.filters.http.proto_api_scrubber]
 // Overview
@@ -249,11 +248,5 @@ message RestrictionConfig {
   // the restriction. e.g., request.headers['X-User-Type'] == 'DEV'
   // For the list of all available attributes of Envoy, please refer to
   // https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
-  string cel_expr = 1;
-
-  // NOT IMPLEMENTED
-  // A restriction matcher which contains pluggable matchers eg, CEL matcher,
-  // regex matcher, string matcher, etc. It is planned to be implemented in
-  // future iterations of the filter.
-  xds.type.matcher.v3.Matcher restriction_matcher = 2;
+  xds.type.v3.CelExpression cel_expr = 1;
 }
