@@ -568,11 +568,16 @@ public:
   TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(
-            priority_set, nullptr, lb_stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                           100, 50),
-            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
+      : locality_lb_config_(
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)),
+        ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random,
+                                  PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                      common_config, healthy_panic_threshold, 100, 50),
+                                  locality_lb_config_) {}
+
+  envoy::config::cluster::v3::Cluster::ZoneAwareLbConfig& mutableLocalityLbConfig() {
+    return locality_lb_config_;
+  }
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;
@@ -580,6 +585,9 @@ public:
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
   HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
+
+private:
+  envoy::config::cluster::v3::Cluster::ZoneAwareLbConfig locality_lb_config_;
 };
 
 // Used to test common functions of ZoneAwareLoadBalancerBase.
@@ -602,6 +610,42 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_FALSE(lb_.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
+}
+
+TEST_F(ZoneAwareLoadBalancerBaseTest, ForceLocalityDirectRouting) {
+  envoy::config::cluster::v3::Cluster::CommonLbConfig modified_config = common_config_;
+  TestZoneAwareLb lb(priority_set_, stats_, runtime_, random_, modified_config);
+  lb.mutableLocalityLbConfig().set_force_direct_routing(true);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getBoolean("upstream.zone_routing.force_locality_direct_routing", true))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 1))
+      .WillRepeatedly(Return(1));
+
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}));
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}});
+  HostsPerLocalitySharedPtr local_hosts =
+      makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)}});
+
+  host_set_.hosts_ = *upstream_hosts;
+  host_set_.healthy_hosts_ = *upstream_hosts;
+  host_set_.healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+
+  lb_with_force.choose_host_once_host_ = local_hosts->get()[0][0];
+  auto response = lb_with_force.chooseHost(nullptr);
+  EXPECT_EQ(response.host, local_hosts->get()[0][0]);
+  EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
 }
 
 } // namespace
