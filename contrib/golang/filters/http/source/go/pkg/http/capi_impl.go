@@ -207,6 +207,7 @@ func (c *httpCApiImpl) HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint6
 			m[key] = append(v, value)
 		}
 	}
+	runtime.KeepAlive(buf)
 	return m
 }
 
@@ -297,6 +298,7 @@ func (c *httpCApiImpl) HttpCopyTrailers(s unsafe.Pointer, num uint64, bytes uint
 			m[key] = append(v, value)
 		}
 	}
+	runtime.KeepAlive(buf)
 	return m
 }
 
