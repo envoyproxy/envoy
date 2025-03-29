@@ -145,6 +145,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/filters/udp/proxy_protocol/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto_descriptor",
