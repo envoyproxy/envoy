@@ -1682,7 +1682,6 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     return;
   }
 
-  Router::RouteConstSharedPtr route;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_->isRoutable() &&
         connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1691,12 +1690,13 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(cb, *request_headers_, filter_manager_.streamInfo(),
-                                           stream_id_);
+      setRoute(snapped_route_config_->route(cb, *request_headers_, filter_manager_.streamInfo(),
+                                            stream_id_));
+      return;
     }
   }
 
-  setRoute(route);
+  setRoute(nullptr);
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
