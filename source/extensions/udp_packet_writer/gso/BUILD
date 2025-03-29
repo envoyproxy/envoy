@@ -21,7 +21,6 @@ envoy_cc_extension(
         "//source/server:__subpackages__",
         "//source/common/listener_manager:__subpackages__",
     ],
-    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/network:udp_packet_writer_handler_interface",

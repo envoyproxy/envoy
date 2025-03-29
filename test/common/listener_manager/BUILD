@@ -111,7 +111,6 @@ envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
     rbe_pool = "6gig",
-    tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",

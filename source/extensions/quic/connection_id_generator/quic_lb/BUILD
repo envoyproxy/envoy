@@ -17,7 +17,6 @@ envoy_cc_library(
     name = "quic_lb_lib",
     srcs = ["quic_lb.cc"],
     hdrs = ["quic_lb.h"],
-    tags = ["nofips"],
     deps = [
         "//source/common/config:datasource_lib",
         "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
@@ -33,7 +32,6 @@ envoy_cc_library(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    tags = ["nofips"],
     deps = [
         ":quic_lb_lib",
         "//envoy/registry",
@@ -45,7 +43,6 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "quic_lb_config",
-    tags = ["nofips"],
     deps = select(
         {
             "//bazel:boringssl_fips": [],

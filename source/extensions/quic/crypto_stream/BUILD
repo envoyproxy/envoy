@@ -19,7 +19,6 @@ envoy_cc_library(
     name = "envoy_quic_crypto_server_stream_lib",
     srcs = ["envoy_quic_crypto_server_stream.cc"],
     hdrs = ["envoy_quic_crypto_server_stream.h"],
-    tags = ["nofips"],
     visibility = [
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
@@ -38,7 +37,6 @@ envoy_cc_extension(
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
     ],
-    tags = ["nofips"],
     deps = select(
         {
             "//bazel:boringssl_fips": [],
@@ -54,7 +52,6 @@ envoy_cc_library(
     name = "envoy_quic_crypto_client_stream_lib",
     srcs = ["envoy_quic_crypto_client_stream.cc"],
     hdrs = ["envoy_quic_crypto_client_stream.h"],
-    tags = ["nofips"],
     visibility = [
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",

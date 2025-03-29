@@ -17,7 +17,6 @@ envoy_cc_library(
     name = "quic_stats_lib",
     srcs = ["quic_stats.cc"],
     hdrs = ["quic_stats.h"],
-    tags = ["nofips"],
     visibility = [
         "//test:__subpackages__",
     ],
@@ -36,7 +35,6 @@ envoy_cc_extension(
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
     ],
-    tags = ["nofips"],
     deps = select(
         {
             "//bazel:boringssl_fips": [],

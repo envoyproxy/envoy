@@ -16,7 +16,6 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = [
         "quiche_bug_tracker_impl.h",
     ],
-    tags = ["nofips"],
     deps = [
         "@com_github_google_quiche//:quiche_common_platform_logging",
     ],

@@ -19,7 +19,6 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_factory_impl_lib",
     srcs = ["envoy_quic_proof_source_factory_impl.cc"],
     hdrs = ["envoy_quic_proof_source_factory_impl.h"],
-    tags = ["nofips"],
     visibility = [
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
@@ -38,7 +37,6 @@ envoy_cc_extension(
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
     ],
-    tags = ["nofips"],
     deps = select(
         {
             "//bazel:boringssl_fips": [],

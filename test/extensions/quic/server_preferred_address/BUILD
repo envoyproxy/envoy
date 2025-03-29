@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["datasource_server_preferred_address_test.cc"],
     extension_names = ["envoy.quic.server_preferred_address.datasource"],
     rbe_pool = "6gig",
-    tags = ["nofips"],
     deps = [
         "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_lib",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -29,7 +28,6 @@ envoy_extension_cc_test(
     srcs = ["fixed_server_preferred_address_test.cc"],
     extension_names = ["envoy.quic.server_preferred_address.fixed"],
     rbe_pool = "6gig",
-    tags = ["nofips"],
     deps = [
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_lib",
         "//test/mocks/protobuf:protobuf_mocks",
