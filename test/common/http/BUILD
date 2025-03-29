@@ -140,6 +140,8 @@ envoy_cc_test(
         "//test/mocks/local_reply:local_reply_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:override_host_policy_mocks",
         "//test/test_common:test_runtime_lib",
     ],
 )

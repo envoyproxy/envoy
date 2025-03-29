@@ -1291,6 +1291,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     return;
   }
 
+  if (config.common_lb_config().has_override_host_policy()) {
+    auto& factory = Config::Utility::getAndCheckFactory<OverrideHostPolicyFactory>(
+        config.common_lb_config().override_host_policy());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        config.common_lb_config().override_host_policy(),
+        factory_context.messageValidationVisitor(), factory);
+    override_host_policy_ = factory.overrideHostPolicy(*message);
+  }
+
   if (config.has_load_balancing_policy() ||
       config.lb_policy() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
     // If load_balancing_policy is set we will use it directly, ignoring lb_policy.

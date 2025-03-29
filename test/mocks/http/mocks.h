@@ -141,7 +141,7 @@ public:
 class MockCodecEventCallbacks : public CodecEventCallbacks {
 public:
   MockCodecEventCallbacks();
-  ~MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks() override;
 
   MOCK_METHOD(void, onCodecEncodeComplete, ());
   MOCK_METHOD(void, onCodecLowLevelReset, ());

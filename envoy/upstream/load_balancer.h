@@ -8,6 +8,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/upstream/override_host_policy.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -145,7 +146,7 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
-  using OverrideHost = std::pair<absl::string_view, bool>;
+  using OverrideHost = ::Envoy::Upstream::OverrideHost;
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
    * the host can be selected directly, the load balancer can bypass the load balancing algorithm
