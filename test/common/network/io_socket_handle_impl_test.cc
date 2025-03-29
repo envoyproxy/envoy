@@ -145,9 +145,8 @@ TEST(IoSocketHandleImpl, NullptrIfaddrs) {
             return {0, 0};
           }));
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
-      .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
-        return {0, 0};
-      }));
+      .WillOnce(
+          Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {0, 0}; }));
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
   EXPECT_FALSE(maybe_interface_name.has_value());

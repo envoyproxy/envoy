@@ -2626,6 +2626,7 @@ envoy_cc_test(
     #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
+    shard_count = 5,
     tags = [
         "cpu:3",
         "fails_on_clang_cl",
