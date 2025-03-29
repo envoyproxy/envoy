@@ -13,7 +13,6 @@ project-lifecycle:
   # Senior maintainers
   - github:mattklein123
   - github:zuercher
-  - github:lizan
   - github:ggreenway
   - github:yanavlasov
   - github:phlax
@@ -27,6 +26,7 @@ project-lifecycle:
   - github:kyessenov
   - github:ravenblackx
   - github:nezdolik
+  - github:botengyao
   - github:tonya11en
   - github:tyxia
   - github:mathetake
