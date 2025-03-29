@@ -152,6 +152,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.consistent_header_validation`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_use_balsa_parser`` and legacy code paths. Also removed hidden
+    field ``use_balsa_parser`` from :ref:`Http1ProtocolOptions <envoy_v3_api_msg_config.core.v3.Http1ProtocolOptions>`.
+- area: http
+  change: |
     Removed runtime guard ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2`` and legacy code paths.
 - area: access_log
   change: |
