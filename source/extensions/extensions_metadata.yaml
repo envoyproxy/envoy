@@ -1724,7 +1724,7 @@ envoy.load_balancing_policies.client_side_weighted_round_robin:
   categories:
   - envoy.load_balancing_policies
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
 envoy.http.early_header_mutation.header_mutation:
