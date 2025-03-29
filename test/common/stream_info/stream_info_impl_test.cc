@@ -303,6 +303,9 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
     ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
     EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
+    stream_info.setResponseCodeDetails("response code details");
+    ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+    EXPECT_EQ("response code details", stream_info.responseCodeDetails().value());
 
     EXPECT_FALSE(stream_info.connectionTerminationDetails().has_value());
     stream_info.setConnectionTerminationDetails("access_denied");

@@ -536,6 +536,13 @@ public:
    * @return std::string the string after replaced all empty characters or space.
    */
   static std::string replaceAllEmptySpace(absl::string_view view);
+
+  /**
+   * Check whether a string contains new line character ('\n').
+   * @param view string.
+   * @return true if string contains '\n'.
+   */
+  static bool hasNewLine(absl::string_view view);
 };
 
 /**

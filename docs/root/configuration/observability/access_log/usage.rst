@@ -267,10 +267,11 @@ The following command operators are supported:
 
 .. _config_access_log_format_response_code_details:
 
-%RESPONSE_CODE_DETAILS%
+%RESPONSE_CODE_DETAILS(X)%
   HTTP
     HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why.
+    who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
+    will be converted to underscore '_', unless optional parameter X is ALLOW_WHITESPACES.
 
   TCP/UDP
     Not implemented ("-")
