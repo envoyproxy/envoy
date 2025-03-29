@@ -3095,7 +3095,7 @@ TEST_F(OAuth2Test, CSRFSameSiteWithCookieDomain) {
            ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
       {Http::Headers::get().SetCookie.get(),
        "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
-           ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+           ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
