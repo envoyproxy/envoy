@@ -4,7 +4,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "source/extensions/filters/common/rbac/matchers.h"
+#include "source/extensions/filters/common/rbac/matcher_interface.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -121,6 +121,7 @@ categories:
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
+- envoy.rbac.principals
 - envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session

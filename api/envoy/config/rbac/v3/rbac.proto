@@ -314,7 +314,7 @@ message Permission {
 
 // Principal defines an identity or a group of identities for a downstream
 // subject.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -328,6 +328,10 @@ message Principal {
   }
 
   // Authentication attributes for a downstream.
+  // It is recommended to NOT use this type, but instead use
+  // :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
+  // configured via :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
+  // which should be used for most use cases due to its improved security.
   message Authenticated {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.rbac.v2.Principal.Authenticated";
@@ -336,7 +340,11 @@ message Principal {
 
     // The name of the principal. If set, The URI SAN or DNS SAN in that order
     // is used from the certificate, otherwise the subject field is used. If
-    // unset, it applies to any user that is authenticated.
+    // unset, it applies to any user that is allowed by the downstream TLS configuration.
+    // If :ref:`require_client_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.require_client_certificate>`
+    // is false or :ref:`trust_chain_verification <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trust_chain_verification>`
+    // is set to :ref:`ACCEPT_UNTRUSTED <envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.CertificateValidationContext.TrustChainVerification.ACCEPT_UNTRUSTED>`,
+    // then no authentication is required.
     type.matcher.v3.StringMatcher principal_name = 2;
   }
 
@@ -355,6 +363,10 @@ message Principal {
     bool any = 3 [(validate.rules).bool = {const: true}];
 
     // Authenticated attributes that identify the downstream.
+    // It is recommended to NOT use this field, but instead use
+    // :ref:`MTlsAuthenticated <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>`,
+    // configured via :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>`,
+    // which should be used for most use cases due to its improved security.
     Authenticated authenticated = 4;
 
     // A CIDR block that describes the downstream IP.
@@ -407,6 +419,10 @@ message Principal {
     // Matches against metadata from either dynamic state or route configuration. Preferred over the
     // ``metadata`` field as it provides more flexibility in metadata source selection.
     SourcedMetadata sourced_metadata = 13;
+
+    // Extension for configuring custom principals for RBAC.
+    // [#extension-category: envoy.rbac.principals]
+    core.v3.TypedExtensionConfig custom = 14;
   }
 }
 
