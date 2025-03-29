@@ -42,6 +42,9 @@ minor_behavior_changes:
 - area: oauth2
   change: |
     Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
+- area: golang
+  change: |
+    Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

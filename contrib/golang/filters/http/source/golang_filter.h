@@ -73,7 +73,7 @@ private:
  * Configuration for the HTTP golang extension filter.
  */
 class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
-                     Logger::Loggable<Logger::Id::http> {
+                     Logger::Loggable<Logger::Id::golang> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
                Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
@@ -116,7 +116,7 @@ private:
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class RoutePluginConfig : public std::enable_shared_from_this<RoutePluginConfig>,
-                          Logger::Loggable<Logger::Id::http> {
+                          Logger::Loggable<Logger::Id::golang> {
 public:
   RoutePluginConfig(const std::string plugin_name,
                     const envoy::extensions::filters::http::golang::v3alpha::RouterPlugin& config);
@@ -145,7 +145,7 @@ using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
  * Route configuration for the filter.
  */
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig,
-                             Logger::Loggable<Logger::Id::http> {
+                             Logger::Loggable<Logger::Id::golang> {
 public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute&,
                        Server::Configuration::ServerFactoryContext&);
@@ -222,7 +222,7 @@ private:
 class Filter : public Http::StreamFilter,
                public std::enable_shared_from_this<Filter>,
                public Filters::Common::Expr::StreamActivation,
-               Logger::Loggable<Logger::Id::http>,
+               Logger::Loggable<Logger::Id::golang>,
                public AccessLog::Instance {
 public:
   explicit Filter(FilterConfigSharedPtr config, Dso::HttpFilterDsoPtr dynamic_lib,
