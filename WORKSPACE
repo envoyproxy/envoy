@@ -8,9 +8,11 @@ load("//bazel:api_repositories.bzl", "envoy_api_dependencies")
 
 envoy_api_dependencies()
 
-load("//bazel:repo.bzl", "envoy_repo")
+load("//bazel:repo.bzl", "detect_arch", "envoy_repo")
 
 envoy_repo()
+
+detect_arch(name = "arch_info")
 
 load("//bazel:repositories.bzl", "envoy_dependencies")
 
