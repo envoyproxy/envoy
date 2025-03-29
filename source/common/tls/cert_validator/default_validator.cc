@@ -218,9 +218,10 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
     match_sni_san.emplace_back(std::make_unique<DnsExactStringSanMatcher>(sni));
     match_san_override = match_sni_san;
   }
-  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
-      leaf_cert, verify_san_override.value_or(std::vector<std::string>()),
-      match_san_override.value_or(subject_alt_name_matchers_), error_details, out_alert);
+  Envoy::Ssl::ClientValidationStatus validated =
+      verifyCertificate(leaf_cert, verify_san_override.value_or(std::vector<std::string>()),
+                        match_san_override.value_or(subject_alt_name_matchers_),
+                        transport_socket_options, error_details, out_alert);
 
   if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
       validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
@@ -238,10 +239,11 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
   return (allow_untrusted_certificate_ || success);
 }
 
-Envoy::Ssl::ClientValidationStatus
-DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
-                                        const std::vector<SanMatcherPtr>& subject_alt_name_matchers,
-                                        std::string* error_details, uint8_t* out_alert) {
+Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
+    X509* cert, const std::vector<std::string>& verify_san_list,
+    const std::vector<SanMatcherPtr>& subject_alt_name_matchers,
+    const Network::TransportSocketOptions* transport_socket_options, std::string* error_details,
+    uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
   if (!verify_san_list.empty()) {
     if (!verifySubjectAltName(cert, verify_san_list)) {
@@ -257,7 +259,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   }
 
   if (!subject_alt_name_matchers.empty()) {
-    if (!matchSubjectAltName(cert, subject_alt_name_matchers)) {
+    if (!matchSubjectAltName(cert, transport_socket_options, subject_alt_name_matchers)) {
       const char* error = "verify cert failed: SAN matcher";
       if (error_details != nullptr) {
         *error_details = error;
@@ -380,7 +382,8 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
 }
 
 bool DefaultCertValidator::matchSubjectAltName(
-    X509* cert, const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
+    X509* cert, const Network::TransportSocketOptions* transport_socket_options,
+    const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
@@ -388,7 +391,7 @@ bool DefaultCertValidator::matchSubjectAltName(
   }
   for (const auto& config_san_matcher : subject_alt_name_matchers) {
     for (const GENERAL_NAME* general_name : san_names.get()) {
-      if (config_san_matcher->match(general_name)) {
+      if (config_san_matcher->match(general_name, transport_socket_options)) {
         return true;
       }
     }

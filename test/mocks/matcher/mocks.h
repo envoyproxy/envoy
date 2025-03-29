@@ -23,7 +23,7 @@ public:
 namespace Matchers {
 class MockStringMatcher : public StringMatcher {
 public:
-  MOCK_METHOD(bool, match, (absl::string_view), (const, override));
+  MOCK_METHOD(bool, match, (absl::string_view, OptRef<const Context> context), (const, override));
 };
 } // namespace Matchers
 } // namespace Envoy

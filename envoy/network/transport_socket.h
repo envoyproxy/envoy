@@ -4,6 +4,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/matchers.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
@@ -215,7 +216,7 @@ using TransportSocketPtr = std::unique_ptr<TransportSocket>;
 /**
  * Options for creating transport sockets.
  */
-class TransportSocketOptions {
+class TransportSocketOptions : public Matchers::StringMatcher::Context {
 public:
   virtual ~TransportSocketOptions() = default;
 

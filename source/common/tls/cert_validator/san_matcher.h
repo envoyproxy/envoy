@@ -24,7 +24,9 @@ namespace Tls {
  */
 class SanMatcher {
 public:
-  virtual bool match(GENERAL_NAME const*) const PURE;
+  virtual bool
+  match(GENERAL_NAME const*,
+        const Network::TransportSocketOptions* transport_socket_options = nullptr) const PURE;
   virtual ~SanMatcher() = default;
 };
 
@@ -32,7 +34,9 @@ using SanMatcherPtr = std::unique_ptr<SanMatcher>;
 
 class StringSanMatcher : public SanMatcher {
 public:
-  bool match(const GENERAL_NAME* general_name) const override;
+  bool
+  match(const GENERAL_NAME* general_name,
+        const Network::TransportSocketOptions* transport_socket_options = nullptr) const override;
   ~StringSanMatcher() override = default;
 
   StringSanMatcher(int general_name_type, envoy::type::matcher::v3::StringMatcher matcher,
@@ -58,7 +62,9 @@ private:
 // and the DNS matching semantics must be followed.
 class DnsExactStringSanMatcher : public SanMatcher {
 public:
-  bool match(const GENERAL_NAME* general_name) const override;
+  bool
+  match(const GENERAL_NAME* general_name,
+        const Network::TransportSocketOptions* transport_socket_options = nullptr) const override;
   ~DnsExactStringSanMatcher() override = default;
 
   DnsExactStringSanMatcher(absl::string_view dns_exact_match) : dns_exact_match_(dns_exact_match) {}

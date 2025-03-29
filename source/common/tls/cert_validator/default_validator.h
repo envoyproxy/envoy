@@ -62,6 +62,7 @@ public:
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
                     const std::vector<SanMatcherPtr>& subject_alt_name_matchers,
+                    const Network::TransportSocketOptions* transport_socket_options,
                     std::string* error_details, uint8_t* out_alert);
 
   /**
@@ -101,6 +102,7 @@ public:
    * @return true if the verification succeeds
    */
   static bool matchSubjectAltName(X509* cert,
+                                  const Network::TransportSocketOptions* transport_socket_options,
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
