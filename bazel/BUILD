@@ -298,7 +298,6 @@ selects.config_setting_group(
     name = "disable_http3",
     match_any = [
         ":disable_http3_setting",
-        ":boringssl_fips",
     ],
 )
 
