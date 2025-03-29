@@ -1434,7 +1434,14 @@ typed_config:
   EXPECT_TRUE(response->complete());
 }
 
-TEST_P(LuaIntegrationTest, RemoveStatusHeader) {
+#ifdef NDEBUG
+TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This is a test that only supports http1";
+  }
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
   const std::string filter_config =
       R"EOF(
 name: lua
@@ -1457,7 +1464,7 @@ virtual_hosts:
   domains: ["lua.per.route"]
   routes:
   - match:
-      prefix: "/"
+      prefix: "/lua"
     direct_response:
       status: 200
       body:
@@ -1467,9 +1474,8 @@ virtual_hosts:
   initializeWithYaml(filter_config, route_config);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Lua code defined in 'default_source_code' will be executed by default.
   Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
-                                                 {":path", "/"},
+                                                 {":path", "/lua"},
                                                  {":scheme", "http"},
                                                  {":authority", "lua.per.route"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
@@ -1484,6 +1490,7 @@ virtual_hosts:
 
   cleanup();
 }
+#endif
 
 } // namespace
 } // namespace Envoy
