@@ -92,6 +92,9 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
+      } else if (status == FilterStatus::StopIterationAndDontClose) {
+        (*entry)->handleStopIterationAndDontClose();
+        return;
       }
     }
   }
@@ -112,6 +115,73 @@ bool FilterManagerImpl::startUpstreamSecureTransport() {
   return false;
 }
 
+void FilterManagerImpl::maybeClose() {
+  if (connection_.state() == Connection::State::Closed) {
+    return;
+  }
+
+  ENVOY_CONN_LOG(trace,
+                 "maybeClose(): remote_close_pending_={}, local_close_pending_={}, "
+                 "write_filter_pending_close_count_={}, read_filter_pending_close_count_={}",
+                 connection_, state_.remote_close_pending_, state_.local_close_pending_,
+                 state_.write_filter_pending_close_count_, state_.read_filter_pending_close_count_);
+
+  // Check if we need to close the connection
+  if ((state_.remote_close_pending_ || state_.local_close_pending_) &&
+      (state_.read_filter_pending_close_count_ == 0 &&
+       state_.write_filter_pending_close_count_ == 0)) {
+    if (latched_close_action_.has_value()) {
+      finalizeClose(latched_close_action_.value());
+    }
+    return;
+  }
+}
+
+void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
+  if (connection_.state() == Connection::State::Closed) {
+    return;
+  }
+
+  ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
+
+  ENVOY_CONN_LOG(trace, "close_action: remote close:{}, local close:{}, close socket:{}",
+                 connection_, close_action.isRemoteClose(), close_action.isLocalClose(),
+                 close_action.closeSocket());
+
+  ENVOY_CONN_LOG(trace,
+                 "onConnectionClose: remote_close_pending_={}, local_close_pending_={}, "
+                 "write_filter_pending_close_count_={}, read_filter_pending_close_count_={}",
+                 connection_, state_.remote_close_pending_, state_.local_close_pending_,
+                 state_.write_filter_pending_close_count_, state_.read_filter_pending_close_count_);
+
+  if (latched_close_action_.has_value() && latched_close_action_->closeSocket()) {
+    if (latched_close_action_->isLocalClose() || !close_action.closeSocket()) {
+      // If the previous close event is a local close and will close the socket, which will only
+      // happen when half close is enabled, or if the current close action does not close the
+      // socket while the previous one does, we keep the previous close action.
+      return;
+    }
+  }
+
+  latched_close_action_ = close_action;
+  state_.local_close_pending_ = close_action.isLocalClose();
+  state_.remote_close_pending_ = close_action.isRemoteClose();
+
+  // Only finalize if we have no pending filters.
+  // TODO(botengyao) this can be more intelligent to distinguish remote close and local
+  // close but will be more complicated.
+  if (state_.read_filter_pending_close_count_ == 0 &&
+      state_.write_filter_pending_close_count_ == 0) {
+    finalizeClose(close_action);
+    return;
+  }
+
+  // Otherwise, wait for filters to complete.
+  ENVOY_CONN_LOG(trace, "delaying close: pending read filters: {}, pending write filters: {}",
+                 connection_, state_.read_filter_pending_close_count_,
+                 state_.write_filter_pending_close_count_);
+}
+
 FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_); }
 
 FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
@@ -119,6 +189,11 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   // Filter could return status == FilterStatus::StopIteration immediately, close the connection and
   // use callback to call this function.
   if (connection_.state() != Connection::State::Open) {
+    return FilterStatus::StopIteration;
+  }
+
+  // Only inject write is allowed when the connection is pending local close.
+  if (filter ? state_.remote_close_pending_ : pendingClose()) {
     return FilterStatus::StopIteration;
   }
 
@@ -133,6 +208,10 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
     FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
+      return FilterStatus::StopIteration;
+    } else if (status == FilterStatus::StopIterationAndDontClose) {
+      (*entry)->handleStopIterationAndDontClose();
+      // The connection write path can still check StopIteration.
       return FilterStatus::StopIteration;
     }
   }

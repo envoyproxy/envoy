@@ -68,6 +68,7 @@ protected:
     void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
+    void continueClosing() override { IS_ENVOY_BUG("Unexpected call to continueClosing"); }
     bool startUpstreamSecureTransport() override {
       IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
       return false;
@@ -128,6 +129,9 @@ protected:
       Network::DetectedCloseType detectedCloseType() const override {
         return Network::DetectedCloseType::Normal;
       };
+      void enableCloseThroughFilterManager(bool) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       Event::Dispatcher& dispatcher() const override { return dispatcher_; }
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
