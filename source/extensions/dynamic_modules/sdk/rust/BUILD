@@ -32,15 +32,3 @@ rust_library(
         normal = True,
     ) + [":build_script"],
 )
-
-# This is exactly the same as the above target, but with the testing feature enabled.
-rust_library(
-    name = "envoy_proxy_dynamic_modules_rust_sdk_for_testing",
-    srcs = glob(["src/**/*.rs"]),
-    crate_features = ["testing"],
-    crate_name = "envoy_proxy_dynamic_modules_rust_sdk",
-    edition = "2021",
-    deps = all_crate_deps(
-        normal = True,
-    ) + [":build_script"],
-)
