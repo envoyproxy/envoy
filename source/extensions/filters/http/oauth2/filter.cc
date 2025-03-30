@@ -450,6 +450,11 @@ FilterConfig::FilterConfig(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_oauth_nonce_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().oauth_nonce_cookie_config())
+              : CookieSettings()),
+      code_verifier_cookie_settings_(
+          (proto_config.has_cookie_configs() &&
+           proto_config.cookie_configs().has_code_verifier_cookie_config())
+              ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
