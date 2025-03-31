@@ -31,7 +31,6 @@ envoy_cc_test_library(
     name = "buffer_fuzz_lib",
     srcs = ["buffer_fuzz.cc"],
     hdrs = ["buffer_fuzz.h"],
-    rbe_pool = "6gig",
     deps = [
         ":buffer_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
@@ -45,14 +44,12 @@ envoy_cc_fuzz_test(
     name = "buffer_fuzz_test",
     srcs = ["buffer_fuzz_test.cc"],
     corpus = "buffer_corpus",
-    rbe_pool = "6gig",
     deps = [":buffer_fuzz_lib"],
 )
 
 envoy_cc_test(
     name = "buffer_test",
     srcs = ["buffer_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -64,7 +61,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "owned_impl_test",
     srcs = ["owned_impl_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -78,7 +74,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "buffer_util_test",
     srcs = ["buffer_util_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -89,7 +84,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -102,7 +96,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "buffer_memory_account_test",
     srcs = ["buffer_memory_account_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//test/integration:tracked_watermark_buffer_lib",
@@ -115,7 +108,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "zero_copy_input_stream_test",
     srcs = ["zero_copy_input_stream_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -125,7 +117,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "buffer_speed_test",
     srcs = ["buffer_speed_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",

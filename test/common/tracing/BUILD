@@ -13,7 +13,6 @@ envoy_cc_test(
     srcs = [
         "http_tracer_impl_test.cc",
     ],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
@@ -42,7 +41,6 @@ envoy_cc_test(
     srcs = [
         "tracer_impl_test.cc",
     ],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/tracing:custom_tag_lib",
@@ -65,7 +63,6 @@ envoy_cc_test(
     srcs = [
         "tracer_manager_impl_test.cc",
     ],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/tracing:tracer_config_lib",
         "//source/common/tracing:tracer_lib",
@@ -83,7 +80,6 @@ envoy_cc_test(
     srcs = [
         "tracer_config_impl_test.cc",
     ],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/tracing:tracer_config_lib",
     ],
@@ -94,7 +90,6 @@ envoy_cc_test(
     srcs = [
         "trace_context_impl_test.cc",
     ],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
