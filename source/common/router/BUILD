@@ -501,11 +501,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "string_list_accessor_lib",
     hdrs = ["string_list_accessor.h"],
-    compatible_with = ["//buildenv/target:non_prod"],
-    visibility = ["//third_party/envoy:envoy_visible"],
     deps = [
-        "//third_party/absl/strings",
-        "//third_party/absl/strings:string_view",
-        "//third_party/envoy/src/envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )

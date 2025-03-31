@@ -8,6 +8,7 @@
 
 #include "absl/status/statusor.h"
 #include "xds/core/v3/cidr.pb.h"
+#include "source/common/router/string_list_accessor.h"
 
 namespace Envoy {
 namespace Matchers {

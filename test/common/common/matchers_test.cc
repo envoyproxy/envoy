@@ -8,6 +8,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/router/string_list_accessor.h"
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
