@@ -823,6 +823,19 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateStringListMatch) {
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
+TEST_F(FilterStateMatcher, NoStringListAccessorForFilterStateStringListMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_list_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
 } // namespace
 } // namespace Matcher
 } // namespace Envoy

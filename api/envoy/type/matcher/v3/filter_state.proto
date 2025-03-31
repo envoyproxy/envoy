@@ -30,7 +30,9 @@ message FilterStateMatcher {
     // Matches the filter state object as a ip Instance.
     AddressMatcher address_match = 3;
 
-    // Matches the filter state object as a list of strings.
+    // Matches the filter state object as a list of strings. It is an OR
+    // matching semantics and it is a match if any string in the list matches
+    // with the value. If the list is empty, the match fails.
     StringMatcher string_list_match = 4;
   }
 }

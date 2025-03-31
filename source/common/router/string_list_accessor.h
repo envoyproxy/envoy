@@ -8,12 +8,14 @@
 namespace Envoy {
 namespace Router {
 
+// StringListAccessor extends StreamInfo::FilterState::Object to allow a list of
+// strings to be stored in the filterState.
 class StringListAccessor : public StreamInfo::FilterState::Object {
 public:
-  StringListAccessor(std::vector<std::string> value) : value_(std::move(value)) {}
+  StringListAccessor(const std::vector<std::string>& value) : value_(value) {}
 
-  // FilterState::Object
-  const std::vector<std::string> getList() const { return value_; }
+  // Returns a list of strings stored in the filterState.
+  const std::vector<std::string>& getList() const { return value_; }
 
   // StringListAccessor
   absl::optional<std::string> serializeAsString() const override {
