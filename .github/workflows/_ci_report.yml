@@ -1,0 +1,71 @@
+name: CI report
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      ENVOY_CI_APP_ID:
+      ENVOY_CI_APP_KEY:
+    inputs:
+      current:
+        type: string
+      output:
+        type: string
+        required: true
+      previous:
+        type: string
+      status:
+        type: string
+      template-issue-title:
+        type: string
+        default: >-
+          CI failures \($monday | strflocaltime("%Y.%m.%d"))-\($sunday | strflocaltime("%Y.%m.%d"))
+      template-request:
+        type: string
+        default: |
+          ##### [\($request.event)@\($requestDate)](\($requestURL))
+
+          \($workflowList)
+
+      template-report:
+        type: string
+        default: |
+          ### [\($branch)@\($commit | .[0:7])](\($commitURL))
+
+          \($commitMessage)
+
+          \($requestList)
+
+      template-workflow:
+        type: string
+        default: |
+          - [\($workflow.name) (\($workflow.conclusion))](\($workflowURL))
+
+
+jobs:
+  report:
+    permissions:
+      contents: read
+    name: Generate CI report
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.36
+      id: checkout
+      name: Checkout Envoy repository
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.36
+      id: appauth
+      with:
+        app_id: ${{ secrets.ENVOY_CI_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/envoy/ci/report@21a1da57dc4d7ed1d563de87d0e487808b530934
+      with:
+        current: ${{ inputs.current }}
+        output: ${{ inputs.output }}
+        previous: hour
+        status: ${{ inputs.status }}
+        token: ${{ steps.appauth.outputs.token }}
+        template-issue-title: ${{ inputs.template-issue-title }}
+        template-report: ${{ inputs.template-report }}
+        template-request: ${{ inputs.template-request }}
