@@ -33,5 +33,22 @@ bool FilterStateStringMatcher::match(const StreamInfo::FilterState::Object& obje
   return string_value && string_matcher_->match(*string_value);
 }
 
+FilterStateStringListMatcher::FilterStateStringListMatcher(StringMatcherPtr&& string_matcher)
+    : string_matcher_(std::move(string_matcher)) {}
+
+bool FilterStateStringListMatcher::match(const StreamInfo::FilterState::Object& object) const {
+  const Router::StringListAccessor* string_list =
+      dynamic_cast<const Router::StringListAccessor*>(&object);
+  if (string_list == nullptr) {
+    return false;
+  }
+  for (const auto& string_value : string_list->getList()) {
+    if (string_matcher_->match(string_value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace Matchers
 } // namespace Envoy

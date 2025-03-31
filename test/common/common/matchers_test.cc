@@ -788,6 +788,40 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
+TEST_F(FilterStateMatcher, MatchFilterStateStringListMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_list_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<Envoy::Router::StringListAccessor>(
+                           std::vector<std::string>{"test_value1", "exact_value"}),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, NoMatchFilterStateStringListMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_list_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<Envoy::Router::StringListAccessor>(
+                           std::vector<std::string>{"test_value1", "test_value2"}),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
 } // namespace
 } // namespace Matcher
 } // namespace Envoy
