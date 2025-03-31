@@ -1003,9 +1003,6 @@ std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
     expires_time = expires_refresh_token_in_;
     break;
-  case 6: // OAUTH_NONCE TYPE
-    same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
-    break;
   }
 
   std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, expires_time, same_site);
