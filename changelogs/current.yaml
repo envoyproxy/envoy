@@ -374,5 +374,11 @@ new_features:
     Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
     :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
     :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
+- area: matchers
+  change: |
+    Added new filter state matcher string_list_match to
+    :ref:`FilterStateMatcher <envoy_v3_api_msg_type.matcher.v3.FilterStateMatcher>` which attempts to
+    cast the filter state object to a list of strings and match each of string against a single string and return
+    true for any match. To support this, also added an :ref:`StringListAccessor <Envoy.Router.StringListAccessor>`.
 
 deprecated:
