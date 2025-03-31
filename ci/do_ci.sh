@@ -36,6 +36,9 @@ setup_clang_toolchain() {
     if [[ -n "${ENVOY_RBE}" ]]; then
         CONFIG_PARTS+=("remote")
     fi
+    if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
+        CONFIG_PARTS+=("arm64")
+    fi
     CONFIG_PARTS+=("clang")
     ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
@@ -147,9 +150,6 @@ function bazel_binary_build() {
   echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
   ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   echo "ENVOY_BIN=${ENVOY_BIN}"
-
-  # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
-  [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build

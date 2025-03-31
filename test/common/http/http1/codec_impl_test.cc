@@ -4333,30 +4333,6 @@ TEST_P(Http1ServerConnectionImplTest, ValidMethodFirstCharacter) {
   EXPECT_EQ(0u, buffer2.length());
 }
 
-// Receiving a first byte that cannot start a valid method name is an error.
-TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
-#ifdef ENVOY_ENABLE_UHV
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    // BalsaParser allows custom methods if UHV is enabled.
-    return;
-  }
-#endif
-
-  initialize();
-
-  StrictMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  EXPECT_CALL(decoder,
-              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-
-  // There is no known method name starting with "E".
-  Buffer::OwnedImpl buffer("E");
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
-  EXPECT_EQ(1u, buffer.length());
-}
-
 // Receiving a first byte that cannot start a valid response is an error.
 TEST_P(Http1ClientConnectionImplTest, InvalidResponseFirstCharacter) {
   initialize();

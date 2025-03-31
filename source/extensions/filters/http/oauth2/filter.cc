@@ -27,6 +27,7 @@
 #include "absl/strings/str_split.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/status.h"
+#include "openssl/rand.h"
 
 using namespace std::chrono_literals;
 
@@ -50,6 +51,8 @@ constexpr absl::string_view queryParamsError = "error";
 constexpr absl::string_view queryParamsCode = "code";
 constexpr absl::string_view queryParamsState = "state";
 constexpr absl::string_view queryParamsRedirectUri = "redirect_uri";
+constexpr absl::string_view queryParamsCodeChallenge = "code_challenge";
+constexpr absl::string_view queryParamsCodeChallengeMethod = "code_challenge_method";
 
 constexpr absl::string_view stateParamsUrl = "url";
 constexpr absl::string_view stateParamsCsrfToken = "csrf_token";
@@ -227,6 +230,30 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
   return generateHmacBase64(hmac_secret_vec, token) == hmac;
 }
 
+// Generates a PKCE code verifier with 32 octets of randomness.
+// This follows recommendations in RFC 7636:
+// https://datatracker.ietf.org/doc/html/rfc7636#section-7.1
+std::string generateCodeVerifier(Random::RandomGenerator& random) {
+  MemBlockBuilder<uint64_t> mem_block(4);
+  // create 4 random uint64_t values to fill the buffer because RFC 7636 recommends 32 octets of
+  // randomness.
+  for (size_t i = 0; i < 4; i++) {
+    mem_block.appendOne(random.random());
+  }
+
+  std::unique_ptr<uint64_t[]> data = mem_block.release();
+  return Base64Url::encode(reinterpret_cast<char*>(data.get()), 4 * sizeof(uint64_t));
+}
+
+// Generates a PKCE code challenge from a code verifier.
+std::string generateCodeChallenge(const std::string& code_verifier) {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  std::vector<uint8_t> sha256_digest =
+      crypto_util.getSha256Digest(Buffer::OwnedImpl(code_verifier));
+  std::string sha256_string(sha256_digest.begin(), sha256_digest.end());
+  return Base64Url::encode(sha256_string.data(), sha256_string.size());
+}
+
 /**
  * Encodes the state parameter for the OAuth2 flow.
  * The state parameter is a base64Url encoded JSON object containing the original request URL and a
@@ -239,6 +266,129 @@ std::string encodeState(const std::string& original_request_url, const std::stri
   std::string json =
       fmt::format(R"({{"url":"{}","csrf_token":"{}"}})", sanitized_url, sanitized_csrf_token);
   return Base64Url::encode(json.data(), json.size());
+}
+
+/**
+ * Encrypt a plaintext string using AES-256-CBC.
+ */
+std::string encrypt(const std::string& plaintext, const std::string& secret,
+                    Random::RandomGenerator& random) {
+  // Generate the key from the secret using SHA-256
+  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH); // AES-256 requires 256-bit (32 bytes) key
+  SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
+
+  // Generate a random IV
+  MemBlockBuilder<uint64_t> mem_block(4);
+  // create 2 random uint64_t values to fill the buffer because AES-256-CBC requires 16 bytes IV
+  for (size_t i = 0; i < 2; i++) {
+    mem_block.appendOne(random.random());
+  }
+
+  std::unique_ptr<uint64_t[]> data = mem_block.release();
+  const unsigned char* raw_data = reinterpret_cast<const unsigned char*>(data.get());
+
+  // AES uses 16-byte IV
+  std::vector<unsigned char> iv(16);
+  iv.assign(raw_data, raw_data + 16);
+
+  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+  RELEASE_ASSERT(ctx, "Failed to create context");
+
+  std::vector<unsigned char> ciphertext(plaintext.size() + EVP_MAX_BLOCK_LENGTH);
+  int len = 0, ciphertext_len = 0;
+
+  // Initialize encryption operation
+  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
+  RELEASE_ASSERT(result == 1, "Encryption initialization failed");
+
+  // Encrypt the plaintext
+  result = EVP_EncryptUpdate(ctx, ciphertext.data(), &len,
+                             reinterpret_cast<const unsigned char*>(plaintext.c_str()),
+                             plaintext.size());
+  RELEASE_ASSERT(result == 1, "Encryption update failed");
+
+  ciphertext_len += len;
+
+  // Finalize encryption
+  result = EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
+  RELEASE_ASSERT(result == 1, "Encryption finalization failed");
+
+  ciphertext_len += len;
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  // AES uses 16-byte IV
+  ciphertext.resize(ciphertext_len);
+
+  // Prepend the IV to the ciphertext
+  std::vector<unsigned char> combined(iv.size() + ciphertext.size());
+  std::copy(iv.begin(), iv.end(), combined.begin());
+  std::copy(ciphertext.begin(), ciphertext.end(), combined.begin() + iv.size());
+
+  // Base64Url encode the IV + ciphertext
+  return Base64Url::encode(reinterpret_cast<const char*>(combined.data()), combined.size());
+}
+
+struct DecryptResult {
+  std::string plaintext;
+  absl::optional<std::string> error;
+};
+
+/**
+ * Decrypt an AES-256-CBC encrypted string.
+ */
+DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
+  // Decode the Base64Url-encoded input
+  std::string decoded = Base64Url::decode(encrypted);
+  std::vector<unsigned char> combined(decoded.begin(), decoded.end());
+
+  if (combined.size() <= 16) {
+    return {"", "Invalid encrypted data"};
+  }
+
+  // Extract the IV (first 16 bytes)
+  std::vector<unsigned char> iv(combined.begin(), combined.begin() + 16);
+
+  // Extract the ciphertext (remaining bytes)
+  std::vector<unsigned char> ciphertext(combined.begin() + 16, combined.end());
+
+  // Generate the key from the secret using SHA-256
+  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
+  SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
+
+  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+  RELEASE_ASSERT(ctx, "Failed to create context");
+
+  std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
+  int len = 0, plaintext_len = 0;
+
+  // Initialize decryption operation
+  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return {"", "failed to initialize decryption"};
+  }
+
+  // Decrypt the ciphertext
+  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return {"", "failed to decrypt data"};
+  }
+  plaintext_len += len;
+
+  // Finalize decryption
+  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return {"", "failed to finalize decryption"};
+  }
+
+  plaintext_len += len;
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  // Resize to actual plaintext length
+  plaintext.resize(plaintext_len);
+
+  return {std::string(plaintext.begin(), plaintext.end()), std::nullopt};
 }
 
 } // namespace
@@ -300,6 +450,11 @@ FilterConfig::FilterConfig(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_oauth_nonce_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().oauth_nonce_cookie_config())
+              : CookieSettings()),
+      code_verifier_cookie_settings_(
+          (proto_config.has_cookie_configs() &&
+           proto_config.cookie_configs().has_code_verifier_cookie_config())
+              ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
@@ -423,6 +578,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
 
+  // Save the request headers for later modification if needed.
+  request_headers_ = &headers;
+
   // We should check if this is a sign out request.
   if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
@@ -472,8 +630,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Save the request headers for later modification if needed.
-  request_headers_ = &headers;
   // If this isn't the callback URI, redirect to acquire credentials.
   //
   // The following conditional could be replaced with a regex pattern-match,
@@ -518,8 +674,26 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+
+  std::string encrypted_code_verifier =
+      Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
+  if (encrypted_code_verifier.empty()) {
+    ENVOY_LOG(error, "code verifier cookie is missing in the request");
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  DecryptResult decrypt_result = decrypt(encrypted_code_verifier, config_->hmacSecret());
+  if (decrypt_result.error.has_value()) {
+    ENVOY_LOG(error, "decryption failed: {}", decrypt_result.error.value());
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  std::string code_verifier = decrypt_result.plaintext;
+
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     redirect_uri, config_->authType());
+                                     redirect_uri, code_verifier, config_->authType());
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -580,22 +754,13 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   // The CSRF token cookie contains the CSRF token that is used to prevent CSRF attacks for the
   // OAuth flow. It was named "oauth_nonce" because the CSRF token contains a generated nonce.
   // "oauth_csrf_token" would be a more accurate name for the cookie.
-  std::string csrf_token;
-  bool csrf_token_cookie_exists = false;
-  const auto csrf_token_cookie =
-      Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-        return key == config_->cookieNames().oauth_nonce_;
-      });
-  if (csrf_token_cookie.find(config_->cookieNames().oauth_nonce_) != csrf_token_cookie.end()) {
-    csrf_token = csrf_token_cookie.at(config_->cookieNames().oauth_nonce_);
-    csrf_token_cookie_exists = true;
-  } else {
-    // Generate a CSRF token to prevent CSRF attacks.
-    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
-  }
-
+  std::string csrf_token =
+      Http::Utility::parseCookieValue(headers, config_->cookieNames().oauth_nonce_);
+  bool csrf_token_cookie_exists = !csrf_token.empty();
   // Set the CSRF token cookie if it does not exist.
   if (!csrf_token_cookie_exists) {
+    // Generate a CSRF token to prevent CSRF attacks.
+    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
     // Expire the CSRF token cookie in 10 minutes.
     // This should be enough time for the user to complete the OAuth flow.
     std::string csrf_expires = std::to_string(10 * 60);
@@ -628,6 +793,30 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
+
+  // Generate a PKCE code verifier and challenge for the OAuth flow.
+  const std::string code_verifier = generateCodeVerifier(random_);
+  // Encrypt the code verifier, using HMAC secret as the symmetric key.
+  const std::string encrypted_code_verifier =
+      encrypt(code_verifier, config_->hmacSecret(), random_);
+
+  // Expire the code verifier cookie in 10 minutes.
+  // This should be enough time for the user to complete the OAuth flow.
+  std::string expire_in = std::to_string(10 * 60);
+  std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
+  std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expire_in, same_site);
+  if (!config_->cookieDomain().empty()) {
+    cookie_tail_http_only = absl::StrCat(
+        fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+  }
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                    absl::StrCat(config_->cookieNames().code_verifier_, "=",
+                                                 encrypted_code_verifier, cookie_tail_http_only));
+
+  const std::string code_challenge = generateCodeChallenge(code_verifier);
+  query_params.overwrite(queryParamsCodeChallenge, code_challenge);
+  query_params.overwrite(queryParamsCodeChallengeMethod, "S256");
 
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
@@ -676,6 +865,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
                    cookie_domain));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().code_verifier_),
+                   cookie_domain));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -697,11 +890,14 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
     // * omitting from HMAC computation (for setting, not for validating)
     id_token_ = id_token;
   }
-  if (!config_->disableRefreshTokenSetCookie()) {
+  // Only set the refresh token if use_refresh_token_ is enabled and it's not disabled by config
+  if (config_->useRefreshToken() && !config_->disableRefreshTokenSetCookie()) {
     // Preventing this here excludes all other Refresh Token functionality
     // * setting the cookie
     // * omitting from HMAC computation (for setting, not for validating)
     refresh_token_ = refresh_token;
+  } else {
+    refresh_token_ = "";
   }
 
   expires_in_ = std::to_string(expires_in.count());
@@ -807,9 +1003,6 @@ std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
     expires_time = expires_refresh_token_in_;
     break;
-  case 6: // OAUTH_NONCE TYPE
-    same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
-    break;
   }
 
   std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, expires_time, same_site);
@@ -862,7 +1055,6 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   absl::flat_hash_map<std::string, std::string> cookies =
       Http::Utility::parseCookies(*request_headers_);
 
-  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
   cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
 
   if (!access_token_.empty()) {
@@ -873,7 +1065,13 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   }
   if (!refresh_token_.empty()) {
     cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
+  } else if (cookies.contains(cookie_names.refresh_token_)) {
+    // If we actually went through the refresh token flow, but we didn't get a new refresh token, we
+    // want to still ensure that the old one is set if it was sent in a cookie
+    refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
+
+  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
@@ -912,22 +1110,44 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                           absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
                                        BuildCookieTail(3))); // OAUTH_EXPIRES
 
+  absl::flat_hash_map<std::string, std::string> request_cookies =
+      Http::Utility::parseCookies(*request_headers_);
+  std::string cookie_domain;
+  if (!config_->cookieDomain().empty()) {
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
+  }
+
   if (!access_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.bearer_token_, "=", access_token_,
                                          BuildCookieTail(1))); // BEARER_TOKEN
+  } else if (request_cookies.contains(cookie_names.bearer_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+                     cookie_domain));
   }
 
   if (!id_token_.empty()) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.id_token_, "=", id_token_, BuildCookieTail(4))); // ID_TOKEN
+  } else if (request_cookies.contains(cookie_names.id_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+                     cookie_domain));
   }
 
   if (!refresh_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
                                          BuildCookieTail(5))); // REFRESH_TOKEN
+  } else if (request_cookies.contains(cookie_names.refresh_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                     cookie_domain));
   }
 }
 

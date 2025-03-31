@@ -21,10 +21,10 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/filters/http/ext_proc/client.h"
-#include "source/extensions/filters/http/ext_proc/client_base.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
@@ -281,6 +281,10 @@ public:
     return grpc_service_;
   }
 
+  bool gracefulGrpcClose() const { return graceful_grpc_close_; }
+
+  std::chrono::milliseconds remoteCloseTimeout() const { return remote_close_timeout_; }
+
   std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
 
 private:
@@ -317,6 +321,7 @@ private:
   const std::vector<Matchers::StringMatcherPtr> disallowed_headers_;
   // is_upstream_ is true if ext_proc filter is in the upstream filter chain.
   const bool is_upstream_;
+  const bool graceful_grpc_close_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
@@ -329,6 +334,7 @@ private:
   const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
+  const std::chrono::milliseconds remote_close_timeout_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -476,10 +482,23 @@ public:
                              absl::Status status,
                              envoy::config::core::v3::TrafficDirection traffic_direction);
 
+  Envoy::Http::LocalErrorStatus
+  onLocalReply(const Envoy::Http::StreamFilterBase::LocalReplyData&) override {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
+      ENVOY_STREAM_LOG(debug,
+                       "When onLocalReply() is called, set processing_complete_ to true to skip "
+                       "external processing",
+                       *decoder_callbacks_);
+      processing_complete_ = true;
+    }
+    return ::Envoy::Http::LocalErrorStatus::Continue;
+  }
+
 private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
+  void halfCloseAndWaitForRemoteClose();
 
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState();

@@ -899,6 +899,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "parser_integration_test",
+    srcs = ["parser_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+    ],
+)
+
+envoy_cc_test(
     name = "multi_envoy_test",
     size = "large",
     srcs = envoy_select_admin_functionality([
@@ -2616,6 +2626,7 @@ envoy_cc_test(
     #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
+    shard_count = 5,
     tags = [
         "cpu:3",
         "fails_on_clang_cl",

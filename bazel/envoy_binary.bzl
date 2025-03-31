@@ -30,7 +30,7 @@ def envoy_cc_binary(
         features = [],
         linkstatic = True):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     linker_inputs = envoy_exported_symbols_input()

@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.dynamic_modules.v3;
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -12,7 +10,6 @@ option java_outer_classname = "DynamicModulesProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/dynamic_modules/v3;dynamic_modulesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Dynamic Modules common configuration]
 
@@ -32,8 +29,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // this restriction and hopefully provide a wider compatibility guarantee. Until then, Envoy
 // checks the hash of the ABI header files to ensure that the dynamic modules are built against the
 // same version of the ABI.
-//
-// Currently, the implementation is work in progress and not usable.
 message DynamicModuleConfig {
   // The name of the dynamic module. The client is expected to have some configuration indicating where to search for the module.
   // In Envoy, the search path can only be configured via the environment variable ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``.

@@ -6,7 +6,7 @@ namespace Envoy {
 class DynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
-  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()){};
+  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {};
 
   void
   initializeFilter(const std::string& filter_name, const std::string& config = "",

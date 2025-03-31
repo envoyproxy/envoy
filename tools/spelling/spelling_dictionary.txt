@@ -367,6 +367,7 @@ PEM
 PERF
 PGV
 PID
+PKCE
 PKCS12
 PKTINFO
 PNG
@@ -645,6 +646,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
@@ -1213,6 +1215,10 @@ regexes
 reified
 reify
 reimplements
+reinitialization
+reinitializations
+reinitialize
+reinitializes
 rele
 releasor
 reloadable
