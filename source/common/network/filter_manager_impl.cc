@@ -92,9 +92,6 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
-      } else if (status == FilterStatus::StopIterationAndDontClose) {
-        (*entry)->handleStopIterationAndDontClose();
-        return;
       }
     }
   }
@@ -208,10 +205,6 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
     FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
-      return FilterStatus::StopIteration;
-    } else if (status == FilterStatus::StopIterationAndDontClose) {
-      (*entry)->handleStopIterationAndDontClose();
-      // The connection write path can still check StopIteration.
       return FilterStatus::StopIteration;
     }
   }

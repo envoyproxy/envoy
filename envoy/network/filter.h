@@ -42,51 +42,6 @@ enum class FilterStatus {
   Continue,
   // Stop executing further filters.
   StopIteration,
-
-  // Stops executing further filters but does not close the connection immediately.
-  //
-  // When a filter returns StopIterationAndDontClose, it pauses further processing and
-  // prevents the connection from closing if the connection want to close the filter chain.
-  // The filter is responsible for eventually calling continueClosing() when it has finished
-  // its necessary work. Calling close() with Abort, NoFlush, and AbortReset will also close
-  // the socket and bypass this filter status.
-  //
-  // This is typically used when a filter needs to delay closure due to:
-  //   - External data processing.
-  //
-  // Failure to call continueClosing() after returning StopIterationAndDontClose
-  // will result in a stalled connection and possible resource leaks.
-  //
-  // The filter may resume processing by calling continueReading(). If continueClosing() is
-  // not called, the filter remains marked as pending closure, and the closure will take
-  // effect once the actual close occurs.
-  //
-  // Typical usage pattern:
-  //
-  //   // Initially stop iteration without closing the connection.
-  //   FilterStatus onData(data) {
-  //     internal_processing(data);
-  //     return FilterStatus::StopIterationAndDontClose;
-  //   }
-  //
-  //   // Later, resume filter processing explicitly.
-  //   continueReading();
-  //   continueClosing();
-  //
-  //   // Another onData invocation that stops iteration.
-  //   FilterStatus onData(data) {
-  //     do_external_processing(data);
-  //     return FilterStatus::StopIterationAndDontClose;
-  //   }
-  //
-  //   // Inject additional data chunks into the filter chain.
-  //   injectReadDataToFilterChain(data_chunk_1);
-  //   injectReadDataToFilterChain(data_chunk_2);
-  //
-  //   // Finally, explicitly mark that the close is allowed for
-  //   // this filter.
-  //   continueClosing();
-  StopIterationAndDontClose,
 };
 
 /**
@@ -134,18 +89,32 @@ public:
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
-   * Resumes the connection closure process if it was previously delayed by a filter.
+   * Enables or disables the connection closure process, depending on the value of the `disabled`
+   * parameter.
    *
-   * This method must be called if a filter has returned `FilterStatus::StopIterationAndDontClose`
-   * to prevent an indefinite open connection for normal situation. It ensures that once the filter
-   * has completed its necessary processing, the connection can proceed with closing.
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
    *
-   * This method is typically called from a filter when it has finished its work and no longer
-   * needs to delay connection termination.
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
    *
-   * This method can be called multiple times.
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
    */
-  virtual void continueClosing() PURE;
+  virtual void disableClose(bool disabled) PURE;
 };
 
 /**
@@ -239,18 +208,32 @@ public:
   virtual bool startUpstreamSecureTransport() PURE;
 
   /**
-   * Resumes the connection closure process if it was previously delayed by a filter.
+   * Enables or disables the connection closure process, depending on the value of the `disabled`
+   * parameter.
    *
-   * This method must be called if a filter has returned `FilterStatus::StopIterationAndDontClose`
-   * to prevent an indefinite open connection for normal situation. It ensures that once the filter
-   * has completed its necessary processing, the connection can proceed with closing.
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
    *
-   * This method is typically called from a filter when it has finished its work and no longer
-   * needs to delay connection termination.
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
    *
-   * This method can be called multiple times.
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
    */
-  virtual void continueClosing() PURE;
+  virtual void disableClose(bool disable) PURE;
 };
 
 /**

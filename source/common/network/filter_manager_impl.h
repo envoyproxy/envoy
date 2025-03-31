@@ -157,21 +157,23 @@ private:
       parent_.onContinueReading(this, buffer_source);
     }
 
-    void continueClosing() override {
-      if (pending_close_) {
-        pending_close_ = false;
-        parent_.state_.read_filter_pending_close_count_ -= 1;
-      }
+    void disableClose(bool disable) override {
+      if (disable) {
+        // Handle the case where we are disabling the close
+        if (!pending_close_) {
+          pending_close_ = true;
+          parent_.state_.read_filter_pending_close_count_ += 1;
+        }
+      } else {
+        // Handle the case where we are re-enabling the close
+        if (pending_close_) {
+          pending_close_ = false;
+          parent_.state_.read_filter_pending_close_count_ -= 1;
+        }
 
-      if (parent_.state_.read_filter_pending_close_count_ == 0) {
-        parent_.maybeClose();
-      }
-    }
-
-    void handleStopIterationAndDontClose() {
-      if (!pending_close_) {
-        pending_close_ = true;
-        parent_.state_.read_filter_pending_close_count_ += 1;
+        if (parent_.state_.read_filter_pending_close_count_ == 0) {
+          parent_.maybeClose();
+        }
       }
     }
 
@@ -202,21 +204,23 @@ private:
       parent_.onResumeWriting(this, buffer_source);
     }
 
-    void continueClosing() override {
-      if (pending_close_) {
-        pending_close_ = false;
-        parent_.state_.write_filter_pending_close_count_ -= 1;
-      }
+    void disableClose(bool disable) override {
+      if (disable) {
+        // Handle the case where we are disabling the close
+        if (!pending_close_) {
+          pending_close_ = true;
+          parent_.state_.read_filter_pending_close_count_ += 1;
+        }
+      } else {
+        // Handle the case where we are re-enabling the close
+        if (pending_close_) {
+          pending_close_ = false;
+          parent_.state_.read_filter_pending_close_count_ -= 1;
+        }
 
-      if (parent_.state_.write_filter_pending_close_count_ == 0) {
-        parent_.maybeClose();
-      }
-    }
-
-    void handleStopIterationAndDontClose() {
-      if (!pending_close_) {
-        pending_close_ = true;
-        parent_.state_.write_filter_pending_close_count_ += 1;
+        if (parent_.state_.read_filter_pending_close_count_ == 0) {
+          parent_.maybeClose();
+        }
       }
     }
 

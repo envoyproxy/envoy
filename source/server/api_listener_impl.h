@@ -68,7 +68,7 @@ protected:
     void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
-    void continueClosing() override { IS_ENVOY_BUG("Unexpected call to continueClosing"); }
+    void disableClose(bool) override { IS_ENVOY_BUG("Unexpected call to disableClose"); }
     bool startUpstreamSecureTransport() override {
       IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
       return false;
