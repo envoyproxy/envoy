@@ -1,8 +1,9 @@
-o#pragma once
+#pragma once
+
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
-#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Router {

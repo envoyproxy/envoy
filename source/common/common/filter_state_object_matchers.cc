@@ -5,10 +5,10 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/network/cidr_range.h"
+#include "source/common/router/string_list_accessor.h"
 
 #include "absl/status/statusor.h"
 #include "xds/core/v3/cidr.pb.h"
-#include "source/common/router/string_list_accessor.h"
 
 namespace Envoy {
 namespace Matchers {
