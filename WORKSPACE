@@ -31,3 +31,10 @@ envoy_dependency_imports()
 load("//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_extra")
 
 envoy_dependency_imports_extra()
+
+register_toolchains(
+    "//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain",
+    "//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain",
+    "//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64",
+    "//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain",
+)
