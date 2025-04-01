@@ -168,7 +168,7 @@ private:
       IS_ENVOY_BUG("Unexpected 100 continue"); // proxy_100_continue_ false by default.
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
-    void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
+    void setRequestDecoder(RequestDecoder& /*decoder*/) override {};
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
                                               Http::ResponseHeaderMapConstSharedPtr,
                                               Http::ResponseTrailerMapConstSharedPtr,

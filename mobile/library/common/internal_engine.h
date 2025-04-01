@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/address.h"
 #include "envoy/server/lifecycle_notifier.h"
 
 #include "source/common/common/logger.h"
@@ -7,6 +8,7 @@
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "absl/types/optional.h"
 #include "extension_registry.h"
@@ -110,7 +112,7 @@ public:
 
   // These functions are wrappers around networkConnectivityManager functions, which hand off
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
-  envoy_status_t setProxySettings(const char* host, const uint16_t port);
+  envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
   envoy_status_t resetConnectivityState();
 
   /**
@@ -120,16 +122,21 @@ public:
   void onDefaultNetworkAvailable();
 
   /**
-   * This function does the following when the default network was changed.
+   * TODO(abeyad): Remove once migrated to using onDefaultNetworkChangeEvent().
+   * The callback that gets executed when the mobile device network monitor receives a network
+   * change event.
    *
-   * - Sets the preferred network.
-   * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
-   *   `setIpVersionToRemove` in the DNS cache implementation to remove the IPv6 addresses from
-   *   the DNS response in the subsequent DNS resolutions.
-   * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
-   * - Optionally (if configured) clear HTTP/3 broken status.
+   * @param network the network type that is now the default network.
    */
   void onDefaultNetworkChanged(int network);
+
+  /**
+   * The callback that gets executed when the mobile device network monitor receives a network
+   * change event.
+   *
+   * @param network_type the network type that is now the default network.
+   */
+  void onDefaultNetworkChangeEvent(int network_type);
 
   /**
    * This functions does the following when the default network is unavailable.
@@ -175,8 +182,18 @@ private:
   envoy_status_t main(std::shared_ptr<OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
-  /** Returns true if there is IPv6 connectivity. */
-  static bool hasIpV6Connectivity();
+
+  // Called when it's been determined that the default network has changed. Executes the following
+  // actions:
+  //  - Sets the preferred network.
+  //  - If no IPv6 connectivity, tells the DNS cache to remove IPv6 addresses from host entries.
+  //  - Clear HTTP/3 broken status.
+  //  - Force refresh DNS cache.
+  void handleNetworkChange(int network_type, bool has_ipv6_connectivity);
+
+  // Probe for connectivity for the provided `domain` and get a pointer to the local address. If
+  // there is no connectivity for the `domain`, a null pointer will be returned.
+  static Network::Address::InstanceConstSharedPtr probeAndGetLocalAddr(int domain);
 
   Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
@@ -204,6 +221,8 @@ private:
   bool terminated_{false};
   absl::Notification engine_running_;
   bool disable_dns_refresh_on_network_change_;
+  int prev_network_type_{0};
+  Network::Address::InstanceConstSharedPtr prev_local_addr_{nullptr};
 };
 
 } // namespace Envoy

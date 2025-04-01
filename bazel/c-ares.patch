@@ -1,20 +1,33 @@
-# Patch for c-ares CVE-2024-25629
-diff --git a/src/lib/ares__read_line.c b/src/lib/ares__read_line.c
-index d65ac1fcf8..018f55e8b2 100644
---- a/src/lib/ares__read_line.c
-+++ b/src/lib/ares__read_line.c
-@@ -59,6 +59,14 @@ ares_status_t ares__read_line(FILE *fp, char **buf, size_t *bufsize)
-       return (offset != 0) ? 0 : (ferror(fp)) ? ARES_EFILE : ARES_EOF;
-     }
-     len = offset + ares_strlen(*buf + offset);
-+
-+    /* Probably means there was an embedded NULL as the first character in
-+     * the line, throw away line */
-+    if (len == 0) {
-+      offset = 0;
-+      continue;
-+    }
-+
-     if ((*buf)[len - 1] == '\n') {
-       (*buf)[len - 1] = 0;
+# Workaround c-ares trusting /etc/hosts entries for localhost
+diff --git a/src/lib/ares_getaddrinfo.c b/src/lib/ares_getaddrinfo.c
+index eabd17fc..83bcf06f 100644
+--- a/src/lib/ares_getaddrinfo.c
++++ b/src/lib/ares_getaddrinfo.c
+@@ -449,6 +449,26 @@ static void next_lookup(struct host_query *hquery, ares_status_t status)
        break;
+ 
+     case 'f':
++      /* FIXME: This works around wonky /etc/hosts files having localhost
++       * entries with IPs that are *not* valid loop-back IPs. Imagine a
++       * scenario where resolving localhost returns a non-loopback IP but
++       * the server we're trying to connect to is only listening on a
++       * loopback IP. Then resolution succeeds but we still cannot connect.
++       * RFC 6751 Section 6.3 #3 seems to support that localhost should
++       * only resolve to loopback IPs:
++       * "Name resolution APIs ... SHOULD always return the IP loopback
++       * address" */
++      if (ares_is_localhost(hquery->name)) {
++          if (ares_addrinfo_localhost(hquery->name, hquery->port, &hquery->hints,
++                                      hquery->ai) == ARES_SUCCESS) {
++            end_hquery(hquery, ARES_SUCCESS);
++            break;
++          }
++          hquery->remaining_lookups++;
++          next_lookup(hquery, status);
++          break;
++      }
++
+       /* Host file lookup */
+       if (file_lookup(hquery) == ARES_SUCCESS) {
+         end_hquery(hquery, ARES_SUCCESS);
+

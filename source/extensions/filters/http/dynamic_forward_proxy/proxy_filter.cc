@@ -386,12 +386,9 @@ void ProxyFilter::addHostAddressToFilterState(
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
 
-  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
-  address_obj->address_ = address;
-
-  filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
-                        StreamInfo::FilterState::StateType::Mutable,
-                        StreamInfo::FilterState::LifeSpan::Request);
+  filter_state->setData(
+      StreamInfo::UpstreamAddress::key(), std::make_unique<StreamInfo::UpstreamAddress>(address),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void ProxyFilter::onLoadClusterComplete() {

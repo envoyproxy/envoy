@@ -23,7 +23,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":generic_lib",
         "//source/common/http:headers_lib",

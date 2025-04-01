@@ -271,21 +271,6 @@ GrpcStatusFormatter::formatValueWithContext(const HttpFormatterContext& context,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-StreamInfoRequestHeaderFormatter::StreamInfoRequestHeaderFormatter(
-    const std::string& main_header, const std::string& alternative_header,
-    absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
-
-absl::optional<std::string> StreamInfoRequestHeaderFormatter::formatWithContext(
-    const HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) const {
-  return HeaderFormatter::format(*stream_info.getRequestHeaders());
-}
-
-ProtobufWkt::Value StreamInfoRequestHeaderFormatter::formatValueWithContext(
-    const HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) const {
-  return HeaderFormatter::formatValue(*stream_info.getRequestHeaders());
-}
-
 QueryParameterFormatter::QueryParameterFormatter(absl::string_view parameter_key,
                                                  absl::optional<size_t> max_length)
     : parameter_key_(parameter_key), max_length_(max_length) {}
@@ -307,6 +292,85 @@ ProtobufWkt::Value
 QueryParameterFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
+}
+
+absl::optional<std::string> PathFormatter::formatWithContext(const HttpFormatterContext& context,
+                                                             const StreamInfo::StreamInfo&) const {
+
+  absl::string_view path_view;
+  const Http::RequestHeaderMap& headers = context.requestHeaders();
+  switch (option_) {
+  case OriginalPathOrPath:
+    path_view = headers.getEnvoyOriginalPathValue();
+    if (path_view.empty()) {
+      path_view = headers.getPathValue();
+    }
+    break;
+  case PathOnly:
+    path_view = headers.getPathValue();
+    break;
+  case OriginalPathOnly:
+    path_view = headers.getEnvoyOriginalPathValue();
+    break;
+  }
+
+  if (path_view.empty()) {
+    return absl::nullopt;
+  }
+
+  // Strip query parameters if needed.
+  if (!with_query_) {
+    auto query_offset = path_view.find('?');
+    if (query_offset != absl::string_view::npos) {
+      path_view = path_view.substr(0, query_offset);
+    }
+  }
+
+  // Truncate the path if needed.
+  if (max_length_.has_value()) {
+    path_view = SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
+  }
+
+  return std::string(path_view);
+}
+
+ProtobufWkt::Value
+PathFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
+}
+
+absl::StatusOr<FormatterProviderPtr> PathFormatter::create(absl::string_view with_query,
+                                                           absl::string_view option,
+                                                           absl::optional<size_t> max_length) {
+  bool with_query_bool = true;
+  PathFormatterOption option_enum = OriginalPathOrPath;
+
+  if (with_query == "WQ") {
+    with_query_bool = true;
+  } else if (with_query == "NQ") {
+    with_query_bool = false;
+  } else if (with_query.empty()) {
+    with_query_bool = true;
+  } else {
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid PATH option: '{}', only 'WQ'/'NQ' are allowed", with_query));
+  }
+
+  if (option == "ORIG") {
+    option_enum = OriginalPathOnly;
+  } else if (option == "PATH") {
+    option_enum = PathOnly;
+  } else if (option == "ORIG_OR_PATH") {
+    option_enum = OriginalPathOrPath;
+  } else if (option.empty()) {
+    option_enum = OriginalPathOrPath;
+  } else {
+    return absl::InvalidArgumentError(fmt::format(
+        "Invalid PATH option: '{}', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed", option));
+  }
+
+  return std::make_unique<PathFormatter>(with_query_bool, option_enum, max_length);
 }
 
 const BuiltInHttpCommandParser::FormatterProviderLookupTbl&
@@ -394,6 +458,15 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            return std::make_unique<QueryParameterFormatter>(std::string(format), max_length);
+         }}},
+       {"PATH",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           absl::string_view query;
+           absl::string_view option;
+           SubstitutionFormatUtils::parseSubcommand(format, ':', query, option);
+           return THROW_OR_RETURN_VALUE(PathFormatter::create(query, option, max_length),
+                                        FormatterProviderPtr);
          }}}});
 }
 
@@ -425,7 +498,7 @@ CommandParserPtr DefaultBuiltInHttpCommandParserFactory::createCommandParser() c
   return std::make_unique<BuiltInHttpCommandParser>();
 }
 
-REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInHttpCommandParserFactory);
+REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy
