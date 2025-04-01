@@ -89,8 +89,7 @@ public:
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
-   * Enables or disables the connection closure process, depending on the value of the `disabled`
-   * parameter.
+   * Control the filter close status for write filters.
    *
    * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
    * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
@@ -208,8 +207,7 @@ public:
   virtual bool startUpstreamSecureTransport() PURE;
 
   /**
-   * Enables or disables the connection closure process, depending on the value of the `disabled`
-   * parameter.
+   * Control the filter close status for read filters.
    *
    * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
    * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
