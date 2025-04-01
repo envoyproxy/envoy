@@ -14,6 +14,12 @@
 namespace Envoy {
 namespace Grpc {
 
+namespace {
+std::string httpResponseCodeDetails(const Http::AsyncClient::Stream* stream) {
+  return stream ? stream->streamInfo().responseCodeDetails().value_or(EMPTY_STRING) : EMPTY_STRING;
+}
+} // namespace
+
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(Upstream::ClusterManager& cm,
                         const envoy::config::core::v3::GrpcService& config,
@@ -210,7 +216,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     }
     // Status is translated via Utility::httpToGrpcStatus per
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    streamError(Utility::httpToGrpcStatus(http_response_status));
+    streamError(Utility::httpToGrpcStatus(http_response_status), httpResponseCodeDetails(stream_));
     return;
   }
   if (end_stream) {
@@ -266,7 +272,8 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
-  notifyRemoteClose(grpc_status.value(), grpc_message);
+  notifyRemoteClose(grpc_status.value(),
+                    grpc_message.empty() ? httpResponseCodeDetails(stream_) : grpc_message);
   cleanup();
 }
 
@@ -300,7 +307,7 @@ void AsyncStreamImpl::onReset() {
   }
 
   http_reset_ = true;
-  streamError(Status::WellKnownGrpcStatus::Internal);
+  streamError(Status::WellKnownGrpcStatus::Internal, httpResponseCodeDetails(stream_));
 }
 
 void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {
