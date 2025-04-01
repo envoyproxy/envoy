@@ -126,10 +126,7 @@ public:
   }
 
   const absl::string_view getHostId() const override { return logical_host_->getHostId(); }
-  void setHostId(const std::string host_id) override {
-    ENVOY_LOG_MISC(error, "Cannot set host id to {} for const RealHostDescription.", host_id);
-    PANIC("not implemented");
-  }
+  void setHostId(const std::string host_id) override;
 
   uint32_t priority() const override { return logical_host_->priority(); }
   Network::UpstreamTransportSocketFactory&

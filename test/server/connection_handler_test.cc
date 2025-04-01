@@ -333,7 +333,7 @@ public:
     TestListener* test_listener_raw_ptr = test_listener.get();
     listeners_.emplace_back(std::move(test_listener));
 
-    if (listener == nullptr) {
+    if (listener == nullptr && !is_reverse_conn_listener) {
       // Expecting listener config in place update.
       // If so, dispatcher would not create new network listener.
       return test_listener_raw_ptr;
@@ -924,13 +924,13 @@ TEST_F(ConnectionHandlerTest, TestAddReverseConnListener) {
       .WillOnce(ReturnRef(*mock_reverse_conn_registry));
 
   Network::TcpListenerCallbacks* listener_callbacks;
-  auto listener = new NiceMock<Network::MockListener>();
+  // auto listener = new NiceMock<Network::MockListener>();
   TestListener* mock_listener_config =
       addListener(1,                                // tag
                   false,                            // bind_to_port
                   false,                            // hand_off_restored_destination_connections
                   "test_listener",                  // name
-                  listener,                         // listener
+                  nullptr,                          // listener
                   &listener_callbacks,              // listener_callbacks
                   nullptr,                          // address
                   nullptr,                          // connection_balancer
@@ -958,7 +958,6 @@ TEST_F(ConnectionHandlerTest, TestAddReverseConnListener) {
         EXPECT_EQ(socket->connectionInfoProvider().remoteAddress()->asString(),
                   remote_address->asString());
       }));
-  // EXPECT_CALL(*raw_mock_reverse_connection_listener, onAccept(_));
 
   handler_->saveUpstreamConnection(std::move(upstream_socket), 1);
 }
