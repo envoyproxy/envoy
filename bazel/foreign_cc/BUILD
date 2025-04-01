@@ -54,6 +54,7 @@ configure_make(
     targets = [
         "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
     ],
+    alwayslink = True,
 )
 
 # Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227

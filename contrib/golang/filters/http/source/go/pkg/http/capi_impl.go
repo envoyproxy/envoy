@@ -77,7 +77,8 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIFilterIsGone,
 		C.CAPIFilterIsDestroy,
 		C.CAPINotInGo,
-		C.CAPIInvalidPhase:
+		C.CAPIInvalidPhase,
+		C.CAPIInvalidScene:
 		panic(capiStatusToStr(status))
 	}
 }
@@ -92,6 +93,8 @@ func capiStatusToStr(status C.CAPIStatus) string {
 		return errNotInGo
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
+	case C.CAPIInvalidScene:
+		return errInvalidScene
 	}
 
 	return "unknown status"
@@ -151,6 +154,13 @@ func (c *httpCApiImpl) HttpSendPanicReply(s unsafe.Pointer, details string) {
 func (c *httpCApiImpl) HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool) {
 	state := (*processState)(s)
 	res := C.envoyGoFilterHttpAddData(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)), C.bool(isStreaming))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpInjectData(s unsafe.Pointer, data []byte) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpInjectData(unsafe.Pointer(state.processState),
+		unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)))
 	handleCApiStatus(res)
 }
 
@@ -441,6 +451,26 @@ func (c *httpCApiImpl) HttpGetStringProperty(r unsafe.Pointer, key string) (stri
 	}
 
 	return "", capiStatusToErr(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string, bool) {
+	req := (*httpRequest)(r)
+	var valueData C.uint64_t
+	var valueLen C.int
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+	req.markMayWaitingCallback()
+	res := C.envoyGoFilterHttpGetStringSecret(unsafe.Pointer(req.req), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	if res == C.CAPIYield {
+		req.checkOrWaitCallback()
+	} else {
+		req.markNoWaitingCallback()
+		handleCApiStatus(res)
+	}
+	if valueLen == -1 {
+		return "", false
+	}
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
