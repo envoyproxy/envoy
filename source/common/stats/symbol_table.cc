@@ -439,8 +439,7 @@ DynamicSpans SymbolTable::getDynamicSpans(StatName stat_name) const {
   // Note that with fake symbol tables, the Symbol lambda is called
   // once for each character in the string, and no dynamics will
   // be recorded.
-  Encoding::decodeTokens(
-      stat_name, [&index](Symbol) { ++index; }, record_dynamic);
+  Encoding::decodeTokens(stat_name, [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 

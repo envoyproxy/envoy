@@ -294,7 +294,8 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   }
 
   // Check for drain close only if there are no pending responses.
-  if (pending_requests_.empty() && config_->drain_decision_.drainClose() &&
+  if (pending_requests_.empty() &&
+      config_->drain_decision_.drainClose(Network::DrainDirection::All) &&
       config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
     config_->stats_.downstream_cx_drain_close_.inc();
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

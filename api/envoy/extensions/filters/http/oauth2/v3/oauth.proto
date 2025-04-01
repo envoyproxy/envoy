@@ -39,7 +39,7 @@ message CookieConfig {
   SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CookieConfigs {
   // Configuration for the bearer token cookie.
   CookieConfig bearer_token_cookie_config = 1;
@@ -58,11 +58,14 @@ message CookieConfigs {
 
   // Configuration for the OAuth nonce cookie.
   CookieConfig oauth_nonce_cookie_config = 6;
+
+  // Configuration for the code verifier cookie.
+  CookieConfig code_verifier_cookie_config = 7;
 }
 
 // [#next-free-field: 6]
 message OAuth2Credentials {
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message CookieNames {
     // Cookie name to hold OAuth bearer token value. When the authentication server validates the
     // client and returns an authorization token back to the OAuth filter, no matter what format
@@ -90,6 +93,10 @@ message OAuth2Credentials {
 
     // Cookie name to hold the nonce value. Defaults to ``OauthNonce``.
     string oauth_nonce = 6
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the PKCE code verifier. Defaults to ``OauthCodeVerifier``.
+    string code_verifier = 7
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
