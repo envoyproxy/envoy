@@ -29,7 +29,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/config/subscription_factory_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -327,7 +326,11 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
-  Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
+  // TODO(adisuissa): remove this method, and switch all the callers to invoke
+  // it directly via the XdsManger.
+  Config::SubscriptionFactory& subscriptionFactory() override {
+    return xds_manager_.subscriptionFactory();
+  }
 
   absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -518,8 +521,8 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
-                                                                                    host)} {}
+          : host_handle_(host->acquireHandle()),
+            pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
@@ -951,10 +954,7 @@ private:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>
       common_lb_config_pool_;
 
-  std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;
-
-  std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
 
   bool initialized_{};
   bool ads_mux_initialized_{};

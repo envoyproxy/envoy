@@ -37,7 +37,7 @@ public class ErrorsTest {
   @Before
   public void setUp() {
     Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-    AndroidNetworkMonitor.load(context, mock(EnvoyEngine.class));
+    AndroidNetworkMonitor.load(context, mock(EnvoyEngine.class), false);
     ConnectivityManager connectivityManager =
         AndroidNetworkMonitor.getInstance().getConnectivityManager();
     networkCapabilities =

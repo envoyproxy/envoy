@@ -36,7 +36,7 @@ secret access key (the session token is optional).
 
       When ``signing_algorithm: AWS_SIGV4A`` is set, the STS cluster host is determined as follows:
 
-      * If your ``region``` (set via profile, environment, or inline) is configured as a SigV4A region set **AND**
+      * If your ``region`` (set via profile, environment, or inline) is configured as a SigV4A region set **AND**
         contains a wildcard in the first region:
 
         - Standard endpoint: ``sts.amazonaws.com``

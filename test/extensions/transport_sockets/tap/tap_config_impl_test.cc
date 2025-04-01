@@ -22,8 +22,10 @@ namespace TapCommon = Extensions::Common::Tap;
 
 class MockSocketTapConfig : public SocketTapConfig {
 public:
-  PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) override {
-    return PerSocketTapperPtr{createPerSocketTapper_(connection)};
+  PerSocketTapperPtr createPerSocketTapper(
+      const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+      const Network::Connection& connection) override {
+    return PerSocketTapperPtr{createPerSocketTapper_(tap_config, connection)};
   }
 
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr
@@ -32,7 +34,9 @@ public:
         createPerTapSinkHandleManager_(trace_id)};
   }
 
-  MOCK_METHOD(PerSocketTapper*, createPerSocketTapper_, (const Network::Connection& connection));
+  MOCK_METHOD(PerSocketTapper*, createPerSocketTapper_,
+              (const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+               const Network::Connection& connection));
   MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
               (uint64_t trace_id));
   MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
@@ -69,7 +73,8 @@ public:
     EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
-    tapper_ = std::make_unique<PerSocketTapperImpl>(config_, connection_);
+    tap_config_.set_set_connection_per_event(output_conn_info_per_event_);
+    tapper_ = std::make_unique<PerSocketTapperImpl>(config_, tap_config_, connection_);
   }
 
   std::shared_ptr<MockSocketTapConfig> config_{std::make_shared<MockSocketTapConfig>()};
@@ -83,6 +88,9 @@ public:
   NiceMock<Network::MockConnection> connection_;
   Event::SimulatedTimeSystem time_system_;
   bool fail_match_{};
+  // Add transport configurations
+  envoy::extensions::transport_sockets::tap::v3::SocketTapConfig tap_config_;
+  bool output_conn_info_per_event_{false};
 };
 
 // Verify the full streaming flow.
@@ -150,6 +158,96 @@ TEST_F(PerSocketTapperImplTest, NonMatchingFlow) {
   EXPECT_CALL(*sink_manager_, submitTrace_(_)).Times(0);
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+}
+
+// Verify the full streaming flow.
+TEST_F(PerSocketTapperImplTest, StreamingFlowOutputConnInfoPerEvent) {
+  // keep the original value
+  bool local_output_conn_info_per_event = output_conn_info_per_event_;
+  output_conn_info_per_event_ = true;
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  connection:
+    local_address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1000
+    remote_address:
+      socket_address:
+        address: 10.0.0.3
+        port_value: 50000
+)EOF")));
+  setup(true);
+
+  InSequence s;
+
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  event:
+    timestamp: 1970-01-01T00:00:00Z
+    read:
+      data:
+        as_bytes: aGVsbG8=
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  tapper_->onRead(Buffer::OwnedImpl("hello"), 5);
+
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  event:
+    timestamp: 1970-01-01T00:00:01Z
+    write:
+      data:
+        as_bytes: d29ybGQ=
+      end_stream: true
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(1));
+  tapper_->onWrite(Buffer::OwnedImpl("world"), 5, true);
+
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  event:
+    timestamp: 1970-01-01T00:00:02Z
+    closed: {}
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(2));
+  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+  // restore the value
+  output_conn_info_per_event_ = local_output_conn_info_per_event;
 }
 
 } // namespace

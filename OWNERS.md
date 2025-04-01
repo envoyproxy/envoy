@@ -11,9 +11,6 @@ routing PRs, questions, etc. to the right place.
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
-* Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
-  * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
-    connections, etc.), Envoy Mobile.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
@@ -51,6 +48,8 @@ routing PRs, questions, etc. to the right place.
   * Overload manager, security, logging, wasm, data plane.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
+  * Dynamic modules, API gateway, WASM, Istio.
 
 # Envoy mobile maintainers
 
@@ -109,6 +108,7 @@ without further review.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
+* Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 
 # Friends of Envoy
 

@@ -1,23 +1,5 @@
 #include "source/extensions/common/aws/signer_base_impl.h"
 
-#include <openssl/ssl.h>
-
-#include <cstddef>
-#include <cstdint>
-#include <regex>
-
-#include "envoy/common/exception.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/hex.h"
-#include "source/common/crypto/utility.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/str_join.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -44,6 +26,10 @@ absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers
   return sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
 }
 
+bool SignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) {
+  return credentials_provider_chain_->addCallbackIfChainCredentialsPending(std::move(cb));
+}
+
 // Region support utilities for sigv4a
 void SignerBaseImpl::addRegionHeader(
     ABSL_ATTRIBUTE_UNUSED Http::RequestHeaderMap& headers,
@@ -61,11 +47,12 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
 
-  const auto& credentials = credentials_provider_->getCredentials();
-  if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
+  const auto credentials = credentials_provider_chain_->chainGetCredentials();
+
+  if (!credentials.hasCredentials()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
-    ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
+    ENVOY_LOG(debug, "Sign exiting early - no credentials found");
     return absl::OkStatus();
   }
 
@@ -196,9 +183,8 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   // These three parameters can contain characters that require URL encoding
   if (session_token.has_value()) {
     // X-Amz-Security-Token
-    query_params.add(
-        SignatureQueryParameterValues::AmzSecurityToken,
-        Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(session_token.value()));
+    query_params.add(SignatureQueryParameterValues::AmzSecurityToken,
+                     Envoy::Http::Utility::PercentEncoding::urlEncode(session_token.value()));
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameterValues::AmzCredential,

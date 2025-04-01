@@ -20,6 +20,8 @@ using OnHttpFilterResponseHeadersType =
 using OnHttpFilterResponseBodyType = decltype(&envoy_dynamic_module_on_http_filter_response_body);
 using OnHttpFilterResponseTrailersType =
     decltype(&envoy_dynamic_module_on_http_filter_response_trailers);
+using OnHttpFilterStreamCompleteType =
+    decltype(&envoy_dynamic_module_on_http_filter_stream_complete);
 using OnHttpFilterDestroyType = decltype(&envoy_dynamic_module_on_http_filter_destroy);
 
 /**
@@ -54,6 +56,7 @@ public:
   OnHttpFilterResponseHeadersType on_http_filter_response_headers_ = nullptr;
   OnHttpFilterResponseBodyType on_http_filter_response_body_ = nullptr;
   OnHttpFilterResponseTrailersType on_http_filter_response_trailers_ = nullptr;
+  OnHttpFilterStreamCompleteType on_http_filter_stream_complete_ = nullptr;
   OnHttpFilterDestroyType on_http_filter_destroy_ = nullptr;
 
 private:

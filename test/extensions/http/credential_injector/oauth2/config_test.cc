@@ -18,9 +18,10 @@ TEST(Config, OAuth2FlowTypeUnset) {
   proto_config.mutable_token_fetch_retry_interval()->set_seconds(1);
   OAuth2CredentialInjectorFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Init::MockManager> init_manager;
 
   EXPECT_THROW_WITH_REGEX(
-      factory.createCredentialInjectorFromProtoTyped(proto_config, "stats", context),
+      factory.createCredentialInjectorFromProtoTyped(proto_config, "stats", context, init_manager),
       EnvoyException, "OAuth2 flow type not set");
 }
 
@@ -42,12 +43,13 @@ TEST(Config, NullClientSecret) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       transport_socket_factory_context;
+  NiceMock<Init::MockManager> init_manager;
   ON_CALL(server_factory_context, getTransportSocketFactoryContext())
       .WillByDefault(ReturnRef(transport_socket_factory_context));
 
-  EXPECT_THROW_WITH_REGEX(
-      factory.createOauth2ClientCredentialInjector(proto_config, "stats", server_factory_context),
-      EnvoyException, "Invalid oauth2 client secret configuration");
+  EXPECT_THROW_WITH_REGEX(factory.createOauth2ClientCredentialInjector(
+                              proto_config, "stats", server_factory_context, init_manager),
+                          EnvoyException, "Invalid oauth2 client secret configuration");
 }
 
 } // namespace OAuth2
