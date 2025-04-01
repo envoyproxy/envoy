@@ -95,7 +95,8 @@ public:
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
           init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit),
-          listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
+          listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()),
+          reverse_connection_listener_config_(nullptr) {
       for (int i = 0; i < num_of_socket_factories; i++) {
         socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
         sockets_.emplace_back(std::make_shared<NiceMock<Network::MockListenSocket>>());
@@ -149,10 +150,10 @@ public:
       return socket_factories_;
     }
     bool bindToPort() const override { return bind_to_port_; }
-    Network::ReverseConnectionListenerConfigOptRef
-    reverseConnectionListenerConfig() const override {
-      ENVOY_LOG_MISC(info, "Reverse connection config is not supported for TestListenerBase.");
-      return Network::ReverseConnectionListenerConfigOptRef();
+    Network::ReverseConnectionListenerConfigOptRef reverseConnectionListenerConfig() const override {
+      return reverse_connection_listener_config_ != nullptr
+                ? *reverse_connection_listener_config_
+                : Network::ReverseConnectionListenerConfigOptRef();
     }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
@@ -211,6 +212,7 @@ public:
     envoy::config::core::v3::TrafficDirection direction_;
     absl::flat_hash_map<std::string, Network::UdpListenerCallbacks*> udp_listener_callback_map_{};
     Network::ListenerInfoConstSharedPtr listener_info_;
+    std::shared_ptr<Network::ReverseConnectionListenerConfig> reverse_connection_listener_config_;
   };
 
   class TestListener : public TestListenerBase {
@@ -320,7 +322,8 @@ public:
       bool continue_on_listener_filters_timeout = false,
       std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
           nullptr,
-      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE, bool ignore_global_conn_limit = false) {
+      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE, bool ignore_global_conn_limit = false,
+      bool is_reverse_conn_listener = false) {
     auto test_listener = std::make_unique<TestListener>(
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, access_log_,
@@ -334,7 +337,9 @@ public:
       // If so, dispatcher would not create new network listener.
       return test_listener_raw_ptr;
     }
-    EXPECT_CALL(listeners_.back()->socketFactory(), socketType()).WillOnce(Return(socket_type));
+    if (!is_reverse_conn_listener) {
+      EXPECT_CALL(listeners_.back()->socketFactory(), socketType()).WillOnce(Return(socket_type));
+    }
     if (address == nullptr) {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
           .WillRepeatedly(ReturnRef(local_address_));
@@ -344,31 +349,33 @@ public:
           .WillRepeatedly(ReturnRefOfCopy(address));
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(address);
     }
-    EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
-        .WillOnce(Return(listeners_.back()->sockets_[0]));
-    if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
-          .WillOnce(
-              Invoke([listener, listener_callbacks](
-                         Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
-                         Runtime::Loader&, Random::RandomGenerator&, const Network::ListenerConfig&,
-                         Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
-                if (listener_callbacks != nullptr) {
-                  *listener_callbacks = &cb;
-                }
-                return std::unique_ptr<Network::Listener>(listener);
-              }));
-    } else {
-      delete listener;
-      if (address == nullptr) {
-        listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
-            local_address_->asString(),
-            std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
+    if (!is_reverse_conn_listener) {
+      EXPECT_CALL(listeners_.back()->socketFactory(), getListenSocket(_))
+          .WillOnce(Return(listeners_.back()->sockets_[0]));
+      if (socket_type == Network::Socket::Type::Stream) {
+        EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+            .WillOnce(
+                Invoke([listener, listener_callbacks](
+                          Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
+                          Runtime::Loader&, Random::RandomGenerator&, const Network::ListenerConfig&,
+                          Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+                  if (listener_callbacks != nullptr) {
+                    *listener_callbacks = &cb;
+                  }
+                  return std::unique_ptr<Network::Listener>(listener);
+                }));
       } else {
-        listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
-            address->asString(),
-            std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
-      }
+        delete listener;
+        if (address == nullptr) {
+          listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
+              local_address_->asString(),
+              std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
+        } else {
+          listeners_.back()->udp_listener_config_->listener_worker_router_map_.emplace(
+              address->asString(),
+              std::make_unique<NiceMock<Network::MockUdpListenerWorkerRouter>>());
+        }
+    }
     }
 
     if (balanced_connection_handler != nullptr) {
@@ -891,6 +898,69 @@ TEST_F(ConnectionHandlerTest, SetListenerRejectFraction) {
   EXPECT_CALL(*listener, onDestroy());
 
   handler_->setListenerRejectFraction(UnitFloat(0.1234f));
+}
+
+TEST_F(ConnectionHandlerTest, TestAddReverseConnListener) {
+  // Mock the reverse connection registry.
+  auto mock_reverse_conn_registry = std::make_shared<NiceMock<Network::MockRevConnRegistry>>();
+  auto mock_local_reverse_conn_registry =
+      std::make_shared<NiceMock<Network::MockLocalRevConnRegistry>>();
+
+  EXPECT_CALL(*mock_reverse_conn_registry, getLocalRegistry())
+      .WillOnce(Return(mock_local_reverse_conn_registry.get()));
+
+  // Mock the reverse connection listener.
+  auto mock_reverse_connection_listener =
+      std::make_unique<NiceMock<Network::MockReverseConnectionListener>>();
+  auto* raw_mock_reverse_connection_listener = mock_reverse_connection_listener.get();
+  EXPECT_CALL(*mock_local_reverse_conn_registry, createActiveReverseConnectionListener(_, _, _))
+      .WillOnce(Return(ByMove(std::move(mock_reverse_connection_listener))));
+
+  // Mock the reverse connection listener config.
+  auto mock_reverse_conn_listener_config =
+      std::make_shared<NiceMock<Network::MockReverseConnectionListenerConfig>>();
+  EXPECT_CALL(*mock_reverse_conn_listener_config, reverseConnRegistry())
+    .WillOnce(ReturnRef(*mock_reverse_conn_registry));
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* mock_listener_config = addListener(
+      1,                                // tag
+      false,                            // bind_to_port
+      false,                            // hand_off_restored_destination_connections
+      "test_listener",                  // name
+      listener,                         // listener
+      &listener_callbacks,              // listener_callbacks
+      nullptr,                          // address
+      nullptr,                          // connection_balancer
+      nullptr,                          // balanced_connection_handler
+      Network::Socket::Type::Stream,    // socket_type
+      std::chrono::milliseconds(15000), // listener_filters_timeout
+      false,                            // continue_on_listener_filters_timeout
+      nullptr,                          // overridden_filter_chain_manager
+      ENVOY_TCP_BACKLOG_SIZE,           // tcp_backlog_size
+      false,                            // ignore_global_conn_limit
+      true                              // is_reverse_conn_listener (set to true for reverse connection listener)
+  );
+  mock_listener_config->reverse_connection_listener_config_ = mock_reverse_conn_listener_config;
+
+  // Add the listener to the handler.
+  handler_->addListener(absl::nullopt, *mock_listener_config, runtime_, random_);
+
+  auto upstream_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  Network::Address::InstanceConstSharedPtr remote_address(
+              new Network::Address::Ipv4Instance("127.0.0.1", 12345));
+  upstream_socket->connection_info_provider_->setRemoteAddress(remote_address);
+
+  EXPECT_CALL(*raw_mock_reverse_connection_listener, onAccept(_))
+    .WillOnce(Invoke([&](Network::ConnectionSocketPtr&& socket) {
+      EXPECT_EQ(socket->connectionInfoProvider().remoteAddress()->asString(),
+                remote_address->asString());
+    }));
+  // EXPECT_CALL(*raw_mock_reverse_connection_listener, onAccept(_));
+
+  handler_->saveUpstreamConnection(std::move(upstream_socket), 1);
+
 }
 
 TEST_F(ConnectionHandlerTest, AddListenerSetRejectFraction) {

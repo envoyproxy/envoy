@@ -532,6 +532,13 @@ public:
                Network::ListenerConfig& config),
               ());
   MOCK_METHOD(void, onAccept, (ConnectionSocketPtr && socket), ());
+  MOCK_METHOD(uint64_t, listenerTag, ());
+  MOCK_METHOD(Network::Listener*, listener, ());
+  MOCK_METHOD(void, pauseListening, ());
+  MOCK_METHOD(void, resumeListening, ());
+  MOCK_METHOD(void, shutdownListener, (const ExtraShutdownListenerOptions& options), ());
+  MOCK_METHOD(void, updateListenerConfig, (Network::ListenerConfig& config), ());
+  MOCK_METHOD(void, onFilterChainDraining, (const std::list<const Network::FilterChain*>& draining_filter_chains), ());
 };
 
 class MockLocalRevConnRegistry : public LocalRevConnRegistry {
