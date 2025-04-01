@@ -789,6 +789,25 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
+TEST_F(FilterStateMatcher, NoIpInstanceFilterStateAddressMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
 TEST_F(FilterStateMatcher, MatchFilterStateStringListMatch) {
   const std::string key = "test.key";
   const std::string value = "exact_value";
@@ -830,6 +849,9 @@ TEST_F(FilterStateMatcher, NoStringListAccessorForFilterStateStringListMatch) {
   matcher.set_key(key);
   matcher.mutable_string_list_match()->set_exact(value);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
+                       StreamInfo::FilterState::StateType::ReadOnly);
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());

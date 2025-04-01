@@ -39,8 +39,7 @@ private:
 
 // FilterStateStringListMatcher class that extends the class
 // FilterStateObjectMatcher to allow a list of strings to match with a string
-// vlue. A match happens whenever any string in the string matchs with the
-// string value.
+// value. A match happens whenever any string in the string matches with the string value.
 class FilterStateStringListMatcher : public FilterStateObjectMatcher {
 public:
   FilterStateStringListMatcher(StringMatcherPtr&& string_matcher);
