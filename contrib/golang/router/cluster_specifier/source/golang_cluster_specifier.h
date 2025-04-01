@@ -34,7 +34,7 @@ using ClusterConfigSharedPtr = std::shared_ptr<ClusterConfig>;
 class GolangClusterSpecifierPlugin : public ClusterSpecifierPlugin,
                                      Logger::Loggable<Logger::Id::http> {
 public:
-  GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config){};
+  GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config) {};
 
   RouteConstSharedPtr route(RouteConstSharedPtr parent,
                             const Http::RequestHeaderMap& header) const override;

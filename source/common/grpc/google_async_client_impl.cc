@@ -192,6 +192,9 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
+  if (options_.on_delete_callback_for_test_only) {
+    options_.on_delete_callback_for_test_only();
+  }
 }
 
 GoogleAsyncStreamImpl::PendingMessage::PendingMessage(Buffer::InstancePtr request, bool end_stream)
@@ -257,9 +260,11 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
   current_span_->finishSpan();
-  callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
-                                                         : Http::ResponseTrailerMapImpl::create());
-  callbacks_.onRemoteClose(grpc_status, message);
+  if (!waiting_to_delete_on_remote_close_) {
+    callbacks_.onReceiveTrailingMetadata(
+        trailing_metadata ? std::move(trailing_metadata) : Http::ResponseTrailerMapImpl::create());
+    callbacks_.onRemoteClose(grpc_status, message);
+  }
 }
 
 void GoogleAsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
@@ -289,6 +294,14 @@ void GoogleAsyncStreamImpl::resetStream() {
     ++inflight_tags_;
   }
   cleanup();
+}
+
+void GoogleAsyncStreamImpl::waitForRemoteCloseAndDelete() {
+  if (!waiting_to_delete_on_remote_close_) {
+    waiting_to_delete_on_remote_close_ = true;
+    remote_close_timer_ = dispatcher_.createTimer([this] { resetStream(); });
+    remote_close_timer_->enableTimer(options_.remote_close_timeout);
+  }
 }
 
 void GoogleAsyncStreamImpl::writeQueued() {
@@ -384,7 +397,9 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ++inflight_tags_;
     Http::ResponseHeaderMapPtr initial_metadata = Http::ResponseHeaderMapImpl::create();
     metadataTranslate(ctxt_.GetServerInitialMetadata(), *initial_metadata);
-    callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
+    if (!waiting_to_delete_on_remote_close_) {
+      callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
+    }
     break;
   }
   case GoogleAsyncTag::Operation::Write: {
@@ -403,7 +418,8 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
     auto buffer = GoogleGrpcUtils::makeBufferInstance(read_buf_);
-    if (!buffer || !callbacks_.onReceiveMessageRaw(std::move(buffer))) {
+    if (!buffer || (!waiting_to_delete_on_remote_close_ &&
+                    !callbacks_.onReceiveMessageRaw(std::move(buffer)))) {
       // This is basically streamError in Grpc::AsyncClientImpl.
       notifyRemoteClose(Status::WellKnownGrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();
@@ -470,6 +486,7 @@ void GoogleAsyncStreamImpl::cleanup() {
       deferredDelete();
     }
   }
+  remote_close_timer_ = nullptr;
 }
 
 GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(

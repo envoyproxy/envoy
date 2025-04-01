@@ -102,7 +102,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
       }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess("golden ticket", _, _, 1000s));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -133,7 +133,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenMissingExpiresIn) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -169,7 +169,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenDefaultExpiresIn) {
   uri.mutable_timeout()->set_seconds(1);
   client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, absl::nullopt, 2000s);
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess("golden ticket", _, _, 2000s));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -200,7 +200,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -225,7 +225,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -256,7 +256,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenInvalidResponse) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
@@ -274,7 +274,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenNetworkError) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(1, callbacks_.size());
 
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
@@ -302,7 +302,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenUnhealthyUpstream) {
 
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
 }
 
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccess) {
@@ -479,7 +479,7 @@ TEST_F(OAuth2ClientTest, NoCluster) {
   ON_CALL(cm_, getThreadLocalCluster("auth")).WillByDefault(Return(nullptr));
   client_->setCallbacks(*mock_callbacks_);
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
   EXPECT_EQ(0, callbacks_.size());
 }
 
@@ -523,7 +523,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncGetAccessToken("a", "b", "c", "d");
+  client_->asyncGetAccessToken("a", "b", "c", "d", "e");
 }
 
 } // namespace Oauth2

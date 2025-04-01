@@ -151,6 +151,14 @@ CAPIStatus envoyGoFilterHttpAddData(void* s, void* data, int data_len, bool is_s
       });
 }
 
+CAPIStatus envoyGoFilterHttpInjectData(void* s, void* data, int data_length) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s, [data, data_length](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+        auto value = stringViewFromGoPointer(data, data_length);
+        return filter->injectData(state, value);
+      });
+}
+
 // unsafe API, without copy memory from c to go.
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len) {
@@ -351,6 +359,15 @@ CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_l
                                        return filter->getStringProperty(key_str, value_data,
                                                                         value_len, rc);
                                      });
+}
+
+CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
+                                            uint64_t* value_data, int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = stringViewFromGoPointer(key_data, key_len);
+        return filter->getSecret(key_str, value_data, value_len);
+      });
 }
 
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,

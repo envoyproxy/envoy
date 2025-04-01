@@ -2,7 +2,9 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/subscription_factory.h"
 #include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/status/status.h"
@@ -57,7 +59,24 @@ public:
    * are moved out of the cluster-manager to the xds-manager.
    * @return the XdsConfigTracker if defined, or nullopt if not.
    */
-  virtual OptRef<Config::XdsConfigTracker> xdsConfigTracker() PURE;
+  virtual OptRef<XdsConfigTracker> xdsConfigTracker() PURE;
+
+  /**
+   * Returns the XdsResourcesDelegate if defined by the bootstrap.
+   * The object will be initialized (if configured) after the call to initialize().
+   * TODO(adisuissa): this method will be removed once all the ADS-related objects
+   * are moved out of the cluster-manager to the xds-manager.
+   * @return the XdsResourcesDelegate if defined, or nullopt if not.
+   */
+  virtual XdsResourcesDelegateOptRef xdsResourcesDelegate() PURE;
+
+  /**
+   * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
+   * upstream component, the factory is a facet of the cluster manager.
+   *
+   * @return Config::SubscriptionFactory& the subscription factory.
+   */
+  virtual SubscriptionFactory& subscriptionFactory() PURE;
 };
 
 using XdsManagerPtr = std::unique_ptr<XdsManager>;

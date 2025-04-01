@@ -7,6 +7,7 @@ using testing::Return;
 
 MockXdsManager::MockXdsManager() {
   ON_CALL(*this, initialize(_, _)).WillByDefault(Return(absl::OkStatus()));
+  ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
 }
 
 } // namespace Config

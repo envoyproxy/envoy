@@ -5,6 +5,7 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/matcher/v3/filter_state.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -510,7 +511,7 @@ message ClusterSpecifierPlugin {
   bool is_optional = 2;
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -661,6 +662,12 @@ message RouteMatch {
   // If the number of specified dynamic metadata matchers is nonzero, they all must match the
   // dynamic metadata for a match to occur.
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
+
+  // Specifies a set of filter state matchers on which the route should match.
+  // The router will check the filter state against all the specified filter state matchers.
+  // If the number of specified filter state matchers is nonzero, they all must match the
+  // filter state for a match to occur.
+  repeated type.matcher.v3.FilterStateMatcher filter_state = 16;
 }
 
 // Cors policy configuration.

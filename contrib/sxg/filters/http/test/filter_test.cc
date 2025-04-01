@@ -28,7 +28,7 @@ using testing::ReturnRef;
 class MockSecretReader : public SecretReader {
 public:
   MockSecretReader(const std::string& certificate, const std::string& private_key)
-      : certificate_(certificate), private_key_(private_key){};
+      : certificate_(certificate), private_key_(private_key) {};
 
   const std::string& certificate() const override { return certificate_; }
   const std::string& privateKey() const override { return private_key_; }
