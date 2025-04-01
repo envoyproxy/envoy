@@ -738,6 +738,9 @@ void ConnectionImpl::onReadReady() {
       onRead(new_buffer_size);
     }
     setDetectedCloseType(DetectedCloseType::RemoteReset);
+    // In some cases, the transport socket may read data along with an RST (Reset) flag.
+    // We need to ensure this data is properly propagated to the terminal filter for proper handling.
+    // For more details, see issues #29616 and #28817.
     remoteCloseThroughFilterManager();
     return;
   }
@@ -850,7 +853,7 @@ void ConnectionImpl::onWriteReady() {
         closeConnectionImmediately();
       } else if (bothSidesHalfClosed()) {
         // If half_close is enabled, the close should still go through the filter manager, since
-        // the read is possible still pending.
+        // the end_stream from read side is possible pending in the filter chain.
         closeThroughFilterManager({ConnectionEvent::LocalClose, true});
       }
     }
