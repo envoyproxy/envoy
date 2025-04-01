@@ -379,6 +379,6 @@ new_features:
     Added new filter state matcher string_list_match to
     :ref:`FilterStateMatcher <envoy_v3_api_msg_type.matcher.v3.FilterStateMatcher>` which attempts to
     cast the filter state object to a list of strings and match each of string against a single string and return
-    true for any match. To support this, also added an :ref:`StringListAccessor <Envoy.Router.StringListAccessor>`.
+    true for any match.
 
 deprecated:
