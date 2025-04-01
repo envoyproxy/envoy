@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::Eq;
 using testing::Invoke;
 using testing::Return;
@@ -64,7 +65,11 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -96,7 +101,10 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -122,7 +130,10 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -144,9 +155,9 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   // Prepare the parent context of this call.
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), connection_info_provider,
-                                         StreamInfo::FilterState::LifeSpan::FilterChain};
-  Http::AsyncClient::ParentContext parent_context{&stream_info};
+  StreamInfo::StreamInfoImpl parent_stream_info{test_time_.timeSystem(), connection_info_provider,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain};
+  Http::AsyncClient::ParentContext parent_context{&parent_stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;
   stream_options.setParentContext(parent_context);
@@ -160,7 +171,10 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -236,7 +250,10 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -263,7 +280,10 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
 TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
