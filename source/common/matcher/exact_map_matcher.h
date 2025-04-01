@@ -30,9 +30,10 @@ protected:
 
   ExactMapMatcher(DataInputPtr<DataType>&& data_input,
                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
-      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status,
+                             false) {}
 
-  absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
+  absl::optional<OnMatch<DataType>> doMatch(absl::string_view data) override {
     const auto itr = children_.find(data);
     if (itr != children_.end()) {
       return itr->second;

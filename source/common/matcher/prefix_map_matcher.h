@@ -16,7 +16,17 @@ public:
   create(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<PrefixMapMatcher<DataType>>(
-        new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status));
+        new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status, false));
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return ret;
+  }
+
+  static absl::StatusOr<std::unique_ptr<PrefixMapMatcher>>
+  createWithRetry(DataInputPtr<DataType>&& data_input,
+                  absl::optional<OnMatch<DataType>> on_no_match) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::unique_ptr<PrefixMapMatcher<DataType>>(
+        new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status, true));
     RETURN_IF_NOT_OK_REF(creation_status);
     return ret;
   }
@@ -27,16 +37,22 @@ public:
 
 protected:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
-                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
-      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
+                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status,
+                   bool retry_shorter)
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status,
+                             retry_shorter) {}
 
-  absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
+  absl::optional<OnMatch<DataType>> doMatch(absl::string_view data) override {
     const auto result = children_.findLongestPrefix(data);
     if (result) {
       return *result;
     }
 
     return absl::nullopt;
+  }
+
+  size_t matchedPrefixLength(absl::string_view str) override {
+    return children_.findLongestPrefixLength(str);
   }
 
 private:

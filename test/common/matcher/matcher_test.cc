@@ -134,6 +134,183 @@ matcher_tree:
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
+TEST_F(MatcherTest, TestPrefixMatcherInnerMissDoesNotPerformOuterOnNoMatch) {
+  const std::string yaml = R"EOF(
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: one might expect this path to be taken, but it is not
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  prefix_match_map:
+    map:
+      val:
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: unexpected
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("bar");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  auto match_tree = factory_.create(matcher);
+
+  const auto result = match_tree()->match(TestData());
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  ASSERT_FALSE(result.on_match_.has_value());
+}
+
+TEST_F(MatcherTest, TestPrefixMatcherWithRetryInnerMissPerformsOuterOnNoMatch) {
+  const std::string yaml = R"EOF(
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: expected!
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  prefix_match_map_with_retry:
+    map:
+      val:
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: unexpected
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("bar");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  auto match_tree = factory_.create(matcher);
+
+  const auto result = match_tree()->match(TestData());
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  ASSERT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(MatcherTest, TestPrefixMatcherWithRetryInnerMissRetriesShorterPrefix) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  prefix_match_map_with_retry:
+    map:
+      val:
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: bar
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: expected!
+      valu:
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: not expected
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("bar");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
+      .Times(2);
+  auto match_tree = factory_.create(matcher);
+
+  const auto result = match_tree()->match(TestData());
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  ASSERT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
 TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
