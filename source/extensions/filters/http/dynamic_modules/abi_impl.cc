@@ -376,9 +376,9 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
 }
 
 bool envoy_dynamic_module_callback_http_set_filter_state_string(
-  envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-  envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-  envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto stream_info = filter->streamInfo();
   if (!stream_info) {
@@ -388,15 +388,16 @@ bool envoy_dynamic_module_callback_http_set_filter_state_string(
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
   absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
-  stream_info->filterState()->setData(key_view, std::make_unique<Router::StringAccessorImpl>(value_view),
-                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info->filterState()->setData(key_view,
+                                      std::make_unique<Router::StringAccessorImpl>(value_view),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
   return true;
 }
 
 bool envoy_dynamic_module_callback_http_get_filter_state_string(
-  envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-  envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-  envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto stream_info = filter->streamInfo();
   if (!stream_info) {
