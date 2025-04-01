@@ -291,7 +291,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
 void Http2FloodMitigationTest::triggerListenerDrain() {
   absl::Notification drain_sequence_started;
   test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
+    test_server_->drainManager().startDrainSequence(Network::DrainDirection::All, [] {});
     drain_sequence_started.Notify();
   });
   drain_sequence_started.WaitForNotification();

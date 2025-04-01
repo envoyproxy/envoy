@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 14]
+// [#next-free-field: 16]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -132,6 +132,23 @@ message RateLimit {
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured ``ratelimit`` filters in an HTTP filter chain.
   string stat_prefix = 13;
+
+  // If set, this will enable -- but not necessarily enforce -- the rate limit for the given
+  // fraction of requests.
+  //
+  // If not set then ``ratelimit.http_filter_enabled`` runtime key will be used to determine
+  // the fraction of requests to enforce rate limits on. And the default percentage of the
+  // runtime key is 100% for backwards compatibility.
+  config.core.v3.RuntimeFractionalPercent filter_enabled = 14;
+
+  // If set, this will enforce the rate limit decisions for the given fraction of requests.
+  //
+  // Note: this only applies to the fraction of enabled requests.
+  //
+  // If not set then ``ratelimit.http_filter_enforcing`` runtime key will be used to determine
+  // the fraction of requests to enforce rate limits on. And the default percentage of the
+  // runtime key is 100% for backwards compatibility.
+  config.core.v3.RuntimeFractionalPercent filter_enforced = 15;
 }
 
 message RateLimitPerRoute {

@@ -19,6 +19,9 @@ struct TcpTunnelingTestParams {
 
 absl::string_view http2ImplementationToString(Http2Impl impl);
 
+using HttpFilterProto =
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
+
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
 //
 // Usage:
@@ -93,8 +96,73 @@ public:
   void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
 
+  void addHttpUpstreamFilterToCluster(const HttpFilterProto& config) {
+    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+              (*cluster->mutable_typed_extension_protocol_options())
+                  ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      *protocol_options.add_http_filters() = config;
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(protocol_options);
+    });
+  }
+
+  const HttpFilterProto getCodecFilterConfig() {
+    HttpFilterProto filter_config;
+    filter_config.set_name("envoy.filters.http.upstream_codec");
+    auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
+    filter_config.mutable_typed_config()->PackFrom(configuration);
+    return filter_config;
+  }
+
+  void setUpConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
+    // Start a connection, and verify the upgrade headers are received upstream.
+    tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+    if (!fake_upstream_connection) {
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+    }
+    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+    // Send upgrade headers downstream, fully establishing the connection.
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+  }
+
+  void sendBidiData(FakeHttpConnectionPtr& fake_upstream_connection, bool send_goaway = false) {
+    // Send some data from downstream to upstream, and make sure it goes through.
+    ASSERT_TRUE(tcp_client_->write("hello", false));
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+    if (send_goaway) {
+      fake_upstream_connection->encodeGoAway();
+    }
+    // Send data from upstream to downstream.
+    upstream_request_->encodeData(12, false);
+    ASSERT_TRUE(tcp_client_->waitForData(12));
+  }
+
+  void closeConnection(FakeHttpConnectionPtr& fake_upstream_connection) {
+    // Now send more data and close the TCP client. This should be treated as half close, so the
+    // data should go through.
+    ASSERT_TRUE(tcp_client_->write("hello", false));
+    tcp_client_->close();
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+    if (upstreamProtocol() == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+      // If the upstream now sends 'end stream' the connection is fully closed.
+      upstream_request_->encodeData(0, true);
+    }
+  }
+
 protected:
   const bool use_universal_header_validator_{false};
+  IntegrationTcpClientPtr tcp_client_;
 };
 
 } // namespace Envoy

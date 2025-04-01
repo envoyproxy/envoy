@@ -9,14 +9,18 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
 
-TapSocket::TapSocket(SocketTapConfigSharedPtr config,
-                     Network::TransportSocketPtr&& transport_socket)
-    : PassthroughSocket(std::move(transport_socket)), config_(config) {}
+TapSocket::TapSocket(
+    SocketTapConfigSharedPtr config,
+    const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& socket_tap_config,
+    Network::TransportSocketPtr&& transport_socket)
+    : PassthroughSocket(std::move(transport_socket)), config_(config),
+      socket_tap_config_(socket_tap_config) {}
 
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
-  tapper_ = config_ ? config_->createPerSocketTapper(callbacks.connection()) : nullptr;
+  tapper_ = config_ ? config_->createPerSocketTapper(socket_tap_config_, callbacks.connection())
+                    : nullptr;
 }
 
 void TapSocket::closeSocket(Network::ConnectionEvent event) {
@@ -54,13 +58,14 @@ TapSocketFactory::TapSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
-      PassthroughFactory(std::move(transport_socket_factory)) {}
+      PassthroughFactory(std::move(transport_socket_factory)),
+      ts_tap_config_(proto_config.socket_tap_config()) {}
 
 Network::TransportSocketPtr
 TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
                                         Upstream::HostDescriptionConstSharedPtr host) const {
   return std::make_unique<TapSocket>(
-      currentConfigHelper<SocketTapConfig>(),
+      currentConfigHelper<SocketTapConfig>(), ts_tap_config_,
       transport_socket_factory_->createTransportSocket(options, host));
 }
 
@@ -72,10 +77,11 @@ DownstreamTapSocketFactory::DownstreamTapSocketFactory(
     Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
-      DownstreamPassthroughFactory(std::move(transport_socket_factory)) {}
+      DownstreamPassthroughFactory(std::move(transport_socket_factory)),
+      ds_ts_tap_config_(proto_config.socket_tap_config()) {}
 
 Network::TransportSocketPtr DownstreamTapSocketFactory::createDownstreamTransportSocket() const {
-  return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(),
+  return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(), ds_ts_tap_config_,
                                      transport_socket_factory_->createDownstreamTransportSocket());
 }
 
