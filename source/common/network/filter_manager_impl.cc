@@ -225,5 +225,45 @@ void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
   }
 }
 
+void FilterManagerImpl::ActiveReadFilter::disableClose(bool disable) {
+  if (disable) {
+    // Handle the case where we are disabling the close
+    if (!pending_close_) {
+      pending_close_ = true;
+      parent_.state_.read_filter_pending_close_count_ += 1;
+    }
+  } else {
+    // Handle the case where we are re-enabling the close
+    if (pending_close_) {
+      pending_close_ = false;
+      parent_.state_.read_filter_pending_close_count_ -= 1;
+    }
+
+    if (parent_.state_.read_filter_pending_close_count_ == 0) {
+      parent_.maybeClose();
+    }
+  }
+}
+
+void FilterManagerImpl::ActiveWriteFilter::disableClose(bool disable) {
+  if (disable) {
+    // Handle the case where we are disabling the close
+    if (!pending_close_) {
+      pending_close_ = true;
+      parent_.state_.write_filter_pending_close_count_ += 1;
+    }
+  } else {
+    // Handle the case where we are re-enabling the close
+    if (pending_close_) {
+      pending_close_ = false;
+      parent_.state_.write_filter_pending_close_count_ -= 1;
+    }
+
+    if (parent_.state_.write_filter_pending_close_count_ == 0) {
+      parent_.maybeClose();
+    }
+  }
+}
+
 } // namespace Network
 } // namespace Envoy
