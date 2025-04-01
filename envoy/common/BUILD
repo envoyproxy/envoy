@@ -77,7 +77,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "matchers_interface",
     hdrs = ["matchers.h"],
-    deps = [":optref_lib"],
+    deps = [
+        ":optref_lib",
+        "//envoy/network:transport_socket_interface",
+    ],
 )
 
 envoy_cc_library(

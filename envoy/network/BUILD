@@ -203,7 +203,6 @@ envoy_cc_library(
         ":proxy_protocol_options_lib",
         "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
-        "//envoy/common:matchers_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",
         "//envoy/ssl:context_interface",

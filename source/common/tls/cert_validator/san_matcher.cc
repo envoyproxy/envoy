@@ -25,8 +25,9 @@ bool StringSanMatcher::match(
       return false;
     }
   }
-  return matcher_.match(Utility::generalNameAsString(general_name),
-                        makeOptRefFromPtr(transport_socket_options));
+
+  Matchers::StringMatcher::Context context{makeOptRefFromPtr(transport_socket_options)};
+  return matcher_.match(Utility::generalNameAsString(general_name), makeOptRef(context));
 }
 
 bool DnsExactStringSanMatcher::match(const GENERAL_NAME* general_name,

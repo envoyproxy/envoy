@@ -4,6 +4,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/transport_socket.h"
 
 #include "absl/strings/string_view.h"
 
@@ -17,9 +18,8 @@ class StringMatcher {
 public:
   virtual ~StringMatcher() = default;
 
-  class Context {
-  public:
-    virtual ~Context() = default;
+  struct Context {
+    OptRef<const Network::TransportSocketOptions> transport_socket_options_;
   };
 
   /**
