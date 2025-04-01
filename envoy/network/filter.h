@@ -390,7 +390,7 @@ public:
    * Called when the connection is closed. Only the current filter that has stopped filter
    * chain iteration will get the callback.
    */
-  virtual void onClose(){};
+  virtual void onClose() {};
 
   /**
    * Return the size of data the filter want to inspect from the connection.

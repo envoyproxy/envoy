@@ -65,9 +65,7 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_EQ(description_.getHostId(), "mock-host-id");
 
   // Test setHostId (should trigger PANIC).
-  EXPECT_DEATH(
-      description_.setHostId("new-host-id"),
-      "not implemented");
+  EXPECT_DEATH(description_.setHostId("new-host-id"), "not implemented");
 }
 
 } // namespace Clusters
