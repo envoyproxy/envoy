@@ -164,6 +164,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     return;
   }
 
+  // Only FlushWrite and FlushWriteAndDelay are managed by the filter manager, since the above
+  // status will abort data naturally.
   ASSERT(type == ConnectionCloseType::FlushWrite ||
          type == ConnectionCloseType::FlushWriteAndDelay);
   closeThroughFilterManager({ConnectionEvent::LocalClose, false, type});

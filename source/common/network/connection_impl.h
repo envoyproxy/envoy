@@ -124,8 +124,10 @@ public:
   void closeConnection(ConnectionCloseAction close_action) override {
     ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
     if (close_action.closeSocket()) {
+      // The socket will be directly closed.
       closeSocket(close_action.event_);
     } else {
+      // It will go through the normal close() process.
       ASSERT(close_action.isLocalClose());
       closeInternal(close_action.type_);
     }
