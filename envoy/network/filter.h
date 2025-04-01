@@ -41,7 +41,7 @@ enum class FilterStatus {
   // Continue to further filters.
   Continue,
   // Stop executing further filters.
-  StopIteration,
+  StopIteration
 };
 
 /**
