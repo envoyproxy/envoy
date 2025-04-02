@@ -15,7 +15,7 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute;
 
 namespace {
 
-constexpr std::string kPrefixSHA = "{SHA}";
+constexpr absl::string_view kPrefixSHA = "{SHA}";
 
 UserMap readHtpasswd(const std::string& htpasswd) {
   UserMap users;
