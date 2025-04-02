@@ -75,7 +75,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
 
   auto status = roles_anywhere_signer_->sign(message, true, region_);
   if (!status.ok()) {
-    ENVOY_LOG_MISC(debug, status.message());
+    ENVOY_LOG(debug, status.message());
     credentialsRetrievalError();
     return;
   }

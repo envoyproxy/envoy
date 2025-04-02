@@ -31,7 +31,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
   if (provider_or_error_.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
-    ENVOY_LOG_MISC(info, "Invalid certificate data source");
+    ENVOY_LOG(info, "Invalid certificate data source");
     certificate_data_source_provider_ = nullptr;
     return;
   }
@@ -43,7 +43,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
-      ENVOY_LOG_MISC(info, "Invalid certificate chain data source");
+      ENVOY_LOG(info, "Invalid certificate chain data source");
     }
   } else {
     certificate_chain_data_source_provider_ = absl::nullopt;
@@ -55,7 +55,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
-    ENVOY_LOG_MISC(info, "Invalid private key data source");
+    ENVOY_LOG(info, "Invalid private key data source");
     private_key_data_source_provider_ = nullptr;
     return;
   }
@@ -184,17 +184,15 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   if (!cert_pem.empty()) {
     status = pemToDerB64(cert_pem, cert_der_b64);
     if (!status.ok()) {
-      ENVOY_LOG_MISC(error, "IAMRolesAnywhere: Certificate PEM decoding failed: {}",
-                     status.message());
+      ENVOY_LOG(error, "IAMRolesAnywhere: Certificate PEM decoding failed: {}", status.message());
       cached_credentials_ = X509Credentials();
       return;
     }
 
     status = pemToAlgorithmSerialExpiration(cert_pem, cert_algorithm, cert_serial, time);
     if (!status.ok()) {
-      ENVOY_LOG_MISC(error,
-                     "IAMRolesAnywhere: Certificate algorithm and serial decoding failed: {}",
-                     status.message());
+      ENVOY_LOG(error, "IAMRolesAnywhere: Certificate algorithm and serial decoding failed: {}",
+                status.message());
       cached_credentials_ = X509Credentials();
       return;
     }
@@ -207,8 +205,8 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
     if (!chain_pem.empty()) {
       status = pemToDerB64(chain_pem, cert_chain_der_b64, true);
       if (!status.ok()) {
-        ENVOY_LOG_MISC(error, "IAMRolesAnywhere: Certificate chain decoding failed: {}",
-                       status.message());
+        ENVOY_LOG(error, "IAMRolesAnywhere: Certificate chain decoding failed: {}",
+                  status.message());
       }
     }
   }
@@ -219,7 +217,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(private_key_pem.c_str(), keysize));
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
   if (pkey == nullptr) {
-    ENVOY_LOG_MISC(error, "IAMRolesAnywhere: Private key decoding failed");
+    ENVOY_LOG(error, "IAMRolesAnywhere: Private key decoding failed");
     cached_credentials_ = X509Credentials();
     return;
   }

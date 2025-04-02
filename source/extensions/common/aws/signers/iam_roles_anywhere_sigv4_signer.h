@@ -1,17 +1,7 @@
 #pragma once
-
-#include <cstdint>
-#include <utility>
-
-#include "source/common/common/hex.h"
-#include "source/common/common/logger.h"
-#include "source/common/common/matchers.h"
-#include "source/common/common/utility.h"
-#include "source/common/http/headers.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
-#include "source/extensions/common/aws/signer.h"
 
 namespace Envoy {
 namespace Extensions {
