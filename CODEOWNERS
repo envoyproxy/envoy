@@ -251,7 +251,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/compression/zstd @rainingmaster @mattklein123
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
-# health cehck
+# health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
 /*/extensions/filters/http/lua @mattklein123 @wbpcode
