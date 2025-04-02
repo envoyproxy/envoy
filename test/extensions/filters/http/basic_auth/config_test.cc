@@ -128,7 +128,7 @@ TEST(Factory, InvalidConfigNoHash) {
 
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "basic auth: invalid htpasswd format, invalid SHA hash length");
+      EnvoyException, "basic auth: invalid htpasswd format, invalid hash length");
 }
 
 TEST(Factory, InvalidConfigNotSHA) {

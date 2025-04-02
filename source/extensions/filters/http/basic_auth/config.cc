@@ -15,6 +15,8 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute;
 
 namespace {
 
+constexpr std::string kPrefixSHA = "{SHA}";
+
 UserMap readHtpasswd(const std::string& htpasswd) {
   UserMap users;
   absl::flat_hash_map<std::string, Hash::AlgorithmProviderSharedPtr> algorithm_providers;
@@ -46,26 +48,34 @@ UserMap readHtpasswd(const std::string& htpasswd) {
       throw EnvoyException("basic auth: duplicate users");
     }
 
-    if (!absl::StartsWith(hash, "{SHA}")) {
+    std::string factory_name;
+    int hash_prefix_length;
+
+    if (absl::StartsWith(hash, kPrefixSHA)) {
+      factory_name = "envoy.hash.sha1";
+      hash_prefix_length = kPrefixSHA.length();
+    } else {
       throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
     }
 
-    auto algorithm_provider = algorithm_providers["envoy.hash.sha1"];
+    auto algorithm_provider = algorithm_providers[factory_name];
     if (algorithm_provider == nullptr) {
       auto* factory = Envoy::Config::Utility::getFactoryByName<
-          Envoy::Extensions::Hash::NamedAlgorithmProviderConfigFactory>("envoy.hash.sha1");
+          Envoy::Extensions::Hash::NamedAlgorithmProviderConfigFactory>(factory_name);
       if (factory == nullptr) {
-        throw EnvoyException("basic auth: did not find factory named 'envoy.hash.sha1'");
+        throw EnvoyException(
+            absl::StrCat("basic auth: did not find factory named '", factory_name, "'"));
       }
       algorithm_provider = factory->createAlgorithmProvider();
+      algorithm_providers[factory_name] = algorithm_provider;
     }
 
-    hash = hash.substr(5);
+    hash = hash.substr(hash_prefix_length);
     if (hash.length() != algorithm_provider->base64EncodedHashLength()) {
-      throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
+      throw EnvoyException("basic auth: invalid htpasswd format, invalid hash length");
     }
 
-    users.insert({name, {name, hash, algorithm_provider}});
+    users.insert({name, {name, hash, algorithm_providers[factory_name]}});
   }
 
   return users;
