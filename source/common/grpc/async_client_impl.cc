@@ -15,8 +15,15 @@ namespace Envoy {
 namespace Grpc {
 
 namespace {
-std::string httpResponseCodeDetails(const Http::AsyncClient::Stream* stream) {
-  return stream ? stream->streamInfo().responseCodeDetails().value_or(EMPTY_STRING) : EMPTY_STRING;
+std::string enhancedGrpcMessage(const std::string& original_message,
+                                const Http::AsyncClient::Stream* stream) {
+  const auto& http_response_code_details = (stream && stream->streamInfo().responseCodeDetails())
+                                               ? *stream->streamInfo().responseCodeDetails()
+                                               : EMPTY_STRING;
+  return original_message.empty() ? http_response_code_details
+         : http_response_code_details.empty()
+             ? original_message
+             : absl::StrCat(original_message, "{", http_response_code_details, "}");
 }
 } // namespace
 
@@ -216,7 +223,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     }
     // Status is translated via Utility::httpToGrpcStatus per
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    streamError(Utility::httpToGrpcStatus(http_response_status), httpResponseCodeDetails(stream_));
+    streamError(Utility::httpToGrpcStatus(http_response_status));
     return;
   }
   if (end_stream) {
@@ -272,8 +279,7 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (!grpc_status) {
     grpc_status = Status::WellKnownGrpcStatus::Unknown;
   }
-  notifyRemoteClose(grpc_status.value(),
-                    grpc_message.empty() ? httpResponseCodeDetails(stream_) : grpc_message);
+  notifyRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
 }
 
@@ -293,7 +299,7 @@ void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
   }
   current_span_->finishSpan();
   if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onRemoteClose(status, message);
+    callbacks_.onRemoteClose(status, enhancedGrpcMessage(message, stream_));
   }
 }
 
@@ -307,7 +313,7 @@ void AsyncStreamImpl::onReset() {
   }
 
   http_reset_ = true;
-  streamError(Status::WellKnownGrpcStatus::Internal, httpResponseCodeDetails(stream_));
+  streamError(Status::WellKnownGrpcStatus::Internal);
 }
 
 void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& buffer, bool end_stream) {

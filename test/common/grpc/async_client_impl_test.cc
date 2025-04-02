@@ -89,6 +89,33 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+// Validate that the HTTP details are reported in the gRPC error message.
+TEST_F(EnvoyAsyncClientImplTest, HttpRcdReportedInGrpcErrorMessage) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(testing::Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  stream_info.setResponseCodeDetails("upstream_reset");
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(grpc_callbacks,
+              onRemoteClose(Status::WellKnownGrpcStatus::Internal, "upstream_reset"));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validate that the host header is the authority field in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   envoy::config::core::v3::GrpcService config;

@@ -120,9 +120,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
-  const absl::optional<std::string>& httpResponseCodeDetails() const {
-    return http_response_code_details_;
-  }
+  const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
@@ -135,7 +133,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
-  absl::optional<std::string> http_response_code_details_;
+  std::string http_response_code_details_;
 };
 
 // Changes to headers are normally tested against the MutationRules supplied
