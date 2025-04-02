@@ -39,24 +39,41 @@ protected:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
                    absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status,
                    bool retry_shorter)
-      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status,
-                             retry_shorter) {}
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status),
+        retry_shorter_(retry_shorter) {}
 
-  absl::optional<OnMatch<DataType>> doMatch(absl::string_view data) override {
-    const auto result = children_.findLongestPrefix(data);
-    if (result) {
-      return *result;
+  absl::optional<OnMatch<DataType>> doMatch(absl::string_view target,
+                                            const DataType& data) override {
+    while (true) {
+      const std::shared_ptr<OnMatch<DataType>> result = children_.findLongestPrefix(target);
+      if (result == nullptr) {
+        return absl::nullopt;
+      }
+      if (result->action_cb_ || !retry_shorter_) {
+        return *result;
+      }
+      ASSERT(result->matcher_);
+      typename MatchTree<DataType>::MatchResult match = result->matcher_->match(data);
+      if (match.match_state_ != MatchState::MatchComplete || match.on_match_.has_value()) {
+        return match.on_match_;
+      }
+      // If a subtree lookup found neither match nor on_no_match, and retry_shorter_ is set,
+      // we want to try again with a shorter matching prefix if one can be found.
+      size_t prev_length = matchedPrefixLength(target);
+      if (prev_length == 0) {
+        return absl::nullopt;
+      }
+      target = target.substr(0, prev_length - 1);
     }
-
-    return absl::nullopt;
   }
 
-  size_t matchedPrefixLength(absl::string_view str) override {
+  size_t matchedPrefixLength(absl::string_view str) {
     return children_.findLongestPrefixLength(str);
   }
 
 private:
   TrieLookupTable<std::shared_ptr<OnMatch<DataType>>> children_;
+  bool retry_shorter_;
 };
 
 } // namespace Matcher
