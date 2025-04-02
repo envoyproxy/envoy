@@ -237,8 +237,7 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  ASSERT_FALSE(result.on_match_.has_value());
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST_F(MatcherTest, TestPrefixMatcherWithRetryInnerMissPerformsOuterOnNoMatch) {
@@ -310,9 +309,7 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  ASSERT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestPrefixMatcherWithRetryInnerMissRetriesShorterPrefix) {
@@ -378,9 +375,7 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  ASSERT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
