@@ -39,6 +39,10 @@ minor_behavior_changes:
   change: |
     The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
     substitution format string if the related extensions are linked.
+- area: formatter
+  change: |
+    The formatter ``%RESPONSE_CODE_DETAILS%`` takes an optional parameter ``ALLOW_WHITESPACES`` to allow whitespaces in output
+    string. By default all whitespaces will be replaced by underscore.
 - area: oauth2
   change: |
     Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
