@@ -32,6 +32,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
 /*/extensions/http/ext_proc/response_processors/save_processing_response @pradeepcrao @botengyao @yanjunxiang-google
+/*/extensions/filters/network/ext_proc @botengyao @yanavlasov
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
 # grpc_field_extraction http filter extension
@@ -250,7 +251,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/compression/zstd @rainingmaster @mattklein123
 # cel
 /*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
-# health cehck
+# health check
 /*/extensions/filters/http/health_check @mattklein123 @adisuissa
 # lua
 /*/extensions/filters/http/lua @mattklein123 @wbpcode

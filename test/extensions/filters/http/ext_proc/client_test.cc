@@ -36,8 +36,7 @@ protected:
     EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
-    client_ =
-        std::make_unique<ExternalProcessorClientImpl>(client_manager_, *stats_store_.rootScope());
+    client_ = createExternalProcessorClient(client_manager_, *stats_store_.rootScope());
 
     watermark_callbacks_.setDecoderFilterCallbacks(&decoder_callbacks_);
     watermark_callbacks_.setEncoderFilterCallbacks(&encoder_callbacks_);

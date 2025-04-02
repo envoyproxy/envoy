@@ -694,6 +694,13 @@ envoy.filters.network.ext_authz:
   status: stable
   type_urls:
   - envoy.extensions.filters.network.ext_authz.v3.ExtAuthz
+envoy.filters.network.ext_proc:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
 envoy.filters.network.http_connection_manager:
   categories:
   - envoy.filters.network
@@ -1322,7 +1329,7 @@ envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream
   - envoy.transport_sockets.upstream
-  security_posture: requires_trusted_downstream_and_upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
@@ -1717,7 +1724,7 @@ envoy.load_balancing_policies.client_side_weighted_round_robin:
   categories:
   - envoy.load_balancing_policies
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
 envoy.http.early_header_mutation.header_mutation:

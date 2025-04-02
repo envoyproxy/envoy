@@ -99,7 +99,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ProtocolError:
     return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
   case Http::StreamResetReason::Overflow:
-    IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
+    IS_ENVOY_BUG("Resource overflow shouldn't be propagated to QUIC network stack");
     break;
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::RemoteReset:

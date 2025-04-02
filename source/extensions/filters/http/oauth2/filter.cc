@@ -450,6 +450,11 @@ FilterConfig::FilterConfig(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_oauth_nonce_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().oauth_nonce_cookie_config())
+              : CookieSettings()),
+      code_verifier_cookie_settings_(
+          (proto_config.has_cookie_configs() &&
+           proto_config.cookie_configs().has_code_verifier_cookie_config())
+              ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
@@ -573,6 +578,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
 
+  // Save the request headers for later modification if needed.
+  request_headers_ = &headers;
+
   // We should check if this is a sign out request.
   if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
@@ -622,8 +630,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Save the request headers for later modification if needed.
-  request_headers_ = &headers;
   // If this isn't the callback URI, redirect to acquire credentials.
   //
   // The following conditional could be replaced with a regex pattern-match,
@@ -884,11 +890,14 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
     // * omitting from HMAC computation (for setting, not for validating)
     id_token_ = id_token;
   }
-  if (!config_->disableRefreshTokenSetCookie()) {
+  // Only set the refresh token if use_refresh_token_ is enabled and it's not disabled by config
+  if (config_->useRefreshToken() && !config_->disableRefreshTokenSetCookie()) {
     // Preventing this here excludes all other Refresh Token functionality
     // * setting the cookie
     // * omitting from HMAC computation (for setting, not for validating)
     refresh_token_ = refresh_token;
+  } else {
+    refresh_token_ = "";
   }
 
   expires_in_ = std::to_string(expires_in.count());
@@ -994,9 +1003,6 @@ std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
     expires_time = expires_refresh_token_in_;
     break;
-  case 6: // OAUTH_NONCE TYPE
-    same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
-    break;
   }
 
   std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, expires_time, same_site);
@@ -1049,7 +1055,6 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   absl::flat_hash_map<std::string, std::string> cookies =
       Http::Utility::parseCookies(*request_headers_);
 
-  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
   cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
 
   if (!access_token_.empty()) {
@@ -1060,7 +1065,13 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   }
   if (!refresh_token_.empty()) {
     cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
+  } else if (cookies.contains(cookie_names.refresh_token_)) {
+    // If we actually went through the refresh token flow, but we didn't get a new refresh token, we
+    // want to still ensure that the old one is set if it was sent in a cookie
+    refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
+
+  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
@@ -1099,22 +1110,44 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                           absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
                                        BuildCookieTail(3))); // OAUTH_EXPIRES
 
+  absl::flat_hash_map<std::string, std::string> request_cookies =
+      Http::Utility::parseCookies(*request_headers_);
+  std::string cookie_domain;
+  if (!config_->cookieDomain().empty()) {
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
+  }
+
   if (!access_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.bearer_token_, "=", access_token_,
                                          BuildCookieTail(1))); // BEARER_TOKEN
+  } else if (request_cookies.contains(cookie_names.bearer_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+                     cookie_domain));
   }
 
   if (!id_token_.empty()) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.id_token_, "=", id_token_, BuildCookieTail(4))); // ID_TOKEN
+  } else if (request_cookies.contains(cookie_names.id_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+                     cookie_domain));
   }
 
   if (!refresh_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
                                          BuildCookieTail(5))); // REFRESH_TOKEN
+  } else if (request_cookies.contains(cookie_names.refresh_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                     cookie_domain));
   }
 }
 
