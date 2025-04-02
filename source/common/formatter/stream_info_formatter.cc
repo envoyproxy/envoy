@@ -972,15 +972,11 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               bool allow_whitespaces = (format == "ALLOW_WHITESPACES");
               return std::make_unique<StreamInfoStringFormatterProvider>(
                   [allow_whitespaces](const StreamInfo::StreamInfo& stream_info) {
-                    if (!allow_whitespaces) {
-                      if (stream_info.responseCodeDetails().has_value() &&
-                          StringUtil::hasEmptySpace(stream_info.responseCodeDetails().value())) {
-                        absl::optional<std::string> details = StringUtil::replaceAllEmptySpace(
-                            stream_info.responseCodeDetails().value());
-                        return details;
-                      }
+                    if (allow_whitespaces || !stream_info.responseCodeDetails().has_value()) {
+                      return stream_info.responseCodeDetails();
                     }
-                    return stream_info.responseCodeDetails();
+                    return absl::optional<std::string>(StringUtil::replaceAllEmptySpace(
+                        stream_info.responseCodeDetails().value()));
                   });
             }}},
           {"CONNECTION_TERMINATION_DETAILS",
