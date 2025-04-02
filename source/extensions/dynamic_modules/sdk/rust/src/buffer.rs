@@ -111,7 +111,6 @@ impl EnvoyMutBuffer<'_> {
   }
 }
 
-
 impl Default for EnvoyMutBuffer<'_> {
   fn default() -> Self {
     Self {

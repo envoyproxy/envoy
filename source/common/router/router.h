@@ -327,12 +327,18 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
 
-  // If there's a local reply (e.g. timeout) during host selection, cancel host
-  // selection.
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    // If there's a local reply (e.g. timeout) during host selection, cancel host
+    // selection.
     if (host_selection_cancelable_) {
       host_selection_cancelable_->cancel();
       host_selection_cancelable_.reset();
+    }
+
+    // Clean up the upstream_requests_.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.router_filter_resetall_on_local_reply")) {
+      resetAll();
     }
     return Http::LocalErrorStatus::Continue;
   }

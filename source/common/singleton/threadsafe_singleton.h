@@ -105,4 +105,30 @@ private:
   T* original_loader_;
 };
 
+// An instance of a singleton class which is thread local and could only be initialized
+// and accessed in the same thread. Different threads could have different T instances.
+//
+// As with ThreadSafeSingleton the use of this class is generally discouraged.
+template <class T> class ThreadLocalInjectableSingleton {
+public:
+  static T& get() {
+    RELEASE_ASSERT(loader_, "ThreadLocalInjectableSingleton used prior to initialization");
+    return *loader_;
+  }
+
+  static T* getExisting() { return loader_; }
+
+  static void initialize(T* value) {
+    RELEASE_ASSERT(value, "ThreadLocalInjectableSingleton initialized with null value.");
+    RELEASE_ASSERT(!loader_, "ThreadLocalInjectableSingleton initialized multiple times.");
+    loader_ = value;
+  }
+  static void clear() { loader_ = nullptr; }
+
+protected:
+  static thread_local T* loader_;
+};
+
+template <class T> thread_local T* ThreadLocalInjectableSingleton<T>::loader_ = nullptr;
+
 } // namespace Envoy

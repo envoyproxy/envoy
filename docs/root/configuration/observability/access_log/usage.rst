@@ -267,10 +267,11 @@ The following command operators are supported:
 
 .. _config_access_log_format_response_code_details:
 
-%RESPONSE_CODE_DETAILS%
+%RESPONSE_CODE_DETAILS(X)%
   HTTP
     HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why.
+    who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
+    will be converted to underscore '_', unless optional parameter X is ALLOW_WHITESPACES.
 
   TCP/UDP
     Not implemented ("-")
@@ -569,6 +570,7 @@ HTTP only
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
   **DownstreamRemoteReset**, **DR**, The response details are ``http2.remote_reset`` or ``http2.remote_refuse``.
+  **UnconditionalDropOverload**, **UDO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>` is set to 100%.
 
 UDP
   Not implemented ("-").
@@ -1389,3 +1391,29 @@ UDP
     Z is an optional parameter denoting string truncation up to Z characters long.
   TCP/UDP
     Not implemented ("-").
+
+%PATH(X:Y):Z%
+  HTTP
+    The value of the request path. The parameter X is used to specify should the output contains
+    query or not. The parameter Y is used to specify the source of the request path. Both X and Y
+    are optional. And Z is an optional parameter denoting string truncation up to Z characters long.
+
+    The X parameter can be:
+
+    * ``WQ``: The output will be the full request path which contains the query parameters. If the X
+      is not present, ``WQ`` will be used.
+    * ``NQ``: The output will be the request path without the query parameters.
+
+    The Y parameter can be:
+
+    * ``ORIG``: Get the request path from the ``x-envoy-original-path`` header.
+    * ``PATH``: Get the request path from the ``:path`` header.
+    * ``ORIG_OR_PATH``: Get the request path from the ``x-envoy-original-path`` header if it is
+      present, otherwise get it from the ``:path`` header. If the Y is not present, ``ORIG_OR_PATH``
+      will be used.
+  TCP/UDP
+    Not implemented ("-").
+
+%CUSTOM_FLAGS%
+  Custom flags set into the stream info. This could be used to log any custom event from the filters.
+  Multiple flags are separated by comma.
