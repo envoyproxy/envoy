@@ -203,6 +203,24 @@ matcher_tree:
       "@type": type.googleapis.com/google.protobuf.StringValue
   prefix_match_map_with_retry:
     map:
+      "":
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: unexpected
       val:
         matcher:
           matcher_list:
@@ -234,7 +252,8 @@ matcher_tree:
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
+      .Times(2);
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());

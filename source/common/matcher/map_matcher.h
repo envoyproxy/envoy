@@ -47,10 +47,11 @@ public:
         }
         // If a subtree lookup found neither match nor on_no_match, and retry_shorter_ is set,
         // we want to try again with a shorter matching prefix if one can be found.
-        if (target.size() == 0) {
+        size_t prev_length = matchedPrefixLength(target);
+        if (prev_length == 0) {
           break;
         }
-        target = target.substr(0, matchedPrefixLength(target) - 1);
+        target = target.substr(0, prev_length - 1);
       } else {
         return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
       }
