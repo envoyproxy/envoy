@@ -19,6 +19,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
+#include "source/common/secret/secret_provider_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/version/version.h"
 #include "source/extensions/common/wasm/context.h"
@@ -170,16 +171,16 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // all failures synchronously as it has no facility to report configuration update failures
 // asynchronously. Callers should throw an exception if they are part of a synchronous xDS update
 // because that is the mechanism for reporting configuration errors.
-bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
-                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                Event::Dispatcher& dispatcher, Api::Api& api,
-                Server::ServerLifecycleNotifier& lifecycle_notifier,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                ThreadLocal::SlotAllocator& slot_alloc,
-                RemoteAsyncDataProviderPtr& remote_data_provider,
-                Oci::ManifestProviderPtr& oci_manifest_provider,
-                Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
-                CreateContextFn create_root_context_for_testing = nullptr);
+bool createWasm(
+    const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+    Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+    Event::Dispatcher& dispatcher, Api::Api& api,
+    Server::ServerLifecycleNotifier& lifecycle_notifier,
+    Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+    ThreadLocal::SlotAllocator& slot_alloc, RemoteAsyncDataProviderPtr& remote_data_provider,
+    Oci::ManifestProviderPtr& oci_manifest_provider, Oci::BlobProviderPtr& oci_blob_provider,
+    std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
+    CreateWasmCallback&& callback, CreateContextFn create_root_context_for_testing = nullptr);
 
 PluginHandleSharedPtr
 getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
@@ -231,6 +232,7 @@ private:
   RemoteAsyncDataProviderPtr remote_data_provider_;
   Oci::ManifestProviderPtr oci_manifest_provider_;
   Oci::BlobProviderPtr oci_blob_provider_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider_;
   const bool is_singleton_handle_{};
   WasmHandleSharedPtr base_wasm_{};
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;

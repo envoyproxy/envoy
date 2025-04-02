@@ -6,6 +6,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/config/remote_data_fetcher.h"
+#include "source/common/secret/secret_provider_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,10 +19,11 @@ namespace Oci {
  */
 class ImageBlobFetcher : public Config::DataFetcher::RemoteDataFetcher {
 public:
-  ImageBlobFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
-                   const std::string& content_hash,
-                   Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                   const std::string& credential);
+  ImageBlobFetcher(
+      Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
+      const std::string& content_hash, Config::DataFetcher::RemoteDataFetcherCallback& callback,
+      std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
+      const std::string& registry);
 
   // Config::DataFetcher::RemoteDataFetcher
   void fetch() override;
@@ -30,7 +32,8 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
 
 private:
-  const std::string credential_;
+  std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider_;
+  const std::string registry_;
 
   Http::AsyncClient::Request* request_{};
 };

@@ -30,12 +30,14 @@ envoy_cc_library(
         "oci_image_manifest_fetcher.h",
     ],
     deps = [
+        ":utility_lib",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:hex_lib",
         "//source/common/config:remote_data_fetcher_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/secret:secret_provider_impl_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

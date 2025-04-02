@@ -37,8 +37,8 @@ absl::Status parseImageURI(const std::string& uri, std::string& registry, std::s
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::string> prepareAuthorizationHeader(std::string image_pull_secret_raw,
-                                                       std::string registry) {
+absl::StatusOr<std::string> prepareAuthorizationHeader(const std::string& image_pull_secret_raw,
+                                                       const std::string& registry) {
   if (image_pull_secret_raw.empty()) {
     return absl::InvalidArgumentError("Empty image pull secret");
   }

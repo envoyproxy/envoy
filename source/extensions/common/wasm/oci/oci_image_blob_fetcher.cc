@@ -7,6 +7,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/extensions/common/wasm/oci/oci_image_manifest_fetcher.h"
+#include "source/extensions/common/wasm/oci/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,18 +15,38 @@ namespace Common {
 namespace Wasm {
 namespace Oci {
 
-ImageBlobFetcher::ImageBlobFetcher(Upstream::ClusterManager& cm,
-                                   const envoy::config::core::v3::HttpUri& uri,
-                                   const std::string& content_hash,
-                                   Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                                   const std::string& credential)
-    : RemoteDataFetcher(cm, uri, content_hash, callback), credential_(credential) {}
+ImageBlobFetcher::ImageBlobFetcher(
+    Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
+    const std::string& content_hash, Config::DataFetcher::RemoteDataFetcherCallback& callback,
+    std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
+    const std::string& registry)
+    : RemoteDataFetcher(cm, uri, content_hash, callback),
+      image_pull_secret_provider_(std::move(image_pull_secret_provider)), registry_(registry) {}
 
 void ImageBlobFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  if (!credential_.empty()) {
-    message->headers().setCopy(Http::CustomHeaders::get().Authorization, credential_);
+
+  if (image_pull_secret_provider_) {
+    const auto& image_pull_secret_raw = image_pull_secret_provider_->secret();
+    if (image_pull_secret_raw.empty()) {
+      ENVOY_LOG(debug, "fetch oci image blob from [uri = {}]: image pull secret empty", uri_.uri());
+    } else {
+      auto basic_authz_header = Oci::prepareAuthorizationHeader(image_pull_secret_raw, registry_);
+      if (basic_authz_header.ok()) {
+        message->headers().setCopy(Http::CustomHeaders::get().Authorization,
+                                   basic_authz_header.value());
+      } else {
+        ENVOY_LOG(error,
+                  "fetch oci image blob from [uri = {}]: failed to prepare Authorization header: ",
+                  uri_.uri(), basic_authz_header.status().message());
+        // TODO(jewertow): add failure reason "Internal"
+        callback_.onFailure(Config::DataFetcher::FailureReason::Network);
+      }
+    }
+  } else {
+    ENVOY_LOG(debug, "fetch oci image blob from [uri = {}]: image pull secret provider is null",
+              uri_.uri());
   }
 
   ENVOY_LOG(debug, "fetch oci image blob from [uri = {}]: start", uri_.uri());

@@ -23,7 +23,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
                                                                             source.sha256(), *this);
           },
           "RemoteAsyncDataProvider", manager, source, dispatcher, random, allow_empty,
-          std::move(callback)){};
+          std::move(callback)) {};
 
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     CreateFetcherFn&& create_fetcher_fn, absl::string_view target_name, Init::Manager& manager,
