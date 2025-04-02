@@ -534,6 +534,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via_upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via_upstream")));
+  }
+
+  {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS", "ALLOW_WHITESPACES");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via upstream")));
+  }
+
+  {
     StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
     absl::optional<std::string> details;
     EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
