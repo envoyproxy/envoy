@@ -27,6 +27,11 @@ public:
    * Returns algorithm-specific length of the calculated hash.
    */
   virtual uint32_t digestLength() PURE;
+
+  /**
+   * Returns algorithm-specific length of a hash encoded in base64.
+   */
+  virtual uint32_t base64EncodedHashLength() PURE;
 };
 
 using AlgorithmProviderSharedPtr = std::shared_ptr<AlgorithmProvider>;

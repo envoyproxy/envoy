@@ -3,11 +3,8 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/base64.h"
-#include "source/common/config/utility.h"
-#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/hash/factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,14 +22,7 @@ FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_
       authentication_header_(Http::LowerCaseString(authentication_header)),
       stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
-BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {
-  auto* factory = Envoy::Config::Utility::getFactoryByName<
-      Envoy::Extensions::Hash::NamedAlgorithmProviderConfigFactory>("envoy.hash.sha1");
-  if (factory == nullptr) {
-    throw EnvoyException("basic auth: did not find factory named 'envoy.hash.sha1'");
-  }
-  hash_algorithm_provider_ = factory->createAlgorithmProvider();
-}
+BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* route_specific_settings =
@@ -96,9 +86,9 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
     return false;
   }
 
-  auto password_hash = hash_algorithm_provider_->computeHash(password);
-  auto encoded_hash =
-      Base64::encode(password_hash.c_str(), hash_algorithm_provider_->digestLength());
+  auto algorithm_provider = user->second.algorithm_provider;
+  auto password_hash = algorithm_provider->computeHash(password);
+  auto encoded_hash = Base64::encode(password_hash.c_str(), algorithm_provider->digestLength());
   return encoded_hash == user->second.hash;
 }
 

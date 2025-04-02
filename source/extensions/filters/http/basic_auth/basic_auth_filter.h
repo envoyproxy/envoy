@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -36,6 +38,8 @@ struct User {
   std::string name;
   // the hashed password,  see https://httpd.apache.org/docs/2.4/misc/password_encryptions.html
   std::string hash;
+  // the algorithm provider for calculating hash of a given password
+  Hash::AlgorithmProviderSharedPtr algorithm_provider;
 };
 
 using UserMap = absl::flat_hash_map<std::string, User>;
@@ -96,7 +100,6 @@ private:
 
   // The callback function.
   FilterConfigConstSharedPtr config_;
-  Hash::AlgorithmProviderSharedPtr hash_algorithm_provider_;
 };
 
 } // namespace BasicAuth

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "source/extensions/hash/algorithm_provider.h"
 
 namespace Envoy {
@@ -14,6 +16,8 @@ public:
   std::string computeHash(absl::string_view input) override;
 
   uint32_t digestLength() override;
+
+  uint32_t base64EncodedHashLength() override;
 };
 
 using SHA1AlgorithmImplSharedPtr = std::shared_ptr<SHA1AlgorithmImpl>;

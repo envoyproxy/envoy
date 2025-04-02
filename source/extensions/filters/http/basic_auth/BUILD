@@ -16,12 +16,10 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
-        "//source/common/config:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/hash:algorithm_provider_config_interface",
         "//source/extensions/hash:algorithm_provider_interface",
         "@envoy_api//envoy/extensions/filters/http/basic_auth/v3:pkg_cc_proto",
     ],
@@ -37,6 +35,7 @@ envoy_cc_extension(
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/hash:algorithm_provider_config_interface",
         "@envoy_api//envoy/extensions/filters/http/basic_auth/v3:pkg_cc_proto",
     ],
 )

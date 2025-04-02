@@ -1,7 +1,9 @@
 #include "source/extensions/filters/http/basic_auth/config.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
+#include "source/extensions/hash/factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,6 +17,7 @@ namespace {
 
 UserMap readHtpasswd(const std::string& htpasswd) {
   UserMap users;
+  absl::flat_hash_map<std::string, Hash::AlgorithmProviderSharedPtr> algorithm_providers;
 
   std::istringstream htpsswd_ss(htpasswd);
   std::string line;
@@ -47,13 +50,22 @@ UserMap readHtpasswd(const std::string& htpasswd) {
       throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
     }
 
+    auto algorithm_provider = algorithm_providers["envoy.hash.sha1"];
+    if (algorithm_provider == nullptr) {
+      auto* factory = Envoy::Config::Utility::getFactoryByName<
+          Envoy::Extensions::Hash::NamedAlgorithmProviderConfigFactory>("envoy.hash.sha1");
+      if (factory == nullptr) {
+        throw EnvoyException("basic auth: did not find factory named 'envoy.hash.sha1'");
+      }
+      algorithm_provider = factory->createAlgorithmProvider();
+    }
+
     hash = hash.substr(5);
-    // The base64 encoded SHA1 hash is 28 bytes long
-    if (hash.length() != 28) {
+    if (hash.length() != algorithm_provider->base64EncodedHashLength()) {
       throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
     }
 
-    users.insert({name, {name, hash}});
+    users.insert({name, {name, hash, algorithm_provider}});
   }
 
   return users;

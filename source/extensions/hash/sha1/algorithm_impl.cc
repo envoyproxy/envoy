@@ -15,6 +15,9 @@ std::string SHA1AlgorithmImpl::computeHash(absl::string_view input) {
 
 uint32_t SHA1AlgorithmImpl::digestLength() { return SHA_DIGEST_LENGTH; }
 
+// The base64 encoded SHA1 hash is 28 bytes long
+uint32_t SHA1AlgorithmImpl::base64EncodedHashLength() { return 28; }
+
 } // namespace Hash
 } // namespace Extensions
 } // namespace Envoy

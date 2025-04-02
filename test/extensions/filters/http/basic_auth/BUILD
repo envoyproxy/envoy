@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.basic_auth"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/basic_auth:basic_auth_lib",
         "//source/extensions/hash/sha1:config",
         "//test/mocks/server:server_mocks",
