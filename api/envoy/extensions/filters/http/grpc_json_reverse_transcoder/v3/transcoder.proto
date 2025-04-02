@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON reverse transcoder :ref:`configuration overview <config_http_filters_grpc_json_reverse_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_reverse_transcoder]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 // ``GrpcJsonReverseTranscoder`` is the filter configuration for the gRPC JSON
 // reverse transcoder. The reverse transcoder acts as a bridge between a gRPC
 // client and an HTTP/JSON server, converting the gRPC request into HTTP/JSON
@@ -26,6 +26,24 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`grpc_json_transcoder filter <config_http_filters_grpc_json_transcoder>`,
 // allowing a gRPC client to communicate with an HTTP/JSON server.
 message GrpcJsonReverseTranscoder {
+  message PrintOptions {
+    // Whether to always print primitive fields. By default primitive
+    // fields with default values will be omitted in JSON output. For
+    // example, an int32 field set to 0 will be omitted. Setting this flag to
+    // true will override the default behavior and print primitive fields
+    // regardless of their values. Defaults to false.
+    bool always_print_primitive_fields = 1;
+
+    // Whether to always print enums as ints. By default they are rendered
+    // as strings. Defaults to false.
+    bool always_print_enums_as_ints = 2;
+
+    // Whether to preserve proto field names. By default protobuf will
+    // generate JSON field names using the ``json_name`` option, or lower camel case,
+    // in that order. Setting this flag will preserve the original field names. Defaults to false.
+    bool preserve_proto_field_names = 3;
+  }
+
   // Supplies the filename of
   // :ref:`the proto descriptor set
   // <config_grpc_json_reverse_transcoder_generate_proto_descriptor_set>` for the gRPC services.
@@ -58,4 +76,9 @@ message GrpcJsonReverseTranscoder {
 
   // The name of the header field that has the API version of the request.
   string api_version_header = 5;
+
+  // Control options for upstream request JSON. These options are passed directly to
+  // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/
+  // google.protobuf.util.json_util#JsonPrintOptions>`_.
+  PrintOptions print_options = 6;
 }

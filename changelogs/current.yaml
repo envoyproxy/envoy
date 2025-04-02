@@ -49,6 +49,9 @@ minor_behavior_changes:
 - area: golang
   change: |
     Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
+- area: grpc-json
+  change: |
+    Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
