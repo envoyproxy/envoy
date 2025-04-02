@@ -14,6 +14,7 @@ constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
 constexpr char TOKEN[] = "Token";
+constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
 
 #define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \
   COUNTER(credential_refreshes_performed)                                                          \

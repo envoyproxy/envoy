@@ -1,16 +1,10 @@
 #pragma once
 
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
-#include "source/common/common/logger.h"
-#include "source/common/config/datasource.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
-#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
 
 namespace Envoy {

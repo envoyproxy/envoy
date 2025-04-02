@@ -1,27 +1,5 @@
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 
-// #include <chrono>
-// #include <memory>
-
-// #include "envoy/common/exception.h"
-
-// #include "source/common/common/base64.h"
-// #include "source/common/common/lock_guard.h"
-// #include "source/common/http/message_impl.h"
-// #include "source/common/http/utility.h"
-// #include "source/common/json/json_loader.h"
-// #include "source/common/protobuf/protobuf.h"
-// #include "source/common/runtime/runtime_features.h"
-// #include "source/extensions/common/aws/credentials_provider.h"
-// #include "source/extensions/common/aws/credentials_provider_impl.h"
-// #include "source/extensions/common/aws/metadata_fetcher.h"
-// #include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
-// #include "source/extensions/common/aws/utility.h"
-
-// #include "absl/strings/str_format.h"
-// #include "absl/strings/str_split.h"
-// #include "fmt/chrono.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

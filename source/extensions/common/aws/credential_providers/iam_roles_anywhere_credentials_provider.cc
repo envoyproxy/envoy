@@ -1,16 +1,5 @@
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
 
-#include <chrono>
-#include <memory>
-
-#include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
-#include "source/extensions/common/aws/utility.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

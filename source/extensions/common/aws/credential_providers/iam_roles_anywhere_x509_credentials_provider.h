@@ -1,15 +1,11 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
-
-#include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer.h"
+#include "envoy/server/factory_context.h"
+#include "source/common/common/base64.h" // IWYU pragma: export
 
 namespace Envoy {
 namespace Extensions {
