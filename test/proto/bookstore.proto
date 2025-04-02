@@ -24,6 +24,13 @@ service Bookstore {
       body: "shelf"
     };
   }
+  // Update an existing shelf
+  rpc UpdateShelf(UpdateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      put: "/shelves/{new_shelf.id}"
+      body: "new_shelf"
+    };
+  }
   // Creates a new shelf in the bookstore via a mapped package.service.method as its HTTP path.
   rpc CreateShelfWithPackageServiceAndMethod(CreateShelfRequest) returns (Shelf) {
     option (google.api.http) = {
@@ -97,6 +104,13 @@ service Bookstore {
   rpc GetAuthor(GetAuthorRequest) returns (Author) {
     option (google.api.http) = {
       get: "/authors/{author}"
+    };
+  }
+  // Updates an Author
+  rpc UpdateAuthor(UpdateAuthorRequest) returns (Author) {
+    option (google.api.http) = {
+      patch: "/authors/{author.id}"
+      body: "author"
     };
   }
   // Echo an Author to test enum encode/decode.
@@ -200,6 +214,15 @@ service ServiceWithResponseBody {
   }
 }
 
+service ServiceWithInvalidRequestBody {
+  rpc UpdateAuthor(UpdateAuthorRequest) returns (Author) {
+    option (google.api.http) = {
+      patch: "/authors/{author.id}"
+      body: "authors"
+    };
+  }
+}
+
 service ServiceWithInvalidRequestBodyPath {
   rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
     option (google.api.http) = {
@@ -278,6 +301,12 @@ message CreateShelfRequest {
   Shelf shelf = 1;
 }
 
+// Request message for UpdateShelf method.
+message UpdateShelfRequest {
+  // The self resource to update
+  Shelf new_shelf = 1;
+}
+
 // Request message for GetShelf method.
 message GetShelfRequest {
   // The ID of the shelf resource to retrieve.
@@ -348,6 +377,10 @@ message DeleteBookRequest {
 message GetAuthorRequest {
   // The ID of the author resource to retrieve.
   int64 author = 1;
+}
+
+message UpdateAuthorRequest {
+  Author author = 1 [json_name = "authorDetails"];
 }
 
 message EchoBodyRequest {
