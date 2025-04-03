@@ -262,10 +262,29 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   EXPECT_EQ(response_trailer->maxHeadersKb(), 60);
 }
 
+TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCode) {
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::OverloadManager),
+            quic::QUIC_STREAM_EXCESSIVE_LOAD);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalRefusedStreamReset),
+            quic::QUIC_REFUSED_STREAM);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalConnectionFailure),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteConnectionFailure),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectionTimeout),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectionTermination),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectError),
+            quic::QUIC_STREAM_CONNECT_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalReset),
+            quic::QUIC_STREAM_REQUEST_REJECTED);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ProtocolError),
+            quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR);
+}
+
 TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {
   EXPECT_ENVOY_BUG(envoyResetReasonToQuicRstError(Http::StreamResetReason::Overflow),
-                   "Resource overflow ");
-  EXPECT_ENVOY_BUG(envoyResetReasonToQuicRstError(Http::StreamResetReason::OverflowManager),
                    "Resource overflow ");
   EXPECT_ENVOY_BUG(
       envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteRefusedStreamReset),
