@@ -33,14 +33,13 @@ class Entry {
 public:
   Entry(const Entry&) = delete;
   Entry& operator=(const Entry&) = delete;
-  Entry(uint64_t time, std::map<std::string, std::string>&& record)
-      : time_(time), record_(record) {}
-  Entry(uint64_t time, std::vector<uint8_t>&& vector_record)
-      : time_(time), vector_record_(vector_record) {}
+  Entry(uint64_t time, std::vector<uint8_t>&& record) : time_(time), record_(record) {}
+  Entry(uint64_t time, std::map<std::string, std::string>&& map_record)
+      : time_(time), map_record_(map_record) {}
 
   const uint64_t time_;
-  const std::map<std::string, std::string> record_;
-  const std::vector<uint8_t> vector_record_;
+  const std::vector<uint8_t> record_;
+  const std::map<std::string, std::string> map_record_;
 };
 
 using EntryPtr = std::unique_ptr<Entry>;
@@ -124,8 +123,7 @@ public:
 
   virtual SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
                                     Random::RandomGenerator& random,
-                                    BackOffStrategyPtr backoff_strategy,
-                                    TimeSource& time_source) = 0;
+                                    BackOffStrategyPtr backoff_strategy) = 0;
 };
 
 template <typename T, typename ConfigType, typename SharedPtrType, typename WeakPtrType>
@@ -143,8 +141,8 @@ public:
   virtual ~FluentdCacheBase() = default;
 
   SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
-                            Random::RandomGenerator& random, BackOffStrategyPtr backoff_strategy,
-                            TimeSource& time_source) override {
+                            Random::RandomGenerator& random,
+                            BackOffStrategyPtr backoff_strategy) override {
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = MessageUtil::hash(*config);
     auto it = cache.instances_.find(cache_key);
@@ -161,7 +159,7 @@ public:
         cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
 
     auto instance = createInstance(*cluster, std::move(client), cache.dispatcher_, *config,
-                                   std::move(backoff_strategy), random, time_source);
+                                   std::move(backoff_strategy), random);
     cache.instances_.emplace(cache_key, instance);
     return instance;
   }
@@ -171,8 +169,7 @@ protected:
                                        Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher,
                                        const ConfigType& config,
                                        BackOffStrategyPtr backoff_strategy,
-                                       Random::RandomGenerator& random,
-                                       TimeSource& time_source) = 0;
+                                       Random::RandomGenerator& random) = 0;
 
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
