@@ -49,6 +49,9 @@ minor_behavior_changes:
 - area: golang
   change: |
     Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
+- area: access_log
+  change: |
+    Refactor shareable fluentd forward logic to common fluentd_base class, in preparation for future fluentd extensions.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
