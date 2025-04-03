@@ -28,6 +28,8 @@ public:
     return worker_lb_->peekAnotherHost(context);
   }
 
+  void refreshWorkerForPriority(uint32_t priority) { worker_lb_->refresh(priority); }
+
   absl::Status initialize() { return lb_->initialize(); }
 
   void updateWeightsOnMainThread() { lb_->updateWeightsOnMainThread(); }
@@ -297,6 +299,20 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
   for (const auto& host_ptr : hostSet().hosts_) {
     EXPECT_EQ(host_ptr->weight(), 2000);
   }
+}
+
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, RefreshWorkerWithRemovedHostSetsForPriority) {
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  init(false);
+
+  // Remove priority set with priority 1 to simulate the case when
+  // applyWeightsToAllWorkers() posts the worker update for the priority
+  // that was removed.
+  priority_set_.host_sets_.erase(priority_set_.host_sets_.begin() + 1);
+  // Simulate applyWeightsToAllWorkers() refreshing the worker.
+  lb_->refreshWorkerForPriority(0);
+  // Expect no crash.
+  lb_->refreshWorkerForPriority(1);
 }
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_FirstReport) {
