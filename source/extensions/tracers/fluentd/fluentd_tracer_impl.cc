@@ -125,7 +125,7 @@ Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
     : tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       fluentd_config_(fluentd_config), tracer_cache_(tracer_cache) {
   Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
-  TimeSource* time_source = &context.serverFactoryContext().timeSource();
+  TimeSource& time_source = context.serverFactoryContext().timeSource();
 
   uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
   uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
@@ -186,7 +186,7 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
                                      const FluentdConfig& config,
                                      BackOffStrategyPtr backoff_strategy,
                                      Stats::Scope& parent_scope, Random::RandomGenerator& random,
-                                     TimeSource* time_source)
+                                     TimeSource& time_source)
     : FluentdBase(
           cluster, std::move(client), dispatcher, config.tag(),
           config.has_retry_policy() && config.retry_policy().has_num_retries()
@@ -201,7 +201,7 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
 // Initialize a span object
 Span::Span(Tracing::TraceContext& trace_context, SystemTime start_time,
            const std::string& operation_name, Tracing::Decision tracing_decision,
-           FluentdTracerSharedPtr tracer, const SpanContext& span_context, TimeSource* time_source)
+           FluentdTracerSharedPtr tracer, const SpanContext& span_context, TimeSource& time_source)
     : trace_context_(trace_context), start_time_(start_time), operation_(operation_name),
       tracing_decision_(tracing_decision), tracer_(tracer), span_context_(span_context),
       time_source_(time_source) {}
@@ -217,7 +217,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 // Log an event as a Fluentd entry
 void Span::log(SystemTime /*timestamp*/, const std::string& event) {
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(
-                      time_source_->systemTime().time_since_epoch())
+                      time_source_.systemTime().time_since_epoch())
                       .count();
 
   EntryPtr entry =
@@ -229,7 +229,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 // Finish and log a span as a Fluentd entry
 void Span::finishSpan() {
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(
-                      time_source_->systemTime().time_since_epoch())
+                      time_source_.systemTime().time_since_epoch())
                       .count();
 
   // Make the record map

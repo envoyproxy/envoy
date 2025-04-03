@@ -47,7 +47,7 @@ protected:
                                               Event::Dispatcher& dispatcher,
                                               const FluentdAccessLogConfig& config,
                                               BackOffStrategyPtr backoff_strategy,
-                                              Random::RandomGenerator&, TimeSource*) override {
+                                              Random::RandomGenerator&, TimeSource&) override {
     return std::make_shared<FluentdAccessLoggerImpl>(cluster, std::move(client), dispatcher, config,
                                                      std::move(backoff_strategy), *stats_scope_);
   }

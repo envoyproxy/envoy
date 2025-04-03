@@ -58,11 +58,12 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
   }
 
   tls_slot_->set([config = config_, &random, access_logger_cache = access_logger_cache_,
-                  base_interval_ms, max_interval_ms](Event::Dispatcher&) {
+                  base_interval_ms, max_interval_ms](Event::Dispatcher& dispatcher) {
     BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, random);
+    TimeSource& time_source = dispatcher.timeSource();
     return std::make_shared<ThreadLocalLogger>(
-        access_logger_cache->getOrCreate(config, random, std::move(backoff_strategy)));
+        access_logger_cache->getOrCreate(config, random, std::move(backoff_strategy), time_source));
   });
 }
 
