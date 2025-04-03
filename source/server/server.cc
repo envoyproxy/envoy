@@ -288,6 +288,7 @@ void InstanceBase::updateServerStats() {
 
 void InstanceBase::flushStatsInternal() {
   updateServerStats();
+  sslContextManager().updateTlsCertificateExpiryStats();
   auto& stats_config = config_.statsConfig();
   InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
                                     timeSource());

@@ -185,7 +185,7 @@ message PrivateKeyProvider {
   bool fallback = 4;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -252,6 +252,9 @@ message TlsCertificate {
 
   // [#not-implemented-hide:]
   repeated config.core.v3.DataSource signed_certificate_timestamp = 5;
+  
+  // The name of this TLS certificate.
+  string stat_prefix = 9;
 }
 
 message TlsSessionTicketKeys {
