@@ -108,7 +108,8 @@ public:
     }
   }
 
-  void setHttpResponseCodeDetails(absl::optional<std::string> http_response_code_details) {
+  void setHttpResponseCodeDetails(
+    const absl::optional<std::string>& http_response_code_details) {
     if (http_response_code_details) {
       http_response_code_details_ = http_response_code_details.value();
     }
