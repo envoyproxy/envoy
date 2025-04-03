@@ -33,7 +33,10 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
     uses: ./.github/workflows/_load.yml
     with:
       check-name: prechecks
@@ -46,7 +49,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    name: Precheck (${{ fromJSON(needs.load.outputs.request).summary.title }})
+    name: Precheck (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_precheck_format.yml
     if: ${{ fromJSON(needs.load.outputs.request).run.precheck-format }}
     needs:
@@ -54,7 +57,7 @@ jobs:
     with:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   deps:
     secrets:
@@ -64,7 +67,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    name: Precheck (${{ fromJSON(needs.load.outputs.request).summary.title }})
+    name: Precheck (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_precheck_deps.yml
     if: ${{ fromJSON(needs.load.outputs.request).run.precheck-deps }}
     needs:
@@ -73,18 +76,22 @@ jobs:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       dependency-review: ${{ github.event_name == 'pull_request_target' && github.repository == 'envoyproxy/envoy' }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   publish:
     secrets:
-      gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      gcp-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
+            || secrets.GCP_SERVICE_ACCOUNT_KEY }}
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
       packages: read
       pull-requests: read
-    name: Precheck (${{ fromJSON(needs.load.outputs.request).summary.title }})
+    name: Precheck (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
     uses: ./.github/workflows/_precheck_publish.yml
     if: ${{ fromJSON(needs.load.outputs.request).run.precheck-publish }}
     needs:
@@ -92,7 +99,7 @@ jobs:
     with:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
   request:
     secrets:
@@ -102,12 +109,14 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    if: >-
-      ${{ always()
-          && github.event.workflow_run.conclusion == 'success'
-          && (fromJSON(needs.load.outputs.request).run.precheck-format
-              || fromJSON(needs.load.outputs.request).run.precheck-deps
-              || fromJSON(needs.load.outputs.request).run.precheck-publish) }}
+    if: |
+      always()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (fromJSON(needs.load.outputs.request).run.precheck-format
+          || fromJSON(needs.load.outputs.request).run.precheck-deps
+          || fromJSON(needs.load.outputs.request).run.precheck-publish)
     needs:
     - load
     - format
