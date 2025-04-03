@@ -185,6 +185,7 @@ public:
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
+    EXPECT_CALL(write_total_, add(_)).Times(AnyNumber());
     EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionClosed(_, _));
   }
 
@@ -273,7 +274,8 @@ protected:
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
   testing::StrictMock<Stats::MockGauge> read_current_;
-  testing::StrictMock<Stats::MockCounter> write_total_;
+  // Currently QUIC only populates write_total_.
+  testing::NiceMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
