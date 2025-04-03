@@ -39,7 +39,7 @@ class FluentdAccessLoggerCacheImpl
 public:
   FluentdAccessLoggerCacheImpl(Upstream::ClusterManager& cluster_manager,
                                Stats::Scope& parent_scope, ThreadLocal::SlotAllocator& tls)
-      : FluentdCacheBase(cluster_manager, parent_scope, tls, "access_logs.fluentd"){};
+      : FluentdCacheBase(cluster_manager, parent_scope, tls, "access_logs.fluentd") {};
 
 protected:
   FluentdAccessLoggerSharedPtr createInstance(Upstream::ThreadLocalCluster& cluster,
