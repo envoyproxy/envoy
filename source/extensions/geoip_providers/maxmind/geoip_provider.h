@@ -19,9 +19,10 @@ public:
   GeoipProviderConfig(const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
                       const std::string& stat_prefix, Stats::Scope& scope);
 
-  const absl::optional<std::string>& cityDbPath() const { return city_db_path_; }
-  const absl::optional<std::string>& ispDbPath() const { return isp_db_path_; }
-  const absl::optional<std::string>& anonDbPath() const { return anon_db_path_; }
+  const absl::optional<std::string>& cityDbPath() const { return db_path_city_; }
+  const absl::optional<std::string>& ispDbPath() const { return db_path_isp_; }
+  const absl::optional<std::string>& anonDbPath() const { return db_path_anon_; }
+  const absl::optional<std::string>& asnDbPath() const { return db_path_asn_; }
 
   bool isLookupEnabledForHeader(const absl::optional<std::string>& header);
 
@@ -35,6 +36,11 @@ public:
   const absl::optional<std::string>& anonHostingHeader() const { return anon_hosting_header_; }
   const absl::optional<std::string>& anonTorHeader() const { return anon_tor_header_; }
   const absl::optional<std::string>& anonProxyHeader() const { return anon_proxy_header_; }
+
+  const absl::optional<std::string>& ispHeader() const { return isp_header_; }
+  const absl::optional<std::string>& applePrivateRelayHeader() const {
+    return apple_private_relay_header_;
+  }
 
   void incLookupError(absl::string_view maxmind_db_type) {
     incCounter(
@@ -64,9 +70,10 @@ public:
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
 
 private:
-  absl::optional<std::string> city_db_path_;
-  absl::optional<std::string> isp_db_path_;
-  absl::optional<std::string> anon_db_path_;
+  absl::optional<std::string> db_path_city_;
+  absl::optional<std::string> db_path_isp_;
+  absl::optional<std::string> db_path_anon_;
+  absl::optional<std::string> db_path_asn_;
 
   absl::optional<std::string> country_header_;
   absl::optional<std::string> city_header_;
@@ -78,6 +85,9 @@ private:
   absl::optional<std::string> anon_hosting_header_;
   absl::optional<std::string> anon_tor_header_;
   absl::optional<std::string> anon_proxy_header_;
+
+  absl::optional<std::string> isp_header_;
+  absl::optional<std::string> apple_private_relay_header_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
@@ -120,6 +130,7 @@ private:
   MaxmindDbSharedPtr city_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr isp_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   MaxmindDbSharedPtr anon_db_ ABSL_GUARDED_BY(mmdb_mutex_);
+  MaxmindDbSharedPtr asn_db_ ABSL_GUARDED_BY(mmdb_mutex_);
   Thread::ThreadPtr mmdb_reload_thread_;
   Event::DispatcherPtr mmdb_reload_dispatcher_;
   Filesystem::WatcherPtr mmdb_watcher_;
@@ -131,6 +142,8 @@ private:
                      absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   void lookupInAnonDb(const Network::Address::InstanceConstSharedPtr& remote_address,
                       absl::flat_hash_map<std::string, std::string>& lookup_result) const;
+  void lookupInIspDb(const Network::Address::InstanceConstSharedPtr& remote_address,
+                     absl::flat_hash_map<std::string, std::string>& lookup_result) const;
   absl::Status onMaxmindDbUpdate(const std::string& db_path, const absl::string_view& db_type);
   absl::Status mmdbReload(const MaxmindDbSharedPtr reloaded_db, const absl::string_view& db_type)
       ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
@@ -141,9 +154,11 @@ private:
   MaxmindDbSharedPtr getCityDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getIspDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   MaxmindDbSharedPtr getAnonDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
+  MaxmindDbSharedPtr getAsnDb() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateCityDb(MaxmindDbSharedPtr city_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateIspDb(MaxmindDbSharedPtr isp_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   void updateAnonDb(MaxmindDbSharedPtr anon_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
+  void updateAsnDb(MaxmindDbSharedPtr asn_db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
   // Used for testing only.
