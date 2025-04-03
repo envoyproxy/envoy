@@ -338,8 +338,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateLoggerWhenClusterNotFound) {
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
-                                           random_, std::unique_ptr<BackOffStrategy>{}, time_source_);
+  auto logger =
+      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config), random_,
+                                 std::unique_ptr<BackOffStrategy>{}, time_source_);
 
   EXPECT_TRUE(logger == nullptr);
 }
@@ -355,8 +356,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
   config.set_cluster(cluster_name_);
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto logger = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config),
-                                           random_, std::unique_ptr<BackOffStrategy>{}, time_source_);
+  auto logger =
+      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config), random_,
+                                 std::unique_ptr<BackOffStrategy>{}, time_source_);
   EXPECT_TRUE(logger != nullptr);
 }
 
@@ -371,16 +373,18 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersSameHash) {
   config1.set_cluster(cluster_name_);
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
-  auto logger1 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1),
-                                            random_, std::unique_ptr<BackOffStrategy>{}, time_source_);
+  auto logger1 =
+      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1), random_,
+                                 std::unique_ptr<BackOffStrategy>{}, time_source_);
   EXPECT_TRUE(logger1 != nullptr);
 
   envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config2;
   config2.set_cluster(cluster_name_); // config hash will be different than config1
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
-  auto logger2 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2),
-                                            random_, std::unique_ptr<BackOffStrategy>{}, time_source_);
+  auto logger2 =
+      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2), random_,
+                                 std::unique_ptr<BackOffStrategy>{}, time_source_);
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got the same logger
@@ -401,8 +405,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config1.set_cluster(cluster_name_);
   config1.set_tag("test.tag");
   config1.mutable_buffer_size_bytes()->set_value(123);
-  auto logger1 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1),
-                                            random_, std::unique_ptr<BackOffStrategy>{}, time_source_);
+  auto logger1 =
+      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config1), random_,
+                                 std::unique_ptr<BackOffStrategy>{}, time_source_);
   EXPECT_TRUE(logger1 != nullptr);
 
   Event::MockTimer* flush_timer2 = new Event::MockTimer(&dispatcher_);
@@ -414,8 +419,9 @@ TEST_F(FluentdAccessLoggerCacheImplTest, CreateTwoLoggersDifferentHash) {
   config2.set_cluster("different_cluster"); // config hash will be different than config1
   config2.set_tag("test.tag");
   config2.mutable_buffer_size_bytes()->set_value(123);
-  auto logger2 = logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2),
-                                            random_, std::unique_ptr<BackOffStrategy>{}, time_source_);
+  auto logger2 =
+      logger_cache_->getOrCreate(std::make_shared<FluentdAccessLogConfig>(config2), random_,
+                                 std::unique_ptr<BackOffStrategy>{}, time_source_);
   EXPECT_TRUE(logger2 != nullptr);
 
   // Make sure we got two different loggers
