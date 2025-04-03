@@ -14,6 +14,7 @@ namespace Http {
 namespace ConnectionPool {
 
 using PoolFailureReason = ::Envoy::ConnectionPool::PoolFailureReason;
+
 using Cancellable = ::Envoy::ConnectionPool::Cancellable;
 
 /**
