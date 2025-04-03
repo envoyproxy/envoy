@@ -34,8 +34,8 @@ void FluentdAccessLoggerImpl::packMessage(MessagePackPacker& packer) {
   for (auto& entry : entries_) {
     packer.pack_array(2); // 1 - time, 2 - record.
     packer.pack(entry->time_);
-    const char* record_bytes = reinterpret_cast<const char*>(&entry->vector_record_[0]);
-    packer.pack_bin_body(record_bytes, entry->vector_record_.size());
+    const char* record_bytes = reinterpret_cast<const char*>(&entry->record_[0]);
+    packer.pack_bin_body(record_bytes, entry->record_.size());
   }
 }
 
@@ -58,12 +58,11 @@ FluentdAccessLog::FluentdAccessLog(AccessLog::FilterPtr&& filter, FluentdFormatt
   }
 
   tls_slot_->set([config = config_, &random, access_logger_cache = access_logger_cache_,
-                  base_interval_ms, max_interval_ms](Event::Dispatcher& dispatcher) {
+                  base_interval_ms, max_interval_ms](Event::Dispatcher&) {
     BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, random);
-    TimeSource& time_source = dispatcher.timeSource();
     return std::make_shared<ThreadLocalLogger>(
-        access_logger_cache->getOrCreate(config, random, std::move(backoff_strategy), time_source));
+        access_logger_cache->getOrCreate(config, random, std::move(backoff_strategy)));
   });
 }
 

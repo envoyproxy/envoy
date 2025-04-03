@@ -125,7 +125,6 @@ Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
     : tls_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       fluentd_config_(fluentd_config), tracer_cache_(tracer_cache) {
   Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
-  TimeSource& time_source = context.serverFactoryContext().timeSource();
 
   uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
   uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
@@ -139,13 +138,12 @@ Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
   }
 
   // Create a thread local tracer
-  tls_slot_->set([fluentd_config = fluentd_config_, &random, &time_source,
-                  tracer_cache = tracer_cache_, base_interval_ms,
-                  max_interval_ms](Event::Dispatcher&) {
+  tls_slot_->set([fluentd_config = fluentd_config_, &random, tracer_cache = tracer_cache_,
+                  base_interval_ms, max_interval_ms](Event::Dispatcher&) {
     BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, random);
-    return std::make_shared<ThreadLocalTracer>(tracer_cache->getOrCreate(
-        fluentd_config, random, std::move(backoff_strategy), time_source));
+    return std::make_shared<ThreadLocalTracer>(
+        tracer_cache->getOrCreate(fluentd_config, random, std::move(backoff_strategy)));
   });
 }
 
@@ -185,8 +183,7 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
                                      Tcp::AsyncTcpClientPtr client, Event::Dispatcher& dispatcher,
                                      const FluentdConfig& config,
                                      BackOffStrategyPtr backoff_strategy,
-                                     Stats::Scope& parent_scope, Random::RandomGenerator& random,
-                                     TimeSource& time_source)
+                                     Stats::Scope& parent_scope, Random::RandomGenerator& random)
     : FluentdBase(
           cluster, std::move(client), dispatcher, config.tag(),
           config.has_retry_policy() && config.retry_policy().has_num_retries()
@@ -196,7 +193,7 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
           PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)),
       option_({{"fluent_signal", "2"}, {"TimeFormat", "DateTime"}}), random_(random),
-      time_source_(time_source) {}
+      time_source_(dispatcher.timeSource()) {}
 
 // Initialize a span object
 Span::Span(Tracing::TraceContext& trace_context, SystemTime start_time,
@@ -341,8 +338,8 @@ void FluentdTracerImpl::packMessage(MessagePackPacker& packer) {
   for (auto& entry : entries_) {
     packer.pack_array(2); // 1 - time, 2 - record.
     packer.pack(entry->time_);
-    packer.pack_map(entry->record_.size());
-    for (const auto& pair : entry->record_) {
+    packer.pack_map(entry->map_record_.size());
+    for (const auto& pair : entry->map_record_) {
       packer.pack(pair.first);
       packer.pack(pair.second);
     }

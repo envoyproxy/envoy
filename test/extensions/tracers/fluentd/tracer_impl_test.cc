@@ -48,7 +48,7 @@ public:
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     tracer_ = std::make_unique<FluentdTracerImpl>(
         cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_system_);
+        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_);
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
@@ -86,7 +86,6 @@ public:
   std::unique_ptr<FluentdTracerImpl> tracer_;
   envoy::extensions::tracers::fluentd::v3::FluentdConfig config_;
   NiceMock<Random::MockRandomGenerator> random_;
-  Event::SimulatedTimeSystem time_system_;
 };
 
 // Fluentd tracer does not write if not connected to upstream.
@@ -332,7 +331,7 @@ TEST_F(FluentdTracerImplTest, TimerFlush) {
   config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
   tracer_ = std::make_unique<FluentdTracerImpl>(
       cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-      BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_system_);
+      BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_);
 
   // Traced event will be logged on timer flush
   EXPECT_CALL(*backoff_strategy_, reset());
@@ -397,8 +396,7 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
   config.mutable_buffer_size_bytes()->set_value(123);
   auto tracer = tracer_cache_->getOrCreate(
       std::make_shared<envoy::extensions::tracers::fluentd::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{},
-      context.serverFactoryContext().timeSource());
+      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{});
   EXPECT_EQ(tracer, nullptr);
 }
 
@@ -410,8 +408,7 @@ TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
   config.mutable_buffer_size_bytes()->set_value(123);
   auto tracer = tracer_cache_->getOrCreate(
       std::make_shared<envoy::extensions::tracers::fluentd::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{},
-      context.serverFactoryContext().timeSource());
+      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{});
   EXPECT_NE(tracer, nullptr);
 }
 
@@ -424,13 +421,11 @@ TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
 
   auto tracer1 = tracer_cache_->getOrCreate(
       std::make_shared<envoy::extensions::tracers::fluentd::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{},
-      context.serverFactoryContext().timeSource());
+      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{});
 
   auto tracer2 = tracer_cache_->getOrCreate(
       std::make_shared<envoy::extensions::tracers::fluentd::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{},
-      context.serverFactoryContext().timeSource());
+      context.serverFactoryContext().api().randomGenerator(), std::unique_ptr<BackOffStrategy>{});
 
   EXPECT_EQ(tracer1, tracer2);
 }

@@ -46,7 +46,8 @@ void FluentdBase::log(EntryPtr&& entry) {
     return;
   }
 
-  approximate_message_size_bytes_ += sizeof(entry->time_) + entry->record_.size();
+  approximate_message_size_bytes_ +=
+      sizeof(entry->time_) + entry->record_.size() + entry->map_record_.size();
   entries_.push_back(std::move(entry));
   fluentd_stats_.entries_buffered_.inc();
   if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {

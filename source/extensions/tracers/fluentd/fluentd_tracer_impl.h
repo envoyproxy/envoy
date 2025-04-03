@@ -80,7 +80,7 @@ public:
   FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
                     Event::Dispatcher& dispatcher, const FluentdConfig& config,
                     BackOffStrategyPtr backoff_strategy, Stats::Scope& parent_scope,
-                    Random::RandomGenerator& random, TimeSource& time_source);
+                    Random::RandomGenerator& random);
 
   Tracing::SpanPtr startSpan(Tracing::TraceContext& trace_context, SystemTime start_time,
                              const std::string& operation_name, Tracing::Decision tracing_decision);
@@ -115,11 +115,9 @@ protected:
                                         Tcp::AsyncTcpClientPtr client,
                                         Event::Dispatcher& dispatcher, const FluentdConfig& config,
                                         BackOffStrategyPtr backoff_strategy,
-                                        Random::RandomGenerator& random,
-                                        TimeSource& time_source) override {
+                                        Random::RandomGenerator& random) override {
     return std::make_shared<FluentdTracerImpl>(cluster, std::move(client), dispatcher, config,
-                                               std::move(backoff_strategy), *stats_scope_, random,
-                                               time_source);
+                                               std::move(backoff_strategy), *stats_scope_, random);
   }
 };
 
