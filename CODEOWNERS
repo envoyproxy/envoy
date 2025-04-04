@@ -359,6 +359,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 # Match delegate extension
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
+/*/extensions/filters/network/match_delegate @botengyao @yanavlasov
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
