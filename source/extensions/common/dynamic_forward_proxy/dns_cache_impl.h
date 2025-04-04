@@ -122,11 +122,9 @@ private:
       return address_;
     }
 
-    std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override {
-      std::vector<Network::Address::InstanceConstSharedPtr> ret;
+    const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
       absl::ReaderMutexLock lock{&resolve_lock_};
-      ret = address_list_;
-      return ret;
+      return address_list_;
     }
 
     const std::string& resolvedHost() const override { return resolved_host_; }

@@ -51,7 +51,7 @@ public:
    * Returns the host's currently resolved address. These addresses may change periodically due to
    * async re-resolution.
    */
-  virtual std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
+  virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
 
   /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
