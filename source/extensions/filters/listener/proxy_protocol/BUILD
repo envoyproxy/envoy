@@ -40,6 +40,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
 
@@ -54,5 +55,6 @@ envoy_cc_extension(
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/udp/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
