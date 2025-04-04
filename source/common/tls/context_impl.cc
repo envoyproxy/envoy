@@ -572,19 +572,6 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (!cert.get()) {
     stats_.no_certificate_.inc();
   }
-
-#if defined(BORINGSSL_FIPS) && BORINGSSL_API_VERSION >= 18
-#error "Delete preprocessor check below; no longer needed"
-#endif
-
-#if BORINGSSL_API_VERSION >= 18
-  // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
-  // error but is allowed because the enforcement that rsa key usage and tls usage need to be
-  // matched has been disabled.
-  if (SSL_was_key_usage_invalid(ssl)) {
-    stats_.was_key_usage_invalid_.inc();
-  }
-#endif // BORINGSSL_API_VERSION
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
