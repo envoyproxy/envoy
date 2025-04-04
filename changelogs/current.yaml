@@ -300,6 +300,11 @@ new_features:
   change: |
     Added support for clearing the route cache explicitly in the Lua filter.
     See :ref:`clearRouteCache() <config_http_filters_lua_stream_handle_api_clear_route_cache>` for more details.
+- area: tracing
+  change: |
+    added support for :ref:`Fluentd <arch_overview_tracing>` tracer to send
+    traces in `Fluentd format
+    <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: local_rate_limit
   change: |
     Added support for dynamic token buckets in local rate limit filter for http requests.
