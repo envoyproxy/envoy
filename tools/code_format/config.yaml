@@ -196,6 +196,7 @@ paths:
     - source/extensions/filters/network/thrift_proxy
     - source/extensions/filters/network/generic_proxy
     - source/extensions/filters/network/ratelimit
+    - source/extensions/filters/network/match_delegate
     - source/extensions/filters/common
     - source/extensions/filters/udp
     - source/extensions/filters/listener
@@ -216,7 +217,6 @@ paths:
     - source/extensions/load_balancing_policies/subset
     - source/extensions/matching
     - source/extensions/network/dns_resolver/cares/
-    - source/extensions/network/match_delegate
     - source/extensions/quic/server_preferred_address
     - source/extensions/quic/connection_id_generator
     - source/extensions/rate_limit_descriptors
