@@ -55,8 +55,12 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
                              common_config,
                              /*round_robin_config=*/std::nullopt, time_source) {
   if (tls_shim.has_value()) {
-    apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) {
-      refresh(priority);
+    apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this]() {
+      for (const HostSetPtr& host_set : priority_set_.hostSetsPerPriority()) {
+        if (host_set != nullptr) {
+          refresh(host_set->priority());
+        }
+      }
       return absl::OkStatus();
     });
   }
@@ -76,11 +80,13 @@ void ClientSideWeightedRoundRobinLoadBalancer::initFromConfig(
 
 void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnMainThread() {
   ENVOY_LOG(trace, "updateWeightsOnMainThread");
+  bool updated = false;
   for (const HostSetPtr& host_set : priority_set_.hostSetsPerPriority()) {
-    if (updateWeightsOnHosts(host_set->hosts())) {
-      // If weights have changed, then apply them to all workers.
-      factory_->applyWeightsToAllWorkers(host_set->priority());
-    }
+    updated = updateWeightsOnHosts(host_set->hosts()) || updated;
+  }
+  if (updated) {
+    // If weights have changed, then apply them to all workers.
+    factory_->applyWeightsToAllWorkers();
   }
 }
 
@@ -246,11 +252,10 @@ Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalL
       cluster_info_.lbConfig(), time_source_, tls_->get());
 }
 
-void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers(
-    uint32_t priority) {
-  tls_->runOnAllThreads([priority](OptRef<ThreadLocalShim> tls_shim) -> void {
+void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers() {
+  tls_->runOnAllThreads([](OptRef<ThreadLocalShim> tls_shim) -> void {
     if (tls_shim.has_value()) {
-      auto status = tls_shim->apply_weights_cb_helper_.runCallbacks(priority);
+      auto status = tls_shim->apply_weights_cb_helper_.runCallbacks();
     }
   });
 }
