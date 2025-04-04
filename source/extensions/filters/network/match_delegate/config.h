@@ -18,14 +18,26 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MatchDelegate {
 
+/**
+ * Action that allows a filter to be skipped based on match conditions.
+ * This is used to conditionally bypass filter processing when certain criteria are met.
+ */
 class SkipAction : public Matcher::ActionBase<
                        envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
 
 using NetworkFilterActionContext = Server::Configuration::ServerFactoryContext;
 
+/**
+ * A network filter that delegates filter operations to wrapped filters based on match conditions.
+ * This filter can dynamically choose to apply or skip the wrapped filter based on match criteria.
+ */
 class DelegatingNetworkFilter : protected Logger::Loggable<Logger::Id::filter>,
                                 public Envoy::Network::Filter {
 public:
+  /**
+   * Helper class that manages the matching state for a delegating filter.
+   * Tracks whether the wrapped filter should be skipped based on match evaluation.
+   */
   class FilterMatchState {
   public:
     FilterMatchState(Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree)
@@ -50,6 +62,13 @@ public:
     bool skip_filter_{};
   };
 
+  /**
+   * Constructor.
+   *
+   * @param match_tree The match tree to evaluate for determining if the filter should be skipped
+   * @param read_filter The read filter to be conditionally applied
+   * @param write_filter The write filter to be conditionally applied
+   */
   DelegatingNetworkFilter(Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree,
                           Envoy::Network::ReadFilterSharedPtr read_filter,
                           Envoy::Network::WriteFilterSharedPtr write_filter);
@@ -72,6 +91,10 @@ private:
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{};
 };
 
+/**
+ * Configuration for the delegating network filter.
+ * Creates filter instances based on configuration proto.
+ */
 class MatchDelegateConfig : public Extensions::NetworkFilters::Common::FactoryBase<
                                 envoy::extensions::common::matching::v3::ExtensionWithMatcher> {
 public:
