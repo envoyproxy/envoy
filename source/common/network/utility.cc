@@ -146,24 +146,26 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
 
 } // namespace
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
-                                                                     uint16_t port, bool v6only) {
+Address::InstanceConstSharedPtr
+Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port, bool v6only,
+                                     absl::optional<std::string> network_namespace) {
   StatusOr<sockaddr_in> sa4 = parseV4Address(ip_address, port);
   if (sa4.ok()) {
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4.value()));
+    return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
+        &sa4.value(), nullptr, network_namespace));
   }
 
   StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_address, port);
   if (sa6.ok()) {
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sa6, v6only));
+    return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
+        *sa6, v6only, nullptr, network_namespace));
   }
   return nullptr;
 }
 
 Address::InstanceConstSharedPtr
-Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only) {
+Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only,
+                                            absl::optional<std::string> network_namespace) {
   if (ip_address.empty()) {
     return nullptr;
   }
@@ -181,8 +183,8 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     }
     StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_str, port64);
     if (sa6.ok()) {
-      return instanceOrNull(
-          Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sa6, v6only));
+      return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
+          *sa6, v6only, nullptr, network_namespace));
     }
     return nullptr;
   }

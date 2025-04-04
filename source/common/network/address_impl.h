@@ -63,13 +63,16 @@ public:
   Type type() const override { return type_; }
 
   const SocketInterface& socketInterface() const override { return socket_interface_; }
+  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
 
 protected:
-  InstanceBase(Type type, const SocketInterface* sock_interface)
-      : socket_interface_(*sock_interface), type_(type) {}
+  InstanceBase(Type type, const SocketInterface* sock_interface,
+               absl::optional<std::string> network_namespace)
+      : socket_interface_(*sock_interface), network_namespace_(network_namespace), type_(type) {}
 
   std::string friendly_name_;
   const SocketInterface& socket_interface_;
+  absl::optional<std::string> network_namespace_;
 
 private:
   const Type type_;
@@ -81,8 +84,8 @@ public:
   template <typename InstanceType, typename... Args>
   static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
     absl::Status status = absl::OkStatus();
-    // Use new instead of make_shared here because the instance constructors are private and must be
-    // called directly here.
+    // Use new instead of make_shared here because the instance constructors are private and must
+    // be called directly here.
     std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
     if (!status.ok()) {
       return status;
@@ -99,26 +102,28 @@ public:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
-  explicit Ipv4Instance(const sockaddr_in* address,
-                        const SocketInterface* sock_interface = nullptr);
+  explicit Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
-  explicit Ipv4Instance(const std::string& address,
-                        const SocketInterface* sock_interface = nullptr);
+  explicit Ipv4Instance(const std::string& address, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
    */
   Ipv4Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
+  explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -157,7 +162,8 @@ private:
    * upon error.
    */
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
-                        const SocketInterface* sock_interface = nullptr);
+                        const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
@@ -197,25 +203,28 @@ public:
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    */
   Ipv6Instance(const sockaddr_in6& address, bool v6only = true,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
    */
-  explicit Ipv6Instance(const std::string& address,
-                        const SocketInterface* sock_interface = nullptr);
+  explicit Ipv6Instance(const std::string& address, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
   Ipv6Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr, bool v6only = true);
+               const SocketInterface* sock_interface = nullptr, bool v6only = true,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
+  explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -252,7 +261,8 @@ private:
    * upon error.
    */
   Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }

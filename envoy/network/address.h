@@ -239,6 +239,11 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+
+  /**
+   * @return filepath of the network namespace for the address.
+   */
+  virtual absl::optional<std::string> networkNamespace() const PURE;
 };
 
 /*
