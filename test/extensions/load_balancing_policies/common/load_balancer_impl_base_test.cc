@@ -641,7 +641,6 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
 }
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, ForceLocalityDirectRouting) {
-
   // Define two zones.
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
@@ -656,23 +655,35 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, ForceLocalityDirectRouting) {
   // Group upstream hosts by locality.
   HostsPerLocalitySharedPtr upstream_hosts_per_locality =
       makeHostsPerLocality({{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
-                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}},
-                           true);
-
-  // Create local hosts for the local cluster: only a host in Zone A.
-  HostsPerLocalitySharedPtr local_hosts = makeHostsPerLocality(
-      {{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)}, {}}, true);
+                            {makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_b)}});
 
   host_set_.hosts_ = *upstream_hosts;
   host_set_.healthy_hosts_ = *upstream_hosts;
   host_set_.healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+  host_set_.runCallbacks({}, {});
 
-  // simulate that the healthy local host (Zone A) is selected.
-  lb_force_.choose_host_once_host_ = local_hosts->get()[0][0];
+  common_config_.mutable_healthy_panic_threshold()->set_value(50);
+  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(100);
+  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(1);
 
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_,
+              getBoolean("upstream.zone_routing.force_locality_direct_routing", true))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 1))
+      .WillRepeatedly(Return(1));
+
+  lb_.choose_host_once_host_ = upstream_hosts_per_locality->get()[0][0];
+  lb_force_.choose_host_once_host_ = upstream_hosts_per_locality->get()[0][0];
+
+  // Verify that our local host set has at least 2 locality groups and that a local locality exists.
+  EXPECT_GE(host_set_.healthy_hosts_per_locality_->get().size(), 2U);
+  EXPECT_TRUE(host_set_.healthy_hosts_per_locality_->hasLocalLocality());
+
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_.chooseHost(nullptr).host);
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_force_.chooseHost(nullptr).host);
-
-  // Verify that the forced routing stat was incremented.
   EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
 }
 
