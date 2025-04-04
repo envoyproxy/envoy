@@ -230,7 +230,8 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
                             expected_worker_index, worker_index_);
     }
 
-    // The kernel has already routed the packet correctly. Make it stay on the current worker.
+    // Any mismatch should only happen in the very short period when kernel worker routing is being
+    // setup. Make it stay on the current worker and ignore the edge case.
     return worker_index_;
   }
 
