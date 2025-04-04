@@ -28,6 +28,8 @@ private:
   const envoy::config::core::v3::Metadata& dynamic_metadata_;
 };
 
+using NetworkMatchingDataImplSharedPtr = std::shared_ptr<MatchingDataImpl>;
+
 /**
  * Implementation of Network::UdpMatchingData, providing UDP data to the match tree.
  */
