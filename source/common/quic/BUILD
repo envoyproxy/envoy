@@ -21,7 +21,6 @@ envoy_cc_library(
     name = "envoy_quic_alarm_lib",
     srcs = ["envoy_quic_alarm.cc"],
     hdrs = ["envoy_quic_alarm.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
@@ -35,7 +34,6 @@ envoy_cc_library(
     name = "envoy_quic_alarm_factory_lib",
     srcs = ["envoy_quic_alarm_factory.cc"],
     hdrs = ["envoy_quic_alarm_factory.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_lib",
         "@com_github_google_quiche//:quic_core_alarm_factory_lib",
@@ -49,7 +47,6 @@ envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
-    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/event:dispatcher_interface",
@@ -60,7 +57,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_connection_debug_visitor_factory_interface",
     hdrs = ["envoy_quic_connection_debug_visitor_factory_interface.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
@@ -75,7 +71,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_connection_helper_lib",
     hdrs = ["envoy_quic_connection_helper.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_clock_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
@@ -87,7 +82,6 @@ envoy_cc_library(
     name = "quic_stat_names_lib",
     srcs = ["quic_stat_names.cc"],
     hdrs = ["quic_stat_names.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/stats:stats_interface",
         "//source/common/stats:symbol_table_lib",
@@ -100,7 +94,6 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_base_lib",
     srcs = ["envoy_quic_proof_source_base.cc"],
     hdrs = ["envoy_quic_proof_source_base.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
@@ -117,7 +110,6 @@ envoy_cc_library(
     srcs = ["envoy_quic_proof_source.cc"],
     hdrs = ["envoy_quic_proof_source.h"],
     external_deps = ["ssl"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_source_base_lib",
         ":envoy_quic_utils_lib",
@@ -136,7 +128,6 @@ envoy_cc_library(
     name = "envoy_quic_proof_verifier_base_lib",
     srcs = ["envoy_quic_proof_verifier_base.cc"],
     hdrs = ["envoy_quic_proof_verifier_base.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
@@ -150,7 +141,6 @@ envoy_cc_library(
     name = "envoy_quic_proof_verifier_lib",
     srcs = ["envoy_quic_proof_verifier.cc"],
     hdrs = ["envoy_quic_proof_verifier.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
@@ -164,7 +154,6 @@ envoy_cc_library(
     name = "envoy_quic_stream_lib",
     srcs = ["envoy_quic_stream.cc"],
     hdrs = ["envoy_quic_stream.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":envoy_quic_utils_lib",
@@ -187,7 +176,6 @@ envoy_cc_library(
     name = "client_connection_factory_lib",
     srcs = ["client_connection_factory_impl.cc"],
     hdrs = ["client_connection_factory_impl.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_factory_lib",
         ":envoy_quic_client_session_lib",
@@ -211,7 +199,6 @@ envoy_cc_library(
         "client_codec_impl.h",
         "codec_impl.h",
     ],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_client_session_lib",
         ":envoy_quic_utils_lib",
@@ -228,7 +215,6 @@ envoy_cc_library(
         "codec_impl.h",
         "server_codec_impl.h",
     ],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_server_session_lib",
         ":envoy_quic_utils_lib",
@@ -244,7 +230,6 @@ envoy_cc_library(
     name = "quic_ssl_connection_info_lib",
     hdrs = ["quic_ssl_connection_info.h"],
     external_deps = ["ssl"],
-    tags = ["nofips"],
     deps = [
         "//source/common/tls:connection_info_impl_base_lib",
         "@com_github_google_quiche//:quic_core_session_lib",
@@ -255,7 +240,6 @@ envoy_cc_library(
     name = "quic_filter_manager_connection_lib",
     srcs = ["quic_filter_manager_connection_impl.cc"],
     hdrs = ["quic_filter_manager_connection_impl.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":quic_network_connection_lib",
@@ -285,7 +269,6 @@ envoy_cc_library(
         "envoy_quic_server_session.h",
         "envoy_quic_server_stream.h",
     ],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_debug_visitor_factory_interface",
         ":envoy_quic_proof_source_lib",
@@ -319,7 +302,6 @@ envoy_cc_library(
         "envoy_quic_network_observer_registry_factory.h",
         "quic_network_connectivity_observer.h",
     ],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_client_connection_lib",
         ":envoy_quic_client_crypto_stream_factory_lib",
@@ -346,7 +328,6 @@ envoy_cc_library(
     hdrs = [
         "envoy_quic_network_observer_registry_factory.h",
     ],
-    tags = ["nofips"],
     deps = envoy_select_enable_http3([
         ":envoy_quic_client_session_lib",
     ]),
@@ -365,7 +346,6 @@ envoy_cc_library(
     name = "quic_network_connection_lib",
     srcs = ["quic_network_connection.cc"],
     hdrs = ["quic_network_connection.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/network:connection_interface",
     ],
@@ -375,7 +355,6 @@ envoy_cc_library(
     name = "envoy_quic_server_connection_lib",
     srcs = ["envoy_quic_server_connection.cc"],
     hdrs = ["envoy_quic_server_connection.h"],
-    tags = ["nofips"],
     deps = [
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
@@ -391,7 +370,6 @@ envoy_cc_library(
     name = "envoy_quic_client_connection_lib",
     srcs = ["envoy_quic_client_connection.cc"],
     hdrs = ["envoy_quic_client_connection.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_packet_writer_lib",
         ":quic_network_connection_lib",
@@ -408,7 +386,6 @@ envoy_cc_library(
     name = "envoy_quic_dispatcher_lib",
     srcs = ["envoy_quic_dispatcher.cc"],
     hdrs = ["envoy_quic_dispatcher.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_debug_visitor_factory_interface",
         ":envoy_quic_proof_source_lib",
@@ -432,7 +409,6 @@ envoy_cc_library(
     name = "active_quic_listener_lib",
     srcs = ["active_quic_listener.cc"],
     hdrs = ["active_quic_listener.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_factory_lib",
         ":envoy_quic_connection_debug_visitor_factory_interface",
@@ -461,7 +437,6 @@ envoy_cc_library(
     srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
     external_deps = ["ssl"],
-    tags = ["nofips"],
     deps = [
         "//envoy/http:codec_interface",
         "//source/common/http:header_map_lib",
@@ -489,7 +464,6 @@ envoy_cc_library(
         "quic_client_transport_socket_factory.h",
         "quic_transport_socket_factory.h",
     ],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_lib",
         "//envoy/network:transport_socket_interface",
@@ -514,7 +488,6 @@ envoy_cc_library(
     hdrs = [
         "quic_server_transport_socket_factory.h",
     ],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_lib",
         ":quic_transport_socket_factory_lib",
@@ -536,7 +509,6 @@ envoy_cc_library(
 # All of these are needed for this extension to function.
 envoy_cc_library(
     name = "quic_client_factory_lib",
-    tags = ["nofips"],
     # QUICHE can't build against FIPS BoringSSL until the FIPS build
     # is on a new enough version to have QUIC support. Remove it from
     # the build until then. Re-enable as part of #7433.
@@ -567,7 +539,6 @@ envoy_cc_library(
 # All of these are needed for this extension to function.
 envoy_cc_library(
     name = "quic_server_factory_lib",
-    tags = ["nofips"],
     # QUICHE can't build against FIPS BoringSSL until the FIPS build
     # is on a new enough version to have QUIC support. Remove it from
     # the build until then. Re-enable as part of #7433.
@@ -587,7 +558,6 @@ envoy_cc_library(
     name = "envoy_quic_packet_writer_lib",
     srcs = ["envoy_quic_packet_writer.cc"],
     hdrs = ["envoy_quic_packet_writer.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_packet_writer_lib",
@@ -602,7 +572,6 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     hdrs = ["udp_gso_batch_writer.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "//envoy/network:udp_packet_writer_handler_interface",
@@ -620,7 +589,6 @@ envoy_cc_library(
     name = "send_buffer_monitor_lib",
     srcs = ["send_buffer_monitor.cc"],
     hdrs = ["send_buffer_monitor.h"],
-    tags = ["nofips"],
     deps = [
         "//source/common/common:assert_lib",
         "@com_github_google_quiche//:quic_core_session_lib",
@@ -630,7 +598,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_client_crypto_stream_factory_lib",
     hdrs = ["envoy_quic_client_crypto_stream_factory.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
@@ -643,7 +610,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_server_crypto_stream_factory_lib",
     hdrs = ["envoy_quic_server_crypto_stream_factory.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
@@ -654,7 +620,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_proof_source_factory_interface",
     hdrs = ["envoy_quic_proof_source_factory_interface.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
         "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
@@ -664,7 +629,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_connection_id_generator_factory_interface",
     hdrs = ["envoy_quic_connection_id_generator_factory.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
         "@com_github_google_quiche//:quic_core_connection_id_generator_interface_lib",
@@ -676,7 +640,6 @@ envoy_cc_library(
     name = "envoy_deterministic_connection_id_generator_lib",
     srcs = ["envoy_deterministic_connection_id_generator.cc"],
     hdrs = ["envoy_deterministic_connection_id_generator.h"],
-    tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_id_generator_factory_interface",
         ":envoy_quic_utils_lib",
@@ -687,7 +650,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_quic_server_preferred_address_config_factory_interface",
     hdrs = ["envoy_quic_server_preferred_address_config_factory.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/network:address_interface",
@@ -700,7 +662,6 @@ envoy_cc_library(
     name = "quic_stats_gatherer",
     srcs = ["quic_stats_gatherer.cc"],
     hdrs = ["quic_stats_gatherer.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/access_log:access_log_interface",
         "//envoy/formatter:http_formatter_context_interface",

@@ -19,7 +19,6 @@ envoy_cc_library(
     name = "envoy_deterministic_connection_id_generator_config_lib",
     srcs = ["envoy_deterministic_connection_id_generator_config.cc"],
     hdrs = ["envoy_deterministic_connection_id_generator_config.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/registry",
         "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
@@ -34,7 +33,6 @@ envoy_cc_extension(
     extra_visibility = [
         "//source/common/quic:__subpackages__",
     ],
-    tags = ["nofips"],
     deps = select(
         {
             "//bazel:boringssl_fips": [],
