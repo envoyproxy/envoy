@@ -55,6 +55,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "iam_roles_anywhere_signer_base_impl",
+    srcs = ["iam_roles_anywhere_signer_base_impl.cc"],
+    hdrs = ["iam_roles_anywhere_signer_base_impl.h"],
+    deps = [
+        ":credentials_provider_interface",
+        ":signer_interface",
+        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "credentials_provider_interface",
     srcs = ["credentials_provider.cc"],
     hdrs = [
