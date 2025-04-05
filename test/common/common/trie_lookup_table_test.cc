@@ -1,6 +1,9 @@
 #include "source/common/common/trie_lookup_table.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::ElementsAre;
 
 namespace Envoy {
 
@@ -43,26 +46,38 @@ TEST(TrieLookupTable, LongestPrefix) {
 
   EXPECT_EQ(cstr_a, trie.find("foo"));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
+  EXPECT_THAT(trie.findMatchingPrefixes("foo"), ElementsAre(cstr_a));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
+  EXPECT_THAT(trie.findMatchingPrefixes("foosball"), ElementsAre(cstr_a));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo/"));
+  EXPECT_THAT(trie.findMatchingPrefixes("foo/"), ElementsAre(cstr_a));
   EXPECT_EQ(cstr_d, trie.findLongestPrefix("foo/bar"));
+  EXPECT_THAT(trie.findMatchingPrefixes("foo/bar"), ElementsAre(cstr_a, cstr_d));
   EXPECT_EQ(cstr_d, trie.findLongestPrefix("foo/bar/zzz"));
+  EXPECT_THAT(trie.findMatchingPrefixes("foo/bar/zzz"), ElementsAre(cstr_a, cstr_d));
 
   EXPECT_EQ(cstr_b, trie.find("bar"));
   EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
+  EXPECT_THAT(trie.findMatchingPrefixes("bar"), ElementsAre(cstr_b));
   EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
+  EXPECT_THAT(trie.findMatchingPrefixes("baritone"), ElementsAre(cstr_b));
   EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
+  EXPECT_THAT(trie.findMatchingPrefixes("barometer"), ElementsAre(cstr_b, cstr_c));
 
   EXPECT_EQ(cstr_e, trie.find("barn"));
   EXPECT_EQ(cstr_e, trie.findLongestPrefix("barnacle"));
+  EXPECT_THAT(trie.findMatchingPrefixes("barnacle"), ElementsAre(cstr_b, cstr_e));
 
   EXPECT_EQ(cstr_f, trie.find("barp"));
   EXPECT_EQ(cstr_f, trie.findLongestPrefix("barpomus"));
+  EXPECT_THAT(trie.findMatchingPrefixes("barpomus"), ElementsAre(cstr_b, cstr_f));
 
   EXPECT_EQ(nullptr, trie.find("toto"));
   EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
+  EXPECT_THAT(trie.findMatchingPrefixes("toto"), ElementsAre());
   EXPECT_EQ(nullptr, trie.find(" "));
   EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
+  EXPECT_THAT(trie.findMatchingPrefixes(" "), ElementsAre());
 }
 
 TEST(TrieLookupTable, VeryDeepTrieDoesNotStackOverflowOnDestructor) {
