@@ -1,4 +1,5 @@
 #include "source/common/http/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -371,6 +372,49 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   const auto& value = key_metadata->string_value();
   *result = const_cast<char*>(value.data());
   *result_length = value.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  stream_info->filterState()->setData(key_view,
+                                      std::make_unique<Router::StringAccessorImpl>(value_view),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  auto filter_state = stream_info->filterState()->getDataReadOnly<Router::StringAccessor>(key_view);
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        fmt::format("key not found in filter state", key_view));
+    return false;
+  }
+  absl::string_view str = filter_state->asString();
+  *result = const_cast<char*>(str.data());
+  *result_length = str.size();
   return true;
 }
 

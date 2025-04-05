@@ -990,6 +990,50 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
 
+// -------------------------- Filter State Callbacks ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_bytes is called by the module to set the
+ * bytes value of the filter state with the given key. If the filter state is not accessible, this
+ * returns false. If the key does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key_ptr is the key of the filter state.
+ * @param key_length is the length of the key.
+ * @param value_ptr is the bytes value of the filter state to be set.
+ * @param value_length is the length of the value.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_bytes is called by the module to get the
+ * bytes value of the filter state with the given key. If the filter state is not accessible, the
+ * key does not exist or the value is not bytes, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key_ptr is the key of the filter state.
+ * @param key_length is the length of the key.
+ * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the buffer
+ * of the value will be stored.
+ * @param result_buffer_length_ptr is the pointer to the variable where the length of the buffer
+ * will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+
 // ------------------- Misc Callbacks for HTTP Filters -------------------------
 
 /**
