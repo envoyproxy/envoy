@@ -24,9 +24,7 @@ EXTENSIONS = {
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
     "envoy.clusters.static":                            "//source/extensions/clusters/static:static_cluster_lib",
-    "envoy.clusters.strict_dns":                        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
     "envoy.clusters.original_dst":                      "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
-    "envoy.clusters.logical_dns":                       "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
 
     #
     # Compression

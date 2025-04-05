@@ -15,7 +15,6 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -33,6 +32,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+// TODO: sort these
+#include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -60,7 +62,7 @@ protected:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> status_or_cluster;
+    absl::StatusOr<std::unique_ptr<ClusterImplBase>> status_or_cluster;
 
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
     if (cluster_config.has_cluster_type()) {
@@ -77,8 +79,10 @@ protected:
       createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
     }
 
+    // Here we tell the DnsClusterImpl it's going to behave like a logic DNS cluster:
+    dns_cluster.set_all_addresses_in_single_endpoint(true);
     status_or_cluster =
-        LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+        DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
     cluster_ = std::move(*status_or_cluster);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -102,7 +106,7 @@ protected:
         cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
         ssl_context_manager_, nullptr, false);
     if (status_or_cluster.ok()) {
-      cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      cluster_ = std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
       priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
           [&](uint32_t, const HostVector&, const HostVector&) {
             membership_updated_.ready();
@@ -173,6 +177,7 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
+    logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
@@ -208,9 +213,11 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+    EXPECT_CALL(membership_updated_, ready());
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
+    logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_port), logical_host->address()->asString());
@@ -268,7 +275,7 @@ protected:
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  std::shared_ptr<LogicalDnsCluster> cluster_;
+  std::shared_ptr<ClusterImplBase> cluster_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -664,7 +671,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_yaml).message(),
-            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+            "DNS clusters must NOT have a custom resolver name set");
 
   const std::string custom_resolver_cluster_type_yaml = R"EOF(
     name: name
@@ -692,7 +699,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_cluster_type_yaml).message(),
-            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+            "DNS clusters must NOT have a custom resolver name set");
 }
 
 // Test using both types of names in the cluster type.
