@@ -287,7 +287,8 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
   }
 
   Common::Redis::RespValue request;
-  for (uint16_t size = 0;; size++) {
+  std::set<Upstream::HostConstSharedPtr> uniqueHosts;
+  for (uint16_t size = 0; size < Envoy::Extensions::Clusters::Redis::MaxSlot; size++) {
     Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
         size, request, Common::Redis::Client::ReadPolicy::Primary);
     Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
@@ -295,8 +296,9 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
     if (!host) {
       return size;
     }
+    uniqueHosts.insert(host);
   }
-  return 0;
+  return static_cast<uint16_t>(uniqueHosts.size());
 }
 
 Common::Redis::Client::PoolRequest*
