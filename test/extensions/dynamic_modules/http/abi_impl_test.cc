@@ -494,9 +494,9 @@ TEST(ABIImpl, filter_state) {
   size_t result_str_length = 0;
 
   // No stream info.
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_string(
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
       &filter, key_ptr, key_length, value_ptr, value_length));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_string(
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
       &filter, key_ptr, key_length, &result_str_ptr, &result_str_length));
 
   // With stream info but non existing key.
@@ -510,13 +510,13 @@ TEST(ABIImpl, filter_state) {
   EXPECT_CALL(stream_info, filterState())
       .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
   filter.setDecoderFilterCallbacks(callbacks);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_string(
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
       &filter, key_ptr, key_length, value_ptr, value_length));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_string(
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
       &filter, non_existing_key_ptr, non_existing_key_length, &result_str_ptr, &result_str_length));
 
   // With key.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_string(
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
       &filter, key_ptr, key_length, &result_str_ptr, &result_str_length));
   EXPECT_EQ(result_str_length, value_length);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str);

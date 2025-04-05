@@ -375,7 +375,7 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   return true;
 }
 
-bool envoy_dynamic_module_callback_http_set_filter_state_string(
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
@@ -394,7 +394,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_string(
   return true;
 }
 
-bool envoy_dynamic_module_callback_http_get_filter_state_string(
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
@@ -412,7 +412,7 @@ bool envoy_dynamic_module_callback_http_get_filter_state_string(
                         fmt::format("key not found in filter state", key_view));
     return false;
   }
-  auto str = filter_state->asString();
+  absl::string_view str = filter_state->asString();
   *result = const_cast<char*>(str.data());
   *result_length = str.size();
   return true;
