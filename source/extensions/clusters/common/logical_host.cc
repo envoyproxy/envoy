@@ -92,5 +92,10 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
       std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 
+void RealHostDescription::setHostId(const std::string host_id) {
+  ENVOY_LOG_MISC(error, "Cannot set host id to {} for const RealHostDescription.", host_id);
+  PANIC("not implemented");
+}
+
 } // namespace Upstream
 } // namespace Envoy
