@@ -97,7 +97,7 @@ public:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(response_headers.getStatusValue(), response->headers().getStatusValue());
     ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
     ASSERT_EQ(content_length, response->body().size());
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
@@ -118,6 +118,8 @@ public:
             content_type:
               - text/html
               - application/json
+          uncompressible_response_codes:
+            - 206
         request_direction_config:
           common_config:
             enabled:
@@ -306,6 +308,23 @@ TEST_P(CompressorIntegrationTest, SkipOnContentType) {
                                                            {"accept-encoding", "deflate, gzip"}},
                             Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                             {"content-length", "128"},
+                                                            {"content-type", "application/xml"}});
+}
+
+/**
+ * Exercises filter when upstream responds with restricted response code value.
+ */
+TEST_P(CompressorIntegrationTest, SkipOnUncompressibleResponseCode) {
+  initializeFilter(full_config);
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "deflate, gzip"},
+                                                           {"range", "bytes=100-227"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "206"},
+                                                            {"content-length", "128"},
+                                                            {"content-range", "bytes=100-227/567"},
                                                             {"content-type", "application/xml"}});
 }
 

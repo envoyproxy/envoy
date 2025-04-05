@@ -38,6 +38,14 @@ struct SupportedCommands {
   }
 
   /**
+   * @return multi-key commands
+   */
+  static const absl::flat_hash_set<std::string>& multiKeyCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "del", "mget", "mset", "touch",
+                           "unlink");
+  }
+
+  /**
    * @return commands which hash on the fourth argument
    */
   static const absl::flat_hash_set<std::string>& evalCommands() {
@@ -123,13 +131,7 @@ struct SupportedCommands {
     return !writeCommands().contains(command);
   }
 
-  static bool isSupportedCommand(const std::string& command) {
-    return (simpleCommands().contains(command) || evalCommands().contains(command) ||
-            hashMultipleSumResultCommands().contains(command) ||
-            transactionCommands().contains(command) || auth() == command || echo() == command ||
-            mget() == command || mset() == command || keys() == command || ping() == command ||
-            time() == command || quit() == command || select() == command);
-  }
+  static bool isSupportedCommand(const std::string& command);
 };
 
 } // namespace Redis

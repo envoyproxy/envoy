@@ -21,6 +21,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/upstream_address.h"
 
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -344,6 +345,16 @@ most_specific_header_mutations_wins: {0}
   absl::Status creation_status_ = absl::OkStatus();
 };
 
+void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
+                             PathMatchType expected_type) {
+  ASSERT_NE(nullptr, route);
+  const auto route_entry = route->routeEntry();
+  ASSERT_NE(nullptr, route_entry);
+  const auto& match_criterion = route_entry->pathMatchCriterion();
+  EXPECT_EQ(expected_matcher, match_criterion.matcher());
+  EXPECT_EQ(expected_type, match_criterion.matchType());
+}
+
 class RouteMatcherTest : public testing::Test,
                          public ConfigImplTestBase,
                          public TestScopedRuntime {};
@@ -476,6 +487,12 @@ virtual_hosts:
   // Header matching (for HTTP/2)
   EXPECT_EQ("connect_header_match",
             config.route(genHeaders("bat5.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+
+  // Increase line coverage for the ConnectRouteEntryImpl class.
+  {
+    checkPathMatchCriterion(config.route(genHeaders("bat3.com", " ", "CONNECT"), 0).get(),
+                            EMPTY_STRING, PathMatchType::None);
+  }
 }
 
 TEST_F(RouteMatcherTest, TestRoutes) {
@@ -681,6 +698,17 @@ virtual_hosts:
       append_x_forwarded_host: true
   - match:
       prefix: "/"
+      filter_state:
+      - key: envoy.address
+        address_match:
+          ranges:
+          - address_prefix: 10.0.0.0
+            prefix_len: 8
+    route:
+      cluster: filter_state_cluster
+      timeout: 30s
+  - match:
+      prefix: "/"
     route:
       cluster: instant-server
       timeout: 30s
@@ -743,7 +771,8 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters(
       {"www2", "root_www2", "www2_staging", "wildcard", "wildcard2", "clock", "sheep",
-       "three_numbers", "four_numbers", "regex_default", "ats", "locations", "instant-server"},
+       "three_numbers", "four_numbers", "regex_default", "ats", "locations", "instant-server",
+       "filter_state_cluster"},
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
@@ -1110,6 +1139,19 @@ virtual_hosts:
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/four/6472/endpoint/xx/yy?test=foo", headers.get_(Http::Headers::get().Path));
     EXPECT_EQ("/xx/yy/6472?test=foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Filter state matching
+  {
+    auto address_obj = std::make_unique<Network::Address::InstanceAccessor>(
+        Envoy::Network::Utility::parseInternetAddressNoThrow("10.0.0.1", 443, false));
+    stream_info.filterState()->setData("envoy.address", std::move(address_obj),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::Request);
+    EXPECT_EQ("filter_state_cluster",
+              config.route(genHeaders("foo.com", "/", "GET"), stream_info, 0)
+                  ->routeEntry()
+                  ->clusterName());
   }
 
   // Virtual cluster testing.
@@ -7795,16 +7837,6 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "response body size is 4097 bytes; maximum is 4096");
 }
 
-void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
-                             PathMatchType expected_type) {
-  ASSERT_NE(nullptr, route);
-  const auto route_entry = route->routeEntry();
-  ASSERT_NE(nullptr, route_entry);
-  const auto& match_criterion = route_entry->pathMatchCriterion();
-  EXPECT_EQ(expected_matcher, match_criterion.matcher());
-  EXPECT_EQ(expected_type, match_criterion.matchType());
-}
-
 // Test loading broken config throws EnvoyException.
 TEST_F(RouteConfigurationV2, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
@@ -9504,6 +9536,9 @@ virtual_hosts:
   const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewriter();
   EXPECT_TRUE(pattern_rewrite_policy != nullptr);
   EXPECT_EQ(pattern_rewrite_policy->uriTemplate(), "/bar/{lang}/{country}");
+
+  checkPathMatchCriterion(config.route(headers, 0).get(), "/bar/{country}/{lang}",
+                          PathMatchType::Template);
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {

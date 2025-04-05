@@ -22,6 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_body",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_headers",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_trailers",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_stream_complete",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # factory_context_mocks needs this.
@@ -66,7 +67,7 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data/rust:http",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
     ],
     rbe_pool = "6gig",
     deps = [

@@ -26,8 +26,7 @@ public:
                       Event::Dispatcher& dispatcher, std::chrono::milliseconds message_timeout_msec)
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
         client_(client),
-        ttl_manager_(
-            dispatcher, [this](uint64_t id) { onError(id); }, message_timeout_msec) {}
+        ttl_manager_(dispatcher, [this](uint64_t id) { onError(id); }, message_timeout_msec) {}
 
   ~BufferedAsyncClient() {
     if (active_stream_ != nullptr) {

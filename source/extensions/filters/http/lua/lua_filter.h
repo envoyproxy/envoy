@@ -117,6 +117,11 @@ public:
    * @param host_and_strict supplies the host and whether the host should be treated as strict.
    */
   virtual void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) PURE;
+
+  /**
+   * Clear the route cache explicitly.
+   */
+  virtual void clearRouteCache() PURE;
 };
 
 class Filter;
@@ -188,7 +193,8 @@ public:
             {"timestamp", static_luaTimestamp},
             {"timestampString", static_luaTimestampString},
             {"connectionStreamInfo", static_luaConnectionStreamInfo},
-            {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost}};
+            {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
+            {"clearRouteCache", static_luaClearRouteCache}};
   }
 
 private:
@@ -315,6 +321,11 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaSetUpstreamOverrideHost);
 
+  /**
+   * Clear the route cache explicitly.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaClearRouteCache);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -405,6 +416,7 @@ public:
     }
     return nullptr;
   }
+  bool clearRouteCache() const { return clear_route_cache_; }
 
   const LuaFilterStats& stats() const { return stats_; }
 
@@ -417,6 +429,7 @@ private:
     return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
+  const bool clear_route_cache_{};
   PerLuaCodeSetupPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
@@ -432,32 +445,11 @@ public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
                        Server::Configuration::ServerFactoryContext& context);
 
-  ~FilterConfigPerRoute() override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.allow_slot_destroy_on_worker_threads")) {
-      return;
-    }
-
-    // The design of the TLS system does not allow TLS state to be modified in worker threads.
-    // However, when the route configuration is dynamically updated via RDS, the old
-    // FilterConfigPerRoute object may be destructed in a random worker thread. Therefore, to
-    // ensure thread safety, ownership of per_lua_code_setup_ptr_ must be transferred to the main
-    // thread and destroyed when the FilterConfigPerRoute object is not destructed in the main
-    // thread.
-    if (per_lua_code_setup_ptr_ && !main_thread_dispatcher_.isThreadSafe()) {
-      auto shared_ptr_wrapper =
-          std::make_shared<PerLuaCodeSetupPtr>(std::move(per_lua_code_setup_ptr_));
-      main_thread_dispatcher_.post([shared_ptr_wrapper] { shared_ptr_wrapper->reset(); });
-    }
-  }
-
   bool disabled() const { return disabled_; }
   const std::string& name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
 
 private:
-  Event::Dispatcher& main_thread_dispatcher_;
-
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
@@ -557,7 +549,14 @@ private:
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
-    void onHeadersModified() override { callbacks_->downstreamCallbacks()->clearRouteCache(); }
+    void onHeadersModified() override {
+      // Do not clear route cache if clear_route_cache is false or if no downstream callbacks are
+      // available.
+      if (!parent_.config_->clearRouteCache() || !callbacks_->downstreamCallbacks()) {
+        return;
+      }
+      callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
@@ -569,6 +568,11 @@ private:
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
     void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
       callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
+    }
+    void clearRouteCache() override {
+      if (auto cb = callbacks_->downstreamCallbacks(); cb.has_value()) {
+        cb->clearRouteCache();
+      }
     }
 
     Filter& parent_;
@@ -597,6 +601,7 @@ private:
     void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
       UNREFERENCED_PARAMETER(host_and_strict);
     }
+    void clearRouteCache() override {}
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

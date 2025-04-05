@@ -99,7 +99,7 @@ public:
 /**
  * This is a filter manager for TCP (L4) filters. It is split out for ease of testing.
  */
-class FilterManagerImpl {
+class FilterManagerImpl : protected Logger::Loggable<Logger::Id::connection> {
 public:
   FilterManagerImpl(FilterManagerConnection& connection, const Socket& socket)
       : connection_(connection), socket_(socket) {}

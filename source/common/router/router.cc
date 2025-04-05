@@ -658,10 +658,72 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
   }
 
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
+  callbacks_->streamInfo().downstreamTiming().setValue(
+      "envoy.router.host_selection_start_ms",
+      callbacks_->dispatcher().timeSource().monotonicTime());
+  auto host_selection_response = cluster->chooseHost(this);
+  if (!host_selection_response.cancelable ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
+    if (host_selection_response.cancelable) {
+      host_selection_response.cancelable->cancel();
+    }
+    // This branch handles the common case of synchronous host selection, as
+    // well as handling unsupported asynchronous host selection by treating it
+    // as host selection failure and calling sendNoHealthyUpstreamResponse.
+    return continueDecodeHeaders(cluster, headers, end_stream, modify_headers, nullptr,
+                                 std::move(host_selection_response.host),
+                                 std::string(host_selection_response.details));
+  }
 
+  ENVOY_STREAM_LOG(debug, "Doing asynchronous host selection\n", *callbacks_);
+  // Latch the cancel handle and call it in Filter::onDestroy to avoid any use-after-frees for cases
+  // like stream timeout.
+  host_selection_cancelable_ = std::move(host_selection_response.cancelable);
+  // Configure a callback to be called on asynchronous host selection.
+  on_host_selected_ = ([this, cluster, end_stream,
+                        modify_headers](Upstream::HostConstSharedPtr&& host,
+                                        std::string host_selection_details) -> void {
+    // It should always be safe to call continueDecodeHeaders. In the case the
+    // stream had a local reply before host selection completed,
+    // the lookup should be canceled.
+    bool should_continue_decoding = false;
+    continueDecodeHeaders(cluster, *downstream_headers_, end_stream, modify_headers,
+                          &should_continue_decoding, std::move(host), host_selection_details);
+    // continueDecodeHeaders can itself send a local reply, in which case should_continue_decoding
+    // should be false. If this is not the case, we can continue the filter chain due to successful
+    // asynchronous host selection.
+    if (should_continue_decoding) {
+      ENVOY_STREAM_LOG(debug, "Continuing stream now that host resolution is complete\n",
+                       *callbacks_);
+      callbacks_->continueDecoding();
+    } else {
+      ENVOY_STREAM_LOG(debug, "Aborting stream after host resolution is complete\n", *callbacks_);
+    }
+  });
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+}
+
+// When asynchronous host selection is complete, call the pre-configured on_host_selected_function.
+void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) {
+  ENVOY_STREAM_LOG(debug, "Completing asynchronous host selection [{}]\n", *callbacks_, details);
+  std::unique_ptr<Upstream::AsyncHostSelectionHandle> local_scope =
+      std::move(host_selection_cancelable_);
+  on_host_selected_(std::move(host), details);
+}
+
+Http::FilterHeadersStatus Filter::continueDecodeHeaders(
+    Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers, bool end_stream,
+    std::function<void(Http::ResponseHeaderMap&)> modify_headers, bool* should_continue_decoding,
+    Upstream::HostConstSharedPtr&& selected_host,
+    absl::optional<std::string> host_selection_details) {
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
+  const DebugConfig* debug_config = filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key());
+  callbacks_->streamInfo().downstreamTiming().setValue(
+      "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
+
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster, selected_host);
   if (!generic_conn_pool) {
-    sendNoHealthyUpstreamResponse();
+    sendNoHealthyUpstreamResponse(host_selection_details);
     return Http::FilterHeadersStatus::StopIteration;
   }
   Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
@@ -795,7 +857,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         continue;
       }
       auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
-      auto options =
+      const auto options =
           Http::AsyncClient::RequestOptions()
               .setTimeout(timeout_.global_timeout_)
               .setParentSpan(callbacks_->activeSpan())
@@ -807,8 +869,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
-              .setDiscardResponseBody(true);
-      options.setFilterConfig(config_);
+              .setDiscardResponseBody(true)
+              .setFilterConfig(config_)
+              .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -832,21 +895,38 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     onRequestComplete();
   }
 
+  // If this was called due to asynchronous host selection, the caller should continueDecoding
+  if (should_continue_decoding) {
+    *should_continue_decoding = true;
+  }
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-std::unique_ptr<GenericConnPool>
-Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
+std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
+                                                        Upstream::HostConstSharedPtr host) {
+  if (host == nullptr) {
+    return nullptr;
+  }
   GenericConnPoolFactory* factory = nullptr;
+  ProtobufTypes::MessagePtr message;
   if (cluster_->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().ref());
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
                           cluster_->upstreamConfig().ref().DebugString()));
+    if (!cluster_->upstreamConfig()->typed_config().value().empty()) {
+      message = Envoy::Config::Utility::translateToFactoryConfig(
+          *cluster_->upstreamConfig(), config_->factory_context_.messageValidationVisitor(),
+          *factory);
+    }
   }
   if (!factory) {
     factory = &config_->router_context_.genericConnPoolFactory();
+  }
+
+  if (!message) {
+    message = factory->createEmptyConfigProto();
   }
 
   using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
@@ -863,23 +943,18 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     }
   }
 
-  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
-      thread_local_cluster.chooseHost(this));
-  if (!host) {
-    return nullptr;
-  }
-
-  return factory->createGenericConnPool(host, thread_local_cluster, upstream_protocol,
-                                        route_entry_->priority(),
-                                        callbacks_->streamInfo().protocol(), this);
+  return factory->createGenericConnPool(host, cluster, upstream_protocol, route_entry_->priority(),
+                                        callbacks_->streamInfo().protocol(), this, *message);
 }
 
-void Filter::sendNoHealthyUpstreamResponse() {
+void Filter::sendNoHealthyUpstreamResponse(absl::optional<std::string> optional_details) {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
+  absl::string_view details = (optional_details.has_value() && !optional_details->empty())
+                                  ? absl::string_view(*optional_details)
+                                  : StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream;
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
-                             absl::nullopt,
-                             StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
+                             absl::nullopt, details);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -1065,14 +1140,16 @@ void Filter::maybeDoShadowing() {
     if (shadow_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
     }
-    auto options = Http::AsyncClient::RequestOptions()
-                       .setTimeout(timeout_.global_timeout_)
-                       .setParentSpan(callbacks_->activeSpan())
-                       .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled())
-                       .setIsShadow(true)
-                       .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend());
-    options.setFilterConfig(config_);
+    const auto options =
+        Http::AsyncClient::RequestOptions()
+            .setTimeout(timeout_.global_timeout_)
+            .setParentSpan(callbacks_->activeSpan())
+            .setChildSpanName("mirror")
+            .setSampled(shadow_policy.traceSampled())
+            .setIsShadow(true)
+            .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
+            .setFilterConfig(config_)
+            .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
     config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                    options);
   }
@@ -1107,6 +1184,11 @@ void Filter::onRequestComplete() {
 }
 
 void Filter::onDestroy() {
+  // Cancel any in-flight host selection
+  if (host_selection_cancelable_) {
+    host_selection_cancelable_->cancel();
+  }
+
   // Reset any in-flight upstream requests.
   resetAll();
 
@@ -1571,6 +1653,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
+  ASSERT(!host_selection_cancelable_);
+
   modify_headers_(*headers);
   // When grpc-status appears in response headers, convert grpc-status to HTTP status code
   // for outlier detection. This does not currently change any stats or logging and does not
@@ -2030,17 +2114,60 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
+  if (host_selection_cancelable_) {
+    // If there was a timeout during host selection, cancel this selection
+    // attempt before potentially creating a new one.
+    host_selection_cancelable_->cancel();
+    host_selection_cancelable_.reset();
+  }
 
   // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
   const auto cluster = config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
   std::unique_ptr<GenericConnPool> generic_conn_pool;
-  if (cluster != nullptr) {
-    cluster_ = cluster->info();
-    generic_conn_pool = createConnPool(*cluster);
+  if (cluster == nullptr) {
+    sendNoHealthyUpstreamResponse({});
+    cleanup();
+    return;
   }
 
+  callbacks_->streamInfo().downstreamTiming().setValue(
+      "envoy.router.host_selection_start_ms",
+      callbacks_->dispatcher().timeSource().monotonicTime());
+  auto host_selection_response = cluster->chooseHost(this);
+  if (!host_selection_response.cancelable ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
+    if (host_selection_response.cancelable) {
+      host_selection_response.cancelable->cancel();
+    }
+    // This branch handles the common case of synchronous host selection, as
+    // well as handling unsupported asynchronous host selection (by treating it
+    // as host selection failure).
+    continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry,
+                    std::move(host_selection_response.host), *cluster,
+                    std::string(host_selection_response.details));
+  }
+
+  ENVOY_STREAM_LOG(debug, "Handling asynchronous host selection for retry\n", *callbacks_);
+  // Again latch the cancel handle, and set up the callback to be called when host
+  // selection is complete.
+  host_selection_cancelable_ = std::move(host_selection_response.cancelable);
+  on_host_selected_ =
+      ([this, can_send_early_data, can_use_http3, is_timeout_retry,
+        cluster](Upstream::HostConstSharedPtr&& host, std::string host_selection_details) -> void {
+        continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry, std::move(host),
+                        *cluster, host_selection_details);
+      });
+}
+
+void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
+                             TimeoutRetry is_timeout_retry, Upstream::HostConstSharedPtr&& host,
+                             Upstream::ThreadLocalCluster& cluster,
+                             absl::optional<std::string> host_selection_details) {
+  callbacks_->streamInfo().downstreamTiming().setValue(
+      "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(cluster, host);
   if (!generic_conn_pool) {
-    sendNoHealthyUpstreamResponse();
+    sendNoHealthyUpstreamResponse(host_selection_details);
     cleanup();
     return;
   }
@@ -2102,6 +2229,29 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
   if (cluster.dropOverload().value()) {
     ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}", *callbacks_,
                      cluster.dropOverload().value());
+
+    if (cluster.dropOverload().value() == 1.0) {
+      ENVOY_STREAM_LOG(
+          debug, "The configured DROP_OVERLOAD ratio is 100%, drop everything unconditionally.",
+          *callbacks_);
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::UnconditionalDropOverload);
+      chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
+      callbacks_->sendLocalReply(
+          Http::Code::ServiceUnavailable, "unconditional drop overload",
+          [modify_headers, this](Http::ResponseHeaderMap& headers) {
+            if (!config_->suppress_envoy_headers_) {
+              headers.addReference(Http::Headers::get().EnvoyUnconditionalDropOverload,
+                                   Http::Headers::get().EnvoyUnconditionalDropOverloadValues.True);
+            }
+            modify_headers(headers);
+          },
+          absl::nullopt, StreamInfo::ResponseCodeDetails::get().UnconditionalDropOverload);
+
+      cluster.info()->loadReportStats().upstream_rq_drop_overload_.inc();
+      return true;
+    }
+
     if (config_->random_.bernoulli(cluster.dropOverload())) {
       ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DropOverLoad);

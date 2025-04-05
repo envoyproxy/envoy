@@ -4,7 +4,7 @@ package envoy.extensions.filters.http.dynamic_modules.v3;
 
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
-import "xds/annotations/v3/status.proto";
+import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -13,17 +13,15 @@ option java_outer_classname = "DynamicModulesProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3;dynamic_modulesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: HTTP filter for dynamic modules]
+// [#extension: envoy.filters.http.dynamic_modules]
 
 // Configuration of the HTTP filter for dynamic modules. This filter allows loading shared object files
 // that can be loaded via dlopen by the HTTP filter.
 //
 // A module can be loaded by multiple HTTP filters, hence the program can be structured in a way that
 // the module is loaded only once and shared across multiple filters providing multiple functionalities.
-//
-// Currently, the implementation is work in progress and not usable.
 message DynamicModuleFilter {
   // Specifies the shared-object level configuration.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
@@ -42,5 +40,22 @@ message DynamicModuleFilter {
   // For example, if a module has two filter implementations, one for logging and one for header manipulation,
   // filter_name is used to choose either logging or header manipulation. The filter_config can be used to
   // configure the logging level or the header manipulation behavior.
-  string filter_config = 3;
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before
+  // passing it to the plugin. ``google.protobuf.BytesValue`` and
+  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing in a string
+  //  filter_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: hello
+  //
+  //  # Passing in raw bytes
+  //  filter_config:
+  //    "@type": "type.googleapis.com/google.protobuf.BytesValue"
+  //    value: aGVsbG8= # echo -n "hello" | base64
+  //
+  google.protobuf.Any filter_config = 3;
 }

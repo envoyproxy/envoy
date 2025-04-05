@@ -73,6 +73,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addQuicCanonicalSuffix(".xyz.com")
       .setNumTimeoutsToTriggerPortMigration(4)
       .addConnectTimeoutSeconds(123)
+      .setDisableDnsRefreshOnFailure(true)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
       .addDnsFailureRefreshSeconds(789, 987)
@@ -239,11 +240,23 @@ TEST(TestConfig, SetDnsQueryTimeout) {
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   // The default value.
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 120 }"));
 
   engine_builder.addDnsQueryTimeoutSeconds(30);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 30 }"));
+}
+
+TEST(TestConfig, SetDisableDnsRefreshOnFailure) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  // The default value.
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("disable_dns_refresh_on_failure")));
+
+  engine_builder.setDisableDnsRefreshOnFailure(true);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("disable_dns_refresh_on_failure: true"));
 }
 
 TEST(TestConfig, EnforceTrustChainVerification) {

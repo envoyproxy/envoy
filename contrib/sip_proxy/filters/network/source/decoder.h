@@ -46,9 +46,9 @@ public:
 private:
   friend class SipDecoderTest;
   struct DecoderStatus {
-    DecoderStatus(State next_state) : next_state_(next_state){};
+    DecoderStatus(State next_state) : next_state_(next_state) {};
     DecoderStatus(State next_state, FilterStatus filter_status)
-        : next_state_(next_state), filter_status_(filter_status){};
+        : next_state_(next_state), filter_status_(filter_status) {};
 
     State next_state_;
     absl::optional<FilterStatus> filter_status_;

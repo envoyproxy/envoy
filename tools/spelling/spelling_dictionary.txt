@@ -29,6 +29,7 @@ BBR
 BIDIRECTIONAL
 CCL
 CGROUP
+CROSSSLOT
 ECN
 ECS
 EKS
@@ -321,6 +322,7 @@ NOLINT
 NOLINTBEGIN
 NOLINTEND
 NOLINTNEXTLINE
+NOLOAD
 NONAME
 NONBLOCK
 NONCES
@@ -365,6 +367,7 @@ PEM
 PERF
 PGV
 PID
+PKCE
 PKCS12
 PKTINFO
 PNG
@@ -440,7 +443,9 @@ SPD
 SPDY
 SPIFFE
 SPKI
+SQE
 SQL
+SQPOLL
 SR
 SRCDIR
 SRDS
@@ -641,6 +646,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
@@ -948,6 +954,8 @@ lightstep
 linearization
 linearize
 linearized
+linkability
+linkable
 linux
 livelock
 llvm
@@ -1104,6 +1112,7 @@ plaintext
 pluggable
 pointee
 poller
+polymorphism
 popen
 pos
 posix
@@ -1206,6 +1215,10 @@ regexes
 reified
 reify
 reimplements
+reinitialization
+reinitializations
+reinitialize
+reinitializes
 rele
 releasor
 reloadable
@@ -1455,6 +1468,7 @@ upvalue
 uring
 urlencoded
 urls
+useragent
 userdata
 userinfo
 username

@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/cncf/xds/go v0.0.0-20231128003011-0fa0005c9caa
-	github.com/envoyproxy/envoy v1.28.0
+	github.com/envoyproxy/envoy v1.33.2
 )
 
 require (
@@ -15,7 +15,7 @@ require (
 require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	google.golang.org/protobuf v1.36.2
+	google.golang.org/protobuf v1.36.6
 )
 
 replace github.com/envoyproxy/envoy => ../../../../../../../

@@ -42,7 +42,12 @@ public:
 
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
-  bool drainClose() const override { return false; }
+  bool drainClose(Network::DrainDirection) const override { return false; }
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected call to addOnDrainCloseCb");
+    return nullptr;
+  }
 
 protected:
   ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,

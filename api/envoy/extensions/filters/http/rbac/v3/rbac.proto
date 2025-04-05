@@ -48,10 +48,8 @@ message RBAC {
   // * If absent, no RBAC enforcement occurs.
   // * If set but empty, all requests are denied.
   //
-  xds.type.matcher.v3.Matcher matcher = 4 [
-    (udpa.annotations.field_migrate).oneof_promotion = "rules_specifier",
-    (xds.annotations.v3.field_status).work_in_progress = true
-  ];
+  xds.type.matcher.v3.Matcher matcher = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "rules_specifier"];
 
   // Shadow policy for testing RBAC rules without enforcing them. These rules generate stats and logs but do not deny
   // requests. If absent, no shadow RBAC policy will be applied.

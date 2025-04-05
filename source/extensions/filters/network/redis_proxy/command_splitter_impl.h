@@ -384,7 +384,8 @@ class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
-               Common::Redis::FaultManagerPtr&& fault_manager);
+               Common::Redis::FaultManagerPtr&& fault_manager,
+               absl::flat_hash_set<std::string>&& custom_commands);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
@@ -417,6 +418,7 @@ private:
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
+  absl::flat_hash_set<std::string> custom_commands_;
 };
 
 } // namespace CommandSplitter
