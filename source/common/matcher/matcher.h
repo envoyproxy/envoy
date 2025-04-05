@@ -279,6 +279,11 @@ private:
                                                 data_input, on_no_match,
                                                 &PrefixMapMatcher<DataType>::create);
     }
+    case MatcherType::MatcherTree::kPrefixMatchMapWithRetry: {
+      return createMapMatcher<PrefixMapMatcher>(
+          matcher.matcher_tree().prefix_match_map_with_retry(), data_input, on_no_match,
+          &PrefixMapMatcher<DataType>::createWithRetry);
+    }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
     case MatcherType::MatcherTree::kCustomMatch: {

@@ -43,26 +43,38 @@ TEST(TrieLookupTable, LongestPrefix) {
 
   EXPECT_EQ(cstr_a, trie.find("foo"));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
+  EXPECT_EQ(3, trie.findLongestPrefixLength("foo"));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
+  EXPECT_EQ(3, trie.findLongestPrefixLength("foosball"));
   EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo/"));
+  EXPECT_EQ(3, trie.findLongestPrefixLength("foo/"));
   EXPECT_EQ(cstr_d, trie.findLongestPrefix("foo/bar"));
+  EXPECT_EQ(7, trie.findLongestPrefixLength("foo/bar"));
   EXPECT_EQ(cstr_d, trie.findLongestPrefix("foo/bar/zzz"));
+  EXPECT_EQ(7, trie.findLongestPrefixLength("foo/bar/zzz"));
 
   EXPECT_EQ(cstr_b, trie.find("bar"));
   EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
+  EXPECT_EQ(3, trie.findLongestPrefixLength("bar"));
   EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
+  EXPECT_EQ(3, trie.findLongestPrefixLength("baritone"));
   EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
+  EXPECT_EQ(4, trie.findLongestPrefixLength("barometer"));
 
   EXPECT_EQ(cstr_e, trie.find("barn"));
   EXPECT_EQ(cstr_e, trie.findLongestPrefix("barnacle"));
+  EXPECT_EQ(4, trie.findLongestPrefixLength("barnacle"));
 
   EXPECT_EQ(cstr_f, trie.find("barp"));
   EXPECT_EQ(cstr_f, trie.findLongestPrefix("barpomus"));
+  EXPECT_EQ(4, trie.findLongestPrefixLength("barpomus"));
 
   EXPECT_EQ(nullptr, trie.find("toto"));
   EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
+  EXPECT_EQ(0, trie.findLongestPrefixLength("toto"));
   EXPECT_EQ(nullptr, trie.find(" "));
   EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
+  EXPECT_EQ(0, trie.findLongestPrefixLength(" "));
 }
 
 TEST(TrieLookupTable, VeryDeepTrieDoesNotStackOverflowOnDestructor) {
