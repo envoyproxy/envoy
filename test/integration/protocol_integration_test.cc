@@ -5690,4 +5690,34 @@ TEST_P(DownstreamProtocolIntegrationTest, ConfigureAsyncLbWhenUnsupported) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, EmptyCookieHeader) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto request_headers = default_request_headers_;
+  request_headers.addCopy("cookie", "");
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+
+  const bool has_empty_cookie =
+      !upstream_request_->headers().get(Http::LowerCaseString("cookie")).empty();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_cookie")) {
+    if (downstreamProtocol() == Http::CodecType::HTTP1 &&
+        upstreamProtocol() == Http::CodecType::HTTP1) {
+      EXPECT_TRUE(has_empty_cookie);
+    } else {
+      EXPECT_FALSE(has_empty_cookie);
+    }
+  } else {
+    if (downstreamProtocol() == Http::CodecType::HTTP2 ||
+        upstreamProtocol() == Http::CodecType::HTTP2) {
+      EXPECT_FALSE(has_empty_cookie);
+    } else {
+      EXPECT_TRUE(has_empty_cookie);
+    }
+  }
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+}
+
 } // namespace Envoy

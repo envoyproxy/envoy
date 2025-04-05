@@ -534,6 +534,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via_upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via_upstream")));
+  }
+
+  {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS", "ALLOW_WHITESPACES");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via upstream")));
+  }
+
+  {
     StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
     absl::optional<std::string> details;
     EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
@@ -832,9 +850,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
-          return {-1, ENAMETOOLONG};
-        }));
+        .WillOnce(
+            Invoke([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; }));
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
@@ -1159,13 +1176,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter upstream_format("COMMON_DURATION"); },
-                              EnvoyException, "COMMON_DURATION requires parameters");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter upstream_format("COMMON_DURATION"); }, EnvoyException,
+        "COMMON_DURATION requires parameters");
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a"); },
-                              EnvoyException, "Invalid common duration configuration: a.");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a"); }, EnvoyException,
+        "Invalid common duration configuration: a.");
   }
 
   {
@@ -1175,8 +1194,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); },
-                              EnvoyException, "Invalid common duration precision: zs.");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); }, EnvoyException,
+        "Invalid common duration precision: zs.");
   }
 
   {
@@ -5098,6 +5118,59 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
     ASSERT_EQ(providers.size(), 1);
 
     EXPECT_EQ("te", providers[0]->formatWithContext({}, stream_info));
+  }
+}
+
+TEST(SubstitutionFormatterTest, PathTest) {
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%PATH(A)%").IgnoreError(),
+                              EnvoyException,
+                              "Invalid PATH option: 'A', only 'WQ'/'NQ' are allowed");
+  }
+
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse("%PATH(NQ:B)%").IgnoreError(), EnvoyException,
+        "Invalid PATH option: 'B', only 'ORIG'/'PATH'/'ORIG_OR_PATH' are allowed");
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/path/to/something"}};
+    Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/path/to/something?query=123"}};
+    Http::TestRequestHeaderMapImpl request_headers_3{{":path", "/path/to/something"},
+                                                     {"x-envoy-original-path", "/original/path"}};
+    Http::TestRequestHeaderMapImpl request_headers_4{
+        {":path", "/path/to/something?query=123"},
+        {"x-envoy-original-path", "/original/path?query=123"}};
+
+    StreamInfo::MockStreamInfo stream_info;
+
+    for (absl::string_view query : {"", "WQ", "NQ"}) {
+      for (absl::string_view orig : {"", "ORIG", "PATH", "ORIG_OR_PATH"}) {
+        auto providers =
+            *SubstitutionFormatParser::parse(absl::StrCat("%PATH(", query, ":", orig, ")%"));
+        ASSERT_EQ(providers.size(), 1);
+
+        std::string expected_1 = orig != "ORIG" ? "/path/to/something" : "-";
+        std::string expected_2 =
+            fmt::format("{}", orig != "ORIG" ? fmt::format("/path/to/something{}",
+                                                           query != "NQ" ? "?query=123" : "")
+                                             : "-");
+        std::string expected_3 = orig != "PATH" ? "/original/path" : "/path/to/something";
+        std::string expected_4 =
+            fmt::format("{}{}", orig != "PATH" ? "/original/path" : "/path/to/something",
+                        query != "NQ" ? "?query=123" : "");
+
+        EXPECT_EQ(expected_1,
+                  providers[0]->formatWithContext({&request_headers_1}, stream_info).value_or("-"));
+        EXPECT_EQ(expected_2,
+                  providers[0]->formatWithContext({&request_headers_2}, stream_info).value_or("-"));
+        EXPECT_EQ(expected_3,
+                  providers[0]->formatWithContext({&request_headers_3}, stream_info).value_or("-"));
+        EXPECT_EQ(expected_4,
+                  providers[0]->formatWithContext({&request_headers_4}, stream_info).value_or("-"));
+      }
+    }
   }
 }
 

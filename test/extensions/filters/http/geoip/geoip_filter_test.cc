@@ -128,10 +128,10 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
   EXPECT_CALL(*dummy_driver_, lookup(_, _))
-      .WillRepeatedly(
-          DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
-                  captured_cb_(Geolocation::LookupResult{{"x-geo-region", "dummy-region"}});
-                })));
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(
+                                  Geolocation::LookupResult{{"x-geo-region", "dummy-region"}});
+                            })));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());

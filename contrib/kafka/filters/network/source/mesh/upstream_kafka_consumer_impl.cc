@@ -14,7 +14,7 @@ RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
                                      const std::string& topic, const int32_t partition_count,
                                      const RawKafkaConfig& configuration)
     : RichKafkaConsumer(record_processor, thread_factory, topic, partition_count, configuration,
-                        LibRdKafkaUtilsImpl::getDefaultInstance()){};
+                        LibRdKafkaUtilsImpl::getDefaultInstance()) {};
 
 RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
                                      Thread::ThreadFactory& thread_factory,

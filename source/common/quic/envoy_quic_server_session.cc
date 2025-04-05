@@ -204,6 +204,11 @@ void EnvoyQuicServerSession::setHttp3Options(
     }
   }
   set_allow_extended_connect(http3_options_->allow_extended_connect());
+  if (http3_options_->disable_qpack()) {
+    DisableHuffmanEncoding();
+    DisableCookieCrumbling();
+    set_qpack_maximum_dynamic_table_capacity(0);
+  }
 }
 
 void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,

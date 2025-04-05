@@ -33,12 +33,9 @@ static void fineGrainLogSlowPath(benchmark::State& state) {
   FL;                                                                                              \
   FL;                                                                                              \
   FL;
-#define FL_64                                                                                      \
-  { FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 }
-#define FL_512                                                                                     \
-  { FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 }
-#define FL_1024                                                                                    \
-  { FL_512 FL_512 }
+#define FL_64 {FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 FL_8 FL_8}
+#define FL_512 {FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 FL_64 FL_64}
+#define FL_1024 {FL_512 FL_512}
 
 /**
  * Benchmark for medium path, i.e. new site initialization within the same file.

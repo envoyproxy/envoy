@@ -64,7 +64,7 @@ public:
 
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()){};
+    ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()) {};
 
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
@@ -131,7 +131,7 @@ protected:
   // Are credentials pending?
   std::atomic<bool> credentials_pending_ = true;
   Thread::MutexBasicLockable mu_;
-  std::list<CredentialSubscriberCallbacks*> credentials_subscribers_ ABSL_GUARDED_BY(mu_) = {};
+  std::list<CredentialSubscriberCallbacks*> credentials_subscribers_ ABSL_GUARDED_BY(mu_);
 };
 
 } // namespace Aws

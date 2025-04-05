@@ -95,7 +95,7 @@ public:
   LifecycleStatsHandler(const Stats::ScopeSharedPtr& scope, std::string runtime)
       : lifecycle_stats_(LifecycleStats{
             LIFECYCLE_STATS(POOL_COUNTER_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")),
-                            POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")))}){};
+                            POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")))}) {};
   ~LifecycleStatsHandler() = default;
 
   void onEvent(WasmEvent event);

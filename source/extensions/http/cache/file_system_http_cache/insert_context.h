@@ -32,7 +32,7 @@ public:
   void insertTrailers(const Http::ResponseTrailerMap&, InsertCallback insert_complete) override {
     dispatcher_.post([cb = std::move(insert_complete)]() mutable { cb(false); });
   }
-  void onDestroy() override{};
+  void onDestroy() override {};
 
 private:
   Event::Dispatcher& dispatcher_;

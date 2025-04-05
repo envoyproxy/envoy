@@ -692,6 +692,10 @@ bool StringUtil::hasEmptySpace(absl::string_view view) {
   return view.find_first_of(WhitespaceChars) != absl::string_view::npos;
 }
 
+bool StringUtil::hasNewLine(absl::string_view view) {
+  return view.find('\n') != absl::string_view::npos;
+}
+
 namespace {
 
 using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
