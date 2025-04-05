@@ -130,51 +130,6 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
   return override_host_status;
 }
 
-HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
-                                                   LoadBalancerContext* context) {
-  if (context == nullptr) {
-    return nullptr;
-  }
-
-  auto override_host = context->overrideHostToSelect();
-  if (!override_host.has_value()) {
-    return nullptr;
-  }
-
-  if (host_map == nullptr) {
-    return nullptr;
-  }
-
-  auto host_iter = host_map->find(override_host.value().first);
-
-  // The override host cannot be found in the host map.
-  if (host_iter == host_map->end()) {
-    return nullptr;
-  }
-
-  HostConstSharedPtr host = host_iter->second;
-  ASSERT(host != nullptr);
-
-  if (status[static_cast<uint32_t>(host->healthStatus())]) {
-    return host;
-  }
-  return nullptr;
-}
-
-bool HostUtility::allowLBChooseHost(LoadBalancerContext* context) {
-  if (context == nullptr) {
-    return true;
-  }
-
-  auto override_host = context->overrideHostToSelect();
-  if (!override_host.has_value()) {
-    return true;
-  }
-
-  // Return opposite value to "strict" setting.
-  return !override_host.value().second;
-}
-
 void HostUtility::forEachHostMetric(
     const ClusterManager& cluster_manager,
     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
@@ -239,6 +194,37 @@ void HostUtility::forEachHostMetric(
       }
     }
   }
+}
+
+std::pair<HostConstSharedPtr, bool>
+HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
+                                const OverrideHostPolicy* policy, LoadBalancerContext* context) {
+  if (context == nullptr || host_map == nullptr) {
+    return {nullptr, false};
+  }
+
+  const auto* stream_info = context->requestStreamInfo();
+  const uint32_t attempt = stream_info != nullptr ? stream_info->attemptCount().value_or(0) : 0;
+  if (attempt >= 2) {
+    return {nullptr, false};
+  }
+
+  const auto override_host =
+      policy != nullptr ? policy->overrideHostToSelect(context) : context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return {nullptr, false};
+  }
+
+  for (absl::string_view host_view : absl::StrSplit(override_host.value().hosts, ',')) {
+    if (auto iter = host_map->find(host_view); iter != host_map->end()) {
+      ASSERT(iter->second != nullptr);
+      if (status[static_cast<uint32_t>(iter->second->healthStatus())]) {
+        return {iter->second, override_host.value().strict};
+      }
+    }
+  }
+
+  return {nullptr, override_host.value().strict};
 }
 
 } // namespace Upstream

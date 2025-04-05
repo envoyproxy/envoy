@@ -118,6 +118,7 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
+  MOCK_METHOD(OptRef<const OverrideHostPolicy>, overrideHostPolicy, (), (const));
   MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
   MOCK_METHOD(TypedLoadBalancerFactory&, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
