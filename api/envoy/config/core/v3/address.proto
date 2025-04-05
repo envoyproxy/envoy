@@ -50,7 +50,7 @@ message EnvoyInternalAddress {
   string endpoint_id = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message SocketAddress {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketAddress";
 
@@ -97,6 +97,11 @@ message SocketAddress {
   // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
   // IPv6 space as ``::FFFF:<IPv4-address>``.
   bool ipv4_compat = 6;
+
+  // The Linux network namespace to bind the socket to. If this is set, Envoy will
+  // create the socket in the specified network namespace. Only supported on Linux.
+  // [#not-implemented-hide:]
+  string network_namespace_filepath = 7;
 }
 
 message TcpKeepalive {
