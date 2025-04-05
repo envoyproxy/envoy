@@ -63,7 +63,7 @@ Matcher::~Matcher() {
   hs_free_database(start_of_match_database_);
 }
 
-bool Matcher::match(absl::string_view value) const {
+bool Matcher::match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
   bool matched = false;
   ScratchThreadLocalPtr local_scratch;
   hs_scratch_t* scratch = getScratch(local_scratch);
