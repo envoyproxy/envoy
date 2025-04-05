@@ -1278,7 +1278,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.rbac",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
-            "envoy.rbac.matchers.upstream_ip_port",
             "envoy.formatter.cel",
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",

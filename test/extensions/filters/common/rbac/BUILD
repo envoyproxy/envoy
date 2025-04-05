@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
+        "//source/extensions/filters/common/rbac/principals/mtls_authenticated:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",

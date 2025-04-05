@@ -465,6 +465,12 @@ EXTENSIONS = {
     "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
 
     #
+    # RBAC principals
+    #
+
+    "envoy.rbac.principals.mtls_authenticated":        "//source/extensions/filters/common/rbac/principals/mtls_authenticated:config",
+
+    #
     # DNS Resolver
     #
 
