@@ -37,5 +37,17 @@ private:
   const StringMatcherPtr string_matcher_;
 };
 
+// FilterStateStringListMatcher class that extends the class
+// FilterStateObjectMatcher to allow a list of strings to match with a string
+// value. A match happens whenever any string in the string matches with the string value.
+class FilterStateStringListMatcher : public FilterStateObjectMatcher {
+public:
+  FilterStateStringListMatcher(StringMatcherPtr&& string_matcher);
+  bool match(const StreamInfo::FilterState::Object& object) const override;
+
+private:
+  const StringMatcherPtr string_matcher_;
+};
+
 } // namespace Matchers
 } // namespace Envoy

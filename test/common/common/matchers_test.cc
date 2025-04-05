@@ -7,6 +7,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_list_accessor.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -782,6 +783,75 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
       std::make_shared<Network::Address::InstanceAccessor>(
           Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)),
       StreamInfo::FilterState::StateType::Mutable);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, NoIpInstanceFilterStateAddressMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, MatchFilterStateStringListMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_list_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<Envoy::Router::StringListAccessor>(
+                           std::vector<std::string>{"test_value1", "exact_value"}),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, NoMatchFilterStateStringListMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_list_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<Envoy::Router::StringListAccessor>(
+                           std::vector<std::string>{"test_value1", "test_value2"}),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, NoStringListAccessorForFilterStateStringListMatch) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_list_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
+                       StreamInfo::FilterState::StateType::ReadOnly);
 
   auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
   ASSERT_TRUE(filter_state_matcher.ok());
