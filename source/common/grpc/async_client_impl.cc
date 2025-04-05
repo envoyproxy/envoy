@@ -14,6 +14,39 @@
 namespace Envoy {
 namespace Grpc {
 
+inline void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
+    absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
+    headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
+      if (header.key().getStringView().ends_with("-bin")) {
+        bin_metadata[header.key().getStringView()]=
+            absl::Base64Escape(header.value().getStringView());
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    for (const auto& [key, value] : bin_metadata) {
+      Http::LowerCaseString key_string(key);
+      headers.remove(key_string);
+        headers.addCopy(key_string, value);
+    }
+}
+
+inline void base64UnescapeBinHeaders(Http::HeaderMap& headers) {
+  absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
+  headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
+    if (header.key().getStringView().ends_with("-bin")) {
+      std::string value;
+      absl::Base64Unescape(header.value().getStringView(), &value);
+      bin_metadata[header.key().getStringView()] = std::move(value);
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  for (const auto& [key, value] : bin_metadata) {
+    Http::LowerCaseString key_string(key);
+    headers.remove(key_string);
+    headers.addCopy(key_string, value);
+  }
+}  
+
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(Upstream::ClusterManager& cm,
                         const envoy::config::core::v3::GrpcService& config,
@@ -180,6 +213,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   );
   current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
+  // base64 encode on "-bin" metadata. 
+  base64EscapeBinHeaders(headers_message_->headers());
+
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 
@@ -188,10 +224,6 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
-  if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
-                                                   : std::move(headers));
-  }
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
@@ -215,6 +247,13 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
     // we can potentially optimize in the future.
     onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
+  }
+    // Normal response, possibly with grpc response in later body and grpc-status
+  // in trailers.
+  if (!waiting_to_delete_on_remote_close_) {
+  base64UnescapeBinHeaders(*headers);
+  callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
+                                                   : std::move(headers));
   }
 }
 
@@ -259,6 +298,7 @@ void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
   if (!waiting_to_delete_on_remote_close_) {
+  base64UnescapeBinHeaders(*trailers);
     callbacks_.onReceiveTrailingMetadata(std::move(trailers));
   }
   if (!grpc_status) {
