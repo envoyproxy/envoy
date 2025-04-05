@@ -66,6 +66,9 @@ public:
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() const override { return enable_half_close_; }
+  void enableCloseThroughFilterManager(bool enabled) override {
+    enable_close_through_filter_manager_ = enabled;
+  }
   void close(ConnectionCloseType type) final;
   void close(ConnectionCloseType type, absl::string_view details) override {
     if (!details.empty()) {
@@ -73,6 +76,7 @@ public:
     }
     close(type);
   }
+
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   ReadDisableStatus readDisable(bool disable) override;
@@ -117,6 +121,17 @@ public:
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
+  void closeConnection(ConnectionCloseAction close_action) override {
+    ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
+    if (close_action.closeSocket()) {
+      // The socket will be directly closed.
+      closeSocket(close_action.event_);
+    } else {
+      // It will go through the normal close() process.
+      ASSERT(close_action.isLocalClose());
+      closeInternal(close_action.type_);
+    }
+  }
 
   // Network::ReadBufferSource
   StreamBuffer getReadBuffer() override { return {*read_buffer_, read_end_stream_}; }
@@ -162,6 +177,10 @@ protected:
 
   // Network::ConnectionImplBase
   void closeConnectionImmediately() final;
+  void remoteCloseThroughFilterManager() {
+    closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::RemoteClose, true});
+  }
+  void closeThroughFilterManager(ConnectionCloseAction close_action);
 
   void closeSocket(ConnectionEvent close_type);
 
@@ -218,6 +237,8 @@ private:
   // Set the detected close type for this connection.
   void setDetectedCloseType(DetectedCloseType close_type);
 
+  void closeInternal(ConnectionCloseType type);
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
@@ -245,6 +266,7 @@ private:
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
   bool transport_wants_read_ : 1;
+  bool enable_close_through_filter_manager_ : 1;
 };
 
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
