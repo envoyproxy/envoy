@@ -386,5 +386,13 @@ new_features:
     Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
     :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
     :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
+- area: oauth2
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.stat_prefix>` to allow
+    differentiating between different oauth2 filters in the same filter chain.
+- area: jwt_authn
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.stat_prefix>` to allow
+    differentiating between different jwt_authn filters in the same filter chain.
 
 deprecated:
