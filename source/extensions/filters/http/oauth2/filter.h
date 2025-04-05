@@ -130,8 +130,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Server::Configuration::CommonFactoryContext& context,
-               std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
-               const std::string& stats_prefix);
+               std::shared_ptr<SecretReader> secret_reader);
   const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
@@ -152,7 +151,6 @@ public:
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
-  FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const std::string& cookieDomain() const { return cookie_domain_; }
@@ -198,8 +196,6 @@ public:
   }
 
 private:
-  static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
-
   const HttpUri oauth_token_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
@@ -210,7 +206,6 @@ private:
   const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
-  FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
@@ -237,6 +232,34 @@ private:
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
+ * This class used to hold the route specific filter config.
+ */
+class RouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  RouteSpecificFilterConfig(FilterConfigSharedPtr config) : oauth2_config_(std::move(config)) {}
+
+  /**
+   * @return the actual oauth2 configuration. Null if no valid oauth2 configuration is set in
+   * route specific config.
+   */
+  FilterConfigSharedPtr config() const { return oauth2_config_; }
+
+private:
+  FilterConfigSharedPtr oauth2_config_;
+};
+
+class StatsConfig {
+public:
+  StatsConfig(const std::string& prefix, Stats::Scope& scope);
+  FilterStats& stats() { return stats_; }
+
+private:
+  FilterStats stats_;
+};
+
+using StatsConfigSharedPtr = std::shared_ptr<StatsConfig>;
 
 /**
  * An OAuth cookie validator:
@@ -293,6 +316,11 @@ struct CallbackValidationResult {
   std::string original_request_url_;
 };
 
+using Oauth2ClientCreator =
+    std::function<std::unique_ptr<OAuth2Client>(const FilterConfig& config)>;
+using Oauth2ValidatorCreator =
+    std::function<std::shared_ptr<CookieValidator>(const FilterConfig& config)>;
+
 /**
  * The filter is the primary entry point for the OAuth workflow. Its responsibilities are to
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
@@ -302,7 +330,8 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      FilterCallbacks,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
+  OAuth2Filter(StatsConfigSharedPtr stats_config, FilterConfigSharedPtr filter_config,
+               Oauth2ClientCreator client_creator, Oauth2ValidatorCreator validator_creator,
                TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
@@ -332,7 +361,10 @@ public:
 private:
   friend class OAuth2Test;
 
-  std::shared_ptr<CookieValidator> validator_;
+  StatsConfigSharedPtr stats_config_;
+  FilterConfigSharedPtr config_;
+  Oauth2ClientCreator client_creator_;
+  Oauth2ValidatorCreator validator_creator_;
 
   // wrap up some of these in a UserData struct or something...
   std::string auth_code_;
@@ -349,7 +381,8 @@ private:
   bool was_refresh_token_flow_{false};
 
   std::unique_ptr<OAuth2Client> oauth_client_;
-  FilterConfigSharedPtr config_;
+  std::shared_ptr<CookieValidator> validator_;
+
   TimeSource& time_source_;
   Random::RandomGenerator& random_;
 
@@ -366,7 +399,7 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
-  std::string BuildCookieTail(int cookie_type) const;
+  std::string buildCookieTail(int cookie_type) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,

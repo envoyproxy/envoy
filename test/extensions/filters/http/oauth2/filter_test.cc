@@ -107,16 +107,22 @@ public:
   void init(FilterConfigSharedPtr config) {
     // Set up the OAuth client.
     oauth_client_ = new MockOAuth2Client();
-    std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
+    auto oauth_client_cretor = [this](const FilterConfig&) {
+      return std::unique_ptr<OAuth2Client>{oauth_client_};
+    };
+    validator_ = std::make_shared<MockOAuth2CookieValidator>();
+    auto validator_creator = [this](const FilterConfig&) {
+      return std::shared_ptr<CookieValidator>{validator_};
+    };
 
+    stats_config_ = std::make_shared<StatsConfig>("test.", factory_context_.scope_);
     config_ = config;
     ON_CALL(test_random_, random()).WillByDefault(Return(123456789));
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_,
-                                             test_random_);
+    filter_ =
+        std::make_shared<OAuth2Filter>(stats_config_, config_, std::move(oauth_client_cretor),
+                                       std::move(validator_creator), test_time_, test_random_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-    validator_ = std::make_shared<MockOAuth2CookieValidator>();
-    filter_->validator_ = validator_;
   }
 
   // Set up proto fields with standard config.
@@ -230,8 +236,8 @@ public:
 
     // Create filter config.
     auto secret_reader = std::make_shared<MockSecretReader>();
-    FilterConfigSharedPtr c = std::make_shared<FilterConfig>(
-        p, factory_context_.server_factory_context_, secret_reader, scope_, "test.");
+    FilterConfigSharedPtr c =
+        std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader);
 
     return c;
   }
@@ -280,11 +286,10 @@ public:
   std::shared_ptr<MockOAuth2CookieValidator> validator_;
   std::shared_ptr<OAuth2Filter> filter_;
   MockOAuth2Client* oauth_client_;
+  StatsConfigSharedPtr stats_config_;
   FilterConfigSharedPtr config_;
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
-  Stats::IsolatedStoreImpl store_;
-  Stats::Scope& scope_{*store_.rootScope()};
   Event::SimulatedTimeSystem test_time_;
   NiceMock<Random::MockRandomGenerator> test_random_;
 };
@@ -390,8 +395,7 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   // Attempt to create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
-                                     scope_, "test."),
+      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader),
       EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
 }
 
@@ -423,8 +427,8 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ =
+      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader);
 
   // resource is optional
   EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
@@ -488,8 +492,8 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ =
+      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader);
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -546,8 +550,8 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   // Create the OAuth config.
   auto secret_reader = std::make_shared<MockSecretReader>();
   FilterConfigSharedPtr test_config_;
-  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
-                                                secret_reader, scope_, "test.");
+  test_config_ =
+      std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader);
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -659,8 +663,8 @@ TEST_F(OAuth2Test, OAuthOkPass) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_success").value(), 1);
 }
 
 /**
@@ -703,8 +707,8 @@ TEST_F(OAuth2Test, OAuthOkPassButInvalidToken) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_success").value(), 1);
 }
 
 /**
@@ -751,8 +755,8 @@ TEST_F(OAuth2Test, OAuthOkPreserveForeignAuthHeader) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_success").value(), 1);
 }
 
 TEST_F(OAuth2Test, SetBearerToken) {
@@ -810,8 +814,8 @@ TEST_F(OAuth2Test, SetBearerToken) {
   filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
                                    std::chrono::seconds(600));
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_success").value(), 1);
 }
 
 /**
@@ -887,7 +891,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
   // Expected response after the callback & validation is complete - verifying we kept the
@@ -919,7 +923,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 }
 
@@ -948,8 +952,8 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 1);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_failure").value(), 1);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_success").value(), 0);
 }
 
 /**
@@ -1193,7 +1197,7 @@ TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_failure_.value());
 }
 
 /**
@@ -1218,9 +1222,9 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(request_headers, expected_headers);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_passthrough").value(), 1);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_failure").value(), 0);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_passthrough").value(), 1);
+  EXPECT_EQ(factory_context_.scope_.counterFromString("test.oauth_success").value(), 0);
 }
 
 /**
@@ -1248,8 +1252,8 @@ TEST_F(OAuth2Test, AjaxDoesNotRedirect) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
-  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_failure_.value());
+  EXPECT_EQ(0, stats_config_->stats().oauth_unauthorized_rq_.value());
 }
 
 // Validates the behavior of the cookie validator.
@@ -1633,7 +1637,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
@@ -1747,7 +1751,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
@@ -2527,7 +2531,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
   // Expected response after the callback & validation is complete - verifying we kept the
@@ -2572,8 +2576,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
   filter_->finishRefreshAccessTokenFlow();
-  EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
-  EXPECT_EQ(2, config_->stats().oauth_success_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_refreshtoken_success_.value());
+  EXPECT_EQ(2, stats_config_->stats().oauth_success_.value());
 }
 
 TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
@@ -2624,8 +2628,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
 
   filter_->onRefreshAccessTokenSuccess("", "", "", std::chrono::seconds(10));
 
-  EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
-  EXPECT_EQ(1, config_->stats().oauth_success_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_refreshtoken_success_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_success_.value());
 }
 
 TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
@@ -2683,8 +2687,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
 
   filter_->onRefreshAccessTokenFailure();
 
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
-  EXPECT_EQ(1, config_->stats().oauth_refreshtoken_failure_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_refreshtoken_failure_.value());
 }
 
 /**
@@ -2728,9 +2732,9 @@ TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
 
   filter_->onRefreshAccessTokenFailure();
 
-  EXPECT_EQ(0, config_->stats().oauth_unauthorized_rq_.value());
-  EXPECT_EQ(1, config_->stats().oauth_refreshtoken_failure_.value());
-  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+  EXPECT_EQ(0, stats_config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_refreshtoken_failure_.value());
+  EXPECT_EQ(1, stats_config_->stats().oauth_failure_.value());
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {

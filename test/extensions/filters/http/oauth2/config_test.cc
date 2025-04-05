@@ -137,7 +137,7 @@ config:
   EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
-  EXPECT_CALL(context, initManager()).Times(2);
+  EXPECT_CALL(context, initManager());
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
@@ -152,18 +152,6 @@ TEST(ConfigTest, InvalidTokenSecret) {
 
 TEST(ConfigTest, InvalidHmacSecret) {
   expectInvalidSecretConfig("hmac", "invalid HMAC secret configuration");
-}
-
-TEST(ConfigTest, CreateFilterMissingConfig) {
-  OAuth2Config config;
-
-  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
-
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  const auto result =
-      config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(), "config must be present for global config");
 }
 
 TEST(ConfigTest, WrongCookieName) {

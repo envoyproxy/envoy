@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,6 +22,11 @@ public:
   createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
+                                       Server::Configuration::ServerFactoryContext&,
+                                       ProtobufMessage::ValidationVisitor&) override;
 };
 
 } // namespace Oauth2

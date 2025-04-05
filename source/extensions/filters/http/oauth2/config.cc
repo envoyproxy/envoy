@@ -35,31 +35,30 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
     return secret_manager.findStaticGenericSecretProvider(config.name());
   }
 }
-} // namespace
 
-absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+absl::StatusOr<FilterConfigSharedPtr>
+createConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+             Server::Configuration::CommonFactoryContext& context,
+             Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+             Init::Manager& init_manager) {
   if (!proto.has_config()) {
-    return absl::InvalidArgumentError("config must be present for global config");
+    // Null config will be accepted as a special case where the filter will be disabled.
+    return nullptr;
   }
+
+  auto& secret_manager = context.clusterManager().clusterManagerFactory().secretManager();
 
   const auto& proto_config = proto.config();
   const auto& credentials = proto_config.credentials();
 
-  const auto& client_secret = credentials.token_secret();
-  const auto& hmac_secret = credentials.hmac_secret();
-
-  auto& cluster_manager = context.serverFactoryContext().clusterManager();
-  auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider_client_secret = secretsProvider(
-      client_secret, secret_manager, transport_socket_factory, context.initManager());
+  auto secret_provider_client_secret = secretsProvider(credentials.token_secret(), secret_manager,
+                                                       transport_socket_factory, init_manager);
   if (secret_provider_client_secret == nullptr) {
     return absl::InvalidArgumentError("invalid token secret configuration");
   }
-  auto secret_provider_hmac_secret =
-      secretsProvider(hmac_secret, secret_manager, transport_socket_factory, context.initManager());
+
+  auto secret_provider_hmac_secret = secretsProvider(credentials.hmac_secret(), secret_manager,
+                                                     transport_socket_factory, init_manager);
   if (secret_provider_hmac_secret == nullptr) {
     return absl::InvalidArgumentError("invalid HMAC secret configuration");
   }
@@ -71,21 +70,49 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
         "preserve_authorization_header must be false");
   }
 
-  auto secret_reader = std::make_shared<SDSSecretReader>(
-      std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
-      context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api());
-  auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(),
-                                               secret_reader, context.scope(), stats_prefix);
+  auto secret_reader = std::make_shared<SDSSecretReader>(std::move(secret_provider_client_secret),
+                                                         std::move(secret_provider_hmac_secret),
+                                                         context.threadLocal(), context.api());
+  return std::make_shared<FilterConfig>(proto_config, context, secret_reader);
+}
 
-  return
-      [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        std::unique_ptr<OAuth2Client> oauth_client =
-            std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint(),
-                                               config->retryPolicy(), config->defaultExpiresIn());
-        callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
-            config, std::move(oauth_client), context.serverFactoryContext().timeSource(),
-            context.serverFactoryContext().api().randomGenerator()));
-      };
+} // namespace
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+OAuth2Config::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  auto status_or_config = createConfig(proto, context, context.getTransportSocketFactoryContext(),
+                                       context.initManager());
+  RETURN_IF_NOT_OK_REF(status_or_config.status());
+  return std::make_shared<RouteSpecificFilterConfig>(std::move(status_or_config.value()));
+}
+
+absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+
+  auto stats_config = std::make_shared<StatsConfig>(stats_prefix, context.scope());
+  auto status_or_config =
+      createConfig(proto, context.serverFactoryContext(),
+                   context.getTransportSocketFactoryContext(), context.initManager());
+  RETURN_IF_NOT_OK_REF(status_or_config.status());
+
+  return [&server = context.serverFactoryContext(), config = std::move(status_or_config.value()),
+          stats_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    auto client_creator = [&server](const FilterConfig& config) {
+      return std::make_unique<OAuth2ClientImpl>(server.clusterManager(),
+                                                config.oauthTokenEndpoint(), config.retryPolicy(),
+                                                config.defaultExpiresIn());
+    };
+    auto validator_creator = [&server](const FilterConfig& config) {
+      return std::make_unique<OAuth2CookieValidator>(server.timeSource(), config.cookieNames(),
+                                                     config.cookieDomain());
+    };
+    callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
+        stats_config, config, std::move(client_creator), std::move(validator_creator),
+        server.timeSource(), server.api().randomGenerator()));
+  };
 }
 
 /*
