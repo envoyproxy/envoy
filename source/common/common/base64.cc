@@ -214,6 +214,8 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   return ret;
 }
 
+std::string Base64::encode(absl::string_view input) { return encode(input.data(), input.length()); }
+
 std::string Base64::encode(const char* input, uint64_t length) {
   return encode(input, length, true);
 }

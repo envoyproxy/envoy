@@ -23,8 +23,6 @@ TEST(HeaderBasedSessionStateFactoryTest, EmptyHeaderName) {
 }
 
 TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
-  testing::NiceMock<Envoy::Upstream::MockHostDescription> mock_host;
-
   {
     HeaderBasedSessionStateProto config;
     config.set_name("session-header");
@@ -35,14 +33,11 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
     auto session_state = factory.create(request_headers);
     EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
-    auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
-
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate(mock_host, response_headers);
+    session_state->onUpdate("1.2.3.4:80", response_headers);
 
     // No valid address then update it in the headers
-    EXPECT_EQ(response_headers.get_("session-header"), Envoy::Base64::encode("1.2.3.4:80", 10));
+    EXPECT_EQ(response_headers.get_("session-header"), Envoy::Base64::encode("1.2.3.4:80"));
   }
 
   {
@@ -57,22 +52,85 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
     auto session_state = factory.create(request_headers);
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
-    auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
-
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate(mock_host, response_headers);
+    session_state->onUpdate("1.2.3.4:80", response_headers);
 
     // Session state is not updated so expect no header in response
     EXPECT_EQ(response_headers.get_("session-header"), "");
 
-    auto upstream_host_2 = std::make_shared<Envoy::Network::Address::Ipv4Instance>("2.3.4.5", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host_2));
-
-    session_state->onUpdate(mock_host, response_headers);
+    session_state->onUpdate("2.3.4.5:80", response_headers);
 
     // Update session state because the current request is routed to a new upstream host.
     EXPECT_EQ(response_headers.get_("session-header"), Envoy::Base64::encode("2.3.4.5:80", 10));
+  }
+}
+
+TEST(HeaderBasedSessionStateFactoryTest, SessionStateTestInPackagesMode) {
+  {
+    HeaderBasedSessionStateProto config;
+    config.set_name("session-header");
+    config.set_mode(HeaderBasedSessionStateProto::PACKAGES);
+
+    HeaderBasedSessionStateFactory factory(config);
+
+    // No valid address in the request headers.
+    Envoy::Http::TestRequestHeaderMapImpl request_headers;
+    auto session_state = factory.create(request_headers);
+    EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+
+    Envoy::Http::TestResponseHeaderMapImpl response_headers;
+    session_state->onUpdate("1.2.3.4:80", response_headers);
+
+    // Do nothing because no original session header in the response.
+    EXPECT_EQ(response_headers.get_("session-header"), "");
+
+    Envoy::Http::TestResponseHeaderMapImpl response_headers2{
+        {":status", "200"}, {"session-header", "abcdefg"}, {"session-header", "highklm"}};
+    session_state->onUpdate("1.2.3.4:80", response_headers2);
+
+    // Do nothing because multiple session headers in the response.
+    EXPECT_EQ(response_headers2.get(Envoy::Http::LowerCaseString("session-header"))[0]->value(),
+              "abcdefg");
+    EXPECT_EQ(response_headers2.get(Envoy::Http::LowerCaseString("session-header"))[1]->value(),
+              "highklm");
+
+    Envoy::Http::TestResponseHeaderMapImpl response_headers3{{":status", "200"},
+                                                             {"session-header", "abcdefg"}};
+    session_state->onUpdate("1.2.3.4:80", response_headers3);
+
+    // Update session state because the current request is routed to a new upstream host.
+    EXPECT_EQ(response_headers3.get_("session-header"),
+              Envoy::Base64::encode("1.2.3.4:80;origin:abcdefg"));
+  }
+
+  {
+    HeaderBasedSessionStateProto config;
+    config.set_name("session-header");
+    config.set_mode(HeaderBasedSessionStateProto::PACKAGES);
+
+    HeaderBasedSessionStateFactory factory(config);
+
+    // Get upstream address from request headers.
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":path", "/path"}, {"session-header", Envoy::Base64::encode("1.2.3.4:80")}};
+
+    // No origin part in the request headers.
+    auto session_state = factory.create(request_headers);
+    EXPECT_FALSE(session_state->upstreamAddress().has_value());
+
+    Envoy::Http::TestRequestHeaderMapImpl request_headers2 = {
+        {":path", "/path"}, {"session-header", Envoy::Base64::encode("1.2.3.4:80;origin:")}};
+
+    // No valid origin part in the request headers.
+    auto session_state2 = factory.create(request_headers2);
+    EXPECT_FALSE(session_state2->upstreamAddress().has_value());
+
+    Envoy::Http::TestRequestHeaderMapImpl request_headers3 = {
+        {":path", "/path"}, {"session-header", Envoy::Base64::encode("1.2.3.4:80;origin:abcdefg")}};
+
+    auto session_state3 = factory.create(request_headers3);
+    EXPECT_EQ(session_state3->upstreamAddress().value(), "1.2.3.4:80");
+    EXPECT_EQ(request_headers3.get_("session-header"), "abcdefg");
   }
 }
 
