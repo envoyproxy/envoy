@@ -260,7 +260,10 @@ def _boringssl():
 def _boringssl_fips():
     external_http_archive(
         name = "boringssl_fips",
+        location_name = "boringssl",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+        patches = ["@envoy//bazel:boringssl_fips.patch"],
+        patch_args = ["-p1"],
     )
 
 def _aws_lc():
