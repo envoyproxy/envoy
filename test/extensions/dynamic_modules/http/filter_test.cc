@@ -198,22 +198,28 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
 
   // Check filter state set by the filter during even hooks.
-  const auto* req_header_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_header_key");
+  const auto* req_header_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_header_key");
   ASSERT_NE(req_header_value, nullptr);
   EXPECT_EQ(req_header_value->serializeAsString(), "req_header_value");
-  const auto* req_body_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_body_key");
+  const auto* req_body_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_body_key");
   ASSERT_NE(req_body_value, nullptr);
   EXPECT_EQ(req_body_value->serializeAsString(), "req_body_value");
-  const auto* req_trailer_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_trailer_key");
+  const auto* req_trailer_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_trailer_key");
   ASSERT_NE(req_trailer_value, nullptr);
   EXPECT_EQ(req_trailer_value->serializeAsString(), "req_trailer_value");
-  const auto* res_header_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_header_key");
+  const auto* res_header_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_header_key");
   ASSERT_NE(res_header_value, nullptr);
   EXPECT_EQ(res_header_value->serializeAsString(), "res_header_value");
-  const auto* res_body_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_body_key");
+  const auto* res_body_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_body_key");
   ASSERT_NE(res_body_value, nullptr);
   EXPECT_EQ(res_body_value->serializeAsString(), "res_body_value");
-  const auto* res_trailer_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_trailer_key");
+  const auto* res_trailer_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_trailer_key");
   ASSERT_NE(res_trailer_value, nullptr);
   EXPECT_EQ(res_trailer_value->serializeAsString(), "res_trailer_value");
   // There is no filter state named key set by the filter.
@@ -221,7 +227,8 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   ASSERT_EQ(value, nullptr);
 
   filter->onStreamComplete();
-  const auto* stream_complete_value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("stream_complete_key");
+  const auto* stream_complete_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("stream_complete_key");
   ASSERT_NE(stream_complete_value, nullptr);
   EXPECT_EQ(stream_complete_value->serializeAsString(), "stream_complete_value");
 }
