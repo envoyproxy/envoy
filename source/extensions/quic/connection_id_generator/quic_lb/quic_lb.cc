@@ -129,7 +129,8 @@ Secret::GenericSecretConfigProviderSharedPtr secretsProvider(
     const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
     Server::Configuration::TransportSocketFactoryContext& transport_socket_factory_context,
     Init::Manager& init_manager) {
-  Secret::SecretManager& secret_manager = transport_socket_factory_context.secretManager();
+  Secret::SecretManager& secret_manager =
+      transport_socket_factory_context.serverFactoryContext().secretManager();
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(
         config.sds_config(), config.name(), transport_socket_factory_context, init_manager);

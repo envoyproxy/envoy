@@ -13,7 +13,7 @@
 
 #include "test/common/tls/ssl_test_utility.h"
 #include "test/mocks/network/connection.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"

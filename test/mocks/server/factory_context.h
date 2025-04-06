@@ -11,7 +11,6 @@
 #include "instance.h"
 #include "overload_manager.h"
 #include "server_lifecycle_notifier.h"
-#include "transport_socket_factory_context.h"
 
 namespace Envoy {
 namespace Server {
