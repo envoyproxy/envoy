@@ -13,6 +13,44 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+/**
+ * A singleton for file based loading of ip tags and looking up parsed trie data structures with Ip
+ * tags. When given equivalent file paths to the Ip tags, the singleton returns pointers to the same
+ * trie structure.
+ */
+class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
+public:
+  IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
+  IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                              Api::Api& api, Event::Dispatcher& dispatcher,
+                              std::shared_ptr<IpTagsRegistrySingleton> singleton);
+
+IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                             Api::Api& api, Event::Dispatcher& dispatcher,
+                             std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+  std::shared_ptr<IpTagsProvider> ip_tags_provider;
+  const uint64_t key = std::hash<std::string>()(ip_tags_path);
+  absl::MutexLock lock(&mu_);
+  auto it = ip_tags_registry_.find(key);
+  if (it != ip_tags_registry_.end()) {
+    ip_tags_provider = it->second.lock();
+  } else {
+    ip_tags_provider =
+        std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, dispatcher, api, singleton);
+    ip_tags_registry_[key] = ip_tags_provider;
+  }
+  return ip_tags_provider;
+}
+
+private:
+  absl::Mutex mu_;
+  //  We keep weak_ptr here so the trie structures can be destroyed if the config is updated to stop
+  //  using that trie. Each provider stores shared_ptrs to this singleton, which keeps the singleton
+  //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
+  //  shared_ptr is *only* held by driver instances.)
+  absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
+};
+
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                            Stats::StatNameSetPtr& stat_name_set)
     : api_(api), validation_visitor_(validation_visitor), stat_name_set_(stat_name_set) {}
@@ -60,26 +98,13 @@ LcTrieSharedPtr IpTagsLoader::parseIpTags(
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
-IpTagsProviderSharedPtr IpTagsRegistrySingleton::get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                    Api::Api& api, Event::Dispatcher& dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
-  IpTagsProviderSharedPtr ip_tags_provider;
-  const size_t key = std::hash<std::string>()(ip_tags_path);
-  absl::MutexLock lock(&mu_);
-  auto it = ip_tags_registry_.find(key);
-  if (it != ip_tags_registry_.end()) {
-    ip_tags_provider = it->second.lock();
-  } else {
-    ip_tags_provider = std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, dispatcher, api, singleton);
-    ip_tags_registry_[key] = ip_tags_provider;
-  }
-  return ip_tags_provider;
-}
+
+SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry, const std::string& stat_prefix,
-    Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
-    Event::Dispatcher& dispatcher,
+    Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
@@ -110,7 +135,14 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
-    trie_ = ip_tags_registry_->get(ip_tags_path_, tags_loader_, dispatcher, api, ip_tags_registry_);
+    std::cerr << "***Resolving provider for: " << ip_tags_path_ <<std::endl;
+    auto provider =
+        ip_tags_registry_->get(ip_tags_path_, tags_loader_, api, dispatcher, ip_tags_registry_);
+    if (provider && provider->ipTags()) {
+      trie_ = provider->ipTags();
+    } else {
+      throw EnvoyException("Failed to get ip tags from provider");
+    }
   }
 }
 

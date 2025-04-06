@@ -44,7 +44,7 @@ private:
   Stats::StatNameSetPtr& stat_name_set_;
 };
 
-//todo nezdolik move to impl file
+// todo nezdolik move to impl file
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
@@ -78,6 +78,8 @@ public:
     }
   };
 
+  LcTrieSharedPtr ipTags() { return tags_; };
+
   absl::Status onIpTagsFileUpdate() { return absl::OkStatus(); }
 
 private:
@@ -102,7 +104,8 @@ class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
   IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
   IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                    Api::Api& api, Event::Dispatcher& dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton);
+                              Api::Api& api, Event::Dispatcher& dispatcher,
+                              std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
   absl::Mutex mu_;
@@ -110,8 +113,7 @@ private:
   //  using that trie. Each provider stores shared_ptrs to this singleton, which keeps the singleton
   //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
   //  shared_ptr is *only* held by driver instances.)
-  absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProviderSharedPtr>>
-      ip_tags_registry_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
 };
 
 SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
