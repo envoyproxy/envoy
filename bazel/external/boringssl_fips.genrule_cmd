@@ -23,11 +23,9 @@ ROOT=./external/boringssl_fips
 pushd "$ROOT"
 export HOME="$PWD"
 
-# Build tools requirements (from section 11 of https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4735.pdf):
-# - Clang compiler version from Envoy (version 18 as of Apr 2025)
-# - Go programming language version 1.18.1 (https://golang.org/dl/)
-# - Ninja build system version 1.10.2 (https://github.com/ninja-build/ninja/releases)
-# - Cmake version 3.22.1 (https://cmake.org/download/)
+# The security policy recommends using the recent compiler versions:
+# "The latest stable versions of Clang, Go, Ninja, and CMake should be used".
+# This build makes use of the same LLVM toolchain as the rest of Envoy.
 
 # Override $PATH for build tools, to avoid picking up anything else.
 export PATH="/usr/bin:/bin:/opt/llvm/bin"

@@ -233,6 +233,10 @@ class Validator(object):
         # It's hard to disentangle API and dataplane today.
         expected_dataplane_core_deps = self._dep_info.deps_by_use_category('dataplane_core').union(
             self._dep_info.deps_by_use_category('api'))
+
+        # Disregard boringssl_fips since it is the same as boringssl.
+        queried_dataplane_core_min_deps = queried_dataplane_core_min_deps.difference(['boringssl_fips'])
+
         bad_dataplane_core_deps = queried_dataplane_core_min_deps.difference(
             expected_dataplane_core_deps)
         print(f'Validating {len(expected_dataplane_core_deps)} data-plane dependencies...')
