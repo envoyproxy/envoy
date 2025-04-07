@@ -482,6 +482,46 @@ TEST(ABIImpl, dynamic_metadata) {
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
 }
 
+TEST(ABIImpl, filter_state) {
+  DynamicModuleHttpFilter filter{nullptr};
+  const std::string key_str = "key";
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr = const_cast<char*>(key_str.data());
+  size_t key_length = key_str.size();
+  const std::string value_str = "value";
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr = const_cast<char*>(value_str.data());
+  size_t value_length = value_str.size();
+  char* result_str_ptr = nullptr;
+  size_t result_str_length = 0;
+
+  // No stream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, key_ptr, key_length, value_ptr, value_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, key_ptr, key_length, &result_str_ptr, &result_str_length));
+
+  // With stream info but non existing key.
+  const char* non_existing_key = "non_existing";
+  envoy_dynamic_module_type_buffer_module_ptr non_existing_key_ptr =
+      const_cast<char*>(non_existing_key);
+  size_t non_existing_key_length = strlen(non_existing_key);
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, key_ptr, key_length, value_ptr, value_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, non_existing_key_ptr, non_existing_key_length, &result_str_ptr, &result_str_length));
+
+  // With key.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, key_ptr, key_length, &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, value_length);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str);
+}
+
 std::string
 bufferVectorToString(const std::vector<envoy_dynamic_module_type_envoy_buffer>& buffer_vector) {
   std::string result;
