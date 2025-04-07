@@ -61,11 +61,9 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     COVERAGE_TARGETS=()
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"
-    BAZEL_COVERAGE_OPTIONS+=(
-        "--config=fuzz-coverage")
+    BAZEL_COVERAGE_OPTIONS=("--config=fuzz-coverage" "${BAZEL_COVERAGE_OPTIONS[@]}")
 else
-    BAZEL_COVERAGE_OPTIONS+=(
-        "--config=test-coverage")
+    BAZEL_COVERAGE_OPTIONS=("--config=test-coverage" "${BAZEL_COVERAGE_OPTIONS[@]}")
 fi
 
 # Output unusually long logs due to trace logging.
