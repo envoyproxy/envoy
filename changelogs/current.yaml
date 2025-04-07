@@ -389,8 +389,7 @@ new_features:
 - area: matcher
   change: |
     Added the integration between :ref:`ExtensionWithMatcher
-    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` and network filters, :ref:`SkipFilter
-    <envoy_v3_api_msg_extensions.filters.matcher.action.v3.SkipFilter>` is supported.
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` and network filters, and only SkipFilter is supported.
 - area: oauth2
   change: |
     Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.stat_prefix>` to allow
