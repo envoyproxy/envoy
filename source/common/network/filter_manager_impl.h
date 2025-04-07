@@ -141,9 +141,6 @@ protected:
     bool local_close_pending_{false};
   };
 
-  // For test
-  State getState() { return state_; }
-
 private:
   struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
     ActiveReadFilter(FilterManagerImpl& parent, ReadFilterSharedPtr filter)
