@@ -22,6 +22,5 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",  # Added this dependency
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/resource_monitors/cgroup_memory/v3:pkg_cc_proto",
     ],
 )

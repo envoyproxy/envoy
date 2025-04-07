@@ -1,8 +1,10 @@
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
+
 #include "envoy/common/pure.h"
+
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_paths.h"
 
 namespace Envoy {

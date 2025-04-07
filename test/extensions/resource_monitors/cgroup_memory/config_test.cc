@@ -12,8 +12,9 @@ namespace CgroupMemory {
 
 TEST(CgroupMemoryMonitorFactoryTest, BasicTest) {
   std::cout << "Running CgroupMemoryMonitorFactory basic test" << std::endl;
-  auto* factory = Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-      "envoy.resource_monitors.cgroup_memory");
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 }
 

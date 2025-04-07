@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <filesystem>
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +18,7 @@ struct CgroupPaths {
     static constexpr const char* const LIMIT = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
   };
 
-  // Memory usage and limit paths for cgroup v2  
+  // Memory usage and limit paths for cgroup v2
   struct V2 {
     static constexpr const char* const USAGE = "/sys/fs/cgroup/memory.current";
     static constexpr const char* const LIMIT = "/sys/fs/cgroup/memory.max";
@@ -26,13 +26,10 @@ struct CgroupPaths {
 
   // Helper methods to check cgroup version
   static bool isV2() {
-    return std::filesystem::exists(V2::USAGE) && 
-           std::filesystem::exists(V2::LIMIT);
+    return std::filesystem::exists(V2::USAGE) && std::filesystem::exists(V2::LIMIT);
   }
 
-  static bool isV1() {
-    return std::filesystem::exists(CGROUP_V1_BASE);
-  } 
+  static bool isV1() { return std::filesystem::exists(CGROUP_V1_BASE); }
 };
 
 } // namespace CgroupMemory

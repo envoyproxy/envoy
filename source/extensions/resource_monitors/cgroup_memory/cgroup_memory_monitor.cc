@@ -1,5 +1,6 @@
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_monitor.h"
-#include "envoy/common/exception.h"  // Add this include for EnvoyException
+
+#include "envoy/common/exception.h" // Add this include for EnvoyException
 
 namespace Envoy {
 namespace Extensions {
@@ -13,7 +14,7 @@ CgroupMemoryMonitor::CgroupMemoryMonitor(
       stats_reader_(stats_reader ? std::move(stats_reader) : CgroupMemoryStatsReader::create()) {}
 
 void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     const uint64_t usage = stats_reader_->getMemoryUsage();
     const uint64_t limit = std::min(max_memory_, stats_reader_->getMemoryLimit());
 
@@ -27,9 +28,9 @@ void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& c
     usage_stats.resource_pressure_ = static_cast<double>(usage) / limit;
 
     callbacks.onSuccess(usage_stats);
-  } catch (const EnvoyException& error) {
-    callbacks.onFailure(error);
   }
+  CATCH(const EnvoyException& error) { callbacks.onFailure(error); }
+  END_TRY;
 }
 
 } // namespace CgroupMemory

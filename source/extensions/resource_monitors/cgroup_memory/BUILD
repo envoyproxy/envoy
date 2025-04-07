@@ -17,14 +17,14 @@ envoy_cc_library(
     ],
     hdrs = [
         "cgroup_memory_monitor.h",
-        "cgroup_memory_stats_reader.h",
         "cgroup_memory_paths.h",
+        "cgroup_memory_stats_reader.h",
     ],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
-        "//envoy/common:exception_lib", 
         "@envoy_api//envoy/extensions/resource_monitors/cgroup_memory/v3:pkg_cc_proto",
     ],
 )
