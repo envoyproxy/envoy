@@ -16,7 +16,8 @@ namespace JwtAuthn {
 FilterConfigImpl::FilterConfigImpl(
     envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-    : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
+    : proto_config_(std::move(proto_config)),
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), context.scope())),
       cm_(context.serverFactoryContext().clusterManager()),
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
 
