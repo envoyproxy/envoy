@@ -66,9 +66,6 @@ public:
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() const override { return enable_half_close_; }
-  void enableCloseThroughFilterManager(bool enabled) override {
-    enable_close_through_filter_manager_ = enabled;
-  }
   void close(ConnectionCloseType type) final;
   void close(ConnectionCloseType type, absl::string_view details) override {
     if (!details.empty()) {
@@ -177,9 +174,6 @@ protected:
 
   // Network::ConnectionImplBase
   void closeConnectionImmediately() final;
-  void remoteCloseThroughFilterManager() {
-    closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::RemoteClose, true});
-  }
   void closeThroughFilterManager(ConnectionCloseAction close_action);
 
   void closeSocket(ConnectionEvent close_type);

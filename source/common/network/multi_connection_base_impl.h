@@ -88,7 +88,6 @@ public:
 
   // Methods which are applied to each connection attempt.
   void enableHalfClose(bool enabled) override;
-  void enableCloseThroughFilterManager(bool enabled) override;
   void noDelay(bool enable) override;
   ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override;

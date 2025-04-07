@@ -87,7 +87,9 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
-      transport_wants_read_(false), enable_close_through_filter_manager_(false) {
+      transport_wants_read_(false),
+      enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
   if (!socket_->isOpen()) {
     IS_ENVOY_BUG("Client socket failure");
@@ -168,7 +170,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   // status will abort data naturally.
   ASSERT(type == ConnectionCloseType::FlushWrite ||
          type == ConnectionCloseType::FlushWriteAndDelay);
-  closeThroughFilterManager({ConnectionEvent::LocalClose, false, type});
+  closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::LocalClose, false, type});
 }
 
 void ConnectionImpl::closeInternal(ConnectionCloseType type) {
@@ -393,7 +395,8 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   ASSERT(dispatcher_.isThreadSafe());
   // Do not read the data from the socket if the connection is in delay closed,
   // high watermark is called, or is closing through filter manager.
-  if (inDelayedClose() || !filterChainWantsData() || filter_manager_.pendingClose()) {
+  if (inDelayedClose() || !filterChainWantsData() ||
+      (enable_close_through_filter_manager_ && filter_manager_.pendingClose())) {
     return;
   }
   ASSERT(socket_->isOpen());
@@ -704,7 +707,7 @@ void ConnectionImpl::onReadReady() {
   // If it is closing through the filter manager, we either need to close the socket or go
   // through the close(), so we prevent further reading from the socket when we are waiting
   // for the connection close.
-  if (filter_manager_.pendingClose()) {
+  if (enable_close_through_filter_manager_ && filter_manager_.pendingClose()) {
     return;
   }
 
@@ -742,7 +745,7 @@ void ConnectionImpl::onReadReady() {
       // In some cases, the transport socket could read data along with an RST (Reset) flag.
       // We need to ensure this data is properly propagated to the terminal filter for proper
       // handling. For more details, see #29616 and #28817.
-      remoteCloseThroughFilterManager();
+      closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::RemoteClose, true});
     } else {
       // Otherwise no data was read, and close the socket directly.
       closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -769,7 +772,11 @@ void ConnectionImpl::onReadReady() {
   // The read callback may have already closed the connection.
   if (result.action_ == PostIoAction::Close || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "remote close", *this);
-    remoteCloseThroughFilterManager();
+    // This is the typical case where a socket read triggers a connection close.
+    // When half-close is disabled, the action_ will be set to close.
+    // When half-close is enabled, once both directions of the connection are closed,
+    // we need to ensure that the read data is properly propagated to the terminal filter.
+    closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::RemoteClose, true});
   }
 }
 
@@ -859,7 +866,7 @@ void ConnectionImpl::onWriteReady() {
       } else if (bothSidesHalfClosed()) {
         // If half_close is enabled, the close should still go through the filter manager, since
         // the end_stream from read side is possible pending in the filter chain.
-        closeThroughFilterManager({ConnectionEvent::LocalClose, true});
+        closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::LocalClose, true});
       }
     }
   } else {

@@ -122,11 +122,6 @@ TEST_F(QuicFilterManagerConnectionImplTest, CloseConnection) {
                    "unexpected call to closeConnection for QUIC");
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, EnableCloseThroughFilterManager) {
-  EXPECT_ENVOY_BUG(impl_.enableCloseThroughFilterManager(true),
-                   "unexpected call to enableCloseThroughFilterManager for QUIC");
-}
-
 TEST_F(QuicFilterManagerConnectionImplTest, GetWriteBuffer) {
   EXPECT_DEATH(impl_.getWriteBuffer(), "not implemented");
 }

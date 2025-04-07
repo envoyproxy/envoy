@@ -131,11 +131,8 @@ public:
 
 protected:
   struct State {
-    // Number of pending write filters awaiting closure.
-    uint32_t write_filter_pending_close_count_{0};
-
-    // Number of pending read filters awaiting closure.
-    uint32_t read_filter_pending_close_count_{0};
+    // Number of pending filters awaiting closure.
+    uint32_t filter_pending_close_count_{0};
 
     // True if a RemoteClose is currently pending.
     bool remote_close_pending_{false};

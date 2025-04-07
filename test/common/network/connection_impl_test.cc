@@ -2054,12 +2054,14 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 
 // Test that remote early close is not managed by the filter manager.
 TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseWithoutFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicConnection();
   connect();
 
   InSequence s1;
 
-  server_connection_->enableCloseThroughFilterManager(true);
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
@@ -2634,10 +2636,11 @@ TEST_P(ConnectionImplCloseTest, DefaultCloseSkipsFilterManager) {
 // Test that when enabled, close goes through the filter manager
 // except for Abort, NoFlush, and AbortReset.
 TEST_P(ConnectionImplCloseTest, EnabledCloseGoesViaFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
   bool filter_invoked = false;
-
-  server_connection_->enableCloseThroughFilterManager(true);
 
   // We expect onData to be called when we send data.
   // We'll disable close and return StopIteration.
@@ -2676,10 +2679,55 @@ TEST_P(ConnectionImplCloseTest, EnabledCloseGoesViaFilterManager) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// Test that when disabled by runtime guard, the close will not go through
+// the filter manager.
+TEST_P(ConnectionImplCloseTest, IgnoreDisableCloseViaFilterManagerRuntime) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "false"}});
+  setUpBasicFilterChain();
+  bool filter_invoked = false;
+
+  // We expect onData to be called when we send data.
+  // We'll disable close and return StopIteration.
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+        filter_invoked = true;
+        buffer.drain(buffer.length());
+        dispatcher_->exit();
+        read_filter_->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+
+  // Write some data from client to server to make sure read filter is active.
+  Buffer::OwnedImpl data("test data");
+  client_connection_->write(data, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Verify the filter was invoked
+  EXPECT_TRUE(filter_invoked);
+
+  // Attempt to close the connection - if using filter manager,
+  // this will be held by the disableClose(true).
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  server_connection_->close(ConnectionCloseType::FlushWrite);
+
+  // Connection should be closing since the runtime guard is false.
+  EXPECT_EQ(server_connection_->state(), Connection::State::Closed);
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .Times(1)
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 // Test Abort type bypasses filter manager.
 TEST_P(ConnectionImplCloseTest, AbortBypassesFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
+
   setUpBasicFilterChain();
-  server_connection_->enableCloseThroughFilterManager(true);
 
   // Verify that Abort type bypasses filter manager and closes immediately.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
@@ -2693,8 +2741,11 @@ TEST_P(ConnectionImplCloseTest, AbortBypassesFilterManager) {
 
 // Test NoFlush type bypasses filter manager.
 TEST_P(ConnectionImplCloseTest, NoFlushBypassesFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
+
   setUpBasicFilterChain();
-  server_connection_->enableCloseThroughFilterManager(true);
 
   // Verify that NoFlush type bypasses filter manager
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
@@ -2709,7 +2760,9 @@ TEST_P(ConnectionImplCloseTest, NoFlushBypassesFilterManager) {
 // Test Abort with pending data - data should be discarded.
 TEST_P(ConnectionImplCloseTest, AbortWithPendingData) {
   setUpBasicFilterChain();
-  server_connection_->enableCloseThroughFilterManager(true);
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
 
   // Write data that should be discarded with Abort
   Buffer::OwnedImpl data("data that should be discarded");
@@ -2728,11 +2781,12 @@ TEST_P(ConnectionImplCloseTest, AbortWithPendingData) {
 
 // Test AbortReset close type
 TEST_P(ConnectionImplCloseTest, AbortResetCloseBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
 
-  // Even with filter manager enabled, AbortReset should always bypass it
-  server_connection_->enableCloseThroughFilterManager(true);
-
+  // Even with filter manager enabled, AbortReset should always bypass it.
   // Verify AbortReset bypasses filter manager
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
   server_connection_->close(ConnectionCloseType::AbortReset);
@@ -2744,10 +2798,13 @@ TEST_P(ConnectionImplCloseTest, AbortResetCloseBehavior) {
 
 // Test that close with FlushWriteAndDelay is gated by the filter manager.
 TEST_P(ConnectionImplCloseTest, FlushWriteAndDelayThroughFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
+
   setUpBasicFilterChain();
   bool filter_invoked = false;
 
-  server_connection_->enableCloseThroughFilterManager(true);
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(1000));
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
@@ -2787,9 +2844,11 @@ TEST_P(ConnectionImplCloseTest, FlushWriteAndDelayThroughFilterManager) {
 
 // Test no more write() is allowed when the connection is pending remote close.
 TEST_P(ConnectionImplCloseTest, RemoteCloseThroughFilterManagerNoMoreWrite) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
 
-  server_connection_->enableCloseThroughFilterManager(true);
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
@@ -2827,9 +2886,10 @@ TEST_P(ConnectionImplCloseTest, RemoteCloseThroughFilterManagerNoMoreWrite) {
 // Test no more injectWriteDataToFilterChain() is allowed when the connection
 // is pending remote close.
 TEST_P(ConnectionImplCloseTest, RemoteCloseThroughFilterManagerWithRawWrite) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
-
-  server_connection_->enableCloseThroughFilterManager(true);
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
@@ -2865,9 +2925,10 @@ TEST_P(ConnectionImplCloseTest, RemoteCloseThroughFilterManagerWithRawWrite) {
 
 // Test that injectWriteDataToFilterChain is allowed during LocalClose.
 TEST_P(ConnectionImplCloseTest, LocalCloseThroughFilterManagerWithRawWrite) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
-
-  server_connection_->enableCloseThroughFilterManager(true);
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
   // We expect onData to be called when we send data.
@@ -2913,10 +2974,11 @@ TEST_P(ConnectionImplCloseTest, LocalCloseThroughFilterManagerWithRawWrite) {
 // Test that close goes through the filter manager and no more write()
 // is allowed when the close is pending.
 TEST_P(ConnectionImplCloseTest, LocalCloseThroughFilterManagerNoMoreWrite) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
   bool filter_invoked = false;
-
-  server_connection_->enableCloseThroughFilterManager(true);
 
   // We expect onData to be called when we send data.
   // We'll disable close and return StopIteration.
@@ -2962,10 +3024,11 @@ TEST_P(ConnectionImplCloseTest, LocalCloseThroughFilterManagerNoMoreWrite) {
 
 // Test that we don't read from socket when connection is closing through filter manager.
 TEST_P(ConnectionImplCloseTest, SkipReadWhenClosingThroughFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
   bool filter_invoked = false;
-
-  server_connection_->enableCloseThroughFilterManager(true);
 
   EXPECT_CALL(*read_filter_, onData(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
@@ -3014,10 +3077,12 @@ TEST_P(ConnectionImplCloseTest, SkipReadWhenClosingThroughFilterManager) {
 // Test both half closes with close through filter manager enabled.
 // RemoteClose is invoked since write path is half closed at first.
 TEST_P(ConnectionImplCloseTest, HalfCloseRemoteWithFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
   bool filter_invoked = false;
 
-  server_connection_->enableCloseThroughFilterManager(true);
   server_connection_->enableHalfClose(true);
   client_connection_->enableHalfClose(true);
 
@@ -3039,8 +3104,7 @@ TEST_P(ConnectionImplCloseTest, HalfCloseRemoteWithFilterManager) {
   // Verify the filter was invoked
   EXPECT_TRUE(filter_invoked);
 
-  // Half-close the connection - this will be gated by the filter manager
-  // since enableCloseThroughFilterManager(true) was set.
+  // Half-close the connection - this will be gated by the filter manager.
   // Client will get the remote close event since server is done the write.
   Buffer::OwnedImpl empty_buffer;
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose));
@@ -3073,10 +3137,12 @@ TEST_P(ConnectionImplCloseTest, HalfCloseRemoteWithFilterManager) {
 // Test both half closes with close through filter manager enabled.
 // LocalClose is invoked since read path is half closed at first.
 TEST_P(ConnectionImplCloseTest, HalfCloseLocalWithFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   setUpBasicFilterChain();
   bool filter_invoked = false;
 
-  server_connection_->enableCloseThroughFilterManager(true);
   server_connection_->enableHalfClose(true);
   client_connection_->enableHalfClose(true);
 
@@ -3134,7 +3200,11 @@ class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest()
       : stream_info_(dispatcher_.timeSource(), nullptr,
-                     StreamInfo::FilterState::LifeSpan::Connection) {
+                     StreamInfo::FilterState::LifeSpan::Connection) {}
+
+  ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }
+
+  void initializeConnection() {
     EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
     EXPECT_CALL(dispatcher_.buffer_factory_, createBuffer_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
@@ -3160,8 +3230,6 @@ public:
     EXPECT_CALL(dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
-  ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }
-
   // This may be invoked for doWrite() on the transport to simulate all the data
   // being written.
   static IoResult simulateSuccessfulWrite(Buffer::Instance& buffer, bool) {
@@ -3186,6 +3254,7 @@ public:
 //
 // Ref: https://github.com/envoyproxy/envoy/issues/5313
 TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
+  initializeConnection();
   connection_->addReadFilter(std::make_shared<Network::FakeReadFilter>());
   connection_->enableHalfClose(true);
   EXPECT_CALL(*transport_socket_, doRead(_))
@@ -3198,6 +3267,7 @@ TEST_F(MockTransportConnectionImplTest, ObjectDestructOrder) {
 // Verify that read resumptions requested via setTransportSocketIsReadable() are scheduled once read
 // is re-enabled.
 TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
+  initializeConnection();
   InSequence s;
 
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
@@ -3261,6 +3331,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferReadyResumeAfterReadDisable) {
 // Verify that read resumption is scheduled when read is re-enabled while the read buffer is
 // non-empty.
 TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
+  initializeConnection();
   InSequence s;
 
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
@@ -3356,6 +3427,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferResumeAfterReadDisable) {
 // Verify that transport_wants_read_ read resumption is not lost when processing read buffer
 // high-watermark resumptions.
 TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
+  initializeConnection();
   InSequence s;
 
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
@@ -3424,6 +3496,7 @@ TEST_F(MockTransportConnectionImplTest, ResumeWhileAndAfterReadDisable) {
 
 // Test the connection correctly handle the transport socket read (data + RST) case.
 TEST_F(MockTransportConnectionImplTest, ServerLargeReadResetClose) {
+  initializeConnection();
   InSequence s;
 
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
@@ -3464,9 +3537,12 @@ TEST_F(MockTransportConnectionImplTest, ServerLargeReadResetClose) {
 // Test the connection correctly handle the transport socket read (data + RST) case
 // with the disableClose(true), and the read path close is managed by the filter manager.
 TEST_F(MockTransportConnectionImplTest, ServerReadResetCloseFinalDisableClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
+  initializeConnection();
   InSequence s;
 
-  connection_->enableCloseThroughFilterManager(true);
   std::shared_ptr<MockReadFilter> read_filter(new StrictMock<MockReadFilter>());
   connection_->addReadFilter(read_filter);
 
@@ -3508,6 +3584,7 @@ TEST_F(MockTransportConnectionImplTest, ServerReadResetCloseFinalDisableClose) {
 
 // Test that BytesSentCb is invoked at the correct times
 TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
+  initializeConnection();
   uint64_t bytes_sent = 0;
   uint64_t cb_called = 0;
   connection_->addBytesSentCallback([&](uint64_t arg) {
@@ -3545,6 +3622,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCallback) {
 
 // Make sure that multiple registered callbacks all get called
 TEST_F(MockTransportConnectionImplTest, BytesSentMultiple) {
+  initializeConnection();
   uint64_t cb_called1 = 0;
   uint64_t cb_called2 = 0;
   uint64_t bytes_sent1 = 0;
@@ -3572,6 +3650,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentMultiple) {
 
 // Test that if a callback closes the connection, further callbacks are not called.
 TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
+  initializeConnection();
   // Order is not defined, so register two callbacks that both close the connection. Only
   // one of them should be called.
   uint64_t cb_called = 0;
@@ -3595,6 +3674,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentCloseInCallback) {
 // Test defines 3 callbacks. First, the middle one unsubscribes and later
 // on the last added callback unsubscribes.
 TEST_F(MockTransportConnectionImplTest, BytesSentUnsubscribe) {
+  initializeConnection();
   uint32_t cb_called1 = 0;
   uint32_t cb_called2 = 0;
   uint32_t cb_called3 = 0;
@@ -3658,6 +3738,7 @@ TEST_F(MockTransportConnectionImplTest, BytesSentUnsubscribe) {
 
 // Test that onWrite does not have end_stream set, with half-close disabled
 TEST_F(MockTransportConnectionImplTest, FullCloseWrite) {
+  initializeConnection();
   const std::string val("some data");
   Buffer::OwnedImpl buffer(val);
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
@@ -3668,6 +3749,7 @@ TEST_F(MockTransportConnectionImplTest, FullCloseWrite) {
 
 // Test that onWrite has end_stream set correctly, with half-close enabled
 TEST_F(MockTransportConnectionImplTest, HalfCloseWrite) {
+  initializeConnection();
   connection_->enableHalfClose(true);
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write))
       .WillRepeatedly(Invoke(file_ready_cb_));
@@ -3683,6 +3765,7 @@ TEST_F(MockTransportConnectionImplTest, HalfCloseWrite) {
 }
 
 TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
+  initializeConnection();
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
@@ -3697,6 +3780,7 @@ TEST_F(MockTransportConnectionImplTest, ReadMultipleEndStream) {
 // Test that if both sides half-close, the connection is closed, with the read half-close coming
 // first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseReadFirst) {
+  initializeConnection();
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
@@ -3716,6 +3800,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseReadFirst) {
 // Test that if both sides half-close, the connection is closed, with the write half-close coming
 // first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
+  initializeConnection();
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
@@ -3736,6 +3821,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
 // the connection closes only when the writes complete flushing. The write half-close happens
 // first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst) {
+  initializeConnection();
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
@@ -3759,6 +3845,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst)
 // the connection closes only when the writes complete flushing. The read half-close happens
 // first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) {
+  initializeConnection();
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
   connection_->addReadFilter(read_filter);
@@ -3786,6 +3873,7 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) 
 // Test that if end_stream is raised, but a filter stops iteration, that end_stream
 // propagates correctly.
 TEST_F(MockTransportConnectionImplTest, ReadEndStreamStopIteration) {
+  initializeConnection();
   const std::string val("a");
   std::shared_ptr<MockReadFilter> read_filter1(new StrictMock<MockReadFilter>());
   std::shared_ptr<MockReadFilter> read_filter2(new StrictMock<MockReadFilter>());
@@ -3813,6 +3901,7 @@ TEST_F(MockTransportConnectionImplTest, ReadEndStreamStopIteration) {
 // Test that if end_stream is written, but a filter stops iteration, that end_stream
 // propagates correctly.
 TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
+  initializeConnection();
   const std::string val("a");
   std::shared_ptr<MockWriteFilter> write_filter1(new StrictMock<MockWriteFilter>());
   std::shared_ptr<MockWriteFilter> write_filter2(new StrictMock<MockWriteFilter>());
@@ -3836,6 +3925,7 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
 // Validate that when the transport signals ConnectionEvent::Connected, that we
 // check for pending write buffer content.
 TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
+  initializeConnection();
   InSequence s;
 
   // Queue up some data in write buffer, simulating what happens in SSL handshake.
@@ -3862,6 +3952,7 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
 
 // Test the interface used by external consumers.
 TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
+  initializeConnection();
   InSequence s;
 
   // Queue up some data in write buffer.
@@ -3889,6 +3980,11 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
 
 // Fixture for validating behavior after a connection is closed.
 class PostCloseConnectionImplTest : public MockTransportConnectionImplTest {
+public:
+  PostCloseConnectionImplTest() : MockTransportConnectionImplTest() {
+    MockTransportConnectionImplTest::initializeConnection();
+  }
+
 protected:
   // Setup connection, single read event.
   void initialize() {
@@ -3943,9 +4039,11 @@ TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnored) {
 // close(ConnectionCloseType::FlushWriteAndDelay), the read is not propagated to
 // a read filter even it is closing through filter manager.
 TEST_F(PostCloseConnectionImplTest, ReadAfterCloseFlushWriteDelayIgnoredWithFilterManager) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
   InSequence s;
   initialize();
-  connection_->enableCloseThroughFilterManager(true);
 
   // Delayed connection close.
   EXPECT_CALL(dispatcher_, createTimer_(_));

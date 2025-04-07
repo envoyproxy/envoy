@@ -57,7 +57,6 @@ public:
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));                               \
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
-  MOCK_METHOD(void, enableCloseThroughFilterManager, (bool enabled));                              \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
   MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
   MOCK_METHOD(DetectedCloseType, detectedCloseType, (), (const));                                  \

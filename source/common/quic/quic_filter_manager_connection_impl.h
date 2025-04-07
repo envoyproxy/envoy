@@ -66,10 +66,6 @@ public:
     IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
   }
 
-  void enableCloseThroughFilterManager(bool) override {
-    IS_ENVOY_BUG("unexpected call to enableCloseThroughFilterManager for QUIC");
-  }
-
   Network::DetectedCloseType detectedCloseType() const override {
     return Network::DetectedCloseType::Normal;
   }
