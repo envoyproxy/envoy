@@ -356,6 +356,94 @@ TEST(DelegatingNetworkFilter, DelegateToFilters) {
   EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, delegating_filter->onWrite(buffer, false));
 }
 
+TEST(DelegatingNetworkFilterManager, RemoveReadFilterAndInitializeReadFilters) {
+  NiceMock<Envoy::Network::MockFilterManager> mock_filter_manager;
+  Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree = nullptr;
+
+  // Create the DelegatingNetworkFilterManager to test
+  Factory::DelegatingNetworkFilterManager delegating_manager(mock_filter_manager, match_tree);
+
+  // Create a filter to be removed
+  std::shared_ptr<CustomMockReadFilter> read_filter(new CustomMockReadFilter());
+
+  // Test removeReadFilter - this is a no-op in the implementation,
+  // but we need to call it for coverage
+  delegating_manager.removeReadFilter(read_filter);
+
+  // Test initializeReadFilters - this always returns false in the implementation,
+  // but we need to call it for coverage
+  EXPECT_FALSE(delegating_manager.initializeReadFilters());
+}
+
+// Custom action type for testing non-skip action
+class TestAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
+public:
+  explicit TestAction(const std::string& value = "test_value") : value_(value) {}
+
+  const std::string& value() const { return value_; }
+
+private:
+  std::string value_;
+};
+
+// Test creating a match tree with TestAction
+template <class InputType>
+Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData>
+createMatchingTreeWithTestAction(const std::string& name, const std::string& value) {
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Network::MatchingData>::create(
+      std::make_unique<InputType>(name), absl::nullopt);
+
+  tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
+                            []() { return std::make_unique<TestAction>(); }, nullptr});
+  return tree;
+}
+
+TEST(DelegatingNetworkFilter, NonSkipActionResult) {
+  // Test case for a filter with a match tree that evaluates to a non-skip action
+  std::shared_ptr<Envoy::Network::MockReadFilter> read_filter(new Envoy::Network::MockReadFilter());
+  std::shared_ptr<Envoy::Network::MockWriteFilter> write_filter(
+      new Envoy::Network::MockWriteFilter());
+  NiceMock<Envoy::Network::MockReadFilterCallbacks> read_callbacks;
+  NiceMock<Envoy::Network::MockWriteFilterCallbacks> write_callbacks;
+  NiceMock<Envoy::Network::MockConnectionSocket> socket;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // With a TestAction result (not a SkipAction), the underlying filter methods should be called
+  EXPECT_CALL(*read_filter, onNewConnection())
+      .WillOnce(testing::Return(Envoy::Network::FilterStatus::Continue));
+  EXPECT_CALL(*read_filter, onData(_, _))
+      .WillOnce(testing::Return(Envoy::Network::FilterStatus::Continue));
+  EXPECT_CALL(*write_filter, onWrite(_, _))
+      .WillOnce(testing::Return(Envoy::Network::FilterStatus::Continue));
+
+  // Create a match tree that will match but return a TestAction (not a SkipAction)
+  auto match_tree =
+      createMatchingTreeWithTestAction<DestinationIPInput>("destination_ip", "127.0.0.1");
+
+  auto delegating_filter =
+      std::make_shared<DelegatingNetworkFilter>(match_tree, read_filter, write_filter);
+
+  // Setup callbacks - this should set up the match state
+  EXPECT_CALL(read_callbacks, socket()).WillRepeatedly(ReturnRef(socket));
+  EXPECT_CALL(read_callbacks, connection())
+      .WillRepeatedly(testing::Invoke([&]() -> Envoy::Network::Connection& {
+        static NiceMock<Envoy::Network::MockConnection> connection;
+        ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(stream_info));
+        return connection;
+      }));
+
+  delegating_filter->initializeReadFilterCallbacks(read_callbacks);
+  delegating_filter->initializeWriteFilterCallbacks(write_callbacks);
+
+  // When a callback is made with a match tree that returns a non-skip action,
+  // it should delegate to the underlying filter
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, delegating_filter->onNewConnection());
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, delegating_filter->onData(buffer, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, delegating_filter->onWrite(buffer, false));
+}
+
 } // namespace
 } // namespace MatchDelegate
 } // namespace NetworkFilters

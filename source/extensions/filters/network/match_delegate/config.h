@@ -113,8 +113,38 @@ private:
 };
 
 DECLARE_FACTORY(MatchDelegateConfig);
+
 namespace Factory {
+
+/**
+ * FilterManager implementation that wraps the provided FilterManager and
+ * wraps any filters with a DelegatingNetworkFilter.
+ */
+class DelegatingNetworkFilterManager : public Envoy::Network::FilterManager {
+public:
+  /**
+   * @param filter_manager The underlying filter manager to delegate to
+   * @param match_tree The match tree to use for filter delegation decisions
+   */
+  DelegatingNetworkFilterManager(
+      Envoy::Network::FilterManager& filter_manager,
+      Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree);
+  ~DelegatingNetworkFilterManager() override = default;
+
+  // Network::FilterManager
+  void addReadFilter(Envoy::Network::ReadFilterSharedPtr filter) override;
+  void addWriteFilter(Envoy::Network::WriteFilterSharedPtr filter) override;
+  void addFilter(Envoy::Network::FilterSharedPtr filter) override;
+  void removeReadFilter(Envoy::Network::ReadFilterSharedPtr filter) override;
+  bool initializeReadFilters() override;
+
+private:
+  Envoy::Network::FilterManager& filter_manager_;
+  Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree_;
+};
+
 DECLARE_FACTORY(SkipActionFactory);
+
 } // namespace Factory
 
 } // namespace MatchDelegate

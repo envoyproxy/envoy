@@ -58,38 +58,33 @@ private:
   absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
-struct DelegatingNetworkFilterManager : public Envoy::Network::FilterManager {
-  DelegatingNetworkFilterManager(
-      Envoy::Network::FilterManager& filter_manager,
-      Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree)
-      : filter_manager_(filter_manager), match_tree_(match_tree) {}
-  ~DelegatingNetworkFilterManager() override = default;
-
-  void addReadFilter(Envoy::Network::ReadFilterSharedPtr filter) override {
-    auto delegating_filter =
-        std::make_shared<DelegatingNetworkFilter>(match_tree_, std::move(filter), nullptr);
-    filter_manager_.addReadFilter(std::move(delegating_filter));
-  }
-
-  void addWriteFilter(Envoy::Network::WriteFilterSharedPtr filter) override {
-    auto delegating_filter =
-        std::make_shared<DelegatingNetworkFilter>(match_tree_, nullptr, std::move(filter));
-    filter_manager_.addWriteFilter(std::move(delegating_filter));
-  }
-
-  void addFilter(Envoy::Network::FilterSharedPtr filter) override {
-    auto delegating_filter = std::make_shared<DelegatingNetworkFilter>(match_tree_, filter, filter);
-    filter_manager_.addFilter(std::move(delegating_filter));
-  }
-
-  void removeReadFilter(Envoy::Network::ReadFilterSharedPtr) override{};
-  bool initializeReadFilters() override { return false; };
-
-  Envoy::Network::FilterManager& filter_manager_;
-  Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree_;
-};
-
 REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<NetworkFilterActionContext>);
+
+DelegatingNetworkFilterManager::DelegatingNetworkFilterManager(
+    Envoy::Network::FilterManager& filter_manager,
+    Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData> match_tree)
+    : filter_manager_(filter_manager), match_tree_(match_tree) {}
+
+void DelegatingNetworkFilterManager::addReadFilter(Envoy::Network::ReadFilterSharedPtr filter) {
+  auto delegating_filter =
+      std::make_shared<DelegatingNetworkFilter>(match_tree_, std::move(filter), nullptr);
+  filter_manager_.addReadFilter(std::move(delegating_filter));
+}
+
+void DelegatingNetworkFilterManager::addWriteFilter(Envoy::Network::WriteFilterSharedPtr filter) {
+  auto delegating_filter =
+      std::make_shared<DelegatingNetworkFilter>(match_tree_, nullptr, std::move(filter));
+  filter_manager_.addWriteFilter(std::move(delegating_filter));
+}
+
+void DelegatingNetworkFilterManager::addFilter(Envoy::Network::FilterSharedPtr filter) {
+  auto delegating_filter = std::make_shared<DelegatingNetworkFilter>(match_tree_, filter, filter);
+  filter_manager_.addFilter(std::move(delegating_filter));
+}
+
+void DelegatingNetworkFilterManager::removeReadFilter(Envoy::Network::ReadFilterSharedPtr) {}
+
+bool DelegatingNetworkFilterManager::initializeReadFilters() { return false; }
 
 } // namespace Factory
 
@@ -118,8 +113,8 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
     } else {
       // TODO(botengyao) this would be similar to `base_filter_->onMatchCallback(*result);`
       // for Network::Filter, and it is a composite filter typically.
-      ENVOY_LOG(debug, "Network filter match result {}, and it is not supported.",
-                result->typeUrl());
+      ENVOY_LOG(warn, "Network filter match result {}, and it is not supported. The configured
+                      filter is used ", result->typeUrl());
     }
   }
 }
