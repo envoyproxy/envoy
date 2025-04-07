@@ -120,13 +120,6 @@ public:
   bool startUpstreamSecureTransport();
   void maybeClose();
   void onConnectionClose(ConnectionCloseAction close_action);
-
-  void finalizeClose(ConnectionCloseAction close_action) {
-    state_.local_close_pending_ = false;
-    state_.remote_close_pending_ = false;
-    connection_.closeConnection(close_action);
-  }
-
   bool pendingClose() { return state_.local_close_pending_ || state_.remote_close_pending_; }
 
 protected:

@@ -126,7 +126,9 @@ void FilterManagerImpl::maybeClose() {
   // Check if we need to close the connection
   if (pendingClose() && state_.filter_pending_close_count_ == 0 &&
       latched_close_action_.has_value()) {
-    finalizeClose(latched_close_action_.value());
+    state_.local_close_pending_ = false;
+    state_.remote_close_pending_ = false;
+    connection_.closeConnection(latched_close_action_.value());
     return;
   }
 }
@@ -157,10 +159,12 @@ void FilterManagerImpl::onConnectionClose(ConnectionCloseAction close_action) {
     }
   }
 
-  // Only finalize if we have no pending filters.
+  // Close the connection if we have no pending filters.
   // The close is initialized by the connection and no filters are gating the close.
   if (state_.filter_pending_close_count_ == 0) {
-    finalizeClose(close_action);
+    state_.local_close_pending_ = false;
+    state_.remote_close_pending_ = false;
+    connection_.closeConnection(close_action);
     return;
   }
 
