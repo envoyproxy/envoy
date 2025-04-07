@@ -1,6 +1,7 @@
 #include "test/mocks/server/instance.h"
 
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
