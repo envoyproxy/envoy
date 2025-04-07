@@ -113,8 +113,10 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
     } else {
       // TODO(botengyao) this would be similar to `base_filter_->onMatchCallback(*result);`
       // for Network::Filter, and it is a composite filter typically.
-      ENVOY_LOG(warn, "Network filter match result {}, and it is not supported. The configured"
-                      " filter will be used.", result->typeUrl());
+      ENVOY_LOG(warn,
+                "Network filter match result {}, and it is not supported. The configured"
+                " filter will be used.",
+                result->typeUrl());
     }
   }
 }
