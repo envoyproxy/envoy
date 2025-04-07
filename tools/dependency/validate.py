@@ -236,7 +236,7 @@ class Validator(object):
 
         # Disregard boringssl_fips since it is the same as boringssl.
         queried_dataplane_core_min_deps = queried_dataplane_core_min_deps.difference(
-                ['boringssl_fips'])
+            ['boringssl_fips'])
 
         bad_dataplane_core_deps = queried_dataplane_core_min_deps.difference(
             expected_dataplane_core_deps)
@@ -264,7 +264,7 @@ class Validator(object):
 
         # Disregard boringssl_fips since it is the same as boringssl.
         queried_controlplane_core_min_deps = queried_controlplane_core_min_deps.difference(
-                ['boringssl_fips'])
+            ['boringssl_fips'])
 
         # Controlplane will always depend on API.
         expected_controlplane_core_deps = self._dep_info.deps_by_use_category('controlplane').union(
