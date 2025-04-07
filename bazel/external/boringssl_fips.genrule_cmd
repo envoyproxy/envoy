@@ -5,8 +5,8 @@ set -eo pipefail
 export CXXFLAGS=''
 export LDFLAGS=''
 
-# BoringSSL build as described in the Security Policy for BoringCrypto module (2022-05-06):
-# https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4407.pdf
+# BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
+# https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
 
 OS=`uname`
 ARCH=`uname -m`
@@ -24,7 +24,7 @@ pushd "$ROOT"
 export HOME="$PWD"
 
 # Build tools requirements (from section 11 of https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4735.pdf):
-# - Clang compiler version 14.0.0 (https://releases.llvm.org/download.html)
+# - Clang compiler version from Envoy (version 18 as of Apr 2025)
 # - Go programming language version 1.18.1 (https://golang.org/dl/)
 # - Ninja build system version 1.10.2 (https://github.com/ninja-build/ninja/releases)
 # - Cmake version 3.22.1 (https://cmake.org/download/)
@@ -34,14 +34,14 @@ export PATH="/usr/bin:/bin:/opt/llvm/bin"
 
 printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > ${HOME}/toolchain
 
-# Go
-VERSION=1.18.1
+# Go: requires minimum 1.22.
+VERSION=1.24.2
 if [[ "$ARCH" == "x86_64" ]]; then
   PLATFORM="linux-amd64"
-  SHA256=b3b815f47ababac13810fc6021eb73d65478e0b2db4b09d348eefad9581a2334
+  SHA256=68097bd680839cbc9d464a0edce4f7c333975e27a90246890e9f1078c7e702ad
 else
   PLATFORM="linux-arm64"
-  SHA256=56a91851c97fb4697077abbca38860f735c32b38993ff79b088dac46e4735633
+  SHA256=756274ea4b68fa5535eb9fe2559889287d725a8da63c6aae4d5f23778c229f4b
 fi
 
 curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
@@ -56,6 +56,12 @@ if [[ `go version | awk '{print $3}'` != "go$VERSION" ]]; then
   echo "ERROR: Go version doesn't match."
   exit 1
 fi
+
+# Go tests use go:embed directives which fail to compile in a Bazel sandbox because Go refuses to embed symlinks.
+# (see issue https://github.com/golang/go/issues/59924). As a workaround, replace symlinks with the file copies.
+for pem in $(ls ssl/test/runner/*.pem);
+  do cp --dereference ${pem} tmp.pem; cp --remove-destination tmp.pem ${pem}; rm tmp.pem;
+done
 
 # Ninja
 VERSION=1.10.2
@@ -103,13 +109,7 @@ rm -rf build
 # because the FIPS module itself is already built with -fPIC.
 mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-fPIC" -DCMAKE_CXX_FLAGS="-fPIC" ..
 ninja
-
-# The `HostMatching` test contains hard-coded expired certificates and always fails due to the expiration.
-# This should be removed during the next FIPS version upgrade, as the test code is fixed in later versions.
-export GTEST_FILTER="-SSLTest.HostMatching"
-
 ninja run_tests
-./crypto/crypto_test
 
 # Verify correctness of the FIPS build.
 if [[ `tool/bssl isfips` != "1" ]]; then
