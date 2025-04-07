@@ -184,6 +184,8 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   }
 
   // Only inject write is allowed when the connection is pending local close.
+  // Injected writes are associated with a filter object.
+  // If the connection is pending close, regular writes are not permitted.
   if (filter ? state_.remote_close_pending_ : pendingClose()) {
     return FilterStatus::StopIteration;
   }
