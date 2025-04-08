@@ -2053,7 +2053,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 }
 
 // Test that remote early close is not managed by the filter manager.
-TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseWithoutFilterManager) {
+TEST_P(ConnectionImplTest, FlushWriteAndDelayRemoteCloseNotWithFilterManager) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.connection_close_through_filter_manager", "true"}});
