@@ -434,7 +434,7 @@ envoy_cc_test(
         "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
