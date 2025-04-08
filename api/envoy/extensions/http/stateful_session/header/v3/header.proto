@@ -42,23 +42,27 @@ message HeaderBasedSessionState {
     // address. This is the default mode.
     OVERRIDE = 0;
 
-    // Iff the response header (assume the header ``name`` is set to ``session-header`` and header
-    // value is ``xxxxxx``) is present then the upstream host address and existing header value will
-    // be encoded in following format to update the existing header value:
+    // Iff the header specified by the :ref:`name
+    // <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>`
+    // (assume the ``name`` is set to ``session-header`` and original header value is ``xxxxxx``)
+    // is present, then the upstream host address and value of ``name`` field specified header will
+    // be encoded in following format and the output will be used to update the ``name`` field
+    // specified header in the response:
     //
     // .. code-block:: none
     //
     //   session-header: "MS4yLjMuNDo4MDtvcmlnaW46eHh4eHh4Cg==" # base64("1.2.3.4:80;origin:xxxxxx")
     //
-    // The ``origin`` part is the the original header value in the response. The ``origin`` part is
-    // should always be last part of the header value.
+    // The ``origin`` part is used to store the original header value of ``name`` field specified
+    // header. And the ``origin`` part should always be last part of the new header value.
     //
     // If this mode is used then we will assume that the header in the request will also be in the
     // same format and contains the ``origin`` part. This extension will parse the upstream host
-    // address and update the header in the request to the ``origin`` part.
+    // address and update the ``name`` field specified header in the request to the ``origin`` part.
     //
-    // This mode is useful when the server have provide a session id or similar information in the
-    // response header and the client is expected to send it back in the request.
+    // This mode is used for the protocols or scenarios where the server will generate and set the
+    // session id in the initial response and the client will use the same header to send the session
+    // id in the subsequent requests without any modification.
     PACKAGES = 1;
   }
 
