@@ -49,9 +49,15 @@ GeoipProviderConfig::GeoipProviderConfig(
                        : absl::nullopt;
   asn_header_ = !geo_headers_to_add.asn().empty() ? absl::make_optional(geo_headers_to_add.asn())
                                                   : absl::nullopt;
-  anon_header_ = !geo_headers_to_add.is_anon().empty()
-                     ? absl::make_optional(geo_headers_to_add.is_anon())
-                     : absl::nullopt;
+
+  // TODO(barroca): When the is_anon field is fully deprecated, remove the part of the code that use
+  // it.
+  anon_header_ = !geo_headers_to_add.anon().empty()
+                     ? absl::make_optional(geo_headers_to_add.anon())
+                     : (!geo_headers_to_add.is_anon().empty()
+                            ? absl::make_optional(geo_headers_to_add.is_anon())
+                            : absl::nullopt);
+
   anon_vpn_header_ = !geo_headers_to_add.anon_vpn().empty()
                          ? absl::make_optional(geo_headers_to_add.anon_vpn())
                          : absl::nullopt;
