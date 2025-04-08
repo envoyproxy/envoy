@@ -30,7 +30,7 @@ constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
  * When instantiated via config, it will create an IAMRolesAnywhereX509CredentialsProvider, which
  * manages the X509 Credentials. IAMRolesAnywhereCredentialsProvider works in the same way as
  * WebIdentityCredentialsProvider, by using the async HTTP client to send requests to the AWS IAM
- * Roles Anywhere service and retrieve temporary AWS Credentials. It is therefore as subclass of
+ * Roles Anywhere service and retrieve temporary AWS Credentials. It is therefore a subclass of
  * MetadataCredentialsProviderBase, which handles the async credential fetch and cluster creation
  * for the IAM Roles Anywhere endpoint.
  *
