@@ -22,6 +22,7 @@ namespace OpenTelemetry {
 TEST(ParentBasedSamplerTest, TestShouldSample) {
   // Case 1: Parent doesn't exist -> Return result of delegateSampler()
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig
       trace_id_ratio_based_config;
   envoy::extensions::tracers::opentelemetry::samplers::v3::ParentBasedSamplerConfig
@@ -42,10 +43,10 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
 
     auto root_sampling_result = wrapped_sampler->shouldSample(
-        absl::nullopt, trace_id, "a_random_name",
+        info, absl::nullopt, trace_id, "a_random_name",
         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     auto sampling_result =
-        sampler->shouldSample(absl::nullopt, trace_id, "a_random_name",
+        sampler->shouldSample(info, absl::nullopt, trace_id, "a_random_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
 
     EXPECT_EQ(sampling_result.decision, root_sampling_result.decision);
@@ -68,7 +69,7 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
     SpanContext parent_context("0", "12345", "45678", true, "random_key=random_value");
     auto sampling_result =
-        sampler->shouldSample(parent_context, trace_id, "a_random_name",
+        sampler->shouldSample(info, parent_context, trace_id, "a_random_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
 
     EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
@@ -91,7 +92,7 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
     SpanContext parent_context("0", "12345", "45678", false, "random_key=random_value");
     auto sampling_result =
-        sampler->shouldSample(parent_context, trace_id, "a_random_name",
+        sampler->shouldSample(info, parent_context, trace_id, "a_random_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
 
     EXPECT_EQ(sampling_result.decision, Decision::Drop);
@@ -103,6 +104,7 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
 // Verify the GetDescription function and other tracing attributes
 TEST(ParentBasedSamplerTest, TestGetDescriptionAndContext) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig
       trace_id_ratio_based_config;
   std::srand(std::time(nullptr));
@@ -116,9 +118,9 @@ TEST(ParentBasedSamplerTest, TestGetDescriptionAndContext) {
       std::make_shared<ParentBasedSampler>(parent_based_config, context, wrapped_sampler);
 
   SpanContext parent_context("0", "12345", "45678", false, "random_key=random_value");
-  auto sampling_result =
-      sampler->shouldSample(parent_context, "3f4a7c912a5a82779d2a7573f4c758ba", "a_random_name",
-                            ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+  auto sampling_result = sampler->shouldSample(
+      info, parent_context, "3f4a7c912a5a82779d2a7573f4c758ba", "a_random_name",
+      ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_STREQ(sampler->getDescription().c_str(), "ParentBasedSampler");
   EXPECT_EQ(sampling_result.attributes, nullptr);
   EXPECT_STREQ(sampling_result.tracestate.c_str(), "random_key=random_value");
