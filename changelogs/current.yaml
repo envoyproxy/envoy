@@ -39,9 +39,16 @@ minor_behavior_changes:
   change: |
     The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
     substitution format string if the related extensions are linked.
+- area: formatter
+  change: |
+    The formatter ``%RESPONSE_CODE_DETAILS%`` takes an optional parameter ``ALLOW_WHITESPACES`` to allow whitespaces in output
+    string. By default all whitespaces will be replaced by underscore.
 - area: oauth2
   change: |
     Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
+- area: golang
+  change: |
+    Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -187,6 +194,9 @@ new_features:
 - area: http
   change: |
     Made the :ref:`lua <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>` work as an upstream filter.
+- area: http
+  change: |
+    Added filter state matcher for router matcher.
 - area: dfp
   change: |
     The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
@@ -210,6 +220,11 @@ new_features:
   change: |
     Added support to monitor container CPU utilization in Linux K8s environment using
     :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>`.
+- area: rbac
+  change: |
+    Added a new :ref:`principal type <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>` for validating
+    mTLS with more specific matches and better default behavior. Also added an extension point for
+    :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` principals.
 - area: lua
   change: |
     Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
@@ -290,6 +305,11 @@ new_features:
   change: |
     Added support for clearing the route cache explicitly in the Lua filter.
     See :ref:`clearRouteCache() <config_http_filters_lua_stream_handle_api_clear_route_cache>` for more details.
+- area: tracing
+  change: |
+    added support for :ref:`Fluentd <arch_overview_tracing>` tracer to send
+    traces in `Fluentd format
+    <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: local_rate_limit
   change: |
     Added support for dynamic token buckets in local rate limit filter for http requests.
@@ -371,5 +391,13 @@ new_features:
     Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
     :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
     :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
+- area: oauth2
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.stat_prefix>` to allow
+    differentiating between different oauth2 filters in the same filter chain.
+- area: jwt_authn
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.stat_prefix>` to allow
+    differentiating between different jwt_authn filters in the same filter chain.
 
 deprecated:

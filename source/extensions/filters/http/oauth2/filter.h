@@ -198,7 +198,8 @@ public:
   }
 
 private:
-  static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  static FilterStats generateStats(const std::string& prefix,
+                                   const std::string& filter_stats_prefix, Stats::Scope& scope);
 
   const HttpUri oauth_token_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.
@@ -303,7 +304,7 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source, Random::RandomGenerator& randomhmacCookieSettings);
+               TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;

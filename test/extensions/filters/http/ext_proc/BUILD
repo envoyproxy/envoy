@@ -289,7 +289,7 @@ envoy_extension_cc_test_library(
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
-        "//source/extensions/filters/http/ext_proc:client_interface",
+        "//source/extensions/filters/http/ext_proc:client_lib",
     ],
 )
 
