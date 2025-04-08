@@ -18,16 +18,18 @@ using envoy::extensions::common::matching::v3::ExtensionWithMatcher;
 using Envoy::ProtobufWkt::StringValue;
 
 // A simple network filter that counts connections and data
-// This will help us verify if it's being skipped or not
+// Thread-safe implementation with mutex protection
 class CountingFilter : public Network::Filter {
 public:
   // Read filter methods
   Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+    absl::MutexLock lock(&mutex_);
     data_bytes_ += data.length();
     return Network::FilterStatus::Continue;
   }
 
   Network::FilterStatus onNewConnection() override {
+    absl::MutexLock lock(&mutex_);
     connection_count_++;
     return Network::FilterStatus::Continue;
   }
@@ -38,6 +40,7 @@ public:
 
   // Write filter methods
   Network::FilterStatus onWrite(Buffer::Instance& data, bool) override {
+    absl::MutexLock lock(&mutex_);
     write_bytes_ += data.length();
     return Network::FilterStatus::Continue;
   }
@@ -46,11 +49,25 @@ public:
     write_callbacks_ = &callbacks;
   }
 
-  // Static counters to track across all instances
-  static uint32_t connection_count_;
-  static uint64_t data_bytes_;
-  static uint64_t write_bytes_;
+  // Thread-safe getters for counter values
+  static uint32_t getConnectionCount() {
+    absl::MutexLock lock(&mutex_);
+    return connection_count_;
+  }
+
+  static uint64_t getDataBytes() {
+    absl::MutexLock lock(&mutex_);
+    return data_bytes_;
+  }
+
+  static uint64_t getWriteBytes() {
+    absl::MutexLock lock(&mutex_);
+    return write_bytes_;
+  }
+
+  // Reset all counters
   static void resetCounters() {
+    absl::MutexLock lock(&mutex_);
     connection_count_ = 0;
     data_bytes_ = 0;
     write_bytes_ = 0;
@@ -59,9 +76,16 @@ public:
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
+
+  // Static counters and mutex for thread-safety
+  static absl::Mutex mutex_;
+  static uint32_t connection_count_ ABSL_GUARDED_BY(mutex_);
+  static uint64_t data_bytes_ ABSL_GUARDED_BY(mutex_);
+  static uint64_t write_bytes_ ABSL_GUARDED_BY(mutex_);
 };
 
 // Initialize static members
+absl::Mutex CountingFilter::mutex_;
 uint32_t CountingFilter::connection_count_ = 0;
 uint64_t CountingFilter::data_bytes_ = 0;
 uint64_t CountingFilter::write_bytes_ = 0;
@@ -160,9 +184,9 @@ TEST_P(MatchDelegateIntegrationTest, NormalPortTest) {
   tcp_client->waitForData("response data");
 
   // Verify the counting filter recorded this connection and data
-  EXPECT_EQ(1u, CountingFilter::connection_count_);
-  EXPECT_EQ(test_data.size(), CountingFilter::data_bytes_);
-  EXPECT_EQ(13u, CountingFilter::write_bytes_); // "response data"
+  EXPECT_EQ(1u, CountingFilter::getConnectionCount());
+  EXPECT_EQ(test_data.size(), CountingFilter::getDataBytes());
+  EXPECT_EQ(13u, CountingFilter::getWriteBytes()); // "response data"
 
   // Clean up connections
   tcp_client->close();
@@ -195,9 +219,9 @@ TEST_P(MatchDelegateIntegrationTest, MatchingPortSkipTest) {
   tcp_client->waitForData("response data");
 
   // The counting filter should not have recorded anything (skipped)
-  EXPECT_EQ(0u, CountingFilter::connection_count_);
-  EXPECT_EQ(0u, CountingFilter::data_bytes_);
-  EXPECT_EQ(0u, CountingFilter::write_bytes_);
+  EXPECT_EQ(0u, CountingFilter::getConnectionCount());
+  EXPECT_EQ(0u, CountingFilter::getDataBytes());
+  EXPECT_EQ(0u, CountingFilter::getWriteBytes());
 
   // Clean up connections
   tcp_client->close();
