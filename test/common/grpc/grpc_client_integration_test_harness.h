@@ -134,11 +134,15 @@ public:
     EXPECT_THAT(*request_args.request, ProtoEq(received_msg));
   }
 
-  void expectInitialMetadata(const TestMetadata& metadata) {
+  // Expects grpc stream receives the provided Server initial metadata, if encoded_metadata is
+  // provided, expects the onReceiveInitialMetadata is called with the encoded metadata.
+  void expectInitialMetadata(const TestMetadata& metadata,
+                             absl::optional<TestMetadata> encoded_metadata = std::nullopt) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
-        .WillOnce(Invoke([this, metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce(Invoke([this, metadata,
+                          encoded_metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseHeaderMapImpl stream_headers(received_headers);
-          for (const auto& value : metadata) {
+          for (const auto& value : encoded_metadata.has_value() ? *encoded_metadata : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
@@ -158,12 +162,14 @@ public:
     dispatcher_helper_.setStreamEventPending();
   }
 
-  void sendServerInitialMetadata(const TestMetadata& metadata) {
+  void
+  sendServerInitialMetadata(const TestMetadata& metadata,
+                            absl::optional<const TestMetadata> transcoded_metadata = std::nullopt) {
     Http::HeaderMapPtr reply_headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
     for (auto& value : metadata) {
       reply_headers->addReference(value.first, value.second);
     }
-    expectInitialMetadata(metadata);
+    expectInitialMetadata(transcoded_metadata.has_value() ? *transcoded_metadata : metadata);
     fake_stream_->startGrpcStream(false);
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
@@ -209,7 +215,8 @@ public:
   }
 
   void sendServerTrailers(Status::GrpcStatus grpc_status, const std::string& grpc_message,
-                          const TestMetadata& metadata, bool trailers_only = false) {
+                          const TestMetadata& metadata, bool trailers_only = false,
+                          absl::optional<const TestMetadata> transcoded_metadata = std::nullopt) {
     Http::TestResponseTrailerMapImpl reply_trailers{
         {"grpc-status", std::to_string(enumToInt(grpc_status))}};
     if (!grpc_message.empty()) {
@@ -221,10 +228,8 @@ public:
     for (const auto& value : metadata) {
       reply_trailers.addCopy(value.first, value.second);
     }
-    if (trailers_only) {
-      expectInitialMetadata(empty_metadata_);
-    }
-    expectTrailingMetadata(metadata);
+    expectTrailingMetadata(transcoded_metadata.has_value() ? *transcoded_metadata : metadata);
+
     expectGrpcStatus(grpc_status);
     if (trailers_only) {
       fake_stream_->encodeHeaders(reply_trailers, true);

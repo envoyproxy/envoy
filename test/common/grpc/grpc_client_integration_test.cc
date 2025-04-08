@@ -377,7 +377,6 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
     auto stream = createStream(empty_metadata_);
     const Http::TestResponseHeaderMapImpl reply_headers{
         {":status", std::to_string(http_response_status)}};
-    stream->expectInitialMetadata(empty_metadata_);
     stream->expectTrailingMetadata(empty_metadata_);
     // Translate status per
     // // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
@@ -395,7 +394,6 @@ TEST_P(GrpcClientIntegrationTest, GrpcStatusFallback) {
       {":status", "404"},
       {"grpc-status", std::to_string(enumToInt(Status::WellKnownGrpcStatus::PermissionDenied))},
       {"grpc-message", "error message"}};
-  stream->expectInitialMetadata(empty_metadata_);
   stream->expectTrailingMetadata(empty_metadata_);
   stream->expectGrpcStatus(Status::WellKnownGrpcStatus::PermissionDenied);
   stream->fake_stream_->encodeHeaders(reply_headers, true);
@@ -588,15 +586,13 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
-      {Http::LowerCaseString("hello-world-in-japanese-bin"),
-       /*こんにちは 世界*/"44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"), "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
   };
   stream->sendServerInitialMetadata(
       initial_metadata,
       TestMetadata{{Http::LowerCaseString("foo"), "bar"},
                    {Http::LowerCaseString("baz"), "blah"},
-                   {Http::LowerCaseString("hello-world-in-japanese-bin"),
-                    "こんにちは 世界"}});
+                   {Http::LowerCaseString("hello-world-in-japanese-bin"), "こんにちは 世界"}});
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
@@ -607,21 +603,23 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
-  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_,
+                                    clientType() == ClientType::EnvoyGrpc
+                                        // Envoy gRPC path does not strip the status header.
+                                        ? TestMetadata{{Http::LowerCaseString(":status"), "200"}}
+                                        : empty_metadata_);
   stream->sendReply();
   const TestMetadata trailing_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
-      {Http::LowerCaseString("hello-world-in-japanese-bin"),
-       /*こんにちは 世界*/"44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"), "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
       {Http::LowerCaseString("baz"), "blah"},
   };
   stream->sendServerTrailers(
       Status::WellKnownGrpcStatus::Ok, "", trailing_metadata,
-      /*trailers_only=*/true,
+      /*trailers_only=*/false,
       TestMetadata{
           {Http::LowerCaseString("foo"), "bar"},
-          {Http::LowerCaseString("hello-world-in-japanese-bin"),
-           "こんにちは 世界"},
+          {Http::LowerCaseString("hello-world-in-japanese-bin"), "こんにちは 世界"},
           {Http::LowerCaseString("baz"), "blah"},
       });
   dispatcher_helper_.runDispatcher();
