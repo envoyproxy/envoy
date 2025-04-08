@@ -24,10 +24,8 @@ on a message-by-message basis. This allows for the construction of sophisticated
 that decide how to respond to each message individually to eliminate unnecessary
 stream requests from the proxy.
 
-This filter status is stable. The major bits of functionality
-are complete. The updated list of supported features and implementation status may
-be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
-
+The updated list of supported features can be found on the
+:ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
 
 Statistics
 ----------
