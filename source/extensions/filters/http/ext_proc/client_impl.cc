@@ -7,8 +7,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-ExternalProcessorClientPtr
-createExternalProcessorClient(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope) {
+ExternalProcessorClientPtr createExternalProcessorClient(Grpc::AsyncClientManager& client_manager,
+                                                         Stats::Scope& scope) {
   static constexpr char kExternalMethod[] = "envoy.service.ext_proc.v3.ExternalProcessor.Process";
   return std::make_unique<
       CommonExtProc::ProcessorClientImpl<ProcessingRequest, ProcessingResponse>>(

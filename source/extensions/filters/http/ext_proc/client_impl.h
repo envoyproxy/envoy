@@ -32,8 +32,8 @@ using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;
 
 using ClientBasePtr = CommonExtProc::ClientBasePtr<ProcessingRequest, ProcessingResponse>;
 
-ExternalProcessorClientPtr
-createExternalProcessorClient(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope);
+ExternalProcessorClientPtr createExternalProcessorClient(Grpc::AsyncClientManager& client_manager,
+                                                         Stats::Scope& scope);
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters
