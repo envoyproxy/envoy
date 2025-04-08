@@ -24,7 +24,7 @@ constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
 
 /**
  *
- * IAMRolesAnywhereCredentialsProvider purpose is to Exchange X509 Credentials for Temporary AWS
+ * IAMRolesAnywhereCredentialsProvider purpose is to exchange X509 Credentials for Temporary AWS
  * Credentials
  *
  * When instantiated via config, it will create an IAMRolesAnywhereX509CredentialsProvider, which
