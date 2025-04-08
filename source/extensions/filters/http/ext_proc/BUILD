@@ -49,6 +49,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "client_lib",
     hdrs = ["client_impl.h"],
+    srcs = ["client_impl.cc"],
     deps = [
         "//envoy/grpc:async_client_manager_interface",
         "//source/common/http:sidestream_watermark_lib",
