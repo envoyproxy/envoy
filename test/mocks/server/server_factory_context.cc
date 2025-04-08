@@ -73,6 +73,8 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
+MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

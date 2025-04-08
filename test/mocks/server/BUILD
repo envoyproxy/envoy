@@ -184,9 +184,9 @@ envoy_cc_mock(
     hdrs = ["instance.h"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/secret:secret_manager_impl_lib",
         ":server_factory_context_mocks",
         "//envoy/server:instance_interface",
+        "//source/common/secret:secret_manager_impl_lib",
     ],
 )
 
