@@ -1,4 +1,6 @@
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/network/match_delegate/config.h"
 
 #include "test/integration/integration.h"
@@ -6,6 +8,7 @@
 #include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -16,9 +19,9 @@ namespace {
 
 using envoy::extensions::common::matching::v3::ExtensionWithMatcher;
 using Envoy::ProtobufWkt::StringValue;
+using Envoy::ProtobufWkt::UInt32Value;
 
-// A simple network filter that counts connections and data
-// Thread-safe implementation with mutex protection
+// A simple network filter that counts connections and data.
 class CountingFilter : public Network::Filter {
 public:
   // Read filter methods
@@ -90,13 +93,42 @@ uint32_t CountingFilter::connection_count_ = 0;
 uint64_t CountingFilter::data_bytes_ = 0;
 uint64_t CountingFilter::write_bytes_ = 0;
 
-// Config for our test filter
+// Filter that sets filter state for testing
+class SetFilterStateFilter : public Network::ReadFilter {
+public:
+  explicit SetFilterStateFilter(const std::string& value) : value_(value) {}
+
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    // Set the filter state value when a new connection is established
+    if (!value_.empty()) {
+      read_callbacks_->connection().streamInfo().filterState()->setData(
+          "test_key", std::make_shared<Router::StringAccessorImpl>(value_),
+          StreamInfo::FilterState::StateType::Mutable,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  Network::ReadFilterCallbacks* read_callbacks_{};
+  const std::string value_;
+};
+
+// Config for our counting filter
 class CountingFilterConfig : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   std::string name() const override { return "envoy.test.counting_filter"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<StringValue>();
+    return std::make_unique<UInt32Value>(); // Using UInt32Value here
   }
 
   absl::StatusOr<Network::FilterFactoryCb>
@@ -109,35 +141,60 @@ public:
   }
 };
 
+// Config for our filter state setting filter
+class SetFilterStateFilterConfig : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  std::string name() const override { return "envoy.test.set_filter_state"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<StringValue>();
+  }
+
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext&) override {
+    const auto& config = dynamic_cast<const StringValue&>(proto_config);
+    return [value = config.value()](auto& filter_manager) {
+      auto filter = std::make_shared<SetFilterStateFilter>(value);
+      filter_manager.addReadFilter(filter);
+    };
+  }
+};
+
 class MatchDelegateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public BaseIntegrationTest {
 public:
-  MatchDelegateIntegrationTest()
-      : BaseIntegrationTest(GetParam(), configureNetworkDelegateFilter()) {
+  MatchDelegateIntegrationTest() : BaseIntegrationTest(GetParam(), configureBaseConfig()) {
     enableHalfClose(true);
   }
 
-  static std::string configureNetworkDelegateFilter() {
+  static std::string configureBaseConfig() {
     return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
       filters:
-        # First the match delegate filter wrapping our counting filter
+        # First filter sets filter state
+        - name: envoy.test.set_filter_state
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: ""  # default empty value, will be overridden in specific tests
+        # Then the match delegate filter wrapping our counting filter
         - name: match_delegate_filter
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
             extension_config:
               name: envoy.test.counting_filter
               typed_config:
-                "@type": type.googleapis.com/google.protobuf.StringValue
+                "@type": type.googleapis.com/google.protobuf.UInt32Value
             xds_matcher:
               matcher_tree:
                 input:
-                  name: source-port
+                  name: filter-state
                   typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourcePortInput
+                    "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+                    key: test_key
                 exact_match_map:
                   map:
-                    "1234":
+                    "skip":
                       action:
                         name: skip
                         typed_config:
@@ -155,20 +212,37 @@ public:
     CountingFilter::resetCounters();
     BaseIntegrationTest::initialize();
   }
+
+  // Helper to create config with specific filter state value
+  void initializeWithFilterStateValue(const std::string& value) {
+    config_helper_.addConfigModifier([value](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      auto* filter_chain = listener->mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+
+      auto* typed_config = filter->mutable_typed_config();
+      StringValue string_value;
+      string_value.set_value(value);
+      typed_config->PackFrom(string_value);
+    });
+
+    initialize();
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MatchDelegateIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Register our test filter
+// Register our test filters
 REGISTER_FACTORY(CountingFilterConfig, Server::Configuration::NamedNetworkFilterConfigFactory);
+REGISTER_FACTORY(SetFilterStateFilterConfig,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
-// Test with normal port (should NOT skip the counting filter)
-TEST_P(MatchDelegateIntegrationTest, NormalPortTest) {
-  initialize();
+// Test with empty filter state (should NOT skip the counting filter)
+TEST_P(MatchDelegateIntegrationTest, NoFilterStateValueTest) {
+  initializeWithFilterStateValue(""); // Empty value won't cause a skip
 
-  // Create a client connection with a normal source port (not 1234)
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -192,19 +266,11 @@ TEST_P(MatchDelegateIntegrationTest, NormalPortTest) {
   tcp_client->close();
 }
 
-// Test with source port 1234 (should SKIP the counting filter)
-TEST_P(MatchDelegateIntegrationTest, MatchingPortSkipTest) {
-  initialize();
+// Test with "skip" filter state (should SKIP the counting filter)
+TEST_P(MatchDelegateIntegrationTest, SkipFilterStateValueTest) {
+  initializeWithFilterStateValue("skip"); // This value will trigger the skip action
 
-  // Create a client connection with source port 1234
-  std::shared_ptr<Network::Address::Instance> source_address;
-  if (version_ == Network::Address::IpVersion::v4) {
-    source_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
-  } else {
-    source_address = std::make_shared<Network::Address::Ipv6Instance>("::1", 1234);
-  }
-  IntegrationTcpClientPtr tcp_client =
-      makeTcpConnection(lookupPort("listener_0"), nullptr, source_address);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -222,6 +288,33 @@ TEST_P(MatchDelegateIntegrationTest, MatchingPortSkipTest) {
   EXPECT_EQ(0u, CountingFilter::getConnectionCount());
   EXPECT_EQ(0u, CountingFilter::getDataBytes());
   EXPECT_EQ(0u, CountingFilter::getWriteBytes());
+
+  // Clean up connections
+  tcp_client->close();
+}
+
+// Test with non-matching filter state (should NOT skip the counting filter)
+TEST_P(MatchDelegateIntegrationTest, NonMatchingFilterStateValueTest) {
+  initializeWithFilterStateValue("other_value"); // This value doesn't match the "skip" action
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send some test data
+  std::string test_data = "hello world";
+  ASSERT_TRUE(tcp_client->write(test_data));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(test_data.size()));
+
+  // Send response back
+  ASSERT_TRUE(fake_upstream_connection->write("response data"));
+  tcp_client->waitForData("response data");
+
+  // Verify the counting filter recorded this connection and data
+  EXPECT_EQ(1u, CountingFilter::getConnectionCount());
+  EXPECT_EQ(test_data.size(), CountingFilter::getDataBytes());
+  EXPECT_EQ(13u, CountingFilter::getWriteBytes()); // "response data"
 
   // Clean up connections
   tcp_client->close();

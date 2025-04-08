@@ -26,6 +26,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/network/match_delegate:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/server/config_validation:server_lib",
