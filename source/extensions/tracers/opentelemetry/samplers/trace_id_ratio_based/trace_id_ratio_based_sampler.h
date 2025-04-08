@@ -23,7 +23,8 @@ public:
                                         TraceIdRatioBasedSamplerConfig& /*config*/,
                                     Server::Configuration::TracerFactoryContext& /*context*/);
 
-  SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
+  SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
+                              const absl::optional<SpanContext> parent_context,
                               const std::string& trace_id, const std::string& name,
                               OTelSpanKind spankind,
                               OptRef<const Tracing::TraceContext> trace_context,
