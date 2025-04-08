@@ -136,7 +136,7 @@ public:
 
   void expectInitialMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
-        .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce(Invoke([this, metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseHeaderMapImpl stream_headers(received_headers);
           for (const auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
@@ -148,7 +148,7 @@ public:
 
   void expectTrailingMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveTrailingMetadata_(_))
-        .WillOnce(Invoke([this, &metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce(Invoke([this, metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseTrailerMapImpl stream_headers(received_headers);
           for (auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));

@@ -14,39 +14,39 @@
 namespace Envoy {
 namespace Grpc {
 
-inline void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
+  void Base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
     absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
     headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
       if (header.key().getStringView().ends_with("-bin")) {
-        bin_metadata[header.key().getStringView()]=
-            absl::Base64Escape(header.value().getStringView());
+        bin_metadata.emplace(header.key().getStringView(),
+                             absl::Base64Escape(header.value().getStringView()));
       }
       return Http::HeaderMap::Iterate::Continue;
     });
     for (const auto& [key, value] : bin_metadata) {
       Http::LowerCaseString key_string(key);
       headers.remove(key_string);
-        headers.addCopy(key_string, value);
+      headers.addCopy(key_string, value);
     }
-}
-
-inline void base64UnescapeBinHeaders(Http::HeaderMap& headers) {
-  absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
-  headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
-    if (header.key().getStringView().ends_with("-bin")) {
-      std::string value;
-      absl::Base64Unescape(header.value().getStringView(), &value);
-      bin_metadata[header.key().getStringView()] = std::move(value);
-    }
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  for (const auto& [key, value] : bin_metadata) {
-    Http::LowerCaseString key_string(key);
-    headers.remove(key_string);
-    headers.addCopy(key_string, value);
   }
-}  
-
+  
+  void base64UnescapeBinHeaders(Http::HeaderMap& headers) {
+    absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
+    headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
+      if (header.key().getStringView().ends_with("-bin")) {
+        std::string value;
+        absl::Base64Unescape(header.value().getStringView(), &value);
+        bin_metadata[header.key().getStringView()] = std::move(value);
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    for (const auto& [key, value] : bin_metadata) {
+      Http::LowerCaseString key_string(key);
+      headers.remove(key_string);
+      headers.addCopy(key_string, value);
+    }
+  }
+    
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(Upstream::ClusterManager& cm,
                         const envoy::config::core::v3::GrpcService& config,

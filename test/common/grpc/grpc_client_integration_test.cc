@@ -588,15 +588,21 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
-      {Http::LowerCaseString("binary-bin"), "help"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"),
+       /*こんにちは 世界*/"44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
   };
-  stream->sendServerInitialMetadata(initial_metadata);
+  stream->sendServerInitialMetadata(
+      initial_metadata,
+      TestMetadata{{Http::LowerCaseString("foo"), "bar"},
+                   {Http::LowerCaseString("baz"), "blah"},
+                   {Http::LowerCaseString("hello-world-in-japanese-bin"),
+                    "こんにちは 世界"}});
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that receiving server trailing metadata works.
+// Validates that receiving server trailing metadata works.
 TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
@@ -605,9 +611,19 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   stream->sendReply();
   const TestMetadata trailing_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"),
+       /*こんにちは 世界*/"44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
       {Http::LowerCaseString("baz"), "blah"},
   };
-  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", trailing_metadata);
+  stream->sendServerTrailers(
+      Status::WellKnownGrpcStatus::Ok, "", trailing_metadata,
+      /*trailers_only=*/true,
+      TestMetadata{
+          {Http::LowerCaseString("foo"), "bar"},
+          {Http::LowerCaseString("hello-world-in-japanese-bin"),
+           "こんにちは 世界"},
+          {Http::LowerCaseString("baz"), "blah"},
+      });
   dispatcher_helper_.runDispatcher();
 }
 
