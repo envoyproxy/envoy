@@ -7,9 +7,9 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: geoip
   change: |
-    The ``isp_db_path`` has been renamed to ``db_path_asn`` to keep the name consistent with the code behavior.
-    The fields ``anon_db_path`` and ``city_db_path`` have been renamed to ``db_path_anon`` and ``db_path_city`` respectively.
-    The field ``db_path_isp`` has been added to the ``MaxMindConfig`` to allow specifying the path to the ISP database.
+    The ``isp_db_path`` has been renamed to ``asn_db_path`` to keep the name consistent with the code behavior.
+    The fields ``anon_db_path`` and ``city_db_path`` have been renamed to ``anon_db_path`` and ``city_db_path`` respectively.
+    The field ``isp_db_path`` has been added to the ``MaxMindConfig`` to allow specifying the path to the ISP database.
 - area: http2
   change: |
     Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.

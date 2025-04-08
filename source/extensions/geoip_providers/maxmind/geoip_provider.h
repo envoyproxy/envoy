@@ -19,10 +19,10 @@ public:
   GeoipProviderConfig(const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
                       const std::string& stat_prefix, Stats::Scope& scope);
 
-  const absl::optional<std::string>& cityDbPath() const { return db_path_city_; }
-  const absl::optional<std::string>& ispDbPath() const { return db_path_isp_; }
-  const absl::optional<std::string>& anonDbPath() const { return db_path_anon_; }
-  const absl::optional<std::string>& asnDbPath() const { return db_path_asn_; }
+  const absl::optional<std::string>& cityDbPath() const { return city_db_path_; }
+  const absl::optional<std::string>& ispDbPath() const { return isp_db_path_; }
+  const absl::optional<std::string>& anonDbPath() const { return anon_db_path_; }
+  const absl::optional<std::string>& asnDbPath() const { return asn_db_path_; }
 
   bool isLookupEnabledForHeader(const absl::optional<std::string>& header);
 
@@ -70,10 +70,10 @@ public:
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
 
 private:
-  absl::optional<std::string> db_path_city_;
-  absl::optional<std::string> db_path_isp_;
-  absl::optional<std::string> db_path_anon_;
-  absl::optional<std::string> db_path_asn_;
+  absl::optional<std::string> city_db_path_;
+  absl::optional<std::string> isp_db_path_;
+  absl::optional<std::string> anon_db_path_;
+  absl::optional<std::string> asn_db_path_;
 
   absl::optional<std::string> country_header_;
   absl::optional<std::string> city_header_;

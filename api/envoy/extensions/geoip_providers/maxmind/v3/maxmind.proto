@@ -18,29 +18,29 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: MaxMind Geolocation Provider]
 // MaxMind geolocation provider :ref:`configuration overview <config_geoip_providers_maxmind>`.
-// At least one geolocation database path :ref:`db_path_city <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.db_path_city>`,
-// :ref:`db_path_isp <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.db_path_isp>` or
-// :ref:`db_path_asn <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.db_path_asn>` or
-// :ref:`db_path_anon <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.db_path_anon>` must be configured.
+// At least one geolocation database path :ref:`city_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.city_db_path>`,
+// :ref:`isp_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.isp_db_path>` or
+// :ref:`asn_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.asn_db_path>` or
+// :ref:`anon_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.anon_db_path>` must be configured.
 // [#extension: envoy.geoip_providers.maxmind]
 
 // [#next-free-field: 6]
 message MaxMindConfig {
   // Full file path to the Maxmind city database, e.g. /etc/GeoLite2-City.mmdb.
   // Database file is expected to have .mmdb extension.
-  string db_path_city = 1 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+  string city_db_path = 1 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Full file path to the Maxmind ASN database, e.g. /etc/GeoLite2-ASN.mmdb.
   // Database file is expected to have .mmdb extension.
-  string db_path_asn = 2 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+  string asn_db_path = 2 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Full file path to the Maxmind anonymous IP database, e.g. /etc/GeoIP2-Anonymous-IP.mmdb.
   // Database file is expected to have .mmdb extension.
-  string db_path_anon = 3 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+  string anon_db_path = 3 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Full file path to the Maxmind ISP database, e.g. /etc/GeoLite2-ISP.mmdb.
   // Database file is expected to have .mmdb extension.
-  string db_path_isp = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
+  string isp_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
   common.v3.CommonGeoipProviderConfig common_provider_config = 4
