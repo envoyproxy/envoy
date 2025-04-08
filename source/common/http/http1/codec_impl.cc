@@ -1102,7 +1102,7 @@ uint32_t ServerConnectionImpl::getHeadersSize() {
 }
 
 void ServerConnectionImpl::onEncodeComplete() {
-  if (active_request_ && active_request_->remote_complete_) {
+  if (active_request_->remote_complete_) {
     // Only do this if remote is complete. If we are replying before the request is complete the
     // only logical thing to do is for higher level code to reset() / close the connection so we
     // leave the request around so that it can fire reset callbacks.
