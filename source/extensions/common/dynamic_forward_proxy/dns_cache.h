@@ -50,8 +50,13 @@ public:
   /**
    * Returns the host's currently resolved address. These addresses may change periodically due to
    * async re-resolution.
+   *
+   * If `filtered` is true and the runtime guard
+   * `envoy.reloadable_features.dns_cache_filter_unusable_ip_version` is true, return a filtered
+   * list where the IP addresses of IP families unsupported on the current network are removed.
    */
-  virtual std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
+  virtual std::vector<Network::Address::InstanceConstSharedPtr>
+  addressList(bool filtered) const PURE;
 
   /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
@@ -281,6 +286,11 @@ public:
    * addresses.
    */
   virtual void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) PURE;
+
+  /**
+   * Gets the `IpVersion` addresses to be removed from the DNS response.
+   */
+  virtual absl::optional<Network::Address::IpVersion> getIpVersionToRemove() PURE;
 
   /**
    * Stops the DNS cache background tasks by canceling the pending queries and stopping the timeout
