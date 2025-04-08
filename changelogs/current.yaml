@@ -49,6 +49,9 @@ minor_behavior_changes:
 - area: golang
   change: |
     Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
+- area: tls
+  change: |
+    FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

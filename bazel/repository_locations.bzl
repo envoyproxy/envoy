@@ -145,25 +145,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
     ),
-    boringssl_fips = dict(
-        project_name = "BoringSSL (FIPS)",
-        project_desc = "FIPS compliant BoringSSL",
-        project_url = "https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md",
-        # When this is updated to a revision newer than 2022-08-12,
-        # CertValidatorUtil::setIgnoreCertificateExpiration can be simplified.
-        #
-        # !!! NOTE !!!
-        # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
-        # specified in the associated accreditation certificate, which can be found linked from
-        # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md, for example
-        # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
-        version = "fips-20220613",
-        sha256 = "62f733289f2d677c2723f556aa58034c438f3a7bbca6c12b156538a88e38da8a",
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-0c6f40132b828e92ba365c6b7680e32820c63fa7.tar.xz"],
-        use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-06-13",
-        cpe = "cpe:2.3:a:google:boringssl:*",
-    ),
     aws_lc = dict(
         project_name = "AWS libcrypto (AWS-LC)",
         project_desc = "OpenSSL compatible general-purpose crypto library",
