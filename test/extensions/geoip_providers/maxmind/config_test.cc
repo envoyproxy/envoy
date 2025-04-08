@@ -237,7 +237,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
         asn: "x-geo-asn"
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
         anon_vpn: "x-anon-vpn"
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"

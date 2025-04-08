@@ -47,7 +47,7 @@ typed_config:
           region: "x-geo-region"
           city: "x-geo-city"
           asn: "x-geo-asn"
-          is_anon: "x-geo-anon"
+          anon: "x-geo-anon"
           anon_vpn: "x-geo-anon-vpn"
       city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
       asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"

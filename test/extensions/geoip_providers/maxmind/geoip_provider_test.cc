@@ -97,7 +97,7 @@ const std::string default_updated_anon_db_path =
 const std::string default_anon_config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
 } // namespace
@@ -286,7 +286,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonVpnSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
         anon_vpn: "x-geo-anon-vpn"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
@@ -310,7 +310,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
         anon_hosting: "x-geo-anon-hosting"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
@@ -334,7 +334,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
         anon_tor: "x-geo-anon-tor"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
@@ -358,7 +358,7 @@ TEST_F(GeoipProviderTest, ValidConfigAnonProxySuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
         anon_proxy: "x-geo-anon-proxy"
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
@@ -586,7 +586,7 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
         R"EOF(
     common_provider_config:
       geo_headers_to_add:
-        is_anon: "x-geo-anon"
+        anon: "x-geo-anon"
         asn: "x-geo-asn"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF",
