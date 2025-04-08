@@ -1254,6 +1254,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tracers.fluentd:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.fluentd.v3.FluentdConfig
 envoy.tracers.datadog:
   categories:
   - envoy.tracers
@@ -1329,7 +1336,7 @@ envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream
   - envoy.transport_sockets.upstream
-  security_posture: requires_trusted_downstream_and_upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
@@ -1491,6 +1498,13 @@ envoy.rbac.matchers.upstream_ip_port:
   status: alpha
   type_urls:
   - envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+envoy.rbac.principals.mtls_authenticated:
+  categories:
+  - envoy.rbac.principals
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.rbac.principals.mtls_authenticated.v3.Config
 envoy.http.stateful_session.cookie:
   categories:
   - envoy.http.stateful_session

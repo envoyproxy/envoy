@@ -229,6 +229,16 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() const PURE;
+
+  /**
+   * @return Ssl::ContextManager& the SSL context manager.
+   */
+  virtual Ssl::ContextManager& sslContextManager() PURE;
+
+  /**
+   * Return the instance of secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
 
 // ServerFactoryContextInstance is a thread local singleton that provides access to the

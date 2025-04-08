@@ -5,6 +5,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
+#include "source/extensions/filters/common/rbac/principal_extension.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -100,6 +101,9 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const PathMatcher>(principal.url_path(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
     return std::make_shared<const FilterStateMatcher>(principal.filter_state(), context);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kCustom:
+    return Config::Utility::getAndCheckFactory<PrincipalExtensionFactory>(principal.custom())
+        .create(principal.custom(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }

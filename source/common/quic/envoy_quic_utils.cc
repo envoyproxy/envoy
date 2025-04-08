@@ -95,11 +95,11 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::LocalReset:
     return quic::QUIC_STREAM_REQUEST_REJECTED;
   case Http::StreamResetReason::OverloadManager:
-    return quic::QUIC_STREAM_CANCELLED;
+    return quic::QUIC_STREAM_EXCESSIVE_LOAD;
   case Http::StreamResetReason::ProtocolError:
     return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
   case Http::StreamResetReason::Overflow:
-    IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
+    IS_ENVOY_BUG("Resource overflow shouldn't be propagated to QUIC network stack");
     break;
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::RemoteReset:
@@ -121,12 +121,11 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::LocalConnectionFailure;
   case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_CANCELLED:
   case quic::QUIC_STREAM_EXCESSIVE_LOAD:
   case quic::QUIC_HEADERS_TOO_LARGE:
   case quic::QUIC_STREAM_REQUEST_REJECTED:
     return Http::StreamResetReason::LocalReset;
-  case quic::QUIC_STREAM_CANCELLED:
-    return Http::StreamResetReason::OverloadManager;
   default:
     return Http::StreamResetReason::ProtocolError;
   }
@@ -141,13 +140,12 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
   case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_CANCELLED:
   case quic::QUIC_STREAM_REQUEST_REJECTED:
   case quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE:
   case quic::QUIC_STREAM_EXCESSIVE_LOAD:
   case quic::QUIC_HEADERS_TOO_LARGE:
     return Http::StreamResetReason::RemoteReset;
-  case quic::QUIC_STREAM_CANCELLED:
-    return Http::StreamResetReason::OverloadManager;
   case quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR:
   default:
     return Http::StreamResetReason::ProtocolError;

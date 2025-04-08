@@ -145,25 +145,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
     ),
-    boringssl_fips = dict(
-        project_name = "BoringSSL (FIPS)",
-        project_desc = "FIPS compliant BoringSSL",
-        project_url = "https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md",
-        # When this is updated to a revision newer than 2022-08-12,
-        # CertValidatorUtil::setIgnoreCertificateExpiration can be simplified.
-        #
-        # !!! NOTE !!!
-        # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
-        # specified in the associated accreditation certificate, which can be found linked from
-        # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md, for example
-        # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
-        version = "fips-20220613",
-        sha256 = "62f733289f2d677c2723f556aa58034c438f3a7bbca6c12b156538a88e38da8a",
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-0c6f40132b828e92ba365c6b7680e32820c63fa7.tar.xz"],
-        use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-06-13",
-        cpe = "cpe:2.3:a:google:boringssl:*",
-    ),
     aws_lc = dict(
         project_name = "AWS libcrypto (AWS-LC)",
         project_desc = "OpenSSL compatible general-purpose crypto library",
@@ -854,7 +835,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "msgpack-cxx-{version}",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-cxx-{version}.tar.gz"],
         use_category = ["observability_ext"],
-        extensions = ["envoy.access_loggers.fluentd"],
+        extensions = ["envoy.access_loggers.fluentd", "envoy.tracers.fluentd"],
         release_date = "2023-07-08",
         cpe = "cpe:2.3:a:messagepack:messagepack:*",
         license = "Boost",
@@ -1232,12 +1213,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "feba5402d20fa4f51c8f7e29ad6f031a650f485a",
-        sha256 = "72c028b14de77443af69a5334c8695125b3df9e943899cb6a8d51886e411082d",
+        version = "2b1d6038906281ff87d0a512b6f4cd0f931d8d2d",
+        sha256 = "b508c85a05b920d8d98c275bb326e6d9d93401df976ff904de329349f75c5534",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-03-20",
+        release_date = "2025-04-02",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1278,7 +1259,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.rbac",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
-            "envoy.rbac.matchers.upstream_ip_port",
             "envoy.formatter.cel",
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",

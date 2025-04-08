@@ -5,7 +5,6 @@
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "gmock/gmock.h"
 

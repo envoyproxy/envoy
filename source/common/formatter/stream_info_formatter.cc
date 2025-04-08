@@ -967,11 +967,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"RESPONSE_CODE_DETAILS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              bool allow_whitespaces = (format == "ALLOW_WHITESPACES");
               return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.responseCodeDetails();
+                  [allow_whitespaces](const StreamInfo::StreamInfo& stream_info) {
+                    if (allow_whitespaces || !stream_info.responseCodeDetails().has_value()) {
+                      return stream_info.responseCodeDetails();
+                    }
+                    return absl::optional<std::string>(StringUtil::replaceAllEmptySpace(
+                        stream_info.responseCodeDetails().value()));
                   });
             }}},
           {"CONNECTION_TERMINATION_DETAILS",
