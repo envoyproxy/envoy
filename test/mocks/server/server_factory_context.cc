@@ -42,7 +42,9 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, nullOverloadManager()).WillByDefault(ReturnRef(null_overload_manager_));
-  ON_CALL(*this, secretManager()).WillByDefault(ReturnRef(*secret_manager_));
+  ON_CALL(*this, secretManager()).WillByDefault(testing::Invoke([this]() -> Secret::SecretManager& {
+    return *secret_manager_;
+  }));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
