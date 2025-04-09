@@ -297,7 +297,7 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
     if (!host) {
       return size;
     }
-    unique_hosts.insert(host);
+    unique_hosts.insert(std::move(host));
   }
   return static_cast<uint16_t>(unique_hosts.size());
 }
