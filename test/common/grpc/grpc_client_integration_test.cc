@@ -605,11 +605,7 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendRequest();
-  stream->sendServerInitialMetadata(empty_metadata_,
-                                    clientType() == ClientType::EnvoyGrpc
-                                        // Envoy gRPC path does not strip the status header.
-                                        ? TestMetadata{{Http::LowerCaseString(":status"), "200"}}
-                                        : empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   const TestMetadata trailing_metadata = {
       {Http::LowerCaseString("foo"), "bar"},

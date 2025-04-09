@@ -17,7 +17,7 @@ namespace Grpc {
 void Base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
   headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
-    if (header.key().getStringView().ends_with("-bin")) {
+    if (absl::EndsWith(header.key().getStringView(), "-bin")) {
       bin_metadata.emplace(header.key().getStringView(),
                            absl::Base64Escape(header.value().getStringView()));
     }
@@ -33,7 +33,7 @@ void Base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
 void base64UnescapeBinHeaders(Http::HeaderMap& headers) {
   absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
   headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
-    if (header.key().getStringView().ends_with("-bin")) {
+    if (absl::EndsWith(header.key().getStringView(), "-bin")) {
       std::string value;
       absl::Base64Unescape(header.value().getStringView(), &value);
       bin_metadata[header.key().getStringView()] = std::move(value);
