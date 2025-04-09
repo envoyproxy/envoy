@@ -223,29 +223,31 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
+
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream && grpc_status) {
+      // Trailers-only response.
+      callbacks_.onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
       // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
       // we can potentially optimize in the future.
-
-      // TODO(mattklein123): clang-tidy is showing a use after move when passing to
-      // onReceiveInitialMetadata() above. This looks like an actual bug that I will fix in a
-      // follow up.
-      // NOLINTNEXTLINE(bugprone-use-after-move)
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
     }
+    callbacks_.onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
     // Status is translated via Utility::httpToGrpcStatus per
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
     streamError(Utility::httpToGrpcStatus(http_response_status));
     return;
   }
   if (end_stream) {
+    // Trailers-only response.
+    callbacks_.onReceiveInitialMetadata(Http::ResponseHeaderMapImpl::create());
     // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
     // we can potentially optimize in the future.
     onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
+    return;
   }
   // Normal response headers/Server initial metadata.
   if (!waiting_to_delete_on_remote_close_) {

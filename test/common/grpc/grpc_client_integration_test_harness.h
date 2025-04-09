@@ -228,6 +228,9 @@ public:
     for (const auto& value : metadata) {
       reply_trailers.addCopy(value.first, value.second);
     }
+    if (trailers_only) {
+      expectInitialMetadata(empty_metadata_);
+    }
     expectTrailingMetadata(transcoded_metadata.has_value() ? *transcoded_metadata : metadata);
 
     expectGrpcStatus(grpc_status);

@@ -377,6 +377,7 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
     auto stream = createStream(empty_metadata_);
     const Http::TestResponseHeaderMapImpl reply_headers{
         {":status", std::to_string(http_response_status)}};
+    stream->expectInitialMetadata(empty_metadata_);
     stream->expectTrailingMetadata(empty_metadata_);
     // Translate status per
     // // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
@@ -394,6 +395,7 @@ TEST_P(GrpcClientIntegrationTest, GrpcStatusFallback) {
       {":status", "404"},
       {"grpc-status", std::to_string(enumToInt(Status::WellKnownGrpcStatus::PermissionDenied))},
       {"grpc-message", "error message"}};
+  stream->expectInitialMetadata(empty_metadata_);
   stream->expectTrailingMetadata(empty_metadata_);
   stream->expectGrpcStatus(Status::WellKnownGrpcStatus::PermissionDenied);
   stream->fake_stream_->encodeHeaders(reply_headers, true);
