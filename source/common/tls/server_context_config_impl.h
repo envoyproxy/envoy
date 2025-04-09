@@ -14,8 +14,7 @@ class ServerContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::Ser
 public:
   static absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-         Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-         bool for_quic);
+         Server::Configuration::GenericFactoryContext& secret_provider_context, bool for_quic);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
@@ -48,7 +47,7 @@ public:
 private:
   ServerContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       absl::Status& creation_status, bool for_quic);
 
   static const unsigned DEFAULT_MIN_VERSION;

@@ -268,7 +268,8 @@ private:
         Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
     Grpc::RawAsyncClientSharedPtr async_client =
         async_client_manager_
-            ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)
+            ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.statsScope(),
+                                                   false)
             .value();
     Grpc::MockAsyncClient* mock_async_client =
         dynamic_cast<Grpc::MockAsyncClient*>(async_client.get());

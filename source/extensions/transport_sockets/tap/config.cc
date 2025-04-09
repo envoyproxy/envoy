@@ -18,7 +18,7 @@ namespace Tap {
 class SocketTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
 public:
   SocketTapConfigFactoryImpl(TimeSource& time_source,
-                             Server::Configuration::TransportSocketFactoryContext& context)
+                             Server::Configuration::GenericFactoryContext& context)
       : time_source_(time_source), factory_context_(context) {}
 
   // TapConfigFactory
@@ -31,13 +31,12 @@ public:
 
 private:
   TimeSource& time_source_;
-  Server::Configuration::TransportSocketFactoryContext& factory_context_;
+  Server::Configuration::GenericFactoryContext& factory_context_;
 };
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamTapSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& context) {
   const auto& outer_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::tap::v3::Tap&>(
           message, context.messageValidationVisitor());
@@ -60,7 +59,7 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
 
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 DownstreamTapSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& context,
     const std::vector<std::string>& server_names) {
   const auto& outer_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::tap::v3::Tap&>(

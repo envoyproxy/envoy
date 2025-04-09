@@ -228,7 +228,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
           logInterfaces("netconf_get_v6_interfaces", v6_interfaces);
-          client_scope_ = server_->serverFactoryContext().scope().createScope("pulse.");
+          client_scope_ = server_->serverFactoryContext().statsScope().createScope("pulse.");
           // StatNameSet is lock-free, the benefit of using it is being able to create StatsName
           // on-the-fly without risking contention on system with lots of threads.
           // It also comes with ease of programming.
@@ -237,7 +237,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
               server_->dispatcher());
           ASSERT(api_listener != nullptr);
           http_client_ = std::make_unique<Http::Client>(std::move(api_listener), *dispatcher_,
-                                                        server_->serverFactoryContext().scope(),
+                                                        server_->serverFactoryContext().statsScope(),
                                                         server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
           engine_running_.Notify();

@@ -41,7 +41,7 @@ DnsCacheImpl::DnsCacheImpl(
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(std::move(resolver)), tls_slot_(context.serverFactoryContext().threadLocal()),
-      scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
+      scope_(context.statsScope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
                         config.dns_cache_circuit_breaker()),

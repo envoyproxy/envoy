@@ -67,7 +67,7 @@ static void envoy_filter_reset_idle(const void* context) {
 PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
     Server::Configuration::FactoryContext& context,
     const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config)
-    : root_scope_(context.scope()), stats_(generateStats("", root_scope_)),
+    : root_scope_(context.statsScope()), stats_(generateStats("", root_scope_)),
       filter_name_(proto_config.platform_filter_name()),
       platform_filter_(static_cast<envoy_http_filter*>(
           Api::External::retrieveApi(proto_config.platform_filter_name()))) {}

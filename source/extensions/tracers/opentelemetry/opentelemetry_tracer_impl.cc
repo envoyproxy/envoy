@@ -68,8 +68,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
                Server::Configuration::TracerFactoryContext& context,
                const ResourceProvider& resource_provider)
     : tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()),
-      tracing_stats_{OPENTELEMETRY_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
+      tracing_stats_{OPENTELEMETRY_TRACER_STATS(POOL_COUNTER_PREFIX(
+          context.serverFactoryContext().statsScope(), "tracing.opentelemetry"))} {
   auto& factory_context = context.serverFactoryContext();
 
   Resource resource = resource_provider.getResource(opentelemetry_config, context);
@@ -91,7 +91,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     if (opentelemetry_config.has_grpc_service()) {
       auto factory_or_error =
           factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-              opentelemetry_config.grpc_service(), factory_context.scope(), true);
+              opentelemetry_config.grpc_service(), factory_context.statsScope(), true);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
       Grpc::AsyncClientFactoryPtr&& factory = std::move(factory_or_error.value());
       const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =

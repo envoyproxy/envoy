@@ -330,7 +330,7 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":factory_context_lib",
-        ":transport_socket_config_lib",
+        ":generic_factory_context_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:listener_interface",
         "//envoy/server:filter_config_interface",
@@ -518,14 +518,6 @@ envoy_cc_library(
         "//envoy/thread:thread_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "transport_socket_config_lib",
-    hdrs = ["transport_socket_config_impl.h"],
-    deps = [
-        "//envoy/server:transport_socket_config_interface",
     ],
 )
 

@@ -168,10 +168,10 @@ private:
 };
 
 // ServerFactoryContextImpl implements both ServerFactoryContext and
-// TransportSocketFactoryContext for convenience as these two contexts
+// GenericFactoryContext for convenience as these two contexts
 // share common member functions and member variables.
 class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
-                                 public Configuration::TransportSocketFactoryContext {
+                                 public Configuration::GenericFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
       : server_(server), server_scope_(server_.stats().createScope("")) {}
@@ -188,11 +188,11 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+  GenericFactoryContext& getGenericFactoryContext() const override {
     return server_.transportSocketFactoryContext();
   };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
-  Stats::Scope& scope() override { return *server_scope_; }
+  Stats::Scope& statsScope() override { return *server_scope_; }
   Stats::Scope& serverScope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
@@ -215,7 +215,7 @@ public:
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
 
-  // Configuration::TransportSocketFactoryContext
+  // Configuration::GenericFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
   Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
@@ -315,7 +315,7 @@ public:
   Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
-  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+  Configuration::GenericFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
   }
   ProtobufMessage::ValidationContext& messageValidationContext() override {

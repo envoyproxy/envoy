@@ -40,10 +40,9 @@ TEST(Config, NullClientSecret) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   OAuth2CredentialInjectorFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
-      transport_socket_factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> transport_socket_factory_context;
   NiceMock<Init::MockManager> init_manager;
-  ON_CALL(server_factory_context, getTransportSocketFactoryContext())
+  ON_CALL(server_factory_context, getGenericFactoryContext())
       .WillByDefault(ReturnRef(transport_socket_factory_context));
 
   EXPECT_THROW_WITH_REGEX(factory.createOauth2ClientCredentialInjector(

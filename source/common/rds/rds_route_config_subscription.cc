@@ -31,7 +31,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager,
     absl::Status& creation_status)
     : route_config_name_(route_config_name),
-      scope_(factory_context.scope().createScope(stat_prefix + route_config_name_ + ".")),
+      scope_(factory_context.statsScope().createScope(stat_prefix + route_config_name_ + ".")),
       factory_context_(factory_context),
       parent_init_target_(
           fmt::format("RdsRouteConfigSubscription {} init {}", rds_type, route_config_name_),

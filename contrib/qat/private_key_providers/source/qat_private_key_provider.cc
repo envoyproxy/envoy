@@ -347,8 +347,7 @@ void QatPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
 
 QatPrivateKeyMethodProvider::QatPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig& conf,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    LibQatCryptoSharedPtr libqat)
+    Server::Configuration::GenericFactoryContext& factory_context, LibQatCryptoSharedPtr libqat)
     : api_(factory_context.serverFactoryContext().api()), libqat_(libqat) {
 
   manager_ = factory_context.serverFactoryContext().singletonManager().getTyped<QatManager>(

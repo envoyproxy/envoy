@@ -70,7 +70,7 @@ public:
   void onWorkersStarted() override {}
 
 private:
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   Event::GlobalTimeSystem time_system_;
@@ -90,10 +90,10 @@ private:
   IntegrationTestServerPtr test_server_;
 
   Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
+      testing::NiceMock<Server::Configuration::MockGenericFactoryContext>&);
 
   Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&, bool);
+      testing::NiceMock<Server::Configuration::MockGenericFactoryContext>&, bool);
 };
 
 } // namespace Envoy

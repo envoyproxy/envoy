@@ -201,7 +201,7 @@ private:
       Server::Configuration::FactoryContext& context) override {
     return [config, &context](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<TestNetworkAsyncTcpFilter>(
-          config, context.scope(), context.serverFactoryContext().clusterManager()));
+          config, context.statsScope(), context.serverFactoryContext().clusterManager()));
     };
   }
 };

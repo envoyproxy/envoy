@@ -2219,7 +2219,7 @@ TEST_F(AsyncClientImplTest, DumpState) {
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
 
   std::stringstream out;
-  filter_callbacks->scope().dumpState(out);
+  filter_callbacks->statsScope().dumpState(out);
   std::string state = out.str();
   EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
 

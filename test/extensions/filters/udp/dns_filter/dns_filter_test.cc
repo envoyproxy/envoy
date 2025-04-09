@@ -74,7 +74,7 @@ public:
     envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
-    ON_CALL(listener_factory_, scope()).WillByDefault(ReturnRef(*store));
+    ON_CALL(listener_factory_, statsScope()).WillByDefault(ReturnRef(*store));
     ON_CALL(listener_factory_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(random_, random()).WillByDefault(Return(3));
     ON_CALL(listener_factory_.server_factory_context_.api_, randomGenerator())

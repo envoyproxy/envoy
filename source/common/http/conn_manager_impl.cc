@@ -2094,7 +2094,7 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
   return {};
 }
 
-const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
+const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::statsScope() { return *this; }
 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.

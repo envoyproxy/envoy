@@ -281,9 +281,9 @@ public:
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
-   * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
+   * @return Configuration::GenericFactoryContext& factory context for transport sockets.
    */
-  virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
+  virtual Configuration::GenericFactoryContext& transportSocketFactoryContext() PURE;
 
   /**
    * Set the default server-wide tracer provider configuration that will be used as a fallback

@@ -254,7 +254,8 @@ void UpstreamRequest::upstreamLog(AccessLog::AccessLogType access_log_type) {
 // This is called by the FilterManager when all filters have processed 1xx headers. Forward them
 // on to the router.
 void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.callbacks()->statsScope(),
+                               parent_.callbacks()->dispatcher());
 
   ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersStat(headers->byteSize(), headers->size());
@@ -268,7 +269,8 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   ASSERT(headers.get());
   ENVOY_STREAM_LOG(trace, "end_stream: {}, upstream response headers:\n{}", *parent_.callbacks(),
                    end_stream, *headers);
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.callbacks()->statsScope(),
+                               parent_.callbacks()->dispatcher());
 
   resetPerTryIdleTimer();
 
@@ -319,7 +321,8 @@ void UpstreamRequest::maybeHandleDeferredReadDisable() {
 }
 
 void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.callbacks()->statsScope(),
+                               parent_.callbacks()->dispatcher());
 
   resetPerTryIdleTimer();
   stream_info_.addBytesReceived(data.length());
@@ -328,7 +331,8 @@ void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
 
 void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ENVOY_STREAM_LOG(trace, "upstream response trailers:\n{}", *parent_.callbacks(), *trailers);
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.callbacks()->statsScope(),
+                               parent_.callbacks()->dispatcher());
 
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::onUpstreamResponseTrailers(*span_, trailers.get());
@@ -454,7 +458,8 @@ void UpstreamRequest::acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_m
 
 void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
                                     absl::string_view transport_failure_reason) {
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.callbacks()->statsScope(),
+                               parent_.callbacks()->dispatcher());
 
   if (span_ != nullptr) {
     // Add tags about reset.
@@ -587,7 +592,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                                   StreamInfo::StreamInfo& info,
                                   absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
-  ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+  ScopeTrackerScopeState scope(&parent_.callbacks()->statsScope(),
+                               parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   recordConnectionPoolCallbackLatency();
   upstream_ = std::move(upstream);
@@ -780,8 +786,8 @@ Http::RequestTrailerMapOptRef UpstreamRequestFilterManagerCallbacks::requestTrai
   return {};
 }
 
-const ScopeTrackedObject& UpstreamRequestFilterManagerCallbacks::scope() {
-  return upstream_request_.parent_.callbacks()->scope();
+const ScopeTrackedObject& UpstreamRequestFilterManagerCallbacks::statsScope() {
+  return upstream_request_.parent_.callbacks()->statsScope();
 }
 
 OptRef<const Tracing::Config> UpstreamRequestFilterManagerCallbacks::tracingConfig() const {

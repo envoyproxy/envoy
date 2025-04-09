@@ -173,12 +173,12 @@ protected:
 
   std::string virtualHostName(const Route* route) {
     Stats::StatName name = route->virtualHost().statName();
-    return factory_context_.scope().symbolTable().toString(name);
+    return factory_context_.statsScope().symbolTable().toString(name);
   }
 
   std::string virtualClusterName(const Route* route, Http::TestRequestHeaderMapImpl& headers) {
     Stats::StatName name = route->virtualHost().virtualCluster(headers)->statName();
-    return factory_context_.scope().symbolTable().toString(name);
+    return factory_context_.statsScope().symbolTable().toString(name);
   }
 
   std::string responseHeadersConfig(const bool most_specific_wins, HeaderAppendAction action) {

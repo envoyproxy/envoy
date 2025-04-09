@@ -14,7 +14,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/original_dst/original_dst_cluster.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

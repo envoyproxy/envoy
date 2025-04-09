@@ -226,8 +226,8 @@ void Tracer::flushSpans() {
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
 
   // set the instrumentation scope name and version
-  *scope_span->mutable_scope()->mutable_name() = "envoy";
-  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+  *scope_span->mutable_statsScope()->mutable_name() = "envoy";
+  *scope_span->mutable_statsScope()->mutable_version() = Envoy::VersionInfo::version();
 
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;

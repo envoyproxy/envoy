@@ -21,9 +21,9 @@ class UpstreamTapSocketConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public TapSocketConfigFactory {
 public:
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override;
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override;
 };
 
 class DownstreamTapSocketConfigFactory
@@ -32,7 +32,7 @@ class DownstreamTapSocketConfigFactory
 public:
   absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
-                               Server::Configuration::TransportSocketFactoryContext& context,
+                               Server::Configuration::GenericFactoryContext& context,
                                const std::vector<std::string>& server_names) override;
 };
 

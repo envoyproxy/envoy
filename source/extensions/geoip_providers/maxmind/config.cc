@@ -34,7 +34,7 @@ public:
       driver = it->second.lock();
     } else {
       const auto& provider_config =
-          std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
+          std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.statsScope());
       driver = std::make_shared<GeoipProvider>(
           context.serverFactoryContext().mainThreadDispatcher(),
           context.serverFactoryContext().api(), singleton, provider_config);

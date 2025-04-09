@@ -125,10 +125,10 @@ QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_v
 
 namespace {
 
-Secret::GenericSecretConfigProviderSharedPtr secretsProvider(
-    const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-    Server::Configuration::TransportSocketFactoryContext& transport_socket_factory_context,
-    Init::Manager& init_manager) {
+Secret::GenericSecretConfigProviderSharedPtr
+secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
+                Server::Configuration::GenericFactoryContext& transport_socket_factory_context,
+                Init::Manager& init_manager) {
   Secret::SecretManager& secret_manager =
       transport_socket_factory_context.serverFactoryContext().secretManager();
   if (config.has_sds_config()) {
@@ -254,9 +254,8 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
         return result.value();
       });
 
-  ret->secrets_provider_ =
-      secretsProvider(config.encryption_parameters(), context.getTransportSocketFactoryContext(),
-                      context.initManager());
+  ret->secrets_provider_ = secretsProvider(
+      config.encryption_parameters(), context.getGenericFactoryContext(), context.initManager());
   if (ret->secrets_provider_ == nullptr) {
     return absl::InvalidArgumentError("invalid encryption_parameters config");
   }

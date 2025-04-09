@@ -17,7 +17,7 @@
 #include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"

@@ -366,8 +366,8 @@ FilterConfigPerRoute::createFilterMatchTree(
       xds::type::matcher::v3::HttpAttributesCelMatchInput::default_instance().GetTypeName()));
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
-      .stat_prefix_ = fmt::format("http.{}.", server_context.scope().symbolTable().toString(
-                                                  server_context.scope().prefix())),
+      .stat_prefix_ = fmt::format("http.{}.", server_context.statsScope().symbolTable().toString(
+                                                  server_context.statsScope().prefix())),
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
       .server_factory_context_ = server_context};

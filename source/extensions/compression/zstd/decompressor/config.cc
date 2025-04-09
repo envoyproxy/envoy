@@ -31,8 +31,8 @@ ZstdDecompressorLibraryFactory::createDecompressorFactoryFromProtoTyped(
     Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
   return std::make_unique<ZstdDecompressorFactory>(
-      proto_config, context.scope(), server_context.mainThreadDispatcher(), server_context.api(),
-      server_context.threadLocal());
+      proto_config, context.statsScope(), server_context.mainThreadDispatcher(),
+      server_context.api(), server_context.threadLocal());
 }
 
 /**

@@ -84,7 +84,7 @@ TEST_F(UdpTapSinkConfigTest, AddTestConfigTransportSocketContextForUdpSink) {
   envoy::config::tap::v3::TapConfig tap_config;
   TestUtility::loadFromYaml(tap_config_yaml, tap_config);
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   TestConfigImpl(tap_config, nullptr, factory_context);
 }
 

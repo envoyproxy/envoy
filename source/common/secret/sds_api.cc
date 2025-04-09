@@ -223,10 +223,11 @@ uint64_t SdsApi::getHashForFiles(const FileContentMap& files) {
   return hash;
 }
 
-TlsCertificateSdsApiSharedPtr TlsCertificateSdsApi::create(
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    const envoy::config::core::v3::ConfigSource& sds_config, const std::string& sds_config_name,
-    std::function<void()> destructor_cb) {
+TlsCertificateSdsApiSharedPtr
+TlsCertificateSdsApi::create(Server::Configuration::GenericFactoryContext& secret_provider_context,
+                             const envoy::config::core::v3::ConfigSource& sds_config,
+                             const std::string& sds_config_name,
+                             std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   auto& server_context = secret_provider_context.serverFactoryContext();
@@ -289,7 +290,7 @@ void TlsCertificateSdsApi::resolveSecret(const FileContentMap& files) {
 }
 
 CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::create(
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    Server::Configuration::GenericFactoryContext& secret_provider_context,
     const envoy::config::core::v3::ConfigSource& sds_config, const std::string& sds_config_name,
     std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
@@ -363,7 +364,7 @@ std::vector<std::string> CertificateValidationContextSdsApi::getDataSourceFilena
 }
 
 TlsSessionTicketKeysSdsApiSharedPtr TlsSessionTicketKeysSdsApi::create(
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    Server::Configuration::GenericFactoryContext& secret_provider_context,
     const envoy::config::core::v3::ConfigSource& sds_config, const std::string& sds_config_name,
     std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
@@ -400,10 +401,11 @@ void TlsSessionTicketKeysSdsApi::validateConfig(
 
 std::vector<std::string> TlsSessionTicketKeysSdsApi::getDataSourceFilenames() { return {}; }
 
-GenericSecretSdsApiSharedPtr GenericSecretSdsApi::create(
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    const envoy::config::core::v3::ConfigSource& sds_config, const std::string& sds_config_name,
-    std::function<void()> destructor_cb) {
+GenericSecretSdsApiSharedPtr
+GenericSecretSdsApi::create(Server::Configuration::GenericFactoryContext& secret_provider_context,
+                            const envoy::config::core::v3::ConfigSource& sds_config,
+                            const std::string& sds_config_name,
+                            std::function<void()> destructor_cb) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   auto& server_context = secret_provider_context.serverFactoryContext();

@@ -37,7 +37,7 @@ public:
   QuicServerTransportSocketConfigFactory config_factory_;
   Stats::TestUtil::TestStore server_stats_store_;
   Api::ApiPtr server_api_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
 };
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, EarlyDataEnabledByDefault) {
@@ -126,7 +126,7 @@ public:
   }
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{

@@ -79,9 +79,9 @@ createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::A
 }
 
 template <class TransportSocketFactoryPtr>
-TransportSocketFactoryPtr createTransportSocketFactoryHelper(
-    const Protobuf::Message& message, bool is_upstream,
-    Server::Configuration::TransportSocketFactoryContext& factory_ctxt) {
+TransportSocketFactoryPtr
+createTransportSocketFactoryHelper(const Protobuf::Message& message, bool is_upstream,
+                                   Server::Configuration::GenericFactoryContext& factory_ctxt) {
   auto config =
       MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::alts::v3::Alts&>(
           message, factory_ctxt.messageValidationVisitor());
@@ -121,16 +121,14 @@ ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigPro
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& factory_ctxt) {
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& factory_ctxt) {
   return createTransportSocketFactoryHelper<Network::UpstreamTransportSocketFactoryPtr>(
       message, /* is_upstream */ true, factory_ctxt);
 }
 
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& factory_ctxt,
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& factory_ctxt,
     const std::vector<std::string>&) {
   return createTransportSocketFactoryHelper<Network::DownstreamTransportSocketFactoryPtr>(
       message, /* is_upstream */ false, factory_ctxt);

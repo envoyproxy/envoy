@@ -113,7 +113,7 @@ OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
 Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
-    : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
+    : stats_scope_(context.statsScope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
@@ -758,7 +758,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       propagate_response_headers_(config_message.tunneling_config().propagate_response_headers()),
       propagate_response_trailers_(config_message.tunneling_config().propagate_response_trailers()),
       post_path_(config_message.tunneling_config().post_path()),
-      route_stat_name_storage_("tcpproxy_tunneling", context.scope().symbolTable()),
+      route_stat_name_storage_("tcpproxy_tunneling", context.statsScope().symbolTable()),
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
       router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),

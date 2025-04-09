@@ -13,7 +13,7 @@ namespace TransportSockets {
 namespace TcpStats {
 
 TcpStatsSocketFactory::TcpStatsSocketFactory(
-    Server::Configuration::TransportSocketFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config) {
 #if defined(__linux__)
   config_ = std::make_shared<Config>(config, context.statsScope());
@@ -25,7 +25,7 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
 }
 
 UpstreamTcpStatsSocketFactory::UpstreamTcpStatsSocketFactory(
-    Server::Configuration::TransportSocketFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
     Network::UpstreamTransportSocketFactoryPtr&& inner_factory)
     : TcpStatsSocketFactory(context, config), PassthroughFactory(std::move(inner_factory)) {}
@@ -47,7 +47,7 @@ Network::TransportSocketPtr UpstreamTcpStatsSocketFactory::createTransportSocket
 }
 
 DownstreamTcpStatsSocketFactory::DownstreamTcpStatsSocketFactory(
-    Server::Configuration::TransportSocketFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
     Network::DownstreamTransportSocketFactoryPtr&& inner_factory)
     : TcpStatsSocketFactory(context, config),
@@ -78,9 +78,9 @@ class UpstreamTcpStatsConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public TcpStatsConfigFactory {
 public:
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override {
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override {
     const auto& outer_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::transport_sockets::tcp_stats::v3::Config&>(
         config, context.messageValidationVisitor());
@@ -105,7 +105,7 @@ class DownstreamTcpStatsConfigFactory
 public:
   absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
-                               Server::Configuration::TransportSocketFactoryContext& context,
+                               Server::Configuration::GenericFactoryContext& context,
                                const std::vector<std::string>& server_names) override {
     const auto& outer_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::transport_sockets::tcp_stats::v3::Config&>(

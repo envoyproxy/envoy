@@ -14,7 +14,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::GenericFactoryContext& transport_socket_factory,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
@@ -47,7 +47,7 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
     Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) {
   auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+  auto& transport_socket_factory = context.getGenericFactoryContext();
 
   const auto& client_secret_secret = proto_config.client_credentials().client_secret();
 
@@ -61,7 +61,7 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
       std::move(client_secret_provider), context.threadLocal(), context.api());
   auto token_reader = std::make_shared<const TokenProvider>(
       secret_reader, context.threadLocal(), cluster_manager, proto_config,
-      context.mainThreadDispatcher(), stats_prefix, context.scope());
+      context.mainThreadDispatcher(), stats_prefix, context.statsScope());
 
   return std::make_shared<OAuth2ClientCredentialTokenInjector>(token_reader);
 }

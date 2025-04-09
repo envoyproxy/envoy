@@ -145,7 +145,7 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           ThreadLocal::Instance& threadlocal,
                                                           const std::string& san_to_match,
                                                           bool connect_to_upstreams) {
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
   ON_CALL(context.server_context_, sslContextManager())

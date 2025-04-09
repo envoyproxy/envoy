@@ -27,7 +27,7 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   auto& server_context = context.serverFactoryContext();
 
   ASSERT(!proto_config.domain().empty());
-  ConfigSharedPtr config(new Config(proto_config, server_context.localInfo(), context.scope(),
+  ConfigSharedPtr config(new Config(proto_config, server_context.localInfo(), context.statsScope(),
                                     server_context.runtime(), server_context.clusterManager()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));

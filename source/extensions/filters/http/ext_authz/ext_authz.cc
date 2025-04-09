@@ -752,7 +752,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_denied_);
       if (config_->chargeClusterResponseStats()) {
-        Http::CodeStats::ResponseStatInfo info{config_->scope(),
+        Http::CodeStats::ResponseStatInfo info{config_->statsScope(),
                                                cluster_->statsScope(),
                                                empty_stat_name,
                                                enumToInt(response->status_code),

@@ -63,7 +63,7 @@ Tracing::DriverSharedPtr DatadogTracerFactory::createTracerDriverTyped(
   auto& factory_context = context.serverFactoryContext();
   return std::make_shared<Tracer>(
       proto_config.collector_cluster(), makeCollectorReferenceHost(proto_config),
-      makeConfig(proto_config), factory_context.clusterManager(), factory_context.scope(),
+      makeConfig(proto_config), factory_context.clusterManager(), factory_context.statsScope(),
       factory_context.threadLocal(), factory_context.timeSource());
 }
 

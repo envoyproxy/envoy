@@ -31,7 +31,7 @@
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/test_local_address_selector.h"

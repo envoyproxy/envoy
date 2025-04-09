@@ -114,7 +114,7 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
+    Stats::StatNameManagedStorage prefix("prefix", context_.statsScope().symbolTable());
     config_ = *FilterConfig::create(prefix.statName(), context_,
                                     ShadowWriterPtr(new MockShadowWriter()), router_proto);
     mock_upstream_log_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();

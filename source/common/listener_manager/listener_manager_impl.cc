@@ -34,7 +34,7 @@
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Server {
@@ -1065,8 +1065,7 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 }
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
-    ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
+    ListenerImpl& listener, Server::GenericFactoryContextImpl& factory_context)
     : listener_(listener), validator_(listener.validation_visitor_),
       listener_component_factory_(*listener.parent_.factory_), factory_context_(factory_context) {}
 

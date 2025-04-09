@@ -1465,7 +1465,7 @@ public:
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
     TestUtility::loadFromYaml(plugin_config_yaml, plugin_config);
     plugin_config_ = std::make_shared<PluginConfig>(
-        plugin_config, server_, server_.scope(), server_.initManager(),
+        plugin_config, server_, server_.statsScope(), server_.initManager(),
         envoy::config::core::v3::TrafficDirection::UNSPECIFIED, nullptr /* metadata */, singleton);
   }
 

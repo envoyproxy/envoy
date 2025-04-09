@@ -22,7 +22,7 @@ AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
       proto_config, context.messageValidationVisitor());
 
   auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
-      config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
+      config.config(), context.serverFactoryContext(), context.statsScope(), context.initManager(),
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, false);
   auto access_log = std::make_shared<WasmAccessLog>(std::move(plugin_config), std::move(filter));
 

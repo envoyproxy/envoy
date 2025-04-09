@@ -68,7 +68,7 @@ public:
       *router_proto.add_upstream_http_filters() = filter;
     }
 
-    Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
+    Stats::StatNameManagedStorage prefix("prefix", context_.statsScope().symbolTable());
     config_ = *FilterConfig::create(prefix.statName(), context_,
                                     ShadowWriterPtr(new MockShadowWriter()), router_proto);
     router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);

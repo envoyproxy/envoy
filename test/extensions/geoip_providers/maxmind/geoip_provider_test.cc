@@ -103,7 +103,7 @@ public:
 
   void initializeProvider(const std::string& yaml,
                           absl::optional<ConditionalInitializer>& conditional) {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
+    EXPECT_CALL(context_, statsScope()).WillRepeatedly(ReturnRef(*scope_));
     EXPECT_CALL(context_, serverFactoryContext())
         .WillRepeatedly(ReturnRef(server_factory_context_));
     EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));

@@ -14,8 +14,7 @@ namespace ProxyProtocol {
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& context) {
   const auto& outer_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::proxy_protocol::
                                            v3::ProxyProtocolUpstreamTransport&>(

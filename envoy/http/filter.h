@@ -439,7 +439,7 @@ public:
   /**
    * @return the ScopeTrackedObject for this stream.
    */
-  virtual const ScopeTrackedObject& scope() PURE;
+  virtual const ScopeTrackedObject& statsScope() PURE;
 
   /**
    * Should be used when we continue processing a request or response by invoking a filter directly

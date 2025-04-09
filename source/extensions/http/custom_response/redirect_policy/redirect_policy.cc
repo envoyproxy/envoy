@@ -56,8 +56,8 @@ namespace CustomResponse {
 RedirectPolicy::RedirectPolicy(
     const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
-    : stat_names_(context.scope().symbolTable()),
-      stats_(stat_names_, context.scope(), stats_prefix),
+    : stat_names_(context.statsScope().symbolTable()),
+      stats_(stat_names_, context.statsScope(), stats_prefix),
       uri_{config.has_uri() ? std::make_unique<std::string>(config.uri()) : nullptr},
       redirect_action_{config.has_redirect_action()
                            ? std::make_unique<::Envoy::Http::Utility::RedirectConfig>(

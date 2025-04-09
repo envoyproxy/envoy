@@ -125,7 +125,7 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
-  Stats::Scope& scope() { return scope_; }
+  Stats::Scope& statsScope() { return scope_; }
   const FaultSettings* settings() { return &settings_; }
   TimeSource& timeSource() { return time_source_; }
 

@@ -9,7 +9,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/health_checker_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Upstream {

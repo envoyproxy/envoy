@@ -51,7 +51,7 @@ public:
     ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
-    ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(factory_context, statsScope()).WillByDefault(ReturnRef(scope_));
 
     Resource resource;
     resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));

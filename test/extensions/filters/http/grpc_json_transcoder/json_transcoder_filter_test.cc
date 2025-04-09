@@ -52,7 +52,7 @@ protected:
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   GrpcJsonTranscoderFilterStatsSharedPtr stats_ = std::make_shared<GrpcJsonTranscoderFilterStats>(
-      GrpcJsonTranscoderFilterStats::generateStats("prefix", context_.scope()));
+      GrpcJsonTranscoderFilterStats::generateStats("prefix", context_.statsScope()));
 };
 
 class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {

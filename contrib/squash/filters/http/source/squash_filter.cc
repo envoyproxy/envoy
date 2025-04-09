@@ -168,7 +168,7 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   attachment_timeout_timer_ =
       decoder_callbacks_->dispatcher().createTimer([this]() -> void { doneSquashing(); });
   attachment_timeout_timer_->enableTimer(config_->attachmentTimeout(),
-                                         &decoder_callbacks_->scope());
+                                         &decoder_callbacks_->statsScope());
   // Check if the timer expired inline.
   if (!is_squashing_) {
     return Http::FilterHeadersStatus::Continue;
@@ -272,7 +272,7 @@ void SquashFilter::scheduleRetry() {
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { pollForAttachment(); });
   }
   attachment_poll_period_timer_->enableTimer(config_->attachmentPollPeriod(),
-                                             &decoder_callbacks_->scope());
+                                             &decoder_callbacks_->statsScope());
 }
 
 void SquashFilter::pollForAttachment() {

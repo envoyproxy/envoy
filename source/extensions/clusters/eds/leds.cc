@@ -12,8 +12,7 @@ namespace Upstream {
 
 LedsSubscription::LedsSubscription(
     const envoy::config::endpoint::v3::LedsClusterLocalityConfig& leds_config,
-    const std::string& cluster_name,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    const std::string& cluster_name, Server::Configuration::GenericFactoryContext& factory_context,
     Stats::Scope& cluster_stats_scope, const UpdateCb& callback)
     : Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::LbEndpoint>(
           factory_context.messageValidationVisitor(), leds_config.leds_collection_name()),

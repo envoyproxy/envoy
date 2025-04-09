@@ -1243,7 +1243,7 @@ public:
 // Validate that empty SNI (according to C string rules) fails config validation.
 TEST_F(ClientContextConfigImplTest, EmptyServerNameIndication) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
 
   tls_context.set_sni(std::string("\000", 1));
   EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context).status().message(),
@@ -1258,7 +1258,7 @@ TEST_F(ClientContextConfigImplTest, EmptyServerNameIndication) {
 TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutValidationContext) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.set_auto_sni_san_validation(true);
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
   Stats::IsolatedStoreImpl store;
   EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
@@ -1276,7 +1276,7 @@ TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutTrustedCa) {
       ->mutable_validation_context()
       ->set_trust_chain_verification(envoy::extensions::transport_sockets::tls::v3::
                                          CertificateValidationContext::ACCEPT_UNTRUSTED);
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
   Stats::IsolatedStoreImpl store;
   EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
@@ -1288,7 +1288,7 @@ TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutTrustedCa) {
 // Validate that values other than a hex-encoded SHA-256 fail config validation.
 TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       // This is valid hex-encoded string, but it doesn't represent SHA-256 (80 vs 64 chars).
@@ -1305,7 +1305,7 @@ TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
 // Validate that values other than a base64-encoded SHA-256 fail config validation.
 TEST_F(ClientContextConfigImplTest, InvalidCertificateSpki) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       // Not a base64-encoded string.

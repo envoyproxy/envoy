@@ -26,8 +26,7 @@ namespace {
 
 std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConfigProviders(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status) {
+    Server::Configuration::GenericFactoryContext& factory_context, absl::Status& creation_status) {
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
   if (!config.tls_certificates().empty()) {
     for (const auto& tls_certificate : config.tls_certificates()) {
@@ -69,7 +68,7 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
 }
 
 Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::GenericFactoryContext& factory_context,
     const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& sds_secret_config,
     absl::Status& creation_status) {
   if (sds_secret_config.has_sds_config()) {
@@ -97,7 +96,7 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
 Secret::CertificateValidationContextConfigProviderSharedPtr
 getCertificateValidationContextConfigProvider(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::GenericFactoryContext& factory_context,
     std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>*
         default_cvc,
     absl::Status& creation_status) {
@@ -132,8 +131,7 @@ ContextConfigImpl::ContextConfigImpl(
     bool auto_sni_san_match, const unsigned default_min_protocol_version,
     const unsigned default_max_protocol_version, const std::string& default_cipher_suites,
     const std::string& default_curves,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status)
+    Server::Configuration::GenericFactoryContext& factory_context, absl::Status& creation_status)
     : api_(factory_context.serverFactoryContext().api()),
       options_(factory_context.serverFactoryContext().options()),
       singleton_manager_(factory_context.serverFactoryContext().singletonManager()),
@@ -335,7 +333,7 @@ const std::string ClientContextConfigImpl::DEFAULT_CURVES =
 
 absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::GenericFactoryContext& secret_provider_context) {
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<ClientContextConfigImpl> ret = absl::WrapUnique(
       new ClientContextConfigImpl(config, secret_provider_context, creation_status));
@@ -345,8 +343,7 @@ absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl
 
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status)
+    Server::Configuration::GenericFactoryContext& factory_context, absl::Status& creation_status)
     : ContextConfigImpl(config.common_tls_context(), config.auto_sni_san_validation(),
                         DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION, DEFAULT_CIPHER_SUITES,
                         DEFAULT_CURVES, factory_context, creation_status),

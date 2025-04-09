@@ -16,7 +16,7 @@
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

@@ -12,7 +12,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -66,7 +66,7 @@ public:
 
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& proto,
-                               Server::Configuration::TransportSocketFactoryContext&) override {
+                               Server::Configuration::GenericFactoryContext&) override {
     const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
     std::string id = "default-foo";
     if (!node.id().empty()) {
@@ -115,7 +115,7 @@ protected:
       registration_;
 
   TransportSocketMatcherPtr matcher_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_context_;
   Network::UpstreamTransportSocketFactoryPtr mock_default_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;

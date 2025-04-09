@@ -311,7 +311,7 @@ void TestServer::setResponse(const absl::flat_hash_map<std::string, std::string>
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
+    testing::NiceMock<Server::Configuration::MockGenericFactoryContext>& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager{server_factory_context_};
   tls_context.mutable_common_tls_context()->add_alpn_protocols("h3");
@@ -333,7 +333,7 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context,
+    testing::NiceMock<Server::Configuration::MockGenericFactoryContext>& factory_context,
     bool add_alpn) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =

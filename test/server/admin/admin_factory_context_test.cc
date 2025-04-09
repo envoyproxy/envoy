@@ -16,8 +16,8 @@ TEST(AdminFactoryContextTest, AdminFactoryContextTest) {
   AdminFactoryContext context(server, listener_info);
 
   context.serverFactoryContext();
-  context.getTransportSocketFactoryContext();
-  context.scope();
+  context.getGenericFactoryContext();
+  context.statsScope();
   context.listenerScope();
   context.listenerInfo().isQuic();
   context.listenerInfo().metadata();

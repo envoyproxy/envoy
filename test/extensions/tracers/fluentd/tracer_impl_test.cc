@@ -371,8 +371,8 @@ public:
         .WillByDefault(testing::Return(testing::ByMove(std::move(client))));
 
     tracer_cache_ = std::make_unique<FluentdTracerCacheImpl>(
-        context.serverFactoryContext().clusterManager(), context.serverFactoryContext().scope(),
-        context.serverFactoryContext().threadLocal());
+        context.serverFactoryContext().clusterManager(),
+        context.serverFactoryContext().statsScope(), context.serverFactoryContext().threadLocal());
   }
 
 protected:
@@ -387,7 +387,7 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster")).WillOnce(Return(nullptr));
   tracer_cache_ = std::make_unique<FluentdTracerCacheImpl>(
-      cluster_manager_, context.serverFactoryContext().scope(),
+      cluster_manager_, context.serverFactoryContext().statsScope(),
       context.serverFactoryContext().threadLocal());
 
   envoy::extensions::tracers::fluentd::v3::FluentdConfig config;

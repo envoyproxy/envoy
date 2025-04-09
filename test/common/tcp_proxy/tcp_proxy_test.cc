@@ -912,7 +912,7 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
       { stream_decoder_callbacks.resetStream(Http::StreamResetReason::RemoteReset, ""); },
       "Not implemented");
   EXPECT_NO_THROW(stream_decoder_callbacks.streamInfo());
-  EXPECT_NO_THROW(stream_decoder_callbacks.scope());
+  EXPECT_NO_THROW(stream_decoder_callbacks.statsScope());
   EXPECT_NO_THROW(stream_decoder_callbacks.route());
   EXPECT_NO_THROW(stream_decoder_callbacks.continueDecoding());
   EXPECT_NO_THROW(stream_decoder_callbacks.requestHeaders());

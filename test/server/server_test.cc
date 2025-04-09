@@ -368,7 +368,7 @@ public:
   absl::StatusOr<Stats::SinkPtr>
   createStatsSink(const Protobuf::Message&,
                   Server::Configuration::ServerFactoryContext& server) override {
-    return std::make_unique<CustomStatsSink>(server.scope());
+    return std::make_unique<CustomStatsSink>(server.statsScope());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

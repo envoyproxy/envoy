@@ -12,7 +12,7 @@ namespace Upstream {
 absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> TransportSocketMatcherImpl::create(
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
         socket_matches,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::GenericFactoryContext& factory_context,
     Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<TransportSocketMatcherImpl>(new TransportSocketMatcherImpl(
@@ -24,7 +24,7 @@ absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> TransportSocketMatch
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
         socket_matches,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::GenericFactoryContext& factory_context,
     Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
     absl::Status& creation_status)
     : stats_scope_(stats_scope),

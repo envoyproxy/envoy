@@ -37,7 +37,7 @@ public:
    */
   void logExportedSpans(const ExportTraceServiceRequest& request) {
     if (request.resource_spans(0).has_resource()) {
-      if (request.resource_spans(0).scope_spans(0).has_scope()) {
+      if (request.resource_spans(0).scope_spans(0).has_statsScope()) {
         ENVOY_LOG(debug, "Number of exported spans: {}",
                   request.resource_spans(0).scope_spans(0).spans_size());
       }

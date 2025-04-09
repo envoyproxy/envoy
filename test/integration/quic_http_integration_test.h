@@ -333,7 +333,7 @@ public:
 
     // Initialize the transport socket factory using a customized ssl option.
     ssl_client_option_.setSan(san_to_match_).setSni("lyft.com");
-    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+    NiceMock<Server::Configuration::MockGenericFactoryContext> context;
     ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
     ON_CALL(context.server_context_, sslContextManager())

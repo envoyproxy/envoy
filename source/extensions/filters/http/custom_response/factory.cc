@@ -10,7 +10,7 @@ namespace CustomResponse {
 ::Envoy::Http::FilterFactoryCb CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     const std::string& stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-  Stats::StatNameManagedStorage prefix(stats_prefix, context.scope().symbolTable());
+  Stats::StatNameManagedStorage prefix(stats_prefix, context.statsScope().symbolTable());
   auto config_ptr =
       std::make_shared<FilterConfig>(config, context.serverFactoryContext(), prefix.statName());
   return [config_ptr](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
@@ -23,7 +23,7 @@ CustomResponseFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     Envoy::Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfig>(config, context, context.scope().prefix());
+  return std::make_shared<FilterConfig>(config, context, context.statsScope().prefix());
 }
 /**
  * Static registration for the filter. @see RegisterFactory.

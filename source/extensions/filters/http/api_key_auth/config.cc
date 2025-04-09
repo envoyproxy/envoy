@@ -14,7 +14,7 @@ absl::StatusOr<Http::FilterFactoryCb> ApiKeyAuthFilterFactory::createFilterFacto
 
   absl::Status status = absl::OkStatus();
   FilterConfigSharedPtr config =
-      std::make_shared<FilterConfig>(proto_config, context.scope(), stats_prefix, status);
+      std::make_shared<FilterConfig>(proto_config, context.statsScope(), stats_prefix, status);
   RETURN_IF_NOT_OK_REF(status);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

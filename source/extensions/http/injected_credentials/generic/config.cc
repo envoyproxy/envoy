@@ -14,7 +14,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::GenericFactoryContext& transport_socket_factory,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
@@ -32,7 +32,7 @@ GenericCredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
   const auto& credential_secret = config.credential();
   auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+  auto& transport_socket_factory = context.getGenericFactoryContext();
   auto secret_provider =
       secretsProvider(credential_secret, secret_manager, transport_socket_factory, init_manager);
 

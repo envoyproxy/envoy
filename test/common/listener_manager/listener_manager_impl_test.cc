@@ -793,7 +793,7 @@ public:
 
 private:
   Network::FilterFactoryCb commonFilterFactory(Configuration::FactoryContext& context) {
-    context.scope().counterFromString("bar").inc();
+    context.statsScope().counterFromString("bar").inc();
     return [](Network::FilterManager&) -> void {};
   }
 };
@@ -5890,8 +5890,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   ListenerFactoryContextBaseImpl& parent_context =
       static_cast<PerListenerFactoryContextImpl*>(listener_factory_context)->parentFactoryContext();
   EXPECT_EQ(&listener_factory_context->initManager(), &listener.initManager());
-  EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),
-            &parent_context.getTransportSocketFactoryContext());
+  EXPECT_EQ(&listener_factory_context->getGenericFactoryContext(),
+            &parent_context.getGenericFactoryContext());
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;

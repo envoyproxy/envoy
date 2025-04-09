@@ -167,7 +167,7 @@ class FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryTestBase() {
     // For server_factory_context
-    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, statsScope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     ON_CALL(validation_context_, dynamicValidationVisitor())

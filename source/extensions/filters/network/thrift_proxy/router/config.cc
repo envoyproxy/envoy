@@ -18,8 +18,8 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
 
-  auto stats =
-      std::make_shared<const RouterStats>(stat_prefix, context.scope(), server_context.localInfo());
+  auto stats = std::make_shared<const RouterStats>(stat_prefix, context.statsScope(),
+                                                   server_context.localInfo());
   auto shadow_writer = std::make_shared<ShadowWriterImpl>(server_context.clusterManager(), *stats,
                                                           server_context.mainThreadDispatcher(),
                                                           server_context.threadLocal());

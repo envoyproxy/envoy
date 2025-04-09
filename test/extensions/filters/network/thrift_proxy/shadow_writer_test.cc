@@ -39,7 +39,7 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
 class ShadowWriterTest : public testing::Test {
 public:
   ShadowWriterTest() {
-    stats_ = std::make_shared<const RouterStats>("test", context_.scope(),
+    stats_ = std::make_shared<const RouterStats>("test", context_.statsScope(),
                                                  context_.server_factory_context_.localInfo());
     shadow_writer_ = std::make_shared<ShadowWriterImpl>(
         cm_, *stats_, dispatcher_, context_.server_factory_context_.threadLocal());
@@ -296,7 +296,8 @@ TEST_F(ShadowWriterTest, SubmitClusterNotFound) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
+  EXPECT_EQ(1U,
+            context_.statsScope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
 TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
@@ -307,7 +308,8 @@ TEST_F(ShadowWriterTest, SubmitClusterInMaintenance) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
+  EXPECT_EQ(1U,
+            context_.statsScope().counterFromString("test.shadow_request_submit_failure").value());
 }
 
 TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
@@ -321,7 +323,8 @@ TEST_F(ShadowWriterTest, SubmitNoHealthyUpstream) {
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_EQ(absl::nullopt, router_handle);
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.shadow_request_submit_failure").value());
+  EXPECT_EQ(1U,
+            context_.statsScope().counterFromString("test.shadow_request_submit_failure").value());
 
   // We still count the request, even if it didn't go through.
   EXPECT_EQ(

@@ -46,7 +46,7 @@ TEST(TokenProvider, TokenProviderTest) {
   auto secret_reader = std::make_shared<MockSecretReader>("");
   auto token_provider =
       std::make_shared<TokenProvider>(secret_reader, tls, cluster_manager, proto_config, dispatcher,
-                                      "stats_prefix", context.serverFactoryContext().scope());
+                                      "stats_prefix", context.serverFactoryContext().statsScope());
   EXPECT_NO_THROW(token_provider->asyncGetAccessToken());
   EXPECT_NO_THROW(token_provider->onGetAccessTokenSuccess("token", std::chrono::seconds(10)));
   EXPECT_NO_THROW(

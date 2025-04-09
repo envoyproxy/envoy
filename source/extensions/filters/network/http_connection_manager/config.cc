@@ -354,9 +354,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
-      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
+      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.statsScope())),
       tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
+          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.statsScope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
@@ -761,13 +761,13 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   switch (codec_type_) {
   case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
+        connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.statsScope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
         headersWithUnderscoresAction(), overload_manager);
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
-        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
+        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.statsScope()),
         context_.serverFactoryContext().api().randomGenerator(), http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
         overload_manager);
@@ -776,12 +776,12 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
                "quic.http_server_connection.default")
         .createQuicHttpServerConnectionImpl(
             connection, callbacks,
-            Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
+            Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.statsScope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
             headersWithUnderscoresAction());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(),
+        connection, data, callbacks, context_.statsScope(),
         context_.serverFactoryContext().api().randomGenerator(), http1_codec_stats_,
         http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
@@ -857,11 +857,11 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
   switch (protocol) {
   case Http::Protocol::Http10:
   case Http::Protocol::Http11:
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.statsScope());
   case Http::Protocol::Http2:
-    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.statsScope());
   case Http::Protocol::Http3:
-    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope());
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.statsScope());
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

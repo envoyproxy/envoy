@@ -71,7 +71,7 @@ protected:
   Event::DispatcherPtr dispatcher_;
   QatHandle handle_;
   std::shared_ptr<FakeLibQatCryptoImpl> libqat_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   FakeSingletonManager fsm_;
 
   // Result of an operation.

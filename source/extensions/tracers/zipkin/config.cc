@@ -19,7 +19,7 @@ Tracing::DriverSharedPtr ZipkinTracerFactory::createTracerDriverTyped(
     Server::Configuration::TracerFactoryContext& context) {
   return std::make_shared<Zipkin::Driver>(
       proto_config, context.serverFactoryContext().clusterManager(),
-      context.serverFactoryContext().scope(), context.serverFactoryContext().threadLocal(),
+      context.serverFactoryContext().statsScope(), context.serverFactoryContext().threadLocal(),
       context.serverFactoryContext().runtime(), context.serverFactoryContext().localInfo(),
       context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());

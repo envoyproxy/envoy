@@ -29,7 +29,7 @@ Envoy::Compression::Decompressor::DecompressorFactoryPtr
 BrotliDecompressorLibraryFactory::createDecompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::brotli::decompressor::v3::Brotli& proto_config,
     Server::Configuration::FactoryContext& context) {
-  return std::make_unique<BrotliDecompressorFactory>(proto_config, context.scope());
+  return std::make_unique<BrotliDecompressorFactory>(proto_config, context.statsScope());
 }
 
 /**

@@ -236,7 +236,7 @@ private:
   }
   uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
-  const ScopeTrackedObject& scope() override { return *this; }
+  const ScopeTrackedObject& statsScope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
     tracked_object_stack.add(*this);
   }

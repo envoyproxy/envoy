@@ -16,8 +16,8 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   auto& server_context = context.serverFactoryContext();
 
-  FaultFilterConfigSharedPtr filter_config(
-      std::make_shared<FaultFilterConfig>(config, stats_prefix, context.scope(), server_context));
+  FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
+      config, stats_prefix, context.statsScope(), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };
@@ -27,7 +27,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServer
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
   FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
-      config, stats_prefix, server_context.scope(), server_context));
+      config, stats_prefix, server_context.statsScope(), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };

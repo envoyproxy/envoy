@@ -113,7 +113,7 @@ CredsUtility::callCredentials(const envoy::config::core::v3::GrpcService::Google
           credential.sts_service().token_exchange_service_uri(),
           credential.sts_service().resource(),
           credential.sts_service().audience(),
-          credential.sts_service().scope(),
+          credential.sts_service().statsScope(),
           credential.sts_service().requested_token_type(),
           credential.sts_service().subject_token_path(),
           credential.sts_service().subject_token_type(),
