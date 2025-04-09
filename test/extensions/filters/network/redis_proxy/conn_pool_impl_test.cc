@@ -478,7 +478,9 @@ TEST_F(RedisConnPoolImplTest, ShardSizeDuplicateHosts) {
             EXPECT_EQ(context->downstreamConnection(), nullptr);
             return mock_hosts[call_count++ % max_hosts];
           }));
+  // shardSize() should only count max_hosts, ignoring duplicates
   EXPECT_EQ(conn_pool_->shardSize(), max_hosts);
+  EXPECT_GT(call_count, max_hosts);
 
   tls_.shutdownThread();
 };
