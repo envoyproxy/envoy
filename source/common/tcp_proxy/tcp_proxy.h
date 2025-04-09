@@ -571,9 +571,7 @@ public:
       DUMP_DETAILS(parent_->getStreamInfo().upstreamInfo());
     }
 
-    void setReverseConnForceLocalReply(bool value) override {
-      ENVOY_LOG_MISC(error, "Cannot set value {}.", value);
-    }
+    void setReverseConnForceLocalReply(bool value) override {}
     Filter* parent_{};
     Http::RequestTrailerMapPtr request_trailer_map_;
     std::shared_ptr<Http::NullRouteImpl> route_;

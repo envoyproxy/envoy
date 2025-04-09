@@ -321,7 +321,7 @@ public:
   /**
    * @return ConnectionSocketPtr& To get socket from current connection.
    */
-  virtual ConnectionSocketPtr& getSocket() PURE;
+  virtual ConnectionSocketPtr moveSocket() PURE;
 
   /**
    *  Mark a connection as a reverse connection. The socket

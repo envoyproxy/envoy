@@ -126,7 +126,6 @@ public:
   }
 
   const absl::string_view getHostId() const override { return logical_host_->getHostId(); }
-  void setHostId(const std::string host_id) override;
 
   uint32_t priority() const override { return logical_host_->priority(); }
   Network::UpstreamTransportSocketFactory&
@@ -151,6 +150,7 @@ public:
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
   void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void setHostId(const std::string host_id) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;
