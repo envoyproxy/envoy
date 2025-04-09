@@ -203,6 +203,8 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
+// Pending on https://github.com/envoyproxy/envoy/issues/39054, we are not doing "-bin" decoding
+// right now.
 void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   const auto grpc_status = Common::getGrpcStatus(*headers);
@@ -276,7 +278,7 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
 
 // TODO(htuch): match Google gRPC base64 decoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-// Depending on https://github.com/envoyproxy/envoy/issues/39054, we are not doing this decoding
+// Pending on https://github.com/envoyproxy/envoy/issues/39054, we are not doing "-bin" decoding
 // right now.
 void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
