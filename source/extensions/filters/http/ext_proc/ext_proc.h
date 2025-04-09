@@ -223,6 +223,8 @@ public:
     return send_body_without_waiting_for_header_response_;
   }
 
+  bool retainContentLengthHeader() const { return retain_content_length_header_; }
+
   const ExtProcFilterStats& stats() const { return stats_; }
 
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
@@ -305,6 +307,7 @@ private:
   const uint32_t max_message_timeout_ms_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
   const bool send_body_without_waiting_for_header_response_;
+  const bool retain_content_length_header_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
