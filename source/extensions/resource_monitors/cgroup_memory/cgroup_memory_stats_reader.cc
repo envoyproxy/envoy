@@ -8,6 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,9 +38,9 @@ uint64_t CgroupMemoryStatsReader::readMemoryStats(const std::string& path) {
   }
 
   uint64_t value;
-  try {
-    value = std::stoull(value_str);
-  } catch (const std::exception&) {
+  TRY_ASSERT_MAIN_THREAD { value = std::stoull(value_str); }
+  END_TRY
+  catch (const std::exception&) {
     throw EnvoyException(fmt::format("Unable to parse memory stats from file at {}", path));
   }
   return value;
@@ -58,18 +59,12 @@ std::unique_ptr<CgroupMemoryStatsReader> CgroupMemoryStatsReader::create() {
 }
 
 // CgroupV1StatsReader implementation
-uint64_t CgroupV1StatsReader::getMemoryUsage() {
-  return readMemoryStats(getMemoryUsagePath());
-}
+uint64_t CgroupV1StatsReader::getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
 
-uint64_t CgroupV1StatsReader::getMemoryLimit() {
-  return readMemoryStats(getMemoryLimitPath());
-}
+uint64_t CgroupV1StatsReader::getMemoryLimit() { return readMemoryStats(getMemoryLimitPath()); }
 
 // CgroupV2StatsReader implementation
-uint64_t CgroupV2StatsReader::getMemoryUsage() {
-  return readMemoryStats(getMemoryUsagePath());
-}
+uint64_t CgroupV2StatsReader::getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
 
 uint64_t CgroupV2StatsReader::getMemoryLimit() {
   const uint64_t max_memory = readMemoryStats(getMemoryLimitPath());

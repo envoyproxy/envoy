@@ -95,8 +95,9 @@ TEST(CgroupMemoryStatsReaderTest, HandlesV2MaxValue) {
 TEST(CgroupMemoryStatsReaderTest, ThrowsOnMissingFile) {
   const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
   TestCgroupV1StatsReader stats_reader(nonexistent_path, "dummy");
-  EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
-                           fmt::format("Unable to open memory stats file at {}", nonexistent_path));
+  EXPECT_THROW_WITH_MESSAGE(
+      stats_reader.getMemoryUsage(), EnvoyException,
+      fmt::format("Unable to open memory stats file at {}", nonexistent_path));
 }
 
 TEST(CgroupMemoryStatsReaderTest, ThrowsOnInvalidContent) {
@@ -119,7 +120,7 @@ TEST(CgroupMemoryStatsReaderTest, ThrowsOnEmptyFile) {
 
   TestCgroupV1StatsReader stats_reader(empty_path, "dummy");
   EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
-                           fmt::format("Unable to read memory stats from file at {}", empty_path));
+                            fmt::format("Unable to read memory stats from file at {}", empty_path));
 }
 
 } // namespace

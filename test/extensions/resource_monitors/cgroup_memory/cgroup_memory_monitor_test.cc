@@ -130,8 +130,10 @@ TEST(CgroupMemoryMonitorTest, HandlesVeryLargeValues) {
   config.set_max_memory_bytes(std::numeric_limits<uint64_t>::max());
 
   auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
-  EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(std::numeric_limits<uint64_t>::max() / 2));
-  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+  EXPECT_CALL(*stats_reader, getMemoryUsage())
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max() / 2));
+  EXPECT_CALL(*stats_reader, getMemoryLimit())
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
 
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
 
