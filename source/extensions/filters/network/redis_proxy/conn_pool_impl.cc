@@ -288,6 +288,7 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
 
   Common::Redis::RespValue request;
   absl::flat_hash_set<Upstream::HostConstSharedPtr> unique_hosts;
+  unique_hosts.reserve(Envoy::Extensions::Clusters::Redis::MaxSlot);
   for (uint16_t size = 0; size < Envoy::Extensions::Clusters::Redis::MaxSlot; size++) {
     Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
         size, request, Common::Redis::Client::ReadPolicy::Primary);
