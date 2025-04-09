@@ -1,6 +1,9 @@
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_monitor.h"
 
-#include "envoy/common/exception.h" // Add this include for EnvoyException
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,10 +21,12 @@ void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& c
     const uint64_t usage = stats_reader_->getMemoryUsage();
     const uint64_t limit = std::min(max_memory_, stats_reader_->getMemoryLimit());
 
-    // Ensure we don't divide by zero
     if (limit == 0) {
-      callbacks.onFailure(EnvoyException("Memory limit cannot be zero"));
-      return;
+      throw EnvoyException("Memory limit cannot be zero");
+    }
+
+    if (usage > std::numeric_limits<double>::max()) {
+      throw EnvoyException("Memory usage value too large");
     }
 
     Server::ResourceUsage usage_stats;
@@ -29,8 +34,10 @@ void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& c
 
     callbacks.onSuccess(usage_stats);
   }
-  CATCH(const EnvoyException& error) { callbacks.onFailure(error); }
-  END_TRY;
+  END_TRY
+  catch (const EnvoyException& error) {
+    callbacks.onFailure(error);
+  }
 }
 
 } // namespace CgroupMemory

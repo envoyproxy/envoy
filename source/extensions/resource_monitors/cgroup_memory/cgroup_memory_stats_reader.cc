@@ -20,13 +20,32 @@ uint64_t CgroupMemoryStatsReader::readMemoryStats(const std::string& path) {
     throw EnvoyException(fmt::format("Unable to open memory stats file at {}", path));
   }
 
+  std::string value_str;
+  if (!std::getline(file, value_str)) {
+    throw EnvoyException(fmt::format("Unable to read memory stats from file at {}", path));
+  }
+
+  // Trim whitespace
+  value_str.erase(std::remove_if(value_str.begin(), value_str.end(), ::isspace), value_str.end());
+
+  if (value_str.empty()) {
+    throw EnvoyException(fmt::format("Empty memory stats file at {}", path));
+  }
+
+  if (value_str == "max") {
+    return 0;
+  }
+
   uint64_t value;
-  file >> value;
+  try {
+    value = std::stoull(value_str);
+  } catch (const std::exception&) {
+    throw EnvoyException(fmt::format("Unable to parse memory stats from file at {}", path));
+  }
   return value;
 }
 
 std::unique_ptr<CgroupMemoryStatsReader> CgroupMemoryStatsReader::create() {
-  // Try cgroup v2 first as it's the newer version
   if (CgroupPaths::isV2()) {
     return std::make_unique<CgroupV2StatsReader>();
   }
@@ -39,20 +58,22 @@ std::unique_ptr<CgroupMemoryStatsReader> CgroupMemoryStatsReader::create() {
 }
 
 // CgroupV1StatsReader implementation
-uint64_t CgroupV1StatsReader::getMemoryUsage() { return readMemoryStats(usage_path_); }
+uint64_t CgroupV1StatsReader::getMemoryUsage() {
+  return readMemoryStats(getMemoryUsagePath());
+}
 
-uint64_t CgroupV1StatsReader::getMemoryLimit() { return readMemoryStats(limit_path_); }
+uint64_t CgroupV1StatsReader::getMemoryLimit() {
+  return readMemoryStats(getMemoryLimitPath());
+}
 
 // CgroupV2StatsReader implementation
-uint64_t CgroupV2StatsReader::getMemoryUsage() { return readMemoryStats(usage_path_); }
+uint64_t CgroupV2StatsReader::getMemoryUsage() {
+  return readMemoryStats(getMemoryUsagePath());
+}
 
 uint64_t CgroupV2StatsReader::getMemoryLimit() {
-  const uint64_t max_memory = readMemoryStats(limit_path_);
-  // In cgroup v2, "max" file might contain "max" string instead of a number
-  if (max_memory == 0) {
-    return std::numeric_limits<uint64_t>::max();
-  }
-  return max_memory;
+  const uint64_t max_memory = readMemoryStats(getMemoryLimitPath());
+  return max_memory == 0 ? std::numeric_limits<uint64_t>::max() : max_memory;
 }
 
 } // namespace CgroupMemory

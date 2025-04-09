@@ -20,7 +20,29 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/cgroup_memory:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:server_mocks",  # Added this dependency
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cgroup_memory_monitor_test",
+    srcs = ["cgroup_memory_monitor_test.cc"],
+    extension_names = ["envoy.resource_monitors.cgroup_memory"],
+    deps = [
+        "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cgroup_memory_stats_reader_test",
+    srcs = ["cgroup_memory_stats_reader_test.cc"],
+    extension_names = ["envoy.resource_monitors.cgroup_memory"],
+    deps = [
+        "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )
