@@ -528,7 +528,8 @@ public:
     return request;
   }
 
-  HelloworldStreamPtr createStream(const TestMetadata& initial_metadata) {
+  HelloworldStreamPtr createStream(const TestMetadata& initial_metadata,
+                                   absl::optional<TestMetadata> encoded_metadata = absl::nullopt) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -564,7 +565,7 @@ public:
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;
 
-    expectInitialHeaders(fake_stream, initial_metadata);
+    expectInitialHeaders(fake_stream, encoded_metadata ? *encoded_metadata : initial_metadata);
     expectExtraHeaders(fake_stream);
 
     return stream;

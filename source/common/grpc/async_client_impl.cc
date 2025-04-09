@@ -30,23 +30,6 @@ void Base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
   }
 }
 
-void base64UnescapeBinHeaders(Http::HeaderMap& headers) {
-  absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
-  headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
-    if (absl::EndsWith(header.key().getStringView(), "-bin")) {
-      std::string value;
-      absl::Base64Unescape(header.value().getStringView(), &value);
-      bin_metadata[header.key().getStringView()] = std::move(value);
-    }
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  for (const auto& [key, value] : bin_metadata) {
-    Http::LowerCaseString key_string(key);
-    headers.remove(key_string);
-    headers.addCopy(key_string, value);
-  }
-}
-
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(Upstream::ClusterManager& cm,
                         const envoy::config::core::v3::GrpcService& config,
@@ -251,7 +234,6 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
   }
   // Normal response headers/Server initial metadata.
   if (!waiting_to_delete_on_remote_close_) {
-    base64UnescapeBinHeaders(*headers);
     callbacks_.onReceiveInitialMetadata(end_stream ? Http::ResponseHeaderMapImpl::create()
                                                    : std::move(headers));
   }
@@ -292,13 +274,14 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-// TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
+// TODO(htuch): match Google gRPC base64 decoding behavior for *-bin headers, see
 // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
+// Depending on https://github.com/envoyproxy/envoy/issues/39054, we are not doing this decoding
+// right now.
 void AsyncStreamImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
   if (!waiting_to_delete_on_remote_close_) {
-    base64UnescapeBinHeaders(*trailers);
     callbacks_.onReceiveTrailingMetadata(std::move(trailers));
   }
   if (!grpc_status) {

@@ -174,8 +174,10 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validates that "*-bin" server init metadata are based64 decoded.
-TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreUnescaped) {
+// Validates that "*-bin" server init metadata are NOT based64 decoded.
+// See https://github.com/envoyproxy/envoy/issues/39054, we don't want arbitrary binary header
+// values gets into Envoy before that's well understood by folks.
+TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescaped) {
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
@@ -198,13 +200,13 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreUnescaped)
         EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
                       ->value()
                       .getStringView(),
-                  "你好，世界。");
+                  "5L2g5aW977yM5LiW55WM44CC");
         EXPECT_EQ(headers.get(Http::LowerCaseString("hello-world-in-japanese-bin"))[0]
                       ->value()
                       .getStringView(),
-                  "こんにちは 世界");
+                  "44GT44KT44Gr44Gh44GvIOS4lueVjA==");
         EXPECT_EQ(headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
-                  "更多bin");
+                  "5pu05aSaYmlu");
         return true;
       }));
   EXPECT_CALL(http_stream, sendHeaders(_, _))
@@ -225,7 +227,9 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreUnescaped)
 }
 
 // Validates that "*-bin" trailing metadata are based64 decoded.
-TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreUnescaped) {
+// See https://github.com/envoyproxy/envoy/issues/39054, we don't want arbitrary binary header
+// values gets into Envoy before that's well understood by folks.
+TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnescaped) {
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
@@ -243,19 +247,19 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreUnescape
             http_callbacks = &callbacks;
             return &http_stream;
           }));
-  EXPECT_CALL(http_stream, reset()).Times(1); // onTrailers will trigger reset.
+  EXPECT_CALL(http_stream, reset()); // onTrailers will trigger reset.
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_))
       .WillOnce(Invoke([&](const Http::ResponseTrailerMap& headers) {
         EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
                       ->value()
                       .getStringView(),
-                  "你好，世界。");
+                  "5L2g5aW977yM5LiW55WM44CC");
         EXPECT_EQ(headers.get(Http::LowerCaseString("hello-world-in-japanese-bin"))[0]
                       ->value()
                       .getStringView(),
-                  "こんにちは 世界");
+                  /*こんにちは 世界*/ "44GT44KT44Gr44Gh44GvIOS4lueVjA==");
         EXPECT_EQ(headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
-                  "更多bin");
+                  /*更多bin*/ "5pu05aSaYmlu");
         return true;
       }));
   EXPECT_CALL(http_stream, sendHeaders(_, _))

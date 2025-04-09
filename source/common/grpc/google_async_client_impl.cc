@@ -5,6 +5,7 @@
 #include "envoy/http/protocol.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
@@ -446,10 +447,14 @@ void GoogleAsyncStreamImpl::metadataTranslate(
     Http::HeaderMap& header_map) {
   // More painful copying, this time due to the mismatch in header
   // representation data structures in Envoy and Google gRPC.
-  // Note that grpc-lib has handled the "-bin" metadata decoding.
   for (const auto& it : grpc_metadata) {
-    header_map.addCopy(Http::LowerCaseString(std::string(it.first.data(), it.first.size())),
-                       std::string(it.second.data(), it.second.size()));
+    auto key = Http::LowerCaseString(std::string(it.first.data(), it.first.size()));
+    if (absl::EndsWith(key.get(), "-bin")) {
+      auto value = Base64::encode(it.second.data(), it.second.size());
+      header_map.addCopy(key, value);
+      continue;
+    }
+    header_map.addCopy(key, std::string(it.second.data(), it.second.size()));
   }
 }
 
