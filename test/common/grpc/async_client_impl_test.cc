@@ -243,6 +243,7 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreUnescape
             http_callbacks = &callbacks;
             return &http_stream;
           }));
+  EXPECT_CALL(http_stream, reset()).Times(1); // onTrailers will trigger reset.
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_))
       .WillOnce(Invoke([&](const Http::ResponseTrailerMap& headers) {
         EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
