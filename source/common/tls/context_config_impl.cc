@@ -125,6 +125,19 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
+Envoy::Ssl::CompliancePolicy compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy& policy) {
+  switch (policy) {
+    using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  case ProtoPolicy::NONE:
+    return Envoy::Ssl::CompliancePolicy::None;
+  case ProtoPolicy::FIPS_202205:
+    return Envoy::Ssl::CompliancePolicy::FIPS_202205;
+  default:
+    PANIC("not reached");
+  }
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -153,7 +166,8 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()) {
+      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
+      compliance_policy_(compliancePolicyFromProto(config.tls_params().compliance_policy())) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   auto list_or_error = Network::Address::IpList::create(config.key_log().local_address_range());
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);

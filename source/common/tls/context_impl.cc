@@ -351,6 +351,17 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       SSL_CTX_set_keylog_callback(ctx, keylogCallback);
     }
   }
+
+  // Compliance policy must be applied last to have a defined behavior.
+  switch (config.compliancePolicy()) {
+  case Envoy::Ssl::CompliancePolicy::FIPS_202205:
+    for (auto& tls_context : tls_contexts_) {
+      SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(), ssl_compliance_policy_fips_202205);
+    }
+    break;
+  case Envoy::Ssl::CompliancePolicy::None:
+    break;
+  }
 }
 
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
