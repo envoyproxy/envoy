@@ -118,6 +118,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
+  ASSERT((socket_ == nullptr || !socket_->isOpen()) && delayed_close_timer_ == nullptr,
+         "ConnectionImpl destroyed with open socket and/or active timer");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -271,8 +273,38 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
-void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
+ConnectionSocketPtr ConnectionImpl::moveSocket() {
+  ASSERT(isConnectionReused());
 
+  // Clean up connection internals but don't close the socket.
+  cleanUpConnectionImpl();
+
+  // Transfer socket ownership to the caller.
+  return std::move(socket_);
+}
+
+void ConnectionImpl::cleanUpConnectionImpl() {
+  // No need for a delayed close now.
+  if (delayed_close_timer_) {
+    delayed_close_timer_->disableTimer();
+    delayed_close_timer_ = nullptr;
+  }
+
+  // Drain input and output buffers.
+  updateReadBufferStats(0, 0);
+  updateWriteBufferStats(0, 0);
+
+  // Drain any remaining data from write buffer.
+  write_buffer_->drain(write_buffer_->length());
+
+  // Reset connection stats.
+  connection_stats_.reset();
+
+  // Notify listeners that the connection is closing but don't close the actual socket.
+  ConnectionImpl::raiseEvent(ConnectionEvent::LocalClose);
+}
+
+void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (socket_ == nullptr || !socket_->isOpen()) {
     return;
   }
@@ -284,6 +316,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
+
+  // Don't close the socket transport if this is a reused connection
   if (!reuse_connection_) {
     ENVOY_CONN_LOG(debug, "closing socket transport_socket_", *this);
     transport_socket_->closeSocket(close_type);
@@ -313,6 +347,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 #endif
   }
 
+  // It is safe to call close() since there is an IO handle check.
   if (!reuse_connection_) {
     ENVOY_LOG(debug, "closeSocket:");
     socket_->close();

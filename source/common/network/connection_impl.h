@@ -62,10 +62,10 @@ public:
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
-  // New Method added to retrieve the connection socket.
-  // so that, new connection can be created with existing connection socket.
-  // This is required for reverse connections.
-  ConnectionSocketPtr& getSocket() override { return socket_; }
+  // Transfers ownership of the connection socket to the caller. This should only be called when
+  // the connection is marked as reused. The connection will be cleaned up but the socket will
+  // not be closed.
+  ConnectionSocketPtr moveSocket() override;
   void setConnectionReused(bool value) override { reuse_connection_ = value; }
   bool isConnectionReused() override { return reuse_connection_; }
 
@@ -166,6 +166,10 @@ protected:
   // socket. If the read count is greater than one, or equal to one when the buffer is not overrun,
   // then the filter chain has called readDisable, and does not want additional data.
   bool filterChainWantsData();
+
+  // Cleans up the connection resources without closing the socket.
+  // Used when transferring socket ownership for reverse connections.
+  void cleanUpConnectionImpl();
 
   // Network::ConnectionImplBase
   void closeConnectionImmediately() final;
