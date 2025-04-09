@@ -27,7 +27,10 @@ public:
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& signatureAlgorithms() const override { return signature_algorithms_; }
-  Envoy::Ssl::CompliancePolicy compliancePolicy() const override { return compliance_policy_; }
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy
+  compliancePolicy() const override {
+    return compliance_policy_;
+  }
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -117,7 +120,8 @@ private:
   const std::string tls_keylog_path_;
   std::unique_ptr<Network::Address::IpList> tls_keylog_local_;
   std::unique_ptr<Network::Address::IpList> tls_keylog_remote_;
-  const Envoy::Ssl::CompliancePolicy compliance_policy_;
+  const envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy
+      compliance_policy_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -129,7 +130,8 @@ public:
   /**
    * @return the compiance policy for the TLS context.
    */
-  virtual CompliancePolicy compliancePolicy() const PURE;
+  virtual envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy
+  compliancePolicy() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
