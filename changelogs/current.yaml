@@ -402,5 +402,9 @@ new_features:
   change: |
     Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.stat_prefix>` to allow
     differentiating between different jwt_authn filters in the same filter chain.
+- area: connection
+  change: |
+    Added the close through the network filter manager support that allows a network filter to disable the close of connection. This
+    behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is false.
 
 deprecated:
