@@ -45,6 +45,25 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
+  enum CompliancePolicy {
+    NONE = 0;
+
+    // FIPS_202205 configures a TLS connection to use:
+    //   * TLS 1.2 or 1.3
+    //   * For TLS 1.2, only ECDHE_[RSA|ECDSA]_WITH_AES_*_GCM_SHA*.
+    //   * For TLS 1.3, only AES-GCM
+    //   * P-256 or P-384 for key agreement.
+    //   * For server signatures, only PKCS#1/PSS with SHA256/384/512, or ECDSA
+    //     with P-256 or P-384.
+    //
+    // Note: this policy can be configured even if BoringSSL has not been built in
+    // FIPS mode.
+    //
+    // Note: this setting aids with compliance with NIST requirements but does not
+    // guarantee it. Careful reading of SP 800-52r2 is recommended.
+    FIPS_202205 = 1;
+  }
+
   // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
   //
   // TLS protocol versions below TLSv1_2 require setting compatible ciphers with the
@@ -157,25 +176,6 @@ message TlsParameters {
   //   rsa_pkcs1_sha1
   //   ecdsa_sha1
   repeated string signature_algorithms = 5;
-
-  enum CompliancePolicy {
-    NONE = 0;
-
-    // FIPS_202205 configures a TLS connection to use:
-    //   * TLS 1.2 or 1.3
-    //   * For TLS 1.2, only ECDHE_[RSA|ECDSA]_WITH_AES_*_GCM_SHA*.
-    //   * For TLS 1.3, only AES-GCM
-    //   * P-256 or P-384 for key agreement.
-    //   * For server signatures, only PKCS#1/PSS with SHA256/384/512, or ECDSA
-    //     with P-256 or P-384.
-    //
-    // Note: this policy can be configured even if BoringSSL has not been built in
-    // FIPS mode.
-    //
-    // Note: this setting aids with compliance with NIST requirements but does not
-    // guarantee it. Careful reading of SP 800-52r2 is recommended.
-    FIPS_202205 = 1;
-  };
 
   // Compliance policy configures various aspects of the TLS based on the given policy.
   // The policies are applied last during configuration and may override the other TLS
