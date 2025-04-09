@@ -22,12 +22,18 @@ class IpResolver : public Resolver {
 public:
   absl::StatusOr<InstanceConstSharedPtr>
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
+    absl::optional<std::string> netns;
+    if (!socket_address.network_namespace_filepath().empty()) {
+      netns = socket_address.network_namespace_filepath();
+    }
+
     switch (socket_address.port_specifier_case()) {
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kPortValue:
     // Default to port 0 if no port value is specified.
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET: {
       auto addr = Network::Utility::parseInternetAddressNoThrow(
-          socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat());
+          socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat(),
+          netns);
       if (!addr) {
         return absl::InvalidArgumentError(
             absl::StrCat("malformed IP address: ", socket_address.address()));

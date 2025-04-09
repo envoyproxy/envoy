@@ -1,6 +1,11 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 
 #include <algorithm>
+#include <future>
+
+// @tallen we cant do this for real
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -283,6 +288,51 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+
+  ENVOY_LOG(info, "@tallen dbg address: {}", address->asString());
+  ENVOY_LOG(info, "@tallen dbg netns: {}", address->networkNamespace().value_or("<booooo>"));
+
+  if (address->networkNamespace().has_value()) {
+    // To change the network namespace, we're going to kick off a thread temporarily and change its
+    // network namespace before creating the socket. In the current thread, we'll wait on the result
+    // and remain in the same netns.
+    ENVOY_LOG(info, "@tallen changing netns to {}", address->networkNamespace().value());
+    auto f = std::async(std::launch::async, [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      // Get the fd for the network namespace we want the socket in.
+      int netns_fd = open(address->networkNamespace().value().c_str(), O_RDONLY);
+      if (netns_fd <= 0) {
+        return absl::InvalidArgumentError(fmt::format(
+            "failed to open {}: {}", address->networkNamespace().value(), strerror(errno)));
+      }
+
+      // Jump over to that net namespace.
+      if (setns(netns_fd, CLONE_NEWNET)) {
+        return absl::InvalidArgumentError(fmt::format("failed to set netns ({}) to {}: {}",
+                                                      netns_fd, address->networkNamespace().value(),
+                                                      strerror(errno)));
+      }
+
+      ENVOY_LOG(info, "@tallen successfully set netns to {} for socket creation",
+                address->networkNamespace().value());
+      return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                        worker_index);
+    });
+
+    auto val = f.get();
+    ENVOY_LOG(info, "@tallen jumped back to original netns. congrats.");
+    return val;
+  }
+
+  ENVOY_LOG(info, "@tallen NOT changing netns to {} :( :( :(",
+            address->networkNamespace().value_or("<nullopt>"));
+  return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                    worker_index);
+}
+
+absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
+    Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -315,7 +365,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
                                  : std::string(Network::Utility::UDP_SCHEME);
   const std::string addr = absl::StrCat(scheme, address->asString());
 
-  if (bind_type != BindType::NoBind) {
+  if (bind_type != BindType::NoBind) { // @tallen what's this?
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
