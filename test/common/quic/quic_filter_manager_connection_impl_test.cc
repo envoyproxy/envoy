@@ -117,8 +117,9 @@ TEST_F(QuicFilterManagerConnectionImplTest, BufferLimit) {
   EXPECT_DEATH(impl_.bufferLimit(), "not implemented");
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, SetBufferLimits) {
-  EXPECT_ENVOY_BUG(impl_.setBufferLimits(1), "unexpected call to setBufferLimits");
+TEST_F(QuicFilterManagerConnectionImplTest, CloseConnection) {
+  EXPECT_ENVOY_BUG(impl_.closeConnection(Network::ConnectionCloseAction()),
+                   "unexpected call to closeConnection for QUIC");
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, GetWriteBuffer) {
