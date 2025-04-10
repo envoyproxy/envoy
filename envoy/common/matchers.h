@@ -4,7 +4,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/transport_socket.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "absl/strings/string_view.h"
 
@@ -19,7 +19,7 @@ public:
   virtual ~StringMatcher() = default;
 
   struct Context {
-    OptRef<const Network::TransportSocketOptions> transport_socket_options_;
+    OptRef<const StreamInfo::StreamInfo> stream_info_;
   };
 
   /**
