@@ -58,6 +58,10 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 
+  Json::ObjectUniquePtr json_object = std::make_unique<Json::ObjectImpl>();
+  
+  json_object["a"]=1;
+
   std::string body_data;
   body_data.append("{");
   if (session_duration_.has_value()) {
