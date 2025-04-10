@@ -80,7 +80,7 @@ public:
                                             last_filter_in_filter_chain, filter_chain_type),
         listener_filter_matcher_(listener_filter_matcher), stat_prefix_(stat_prefix),
         main_config_(std::make_shared<MainConfig>(tls)),
-        default_configuration_(std::move(default_config)){};
+        default_configuration_(std::move(default_config)) {};
 
   ~DynamicFilterConfigProviderImpl() override {
     auto& tls = main_config_->tls_;

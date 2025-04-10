@@ -10,6 +10,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using StreamBase = Envoy::Extensions::Common::ExternalProcessing::StreamBase;
+using RequestCallbacks = Envoy::Extensions::Common::ExternalProcessing::RequestCallbacks<
+    envoy::service::ext_proc::v3::ProcessingResponse>;
+
 namespace {
 Http::RequestHeaderMapPtr buildHttpRequestHeaders(absl::string_view uri, const uint64_t stream_id) {
   absl::string_view host, path;

@@ -41,7 +41,7 @@ class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secre
 public:
   SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
       : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
-        time_source_(context.timeSource()){};
+        time_source_(context.timeSource()) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   Server::Configuration::CommonFactoryContext& context);
 

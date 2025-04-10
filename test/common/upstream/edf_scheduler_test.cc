@@ -189,8 +189,8 @@ TEST_F(EdfSchedulerTest, SchedulerWithZeroPicksEqualToEmptyWithAddedEntries) {
     sched1.add(i + 1, entries.back());
   }
 
-  EdfScheduler<uint32_t> sched2 = EdfScheduler<uint32_t>::createWithPicks(
-      entries, [](const double& w) { return w; }, 0);
+  EdfScheduler<uint32_t> sched2 =
+      EdfScheduler<uint32_t>::createWithPicks(entries, [](const double& w) { return w; }, 0);
 
   compareEdfSchedulers(sched1, sched2);
 }
@@ -223,8 +223,8 @@ TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEqualToEmptyWithAddedEntries) {
     }
 
     // Create sched2 with pre-built and pre-picked entries.
-    EdfScheduler<double> sched2 = EdfScheduler<double>::createWithPicks(
-        entries, [](const double& w) { return w; }, picks);
+    EdfScheduler<double> sched2 =
+        EdfScheduler<double>::createWithPicks(entries, [](const double& w) { return w; }, picks);
 
     compareEdfSchedulers(sched1, sched2);
   }
@@ -233,8 +233,8 @@ TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEqualToEmptyWithAddedEntries) {
 // Validating that calling `createWithPicks()` with no entries returns an empty
 // scheduler.
 TEST_F(EdfSchedulerTest, SchedulerWithSomePicksEmptyEntries) {
-  EdfScheduler<double> sched = EdfScheduler<double>::createWithPicks(
-      {}, [](const double& w) { return w; }, 123);
+  EdfScheduler<double> sched =
+      EdfScheduler<double>::createWithPicks({}, [](const double& w) { return w; }, 123);
   EXPECT_EQ(nullptr, sched.peekAgain([](const double&) { return 0; }));
   EXPECT_EQ(nullptr, sched.pickAndAdd([](const double&) { return 0; }));
 }

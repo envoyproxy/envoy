@@ -453,7 +453,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
 
 class MockFluentdAccessLogger : public FluentdAccessLogger {
 public:
-  MOCK_METHOD(void, log, (EntryPtr &&));
+  MOCK_METHOD(void, log, (EntryPtr&&));
 };
 
 class MockFluentdAccessLoggerCache : public FluentdAccessLoggerCache {
