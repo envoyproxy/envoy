@@ -2,7 +2,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/transport_sockets/alts/config.h"
 
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

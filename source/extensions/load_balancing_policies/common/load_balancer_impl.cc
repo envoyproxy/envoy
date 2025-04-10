@@ -26,6 +26,8 @@ namespace Upstream {
 namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
+static const std::string RuntimeForceDirectRouting =
+    "upstream.zone_routing.force_locality_direct_routing";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
 // Returns true if the weights of all the hosts in the HostVector are equal.
@@ -430,6 +432,10 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
+      force_locality_direct_routing_(
+          locality_config.has_value()
+              ? locality_config->zone_aware_lb_config().force_locality_direct_routing()
+              : false),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -495,13 +501,20 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   auto locality_percentages =
       calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
 
-  // If we have lower percent of hosts in the local cluster in the same locality,
-  // we can push all of the requests directly to upstream cluster in the same locality.
-  if (upstreamHostsPerLocality.hasLocalLocality() &&
-      locality_percentages[0].upstream_percentage > 0 &&
-      locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) {
-    state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
-    return;
+  const bool force_locality_direct_routing =
+      runtime_.snapshot().getBoolean(RuntimeForceDirectRouting, force_locality_direct_routing_);
+
+  if (upstreamHostsPerLocality.hasLocalLocality()) {
+    // If we have lower percent of hosts in the local cluster in the same locality,
+    // we can push all of the requests directly to upstream cluster in the same locality.
+    if ((locality_percentages[0].upstream_percentage > 0 &&
+         locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) ||
+        // When force_locality_direct_routing is enabled, always use LocalityDirect
+        // routing if a healthy local host exists.
+        force_locality_direct_routing) {
+      state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
+      return;
+    }
   }
 
   state.locality_routing_state_ = LocalityRoutingState::LocalityResidual;
@@ -571,9 +584,12 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
     return true;
   }
 
+  const bool force_locality_direct_routing =
+      runtime_.snapshot().getBoolean(RuntimeForceDirectRouting, force_locality_direct_routing_);
+
   // Do not perform locality routing if there are too few local localities for zone routing to have
   // an effect.
-  if (localHostSet().hostsPerLocality().get().size() < 2) {
+  if (localHostSet().hostsPerLocality().get().size() < 2 && !force_locality_direct_routing) {
     return true;
   }
 
