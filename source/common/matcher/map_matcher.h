@@ -37,7 +37,7 @@ protected:
       if (result->matcher_) {
         return result->matcher_->match(data);
       } else {
-        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr, {}}};
+        return {MatchState::MatchComplete, *result};
       }
     } else if (input.data_availability_ ==
                DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {

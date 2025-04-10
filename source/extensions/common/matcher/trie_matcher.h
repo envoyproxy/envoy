@@ -95,8 +95,7 @@ protected:
         continue;
       }
       if (node.on_match_->action_cb_) {
-        return {MatchState::MatchComplete,
-                OnMatch<DataType>{node.on_match_->action_cb_, nullptr, false}};
+        return {MatchState::MatchComplete, *node.on_match_};
       }
       // Resume any subtree matching to preserve backtracking progress.
       auto matched = evaluateMatch(*node.on_match_->matcher_, data);
