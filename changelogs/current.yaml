@@ -63,6 +63,10 @@ minor_behavior_changes:
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
+    FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
+- area: oauth2
+  change: |
+    The access token, id token and refresh token in the cookies are now encrypted using the HMCA secret.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
