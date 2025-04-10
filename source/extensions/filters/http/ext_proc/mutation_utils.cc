@@ -163,10 +163,10 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
     const LowerCaseString header_name(sh.header().key());
     bool append;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_append_legacy_default")) {
-      append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
-    } else {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_append_default_true")) {
       append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, true);
+    } else {
+      append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
     }
     const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
                                                                         : CheckOperation::SET;

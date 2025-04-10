@@ -330,11 +330,12 @@ new_features:
     :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
 - area: ext_proc
   change: |
-    Added runtime guard ``envoy.reloadable_features.ext_proc_append_legacy_default`` and set it to true by default.
+    Added runtime guard ``envoy.reloadable_features.ext_proc_append_default_true`` and set it to false by default to keep the
+    legacy behavior.
     When this runtime guard is true, the default value of:ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
-    in :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` is false.
-    When this runtime guard is false, the default value of:ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
     in :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` is true.
+    When this runtime guard is false, the default value of:ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
+    in :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` is false.
 - area: http
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
