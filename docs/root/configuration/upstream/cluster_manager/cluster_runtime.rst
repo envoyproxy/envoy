@@ -166,9 +166,15 @@ upstream.zone_routing.min_cluster_size
   is 6. If the upstream cluster size is smaller than *min_cluster_size* zone aware routing will not
   be performed.
 
-upstream.zone_routing.force_locality_direct_routing
+upstream.zone_routing.force_local_zone
   When set to true, forces Envoy to always send traffic to the local zone. This overrides the default
-  behavior that attempts to balance traffic evenly across all zones among other cluster members.
+  behavior that attempts to balance traffic evenly across all upstream hosts.
+
+upstream.zone_routing.force_local_zone_min_size
+  Minimal number of the upstream hosts in the local zone for *force_local_zone* to be respected. Default value
+  is 1. If the upstream zone size is smaller than *force_local_zone_min_size* routing logic falls back to
+  default zone aware routing behavior.
+  be performed.
 
 Circuit breaking
 ----------------
