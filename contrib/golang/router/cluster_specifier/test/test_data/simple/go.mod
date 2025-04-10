@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/cncf/xds/go v0.0.0-20231128003011-0fa0005c9caa
-	github.com/envoyproxy/envoy v1.28.0
+	github.com/envoyproxy/envoy v1.33.2
 )
 
 require (

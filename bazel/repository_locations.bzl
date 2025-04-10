@@ -145,25 +145,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
     ),
-    boringssl_fips = dict(
-        project_name = "BoringSSL (FIPS)",
-        project_desc = "FIPS compliant BoringSSL",
-        project_url = "https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md",
-        # When this is updated to a revision newer than 2022-08-12,
-        # CertValidatorUtil::setIgnoreCertificateExpiration can be simplified.
-        #
-        # !!! NOTE !!!
-        # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
-        # specified in the associated accreditation certificate, which can be found linked from
-        # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md, for example
-        # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
-        version = "fips-20220613",
-        sha256 = "62f733289f2d677c2723f556aa58034c438f3a7bbca6c12b156538a88e38da8a",
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-0c6f40132b828e92ba365c6b7680e32820c63fa7.tar.xz"],
-        use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-06-13",
-        cpe = "cpe:2.3:a:google:boringssl:*",
-    ),
     aws_lc = dict(
         project_name = "AWS libcrypto (AWS-LC)",
         project_desc = "OpenSSL compatible general-purpose crypto library",
@@ -854,7 +835,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "msgpack-cxx-{version}",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-cxx-{version}.tar.gz"],
         use_category = ["observability_ext"],
-        extensions = ["envoy.access_loggers.fluentd"],
+        extensions = ["envoy.access_loggers.fluentd", "envoy.tracers.fluentd"],
         release_date = "2023-07-08",
         cpe = "cpe:2.3:a:messagepack:messagepack:*",
         license = "Boost",
@@ -1232,12 +1213,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "13e508decc141e3b4bbb96f1a3dba4f82d4e4c7e",
-        sha256 = "36aa5feadeb2fe086bf874f29244d6741a7e669d82e596993420772d0987aa60",
+        version = "2b1d6038906281ff87d0a512b6f4cd0f931d8d2d",
+        sha256 = "b508c85a05b920d8d98c275bb326e6d9d93401df976ff904de329349f75c5534",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-03-14",
+        release_date = "2025-04-02",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1278,7 +1259,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.rbac",
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
-            "envoy.rbac.matchers.upstream_ip_port",
             "envoy.formatter.cel",
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",
@@ -1468,13 +1448,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        # v3.1.7 with Bazel fixes
-        version = "0ea8f8a8707070e9a7c83fbb4a3065683bcf1799",
-        sha256 = "1ca0ff918d476c55707bb99bc0452be28ac5fb8f22a9260a8aae8a38d1bc0e27",
+        version = "3.1.67",
+        sha256 = "0cb0eabd6e3ceb1a970a2363e67f2b1689c2d83fbeae1e75901213c1f84de2e2",
         strip_prefix = "emsdk-{version}/bazel",
-        urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
+        urls = ["https://github.com/emscripten-core/emsdk/archive/refs/tags/{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2022-03-09",
+        release_date = "2024-09-17",
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),

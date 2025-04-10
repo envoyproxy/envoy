@@ -59,6 +59,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http2_no_protocol_error_upon_clean_close
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
+RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_cookie);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
@@ -159,6 +160,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 // TODO(fredyw): Remove after done with debugging.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
+// TODO(botengyao): flip to true after canarying the feature internally without problems.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_manager);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

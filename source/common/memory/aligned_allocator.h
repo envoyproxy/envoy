@@ -72,7 +72,9 @@ public:
   }
 
   // Satisfy libc++ requirement.
-  template <typename U> struct rebind { using other = AlignedAllocator<U, Alignment>; };
+  template <typename U> struct rebind {
+    using other = AlignedAllocator<U, Alignment>;
+  };
 };
 
 } // namespace Memory

@@ -534,6 +534,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via_upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via_upstream")));
+  }
+
+  {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS", "ALLOW_WHITESPACES");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via upstream")));
+  }
+
+  {
     StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
     absl::optional<std::string> details;
     EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
@@ -832,9 +850,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
-          return {-1, ENAMETOOLONG};
-        }));
+        .WillOnce(
+            Invoke([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; }));
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
@@ -1159,13 +1176,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter upstream_format("COMMON_DURATION"); },
-                              EnvoyException, "COMMON_DURATION requires parameters");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter upstream_format("COMMON_DURATION"); }, EnvoyException,
+        "COMMON_DURATION requires parameters");
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a"); },
-                              EnvoyException, "Invalid common duration configuration: a.");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a"); }, EnvoyException,
+        "Invalid common duration configuration: a.");
   }
 
   {
@@ -1175,8 +1194,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    EXPECT_THROW_WITH_MESSAGE({ StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); },
-                              EnvoyException, "Invalid common duration precision: zs.");
+    EXPECT_THROW_WITH_MESSAGE(
+        { StreamInfoFormatter duration_format("COMMON_DURATION", "a:b:zs"); }, EnvoyException,
+        "Invalid common duration precision: zs.");
   }
 
   {

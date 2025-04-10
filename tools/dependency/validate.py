@@ -233,6 +233,11 @@ class Validator(object):
         # It's hard to disentangle API and dataplane today.
         expected_dataplane_core_deps = self._dep_info.deps_by_use_category('dataplane_core').union(
             self._dep_info.deps_by_use_category('api'))
+
+        # Disregard boringssl_fips since it is the same as boringssl.
+        queried_dataplane_core_min_deps = queried_dataplane_core_min_deps.difference(
+            ['boringssl_fips'])
+
         bad_dataplane_core_deps = queried_dataplane_core_min_deps.difference(
             expected_dataplane_core_deps)
         print(f'Validating {len(expected_dataplane_core_deps)} data-plane dependencies...')
@@ -256,6 +261,11 @@ class Validator(object):
         # these paths.
         queried_controlplane_core_min_deps = await self._build_graph.query_external_deps(
             '//source/common/config/...')
+
+        # Disregard boringssl_fips since it is the same as boringssl.
+        queried_controlplane_core_min_deps = queried_controlplane_core_min_deps.difference(
+            ['boringssl_fips'])
+
         # Controlplane will always depend on API.
         expected_controlplane_core_deps = self._dep_info.deps_by_use_category('controlplane').union(
             self._dep_info.deps_by_use_category('api'))

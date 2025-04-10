@@ -170,7 +170,7 @@ envoy_cc_test_library(
         "//source/common/router:context_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:host_mocks",

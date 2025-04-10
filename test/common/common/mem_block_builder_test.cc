@@ -84,8 +84,9 @@ TEST(MemBlockBuilderTest, AppendOneTooMuch) {
 TEST(MemBlockBuilderTest, AppendDataTooMuch) {
   MemBlockBuilder<uint8_t> mem_block(1);
   const uint8_t foo[] = {1, 2};
-  EXPECT_DEATH({ mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo))); },
-               expected_death_regex);
+  EXPECT_DEATH(
+      { mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo))); },
+      expected_death_regex);
 }
 
 } // namespace Envoy
