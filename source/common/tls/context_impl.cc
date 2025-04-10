@@ -34,6 +34,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "cert_validator/cert_validator.h"
+#include "openssl/crypto.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/pkcs12.h"
@@ -185,6 +186,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
     }
   }
+
+  const bool fips_mode = FIPS_mode();
 
 #ifdef BORINGSSL_FIPS
   if (!capabilities_.is_fips_compliant) {
@@ -356,6 +359,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   switch (config.compliancePolicy()) {
     using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
   case ProtoPolicy::FIPS_202205:
+    if (!fips_mode) {
+      ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
+    }
     for (auto& tls_context : tls_contexts_) {
       int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
                                              ssl_compliance_policy_fips_202205);
