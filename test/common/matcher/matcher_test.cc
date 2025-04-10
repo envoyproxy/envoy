@@ -133,6 +133,8 @@ MATCHER(MaybeHasNoMatch, "") {
   return true;
 }
 
+using ::testing::IsEmpty;
+
 TEST_F(MatcherTest, TestMatcher) {
   const std::string yaml = R"EOF(
   matcher_tree:
@@ -880,40 +882,40 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
   std::vector<ActionFactoryCb> skipped_results;
   MaybeMatchResult result_1 = reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(result_1, MaybeHasStringAction("match-1"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult result_2 = reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(result_2, MaybeHasStringAction("match-2"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult on_no_match_result_1 =
       reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(on_no_match_result_1, MaybeHasStringAction("on-no-match-nested-1"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult result_3 = reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(result_3, MaybeHasStringAction("match-3"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult result_4 = reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(result_4, MaybeHasStringAction("match-4"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult on_no_match_result_2 =
       reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(on_no_match_result_2, MaybeHasStringAction("on-no-match"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult no_remaining_reentrants_result =
       reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(no_remaining_reentrants_result, MaybeHasNoMatch());
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 }
 
@@ -1090,13 +1092,13 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
 
   MaybeMatchResult result_3 = reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(result_3, MaybeHasStringAction("on no match"));
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
   MaybeMatchResult no_remaining_reentrants_result =
       reenterable_matcher.evaluateMatch(TestData(), skipped_results);
   EXPECT_THAT(no_remaining_reentrants_result, MaybeHasNoMatch());
-  EXPECT_TRUE(skipped_results.empty());
+  EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 }
 
