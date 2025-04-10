@@ -64,8 +64,8 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, getHostId()).WillOnce(Return("mock-host-id"));
   EXPECT_EQ(description_.getHostId(), "mock-host-id");
 
-  // Test setHostId (should trigger PANIC).
-  EXPECT_DEATH(description_.setHostId("new-host-id"), "not implemented");
+  // Test setHostId (no-op implementation).
+  description_.setHostId("new-host-id");
 }
 
 } // namespace Clusters

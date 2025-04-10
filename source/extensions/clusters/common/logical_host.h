@@ -150,9 +150,7 @@ public:
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
   void setLbPolicyData(HostLbPolicyDataPtr) override {}
-  void setHostId(const std::string host_id) override {
-    ENVOY_LOG_MISC(debug, "Cannot set host ID to {} setHostId is not supported for RealHostDescription", host_id);
-  }
+  void setHostId(const std::string) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;
