@@ -58,7 +58,7 @@ message LocalityLbConfig {
     // If not specified, the default is 1.
     // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
     // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
-    google.protobuf.UInt64Value force_local_zone_min_size = 5;
+    google.protobuf.UInt32Value force_local_zone_min_size = 5;
   }
 
   // Configuration for :ref:`locality weighted load balancing

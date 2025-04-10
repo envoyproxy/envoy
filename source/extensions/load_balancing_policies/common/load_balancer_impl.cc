@@ -508,7 +508,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
 
   const bool force_local_zone =
       runtime_.snapshot().getBoolean(RuntimeForceLocalZone, force_local_zone_);
-  const uint64_t force_local_zone_min_size =
+  const uint32_t force_local_zone_min_size =
       runtime_.snapshot().getInteger(RuntimeForceLocalZoneMinSize, force_local_zone_min_size_);
 
   if (upstreamHostsPerLocality.hasLocalLocality()) {
