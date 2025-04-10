@@ -174,7 +174,6 @@ upstream.zone_routing.force_local_zone_min_size
   Minimal number of the upstream hosts in the local zone for *force_local_zone* to be respected. Default value
   is 1. If the upstream zone size is smaller than *force_local_zone_min_size* routing logic falls back to
   default zone aware routing behavior.
-  be performed.
 
 Circuit breaking
 ----------------
