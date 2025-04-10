@@ -70,9 +70,6 @@ void CacheFilter::onDestroy() {
 }
 
 absl::optional<absl::string_view> CacheFilter::clusterName() {
-  if (!config_->overrideUpstreamCluster().empty()) {
-    return config_->overrideUpstreamCluster();
-  }
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry = (route == nullptr) ? nullptr : route->routeEntry();
   if (route_entry == nullptr) {
@@ -126,21 +123,25 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
 
-  absl::optional<absl::string_view> cluster_name = clusterName();
-  if (!cluster_name) {
+  absl::optional<absl::string_view> original_cluster_name = clusterName();
+  if (!original_cluster_name) {
     sendNoRouteResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-  OptRef<Http::AsyncClient> async_client = asyncClient(*cluster_name);
+  absl::string_view cluster_name = *original_cluster_name;
+  if (!config_->overrideUpstreamCluster().empty()) {
+    cluster_name = config_->overrideUpstreamCluster();
+  }
+  OptRef<Http::AsyncClient> async_client = asyncClient(cluster_name);
   if (!async_client) {
-    sendNoClusterResponse(*cluster_name);
+    sendNoClusterResponse(cluster_name);
     return Http::FilterHeadersStatus::StopIteration;
   }
   auto upstream_request_factory = std::make_unique<UpstreamRequestImplFactory>(
       decoder_callbacks_->dispatcher(), *async_client, config_->upstreamOptions());
   auto lookup_request = std::make_unique<ActiveLookupRequest>(
-      headers, std::move(upstream_request_factory), *cluster_name, decoder_callbacks_->dispatcher(),
-      config_->timeSource().systemTime(), config_, config_,
+      headers, std::move(upstream_request_factory), *original_cluster_name,
+      decoder_callbacks_->dispatcher(), config_->timeSource().systemTime(), config_, config_,
       config_->ignoreRequestCacheControlHeader());
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
