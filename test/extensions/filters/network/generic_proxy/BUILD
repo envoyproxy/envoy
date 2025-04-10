@@ -49,8 +49,11 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":fake_codec_lib",
+        "//source/common/access_log:access_log_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/formatter:formatter_extension_lib",
+        "//source/common/formatter:substitution_format_string_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/generic_proxy:proxy_lib",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
@@ -70,6 +73,7 @@ envoy_cc_test(
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/generic_proxy:config",
         "//source/extensions/filters/network/generic_proxy/router:config",
         "//source/extensions/tracers/zipkin:config",
@@ -140,6 +144,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         ":fake_codec_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/extensions/filters/network/generic_proxy:access_log_lib",
         "//test/mocks/stream_info:stream_info_mocks",
     ],

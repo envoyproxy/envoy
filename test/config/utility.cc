@@ -22,11 +22,13 @@
 #include "test/config/integration/certs/client2cert_hash.h"
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/integration/async_round_robin.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
@@ -882,7 +884,7 @@ void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
     absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
         alternate_protocol_cache_config,
-    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
         configure_tls_context) {
   addConfigModifier([use_alpn, http3, alternate_protocol_cache_config,
                      configure_tls_context](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -928,15 +930,15 @@ void ConfigHelper::configureUpstreamTls(
               .PackFrom(new_protocol_options);
     }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-    if (configure_tls_context != nullptr) {
-      configure_tls_context(*tls_context.mutable_common_tls_context());
-    }
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     // The test certs are for *.lyft.com, so make sure SNI matches.
     tls_context.set_sni("foo.lyft.com");
+    if (configure_tls_context != nullptr) {
+      configure_tls_context(tls_context);
+    }
     if (http3) {
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
@@ -1006,7 +1008,30 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 #endif
   }
 
+  // Make sure we don't setAsyncLb() when we intend to use a non-default LB algorithm.
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
+    auto* cluster = bootstrap_.mutable_static_resources()->mutable_clusters(i);
+    if (cluster->has_load_balancing_policy() &&
+        cluster->load_balancing_policy().policies(0).typed_extension_config().name() ==
+            "envoy.load_balancing_policies.async_round_robin") {
+      ASSERT_EQ(::envoy::config::cluster::v3::Cluster::ROUND_ROBIN, cluster->lb_policy());
+    }
+  }
+
   finalized_ = true;
+}
+
+void ConfigHelper::setAsyncLb(bool hang) {
+  for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
+    auto* cluster = bootstrap_.mutable_static_resources()->mutable_clusters(i);
+
+    auto* policy = cluster->mutable_load_balancing_policy()->mutable_policies()->Add();
+    policy->mutable_typed_extension_config()->set_name(
+        "envoy.load_balancing_policies.async_round_robin");
+    test::integration::lb::AsyncRoundRobin lb_config;
+    lb_config.set_hang(hang);
+    policy->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(lb_config);
+  }
 }
 
 void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_port_zero) {
@@ -1021,7 +1046,8 @@ void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_po
       eds_hosts = true;
     } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
       original_dst_cluster = true;
-    } else if (cluster->has_cluster_type()) {
+    } else if (cluster->has_cluster_type() &&
+               !absl::StartsWith(cluster->cluster_type().name(), "envoy.cluster.")) {
       custom_cluster = true;
     } else {
       // Assign ports to statically defined load_assignment hosts.

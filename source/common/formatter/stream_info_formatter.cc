@@ -2,6 +2,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -26,16 +27,6 @@ Network::Address::InstanceConstSharedPtr
 getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
   auto opt_ref = stream_info.upstreamInfo();
   if (!opt_ref.has_value()) {
-    return nullptr;
-  }
-
-  // TODO(wbpcode): remove this after the flag is removed.
-  const bool use_upstream_remote_address = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.upstream_remote_address_use_connection");
-  if (!use_upstream_remote_address) {
-    if (auto host = opt_ref->upstreamHost(); host != nullptr) {
-      return host->address();
-    }
     return nullptr;
   }
 
@@ -323,6 +314,30 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            const auto downstream_timing = stream_info.downstreamTiming();
            if (downstream_timing.has_value()) {
              return downstream_timing->lastDownstreamRxByteReceived();
+           }
+           return {};
+         }},
+        {UpstreamConnectStart,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_connect_start_;
+           }
+           return {};
+         }},
+        {UpstreamConnectEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_connect_complete_;
+           }
+           return {};
+         }},
+        {UpstreamTLSConnectEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_handshake_complete_;
            }
            return {};
          }},
@@ -952,11 +967,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"RESPONSE_CODE_DETAILS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              bool allow_whitespaces = (format == "ALLOW_WHITESPACES");
               return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.responseCodeDetails();
+                  [allow_whitespaces](const StreamInfo::StreamInfo& stream_info) {
+                    if (allow_whitespaces || !stream_info.responseCodeDetails().has_value()) {
+                      return stream_info.responseCodeDetails();
+                    }
+                    return absl::optional<std::string>(StringUtil::replaceAllEmptySpace(
+                        stream_info.responseCodeDetails().value()));
                   });
             }}},
           {"CONNECTION_TERMINATION_DETAILS",
@@ -1024,6 +1044,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](absl::string_view sub_command, absl::optional<size_t>) {
               return CommonDurationFormatter::create(sub_command);
             }}},
+          {"CUSTOM_FLAGS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return std::string(stream_info.customFlags());
+                  });
+            }}},
           {"RESPONSE_FLAGS",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1058,6 +1086,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       // If no hostname is available, the main address is used.
                       return host->address()->asString();
                     }
+                    return absl::make_optional<std::string>(std::move(host_name));
+                  });
+            }}},
+          {"UPSTREAM_HOST_NAME_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return absl::nullopt;
+                    }
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return absl::nullopt;
+                    }
+                    std::string host_name = host->hostname();
+                    if (host_name.empty()) {
+                      // If no hostname is available, the main address is used.
+                      host_name = host->address()->asString();
+                    }
+                    Envoy::Http::HeaderUtility::stripPortFromHost(host_name);
                     return absl::make_optional<std::string>(std::move(host_name));
                   });
             }}},
@@ -1251,6 +1301,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withPort(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1259,12 +1317,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withoutPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().localAddress();
+                  });
+            }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
                   });
             }}},
           {"DOWNSTREAM_REMOTE_ADDRESS",
@@ -1331,7 +1405,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     absl::optional<std::string> result;
                     if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
                       if (Runtime::runtimeFeatureEnabled(
-                              "envoy.reloadable_features.sanitize_sni_in_access_log")) {
+                              "envoy.reloadable_features.sanitize_sni_in_access_"
+                              "log")) {
                         result = StringUtil::sanitizeInvalidHostname(
                             stream_info.downstreamAddressProvider().requestedServerName());
                       } else {
@@ -1815,13 +1890,13 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
       });
 }
 
-class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
+class BuiltInStreamInfoCommandParser : public CommandParser {
 public:
   BuiltInStreamInfoCommandParser() = default;
 
-  // StreamInfoCommandParser
-  StreamInfoFormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
-                                       absl::optional<size_t> max_length) const override {
+  // CommandParser
+  FormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
+                             absl::optional<size_t> max_length) const override {
 
     auto it = getKnownStreamInfoFormatterProviders().find(command);
 
@@ -1842,13 +1917,11 @@ std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
   return "envoy.built_in_formatters.stream_info.default";
 }
 
-StreamInfoCommandParserPtr
-DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
+CommandParserPtr DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
   return std::make_unique<BuiltInStreamInfoCommandParser>();
 }
 
-REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
-                 BuiltInStreamInfoCommandParserFactory);
+REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory, BuiltInCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

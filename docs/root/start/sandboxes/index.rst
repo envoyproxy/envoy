@@ -13,7 +13,7 @@ Sandboxes
    `Pull Request <https://github.com/envoyproxy/envoy/pulls>`_ with the necessary changes
    should you be able to create one.
 
-   :repo:`See the sandbox developer documentation <examples/DEVELOPER.md>` for more information about
+   `See the sandbox developer documentation in the envoyproxy/examples project <https://github.com/envoyproxy/examples/blob/main/DEVELOPER.md>`_ for more information about
    creating your own sandbox.
 
 .. sidebar:: Compatibility

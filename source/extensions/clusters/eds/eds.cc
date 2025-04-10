@@ -160,9 +160,15 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   if (!lb_endpoint.endpoint().additional_addresses().empty()) {
     address_list.push_back(address);
     for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-      address_list.emplace_back(
-          THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(additional_address.address()),
-                                const Network::Address::InstanceConstSharedPtr));
+      Network::Address::InstanceConstSharedPtr address =
+          returnOrThrow(parent_.resolveProtoAddress(additional_address.address()));
+      address_list.emplace_back(address);
+    }
+    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+      // All addresses must by IP addresses.
+      if (!address->ip()) {
+        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+      }
     }
   }
 
@@ -240,9 +246,11 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (transport_factory_context_->clusterManager().adsMux()) {
+  if (transport_factory_context_->serverFactoryContext().clusterManager().adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
+    maybe_resume_leds =
+        transport_factory_context_->serverFactoryContext().clusterManager().adsMux()->pause(
+            type_url);
   }
 
   update(cluster_load_assignment);

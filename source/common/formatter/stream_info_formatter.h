@@ -19,6 +19,36 @@
 namespace Envoy {
 namespace Formatter {
 
+class StreamInfoFormatterProvider : public FormatterProvider {
+public:
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+    return format(stream_info);
+  }
+  ProtobufWkt::Value
+  formatValueWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+    return formatValue(stream_info);
+  }
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return absl::optional<std::string> optional string containing a single value extracted from
+   *         the given stream info.
+   */
+  virtual absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const PURE;
+
+  /**
+   * Format the value with the given stream info.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
+   */
+  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
+};
+
+using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
+
 using StreamInfoFormatterProviderCreateFunc =
     std::function<StreamInfoFormatterProviderPtr(absl::string_view, absl::optional<size_t>)>;
 
@@ -143,6 +173,12 @@ private:
       "DS_RX_BEG"; // Downstream request receiving begin.
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
+  static constexpr absl::string_view UpstreamConnectStart =
+      "US_CX_BEG"; // Upstream TCP connection establishment start.
+  static constexpr absl::string_view UpstreamConnectEnd =
+      "US_CX_END"; // Upstream TCP connection establishment start.
+  static constexpr absl::string_view UpstreamTLSConnectEnd =
+      "US_HS_END"; // Upstream TLS connection establishment start.
   static constexpr absl::string_view FirstUpstreamTxByteSent =
       "US_TX_BEG"; // Upstream request sending begin.
   static constexpr absl::string_view LastUpstreamTxByteSent =
@@ -242,10 +278,10 @@ private:
   ProtobufWkt::Value str_;
 };
 
-class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInStreamInfoCommandParserFactory {
+class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {
 public:
   std::string name() const override;
-  StreamInfoCommandParserPtr createCommandParser() const override;
+  CommandParserPtr createCommandParser() const override;
 };
 
 DECLARE_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory);

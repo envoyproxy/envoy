@@ -129,6 +129,7 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
   bool is_issued_by_known_root;
   std::vector<std::string> verified_chain;
   std::vector<std::string> cert_chain;
+  cert_chain.reserve(certs.size());
   for (absl::string_view cert : certs) {
     cert_chain.push_back(std::string(cert));
   }

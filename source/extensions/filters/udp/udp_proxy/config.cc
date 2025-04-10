@@ -64,7 +64,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   proxy_host_formatter_ =
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                 proxy_substitution_format_config, context),
-                            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+                            Formatter::FormatterPtr);
 
   if (config.has_proxy_port()) {
     uint32_t port = config.proxy_port().value();
@@ -81,7 +81,22 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   target_host_formatter_ =
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                 target_substitution_format_config, context),
-                            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+                            Formatter::FormatterPtr);
+
+  if (config.has_retry_options() && config.retry_options().has_backoff_options()) {
+    const uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(config.retry_options().backoff_options(), base_interval);
+    const uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+        config.retry_options().backoff_options(), max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException(
+          "max_backoff_interval must be greater or equal to base_backoff_interval");
+    }
+
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        base_interval_ms, max_interval_ms, context.serverFactoryContext().api().randomGenerator());
+  }
 }
 
 UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(

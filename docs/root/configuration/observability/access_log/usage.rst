@@ -267,10 +267,11 @@ The following command operators are supported:
 
 .. _config_access_log_format_response_code_details:
 
-%RESPONSE_CODE_DETAILS%
+%RESPONSE_CODE_DETAILS(X)%
   HTTP
     HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why.
+    who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
+    will be converted to underscore '_', unless optional parameter X is ALLOW_WHITESPACES.
 
   TCP/UDP
     Not implemented ("-")
@@ -420,6 +421,9 @@ The following command operators are supported:
 
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
+    * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
+    * ``US_CX_END``: The time point of the upstream TCP connect end.
+    * ``US_HS_END``: The time point of the upstream TLS handshake end.
     * ``US_TX_BEG``: The time point of the upstream request sending begin.
     * ``US_TX_END``: The time point of the upstream request sending end.
     * ``US_RX_BEG``: The time point of the upstream response receiving begin.
@@ -427,6 +431,9 @@ The following command operators are supported:
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.
     * Dynamic value: Other values will be treated as custom time points that are set by named keys.
+
+    NOTE: Upstream connection establishment time points (US_CX_*, US_HS_END) repeat for all requests
+    in a given connection.
 
     The PRECISION is specified by the following values (NOTE: all values here are case-sensitive):
 
@@ -563,6 +570,7 @@ HTTP only
   **DnsResolutionFailed**, **DF**, The request was terminated due to DNS resolution failure.
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
   **DownstreamRemoteReset**, **DR**, The response details are ``http2.remote_reset`` or ``http2.remote_refuse``.
+  **UnconditionalDropOverload**, **UDO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>` is set to 100%.
 
 UDP
   Not implemented ("-").
@@ -591,6 +599,12 @@ UDP
 %UPSTREAM_HOST_NAME%
   Upstream host name (e.g., DNS name). If no DNS name is available, the main address of the upstream host
   (e.g., ip:port for TCP connections) will be used.
+
+.. _config_access_log_format_upstream_host_name_without_port:
+
+%UPSTREAM_HOST_NAME_WITHOUT_PORT%
+  Upstream host name (e.g., DNS name) without port component. If no DNS name is available,
+  the main address of the upstream host (e.g., ip for TCP connections) will be used.
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
@@ -723,16 +737,50 @@ UDP
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
-    <config_http_conn_man_headers_x-forwarded-for>`.
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+%DOWNSTREAM_DIRECT_LOCAL_ADDRESS%
+  Direct local address of the downstream connection.
+
+  .. note::
+
+    This is always the physical local address even if the downstream remote address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
   Local address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
 
+  .. note::
+
+    This may not be the physical local address if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%
+  Direct local address of the downstream connection, without any port component.
+
+  .. note::
+
+    This is always the physical local address even if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
 %DOWNSTREAM_LOCAL_PORT%
   Local port of the downstream connection.
   IP addresses are the only address type with a port component.
+
+  .. note::
+
+    This may not be the physical port if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+%DOWNSTREAM_DIRECT_LOCAL_PORT%
+  Direct local port of the downstream connection.
+  IP addresses are the only address type with a port component.
+
+  .. note::
+
+    This is always the listener port even if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
 .. _config_access_log_format_connection_id:
 
@@ -1169,6 +1217,14 @@ UDP
   UDP
     Not implemented ("-").
 
+%TLS_JA3_FINGERPRINT%
+  HTTP/TCP/Thrift
+    The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
+    Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
+    extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
+  UDP
+    Not implemented (``-``).
+
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
 %DOWNSTREAM_PEER_CERT_V_START%
@@ -1328,3 +1384,36 @@ UDP
     The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
   TCP/UDP
     Not implemented ("-").
+
+%QUERY_PARAM(X):Z%
+  HTTP
+    The value of the query parameter X. If the query parameter X is not present, '-' symbol will be used.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+  TCP/UDP
+    Not implemented ("-").
+
+%PATH(X:Y):Z%
+  HTTP
+    The value of the request path. The parameter X is used to specify should the output contains
+    query or not. The parameter Y is used to specify the source of the request path. Both X and Y
+    are optional. And Z is an optional parameter denoting string truncation up to Z characters long.
+
+    The X parameter can be:
+
+    * ``WQ``: The output will be the full request path which contains the query parameters. If the X
+      is not present, ``WQ`` will be used.
+    * ``NQ``: The output will be the request path without the query parameters.
+
+    The Y parameter can be:
+
+    * ``ORIG``: Get the request path from the ``x-envoy-original-path`` header.
+    * ``PATH``: Get the request path from the ``:path`` header.
+    * ``ORIG_OR_PATH``: Get the request path from the ``x-envoy-original-path`` header if it is
+      present, otherwise get it from the ``:path`` header. If the Y is not present, ``ORIG_OR_PATH``
+      will be used.
+  TCP/UDP
+    Not implemented ("-").
+
+%CUSTOM_FLAGS%
+  Custom flags set into the stream info. This could be used to log any custom event from the filters.
+  Multiple flags are separated by comma.

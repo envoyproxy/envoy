@@ -26,6 +26,8 @@ namespace Upstream {
 namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
+static const std::string RuntimeForceDirectRouting =
+    "upstream.zone_routing.force_locality_direct_routing";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
 // Returns true if the weights of all the hosts in the HostVector are equal.
@@ -398,6 +400,21 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
           priority_and_source.second};
 }
 
+uint64_t LoadBalancerBase::random(bool peeking) {
+  if (peeking) {
+    stashed_random_.push_back(random_.random());
+    return stashed_random_.back();
+  } else {
+    if (!stashed_random_.empty()) {
+      auto random = stashed_random_.front();
+      stashed_random_.pop_front();
+      return random;
+    } else {
+      return random_.random();
+    }
+  }
+}
+
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
@@ -415,6 +432,10 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
+      force_locality_direct_routing_(
+          locality_config.has_value()
+              ? locality_config->zone_aware_lb_config().force_locality_direct_routing()
+              : false),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -480,13 +501,20 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   auto locality_percentages =
       calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
 
-  // If we have lower percent of hosts in the local cluster in the same locality,
-  // we can push all of the requests directly to upstream cluster in the same locality.
-  if (upstreamHostsPerLocality.hasLocalLocality() &&
-      locality_percentages[0].upstream_percentage > 0 &&
-      locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) {
-    state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
-    return;
+  const bool force_locality_direct_routing =
+      runtime_.snapshot().getBoolean(RuntimeForceDirectRouting, force_locality_direct_routing_);
+
+  if (upstreamHostsPerLocality.hasLocalLocality()) {
+    // If we have lower percent of hosts in the local cluster in the same locality,
+    // we can push all of the requests directly to upstream cluster in the same locality.
+    if ((locality_percentages[0].upstream_percentage > 0 &&
+         locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) ||
+        // When force_locality_direct_routing is enabled, always use LocalityDirect
+        // routing if a healthy local host exists.
+        force_locality_direct_routing) {
+      state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
+      return;
+    }
   }
 
   state.locality_routing_state_ = LocalityRoutingState::LocalityResidual;
@@ -556,9 +584,12 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
     return true;
   }
 
+  const bool force_locality_direct_routing =
+      runtime_.snapshot().getBoolean(RuntimeForceDirectRouting, force_locality_direct_routing_);
+
   // Do not perform locality routing if there are too few local localities for zone routing to have
   // an effect.
-  if (localHostSet().hostsPerLocality().get().size() < 2) {
+  if (localHostSet().hostsPerLocality().get().size() < 2 && !force_locality_direct_routing) {
     return true;
   }
 
@@ -585,7 +616,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+HostSelectionResponse ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
 
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
@@ -917,7 +948,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
     // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
     // host selection with lower memory and CPU overhead.
-    if (!alwaysUseEdfScheduler() && hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
+    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
       // Skip edf creation.
       return;
     }
@@ -962,8 +993,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
 }
-
-bool EdfLoadBalancerBase::alwaysUseEdfScheduler() const { return false; }
 
 bool EdfLoadBalancerBase::isSlowStartEnabled() const {
   return slow_start_window_ > std::chrono::milliseconds(0);

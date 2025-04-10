@@ -3,8 +3,10 @@ syntax = "proto3";
 package envoy.extensions.filters.network.tcp_proxy.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/v3/hash_policy.proto";
 
 import "google/protobuf/duration.proto";
@@ -25,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 18]
+// [#next-free-field: 20]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -211,6 +213,9 @@ message TcpProxy {
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 
+  // Sets the backoff strategy. If not set, the retries are performed without backoff.
+  config.core.v3.BackoffStrategy backoff_options = 18;
+
   // Optional configuration for TCP proxy hash policy. If hash_policy is not set, the hash-based
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
@@ -228,29 +233,47 @@ message TcpProxy {
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`access_log_flush_interval
-  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
   // Note that if both this field and :ref:`access_log_flush_interval
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
   // are specified, the former (deprecated field) is ignored.
+  //
+  // .. attention::
+  //   This field is deprecated in favor of
+  //   :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
   google.protobuf.Duration access_log_flush_interval = 15 [
     deprecated = true,
     (validate.rules).duration = {gte {nanos: 1000000}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
-  // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`flush_access_log_on_connected
-  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
   // Note that if both this field and :ref:`flush_access_log_on_connected
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
   // are specified, the former (deprecated field) is ignored.
+  //
+  // .. attention::
+  //   This field is deprecated in favor of
+  //   :ref:`flush_access_log_on_connected
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
   bool flush_access_log_on_connected = 16
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Additional access log options for TCP Proxy.
   TcpAccessLogOptions access_log_options = 17;
+
+  // If set, the specified PROXY protocol TLVs (Type-Length-Value) will be added to the PROXY protocol
+  // state created by the TCP proxy filter. These TLVs will be sent in the PROXY protocol v2 header
+  // to upstream.
+  //
+  // This field only takes effect when the TCP proxy filter is creating new PROXY protocol
+  // state and there is an upstream proxy protocol transport socket configured in the cluster.
+  // If the connection already contains PROXY protocol state (including any TLVs) parsed by a
+  // downstream proxy protocol listener filter, the TLVs specified here are ignored.
+  //
+  // .. note::
+  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header, you must also
+  //   configure the passthrough TLVs on the upstream proxy protocol transport. See
+  //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
+  //   for details.
+  repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
 }

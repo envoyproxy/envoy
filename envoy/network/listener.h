@@ -273,9 +273,9 @@ public:
   virtual ResourceLimit& openConnections() PURE;
 
   /**
-   * @return std::vector<AccessLog::InstanceSharedPtr> access logs emitted by the listener.
+   * @return AccessLog::InstanceSharedPtrVector access logs emitted by the listener.
    */
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
 
   /**
    * @return pending connection backlog for TCP listeners.
@@ -359,7 +359,7 @@ struct UdpRecvData {
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
   uint8_t tos_ = 0;
-  Buffer::RawSlice saved_cmsg_;
+  Buffer::OwnedImpl saved_cmsg_;
 };
 
 /**

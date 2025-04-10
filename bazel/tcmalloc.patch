@@ -1,0 +1,12 @@
+diff --git a/tcmalloc/BUILD b/tcmalloc/BUILD
+--- a/tcmalloc/BUILD	2025-01-28 16:41:20.424424728 +0000
++++ b/tcmalloc/BUILD	2025-01-28 16:41:09.408433981 +0000
+@@ -21,7 +21,7 @@
+ load("//tcmalloc:copts.bzl", "TCMALLOC_DEFAULT_COPTS")
+ load("//tcmalloc:variants.bzl", "create_tcmalloc_benchmark", "create_tcmalloc_libraries", "create_tcmalloc_testsuite")
+ 
+-package(default_visibility = ["//visibility:private"])
++package(default_visibility = ["//visibility:public"])
+ 
+ licenses(["notice"])
+ 

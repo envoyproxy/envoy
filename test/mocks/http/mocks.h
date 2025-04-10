@@ -60,9 +60,9 @@ public:
   MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
-  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr &&));
+  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr&&));
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
-  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
+  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr&&));
   MOCK_METHOD(void, setInformationalHeaders_, (ResponseHeaderMap&));
   void setInformationalHeaders(ResponseHeaderMapPtr&& informational_headers) override {
     informational_headers_ = std::move(informational_headers);
@@ -84,9 +84,9 @@ public:
   MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
   MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
   MOCK_METHOD(void, endStream, ());
+  MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, upgradeFilterChainCreated, ());
   MOCK_METHOD(void, disarmRequestTimeout, ());
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
@@ -136,6 +136,15 @@ public:
   MOCK_METHOD(void, onResetStream, (StreamResetReason reason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockCodecEventCallbacks : public CodecEventCallbacks {
+public:
+  MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks();
+
+  MOCK_METHOD(void, onCodecEncodeComplete, ());
+  MOCK_METHOD(void, onCodecLowLevelReset, ());
 };
 
 class MockServerConnection : public ServerConnection {
@@ -202,8 +211,7 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool,
-                         const FilterChainOptions&) const override {
+  bool createFilterChain(FilterChainManager& manager, const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
@@ -271,6 +279,7 @@ public:
   MOCK_METHOD(void, setDecoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, decoderBufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
+  MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions, (), (const));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
@@ -385,7 +394,7 @@ public:
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
-  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
+  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr&&));
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
@@ -621,7 +630,7 @@ public:
   }
 
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
-  MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
+  MOCK_METHOD(const AccessLog::InstanceSharedPtrVector&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
   MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());

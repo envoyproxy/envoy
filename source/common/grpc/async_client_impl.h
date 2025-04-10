@@ -24,8 +24,9 @@ using AsyncStreamImplPtr = std::unique_ptr<AsyncStreamImpl>;
 
 class AsyncClientImpl final : public RawAsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
-                  TimeSource& time_source);
+  static absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
+  create(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
+         TimeSource& time_source);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -41,6 +42,10 @@ public:
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() {
     return retry_policy_;
   }
+
+protected:
+  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
+                  TimeSource& time_source, absl::Status& creation_status);
 
 private:
   const uint32_t max_recv_message_length_;
@@ -67,6 +72,7 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                   absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                   const Http::AsyncClient::StreamOptions& options);
+  ~AsyncStreamImpl() override;
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -76,6 +82,7 @@ public:
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void onComplete() override;
   void onReset() override;
+  void waitForRemoteCloseAndDelete() override;
 
   // Grpc::AsyncStream
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
@@ -124,10 +131,12 @@ private:
   RawAsyncStreamCallbacks& callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};
+  bool waiting_to_delete_on_remote_close_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;
   // This is a member to avoid reallocation on every onData().
   std::vector<Frame> decoded_frames_;
+  Event::TimerPtr remote_close_timer_;
 
   friend class AsyncClientImpl;
 };

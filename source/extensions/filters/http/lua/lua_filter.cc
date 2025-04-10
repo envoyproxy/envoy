@@ -657,42 +657,6 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
   return 1;
 }
 
-int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::trace, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::debug, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::info, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::warn, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::err, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::critical, message);
-  return 0;
-}
-
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   // Step 1: Get hash function.
   absl::string_view hash = luaL_checkstring(state, 2);
@@ -826,6 +790,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
                            Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_manager_(cluster_manager),
+      clear_route_cache_(
+          proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
@@ -854,8 +820,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()), disabled_(config.disabled()),
-      name_(config.name()) {
+    : disabled_(config.disabled()), name_(config.name()) {
   if (disabled_ || !name_.empty()) {
     return;
   }
@@ -935,32 +900,35 @@ void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   response_stream_wrapper_.reset();
 }
 
-void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view message) {
-  switch (level) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "script log: {}", message);
-    return;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "script log: {}", message);
-    return;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "script log: {}", message);
-    return;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "script log: {}", message);
-    return;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "script log: {}", message);
-    return;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "script log: {}", message);
-    return;
-  case spdlog::level::off:
-    PANIC("unsupported");
-    return;
-  case spdlog::level::n_levels:
-    PANIC("unsupported");
+int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
+  // Get the host address argument
+  size_t len;
+  const char* host = luaL_checklstring(state, 2, &len);
+
+  // Validate that host is not null and is an IP address
+  if (host == nullptr) {
+    luaL_error(state, "host argument is required");
   }
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    luaL_error(state, "host is not a valid IP address");
+  }
+
+  // Get the optional strict flag (defaults to false)
+  bool strict = false;
+  if (lua_gettop(state) >= 3) {
+    luaL_checktype(state, 3, LUA_TBOOLEAN);
+    strict = lua_toboolean(state, 3);
+  }
+
+  // Set the upstream override host
+  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
+
+  return 0;
+}
+
+int StreamHandleWrapper::luaClearRouteCache(lua_State*) {
+  callbacks_.clearRouteCache();
+  return 0;
 }
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,

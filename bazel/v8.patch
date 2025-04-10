@@ -71,6 +71,20 @@ index e957c0f..0327669 100644
          }),
          includes = ["include"],
          linkopts = select({
+diff --git a/src/compiler/control-equivalence.cc b/src/compiler/control-equivalence.cc
+index 4649cf0..6fc6e57 100644
+--- a/src/compiler/control-equivalence.cc
++++ b/src/compiler/control-equivalence.cc
+@@ -157,8 +157,8 @@ void ControlEquivalence::RunUndirectedDFS(Node* exit) {
+     // Pop node from stack when done with all inputs and uses.
+     DCHECK(entry.input == node->input_edges().end());
+     DCHECK(entry.use == node->use_edges().end());
+-    DFSPop(stack, node);
+     VisitPost(node, entry.parent_node, entry.direction);
++    DFSPop(stack, node);
+   }
+ }
+ 
 diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
 index 4473e20..65a6ec7 100644
 --- a/src/wasm/c-api.cc

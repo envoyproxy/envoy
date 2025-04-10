@@ -30,7 +30,7 @@ constexpr absl::string_view DisableTunnelingFilterStateKey = "envoy.tcp_proxy.di
 
 class TcpConnPool : public GenericConnPool, public Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  TcpConnPool(Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::LoadBalancerContext* context,
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
               StreamInfo::StreamInfo& downstream_info);
@@ -78,7 +78,8 @@ public:
 
 class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callbacks {
 public:
-  HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  HttpConnPool(Upstream::HostConstSharedPtr host,
+               Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfigHelper& config,
                Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                Http::StreamDecoderFilterCallbacks&, Http::CodecType type,
@@ -89,7 +90,8 @@ public:
 
   bool valid() const { return conn_pool_data_.has_value() || generic_conn_pool_; }
   Http::CodecType codecType() const { return type_; }
-  std::unique_ptr<Router::GenericConnPool> createConnPool(Upstream::ThreadLocalCluster&,
+  std::unique_ptr<Router::GenericConnPool> createConnPool(Upstream::HostConstSharedPtr host,
+                                                          Upstream::ThreadLocalCluster&,
                                                           Upstream::LoadBalancerContext* context,
                                                           absl::optional<Http::Protocol> protocol);
 
@@ -300,6 +302,7 @@ public:
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
+  void recordUpstreamSslConnection();
   void addBytesSentCallback(Network::Connection::BytesSentCb) override{};
   // HTTP upstream must not implement converting upstream transport
   // socket from non-secure to secure mode.
@@ -400,6 +403,7 @@ private:
   // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
   UpstreamRequestPtr upstream_request_;
+  Http::CodecType type_;
 };
 
 } // namespace TcpProxy

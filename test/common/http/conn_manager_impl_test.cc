@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/network/proxy_protocol.h"
+
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/mocks/http/early_header_mutation.h"
 #include "test/test_common/logging.h"
@@ -491,7 +493,13 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
   EXPECT_TRUE(decoder_->streamInfo().filterState()->hasDataWithName(
       Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = decoder_->streamInfo()
+                                     .filterState()
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
 
+  EXPECT_EQ(proxy_proto_data.version_, absl::nullopt);
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -4061,7 +4069,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 
   // Store the basic request encoder during filter chain setup.
   auto* filter = new MockStreamFilter();
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
       .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
@@ -4193,7 +4201,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   conn_manager_->onData(fake_input, false);
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -4297,7 +4305,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "300"}}};
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");

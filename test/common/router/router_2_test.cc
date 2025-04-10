@@ -22,7 +22,7 @@ public:
 // x-envoy-original-path in the basic upstream test when Envoy header
 // suppression is configured.
 TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -715,7 +715,7 @@ class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
   RouterTestStrictCheckOneHeader()
-      : RouterTestBase(false, false, false, false, protobufStrList({GetParam()})){};
+      : RouterTestBase(false, false, false, false, protobufStrList({GetParam()})) {};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -765,7 +765,7 @@ class RouterTestStrictCheckSomeHeaders
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
   RouterTestStrictCheckSomeHeaders()
-      : RouterTestBase(false, false, false, false, protobufStrList(GetParam())){};
+      : RouterTestBase(false, false, false, false, protobufStrList(GetParam())) {};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -799,7 +799,7 @@ class RouterTestStrictCheckAllHeaders
 public:
   RouterTestStrictCheckAllHeaders()
       : RouterTestBase(false, false, false, false,
-                       protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+                       protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)) {};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,

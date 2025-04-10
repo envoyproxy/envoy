@@ -20,7 +20,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -640,7 +640,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   auto cvc_config =
-      Ssl::CertificateValidationContextConfigImpl::create(*sds_api.secret(), *api_).value();
+      Ssl::CertificateValidationContextConfigImpl::create(*sds_api.secret(), false, *api_).value();
   const std::string ca_cert = "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config->caCert());
@@ -716,7 +716,8 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext merged_cvc =
       default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  auto cvc_config = Ssl::CertificateValidationContextConfigImpl::create(merged_cvc, *api_).value();
+  auto cvc_config =
+      Ssl::CertificateValidationContextConfigImpl::create(merged_cvc, false, *api_).value();
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
   EXPECT_TRUE(cvc_config->allowExpiredCertificate());

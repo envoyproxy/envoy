@@ -95,11 +95,11 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::LocalReset:
     return quic::QUIC_STREAM_REQUEST_REJECTED;
   case Http::StreamResetReason::OverloadManager:
-    return quic::QUIC_STREAM_CANCELLED;
+    return quic::QUIC_STREAM_EXCESSIVE_LOAD;
   case Http::StreamResetReason::ProtocolError:
     return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
   case Http::StreamResetReason::Overflow:
-    IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
+    IS_ENVOY_BUG("Resource overflow shouldn't be propagated to QUIC network stack");
     break;
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::RemoteReset:
@@ -121,12 +121,11 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::LocalConnectionFailure;
   case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_CANCELLED:
   case quic::QUIC_STREAM_EXCESSIVE_LOAD:
   case quic::QUIC_HEADERS_TOO_LARGE:
   case quic::QUIC_STREAM_REQUEST_REJECTED:
     return Http::StreamResetReason::LocalReset;
-  case quic::QUIC_STREAM_CANCELLED:
-    return Http::StreamResetReason::OverloadManager;
   default:
     return Http::StreamResetReason::ProtocolError;
   }
@@ -141,13 +140,12 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
   case quic::QUIC_STREAM_NO_ERROR:
+  case quic::QUIC_STREAM_CANCELLED:
   case quic::QUIC_STREAM_REQUEST_REJECTED:
   case quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE:
   case quic::QUIC_STREAM_EXCESSIVE_LOAD:
   case quic::QUIC_HEADERS_TOO_LARGE:
     return Http::StreamResetReason::RemoteReset;
-  case quic::QUIC_STREAM_CANCELLED:
-    return Http::StreamResetReason::OverloadManager;
   case quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR:
   default:
     return Http::StreamResetReason::ProtocolError;
@@ -189,6 +187,12 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   ASSERT(peer_addr != nullptr);
   const bool should_connect =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_connect_client_udp_sockets");
+  // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
+  // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
+  //
+  // If setting a higher cache size, try profiling std::deque instead of std::vector for the
+  // `recent_received_addresses_` cache in
+  // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   size_t max_addresses_cache_size =
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
@@ -211,9 +215,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
-    connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
-  }
+  connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
   if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
@@ -387,14 +389,6 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
   quic_config.SetInitialSessionFlowControlWindowToSend(
       std::max(quic::kMinimumFlowControlSendWindow,
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
-}
-
-void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
-                                     const quic::QuicConnectionId& old_connection_id) {
-  char* new_connection_id_data = new_connection_id.mutable_data();
-  const char* old_connection_id_ptr = old_connection_id.data();
-  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
 }
 
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {

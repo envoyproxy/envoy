@@ -42,8 +42,9 @@ public:
 
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
-  bool drainClose() const override { return false; }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+  bool drainClose(Network::DrainDirection) const override { return false; }
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
     IS_ENVOY_BUG("Unexpected call to addOnDrainCloseCb");
     return nullptr;
   }
@@ -67,6 +68,7 @@ protected:
     void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
+    void disableClose(bool) override { IS_ENVOY_BUG("Unexpected call to disableClose"); }
     bool startUpstreamSecureTransport() override {
       IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
       return false;
@@ -232,7 +234,7 @@ public:
 private:
   HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
                   const envoy::config::listener::v3::Listener& config, Server::Instance& server,
-                  const std::string& name);
+                  const std::string& name, absl::Status& creation_status);
 
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.

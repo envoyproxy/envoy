@@ -110,6 +110,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
       config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
                                                             tsf_context.messageValidationVisitor(),
                                                             tap_sink_factory);
+      sink_ = tap_sink_factory.createTransportSinkPtr(*config, tsf_context);
     } else {
       Server::Configuration::FactoryContext& http_context =
           absl::get<HttpContextRef>(context).get();
@@ -117,9 +118,9 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           sinks[0].custom_sink().typed_config(),
           http_context.serverFactoryContext().messageValidationContext().staticValidationVisitor(),
           tap_sink_factory);
+      sink_ = tap_sink_factory.createHttpSinkPtr(*config, http_context);
     }
 
-    sink_ = tap_sink_factory.createSinkPtr(*config, context);
     sink_to_use_ = sink_.get();
     break;
   }
@@ -137,7 +138,11 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     // Fallback to use the deprecated match_config field and upgrade (wire cast) it to the new
     // MatchPredicate which is backward compatible with the old MatchPredicate originally
     // introduced in the Tap filter.
-    MessageUtil::wireCast(proto_config.match_config(), match);
+    if (!match.ParseFromString(proto_config.match_config().SerializeAsString())) {
+      // This should should generally succeed, but if there are malformed UTF-8 strings in a
+      // message, this can fail.
+      throw EnvoyException("Unable to deserialize proto.");
+    }
   } else {
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                      proto_config.DebugString()));

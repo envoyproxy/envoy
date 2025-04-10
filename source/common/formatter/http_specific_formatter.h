@@ -181,15 +181,9 @@ private:
   const Format format_;
 };
 
-/**
- * FormatterProvider for request headers from StreamInfo (rather than the request_headers param).
- * Purely for testing.
- */
-class StreamInfoRequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
+class QueryParameterFormatter : public FormatterProvider {
 public:
-  StreamInfoRequestHeaderFormatter(const std::string& main_header,
-                                   const std::string& alternative_header,
-                                   absl::optional<size_t> max_length);
+  QueryParameterFormatter(absl::string_view parameter_key, absl::optional<size_t> max_length);
 
   // FormatterProvider
   absl::optional<std::string>
@@ -198,6 +192,38 @@ public:
   ProtobufWkt::Value
   formatValueWithContext(const HttpFormatterContext& context,
                          const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  const std::string parameter_key_;
+  absl::optional<size_t> max_length_;
+};
+
+class PathFormatter : public FormatterProvider {
+public:
+  enum PathFormatterOption {
+    OriginalPathOrPath,
+    PathOnly,
+    OriginalPathOnly,
+  };
+
+  static absl::StatusOr<FormatterProviderPtr>
+  create(absl::string_view with_query, absl::string_view option, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
+
+  PathFormatter(bool with_query, PathFormatterOption option, absl::optional<size_t> max_length)
+      : with_query_(with_query), option_(option), max_length_(max_length) {}
+
+private:
+  const bool with_query_{};
+  const PathFormatterOption option_{};
+  absl::optional<size_t> max_length_;
 };
 
 class BuiltInHttpCommandParser : public CommandParser {
@@ -218,8 +244,7 @@ private:
   static const FormatterProviderLookupTbl& getKnownFormatters();
 };
 
-using BuiltInHttpCommandParserFactory = BuiltInCommandParserFactoryBase<HttpFormatterContext>;
-class DefaultBuiltInHttpCommandParserFactory : public BuiltInHttpCommandParserFactory {
+class DefaultBuiltInHttpCommandParserFactory : public BuiltInCommandParserFactory {
 public:
   std::string name() const override;
   CommandParserPtr createCommandParser() const override;

@@ -27,6 +27,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/cert_validator/utility.h"
@@ -45,7 +46,8 @@ namespace Tls {
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
     Server::Configuration::CommonFactoryContext& context)
-    : config_(config), stats_(stats), context_(context) {
+    : config_(config), stats_(stats), context_(context),
+      auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
                                    envoy::extensions::transport_sockets::tls::v3::
@@ -118,6 +120,12 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
     }
   }
 
+  // Disallow insecure configuration.
+  if (config_ != nullptr && config_->autoSniSanMatch() && !verify_trusted_ca_) {
+    return absl::InvalidArgumentError(
+        "'auto_sni_san_validation' was configured without configuring a trusted CA");
+  }
+
   if (config_ != nullptr && !config_->certificateRevocationList().empty()) {
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config_->certificateRevocationList().data()),
@@ -156,7 +164,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
           return absl::InvalidArgumentError(
               absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
         }
-        subject_alt_name_matchers_.push_back(std::move(san_matcher));
+        subject_alt_name_matchers_.emplace_back(std::move(san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -193,15 +201,26 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
 }
 
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
-    X509* leaf_cert, const Network::TransportSocketOptions* transport_socket_options,
+    X509* leaf_cert, absl::string_view sni,
+    const Network::TransportSocketOptions* transport_socket_options,
     Envoy::Ssl::ClientValidationStatus& detailed_status, std::string* error_details,
     uint8_t* out_alert) {
-  Envoy::Ssl::ClientValidationStatus validated =
-      verifyCertificate(leaf_cert,
-                        transport_socket_options != nullptr
-                            ? transport_socket_options->verifySubjectAltNameListOverride()
-                            : std::vector<std::string>{},
-                        subject_alt_name_matchers_, error_details, out_alert);
+
+  std::vector<SanMatcherPtr> match_sni_san;
+  OptRef<const std::vector<std::string>> verify_san_override;
+  OptRef<const std::vector<SanMatcherPtr>> match_san_override;
+  if (transport_socket_options != nullptr &&
+      !transport_socket_options->verifySubjectAltNameListOverride().empty()) {
+    // TODO(ggreenway): this validation should be part of `match_sni_san` so that the type is
+    // validated as a DNS SAN, but this change will require a runtime flag for the behavior change.
+    verify_san_override = transport_socket_options->verifySubjectAltNameListOverride();
+  } else if (auto_sni_san_match_ && !sni.empty()) {
+    match_sni_san.emplace_back(std::make_unique<DnsExactStringSanMatcher>(sni));
+    match_san_override = match_sni_san;
+  }
+  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
+      leaf_cert, verify_san_override.value_or(std::vector<std::string>()),
+      match_san_override.value_or(subject_alt_name_matchers_), error_details, out_alert);
 
   if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
       validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
@@ -281,7 +300,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
     const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
-    absl::string_view /*host_name*/) {
+    absl::string_view host_name) {
   if (sk_X509_num(&cert_chain) == 0) {
     stats_.fail_verify_error_.inc();
     const char* error = "verify cert failed: empty cert chain";
@@ -332,8 +351,9 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   }
   std::string error_details;
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
-  const bool succeeded = verifyCertAndUpdateStatus(leaf_cert, transport_socket_options.get(),
-                                                   detailed_status, &error_details, &tls_alert);
+  const bool succeeded =
+      verifyCertAndUpdateStatus(leaf_cert, host_name, transport_socket_options.get(),
+                                detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        detailed_status, absl::nullopt, absl::nullopt}
                    : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
@@ -475,6 +495,17 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
     auto only_leaf_crl = config_->onlyVerifyLeafCertificateCrl();
     rc = EVP_DigestUpdate(md.get(), &only_leaf_crl, sizeof(only_leaf_crl));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    auto max_verify_depth_opt = config_->maxVerifyDepth();
+    if (max_verify_depth_opt.has_value()) {
+      auto max_verify_depth = *max_verify_depth_opt;
+      rc = EVP_DigestUpdate(md.get(), &max_verify_depth, sizeof(max_verify_depth));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    bool auto_sni_san_match = config_->autoSniSanMatch();
+    rc = EVP_DigestUpdate(md.get(), &auto_sni_san_match, sizeof(auto_sni_san_match));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }
 
@@ -507,6 +538,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
       continue;
     }
+
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError(absl::StrCat(
@@ -530,13 +562,11 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
   // Set the verify_depth
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
-#if BORINGSSL_API_VERSION >= 29
     // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the
     // depth but include the trust anchor. Newer BoringSSLs match OpenSSL 1.1.x
     // and later in excluding both the leaf and trust anchor. `maxVerifyDepth`
     // documents the older behavior, so adjust the value to match.
     max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
-#endif
     SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
   }
   return absl::OkStatus();
@@ -555,7 +585,7 @@ absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const
 
 class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr
+  absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context) override {
     return std::make_unique<DefaultCertValidator>(config, stats, context);

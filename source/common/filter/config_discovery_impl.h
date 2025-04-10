@@ -80,7 +80,7 @@ public:
                                             last_filter_in_filter_chain, filter_chain_type),
         listener_filter_matcher_(listener_filter_matcher), stat_prefix_(stat_prefix),
         main_config_(std::make_shared<MainConfig>(tls)),
-        default_configuration_(std::move(default_config)){};
+        default_configuration_(std::move(default_config)) {};
 
   ~DynamicFilterConfigProviderImpl() override {
     auto& tls = main_config_->tls_;
@@ -112,7 +112,7 @@ public:
                               Config::ConfigAppliedCb applied_on_all_threads) override {
     const absl::StatusOr<FactoryCb> config_or_error = instantiateFilterFactory(message);
     RETURN_IF_NOT_OK_REF(config_or_error.status());
-    update(config_or_error.value(), applied_on_all_threads);
+    update(std::move(config_or_error.value()), applied_on_all_threads);
     return absl::OkStatus();
   }
 
@@ -121,7 +121,7 @@ public:
     if (default_configuration_) {
       auto cb_or_error = instantiateFilterFactory(*default_configuration_);
       RETURN_IF_NOT_OK_REF(cb_or_error.status());
-      cb = cb_or_error.value();
+      cb = std::move(cb_or_error.value());
     }
     update(cb, applied_on_all_threads);
     return absl::OkStatus();
@@ -423,14 +423,13 @@ class FilterConfigSubscription
       Logger::Loggable<Logger::Id::filter>,
       public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
-  FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
-                           const std::string& filter_config_name,
-                           Server::Configuration::ServerFactoryContext& factory_context,
-                           Upstream::ClusterManager& cluster_manager,
-                           const std::string& stat_prefix,
-                           FilterConfigProviderManagerImplBase& filter_config_provider_manager,
-                           const std::string& subscription_id);
-
+  static absl::StatusOr<std::unique_ptr<FilterConfigSubscription>>
+  create(const envoy::config::core::v3::ConfigSource& config_source,
+         const std::string& filter_config_name,
+         Server::Configuration::ServerFactoryContext& factory_context,
+         Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
+         FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+         const std::string& subscription_id);
   ~FilterConfigSubscription() override;
 
   const Init::SharedTargetImpl& initTarget() { return init_target_; }
@@ -442,6 +441,15 @@ public:
   const SystemTime& lastUpdated() { return last_->updated_; }
 
   void incrementConflictCounter();
+
+protected:
+  FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
+                           const std::string& filter_config_name,
+                           Server::Configuration::ServerFactoryContext& factory_context,
+                           Upstream::ClusterManager& cluster_manager,
+                           const std::string& stat_prefix,
+                           FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+                           const std::string& subscription_id, absl::Status& creation_status);
 
 private:
   struct ConfigVersion {
@@ -521,19 +529,20 @@ public:
              Server::Configuration::ServerFactoryContext& factory_context) const PURE;
 
 protected:
-  std::shared_ptr<FilterConfigSubscription>
+  absl::StatusOr<std::shared_ptr<FilterConfigSubscription>>
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                   const std::string& name,
                   Server::Configuration::ServerFactoryContext& server_context,
                   Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix);
-  void applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
-                                DynamicFilterConfigProviderImplBase& provider,
-                                const std::string& filter_config_name);
+  absl::Status applyLastOrDefaultConfig(std::shared_ptr<FilterConfigSubscription>& subscription,
+                                        DynamicFilterConfigProviderImplBase& provider,
+                                        const std::string& filter_config_name);
   absl::Status validateProtoConfigDefaultFactory(const bool null_default_factory,
                                                  const std::string& filter_config_name,
                                                  absl::string_view type_url) const;
-  void validateProtoConfigTypeUrl(const std::string& type_url,
-                                  const absl::flat_hash_set<std::string>& require_type_urls) const;
+  absl::Status
+  validateProtoConfigTypeUrl(const std::string& type_url,
+                             const absl::flat_hash_set<std::string>& require_type_urls) const;
   // Return the config dump map key string for the corresponding ECDS filter type.
   virtual const std::string getConfigDumpType() const PURE;
 
@@ -549,24 +558,7 @@ private:
     }
   }
 
-  ProtobufTypes::MessagePtr dumpEcdsFilterConfigs(const Matchers::StringMatcher& name_matcher) {
-    auto config_dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
-    for (const auto& subscription : subscriptions_) {
-      const auto& ecds_filter = subscription.second.lock();
-      if (!ecds_filter || !ecds_filter->lastConfig() || !name_matcher.match(ecds_filter->name())) {
-        continue;
-      }
-      envoy::config::core::v3::TypedExtensionConfig filter_config;
-      filter_config.set_name(ecds_filter->name());
-      MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
-      auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
-      filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
-      filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
-      TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
-                                            *(filter_config_dump.mutable_last_updated()));
-    }
-    return config_dump;
-  }
+  ProtobufTypes::MessagePtr dumpEcdsFilterConfigs(const Matchers::StringMatcher& name_matcher);
 
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
@@ -594,8 +586,10 @@ public:
         absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
     provider_stat_prefix = subscription_stat_prefix;
 
-    auto subscription = getSubscription(config_source.config_source(), filter_config_name,
-                                        server_context, cluster_manager, subscription_stat_prefix);
+    auto subscription = THROW_OR_RETURN_VALUE(
+        getSubscription(config_source.config_source(), filter_config_name, server_context,
+                        cluster_manager, subscription_stat_prefix),
+        std::shared_ptr<FilterConfigSubscription>);
     // For warming, wait until the subscription receives the first response to indicate readiness.
     // Otherwise, mark ready immediately and start the subscription on initialization. A default
     // config is expected in the latter case.
@@ -626,7 +620,7 @@ public:
     if (config_source.apply_default_config_without_warming()) {
       factory_context.initManager().add(provider->initTarget());
     }
-    applyLastOrDefaultConfig(subscription, *provider, filter_config_name);
+    THROW_IF_NOT_OK(applyLastOrDefaultConfig(subscription, *provider, filter_config_name));
     return provider;
   }
 
@@ -664,7 +658,8 @@ protected:
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
     RETURN_IF_NOT_OK(validateProtoConfigDefaultFactory(
         default_factory == nullptr, filter_config_name, proto_config.type_url()));
-    validateProtoConfigTypeUrl(Config::Utility::getFactoryType(proto_config), require_type_urls);
+    RETURN_IF_NOT_OK(validateProtoConfigTypeUrl(Config::Utility::getFactoryType(proto_config),
+                                                require_type_urls))
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         proto_config, server_context.messageValidationVisitor(), *default_factory);
     validateFilters(filter_config_name, default_factory->name(), filter_chain_type,

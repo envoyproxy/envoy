@@ -42,7 +42,7 @@ public:
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
@@ -109,7 +109,7 @@ private:
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        runReferenceUpdateCallbacks(i, {}, {});
+        THROW_IF_NOT_OK(runReferenceUpdateCallbacks(i, {}, {}));
       }
     }
 
@@ -118,7 +118,7 @@ private:
                       uint64_t seed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
           ->update(matching_hosts, hosts_added, hosts_removed, seed);
-      runUpdateCallbacks(hosts_added, hosts_removed);
+      THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
     }
 
     // Thread aware LB if applicable.
@@ -171,7 +171,7 @@ public:
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
     }
-    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    StreamInfo::StreamInfo* requestStreamInfo() const override {
       return wrapped_->requestStreamInfo();
     }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
@@ -199,10 +199,7 @@ public:
     absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
     }
-
-    void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
-      wrapped_->setOrcaLoadReportCallbacks(callbacks);
-    }
+    void onAsyncHostSelection(Upstream::HostConstSharedPtr&&, std::string&&) override {}
 
   private:
     LoadBalancerContext* wrapped_;
@@ -224,7 +221,7 @@ private:
   class LbSubset {
   public:
     virtual ~LbSubset() = default;
-    virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) const PURE;
+    virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) const PURE;
     virtual void pushHost(uint32_t priority, HostSharedPtr host) PURE;
     virtual void finalize(uint32_t priority, uint64_t seed) PURE;
     virtual bool active() const PURE;
@@ -238,7 +235,7 @@ private:
         : subset_(subset_lb, locality_weight_aware, scale_locality_weight) {}
 
     // Subset
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) const override {
+    HostSelectionResponse chooseHost(LoadBalancerContext* context) const override {
       return subset_.lb_->chooseHost(context);
     }
     void pushHost(uint32_t priority, HostSharedPtr host) override {
@@ -249,32 +246,7 @@ private:
     }
     // Called after pushHost. Update subset by the hosts that pushed in the pushHost. If no any host
     // is pushed then subset_ will be set to empty.
-    void finalize(uint32_t priority, uint64_t seed) override {
-      while (host_sets_.size() <= priority) {
-        host_sets_.push_back({HostHashSet(), HostHashSet()});
-      }
-      auto& [old_hosts, new_hosts] = host_sets_[priority];
-
-      HostVector added;
-      HostVector removed;
-
-      for (const auto& host : old_hosts) {
-        if (new_hosts.count(host) == 0) {
-          removed.emplace_back(host);
-        }
-      }
-
-      for (const auto& host : new_hosts) {
-        if (old_hosts.count(host) == 0) {
-          added.emplace_back(host);
-        }
-      }
-
-      subset_.update(priority, new_hosts, added, removed, seed);
-
-      old_hosts.swap(new_hosts);
-      new_hosts.clear();
-    }
+    void finalize(uint32_t priority, uint64_t seed) override;
 
     bool active() const override { return !subset_.empty(); }
 
@@ -284,7 +256,7 @@ private:
 
   class SingleHostLbSubset : public LbSubset {
     // Subset
-    HostConstSharedPtr chooseHost(LoadBalancerContext*) const override { return subset_; }
+    HostSelectionResponse chooseHost(LoadBalancerContext*) const override { return subset_; }
     // This is called at most once for every update for single host subset.
     void pushHost(uint32_t priority, HostSharedPtr host) override {
       new_hosts_[priority] = std::move(host);

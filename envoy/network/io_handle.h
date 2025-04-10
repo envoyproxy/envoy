@@ -11,6 +11,8 @@
 #include "envoy/event/file_event.h"
 #include "envoy/network/address.h"
 
+#include "source/common/buffer/buffer_impl.h"
+
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
 
@@ -142,7 +144,7 @@ public:
     // The contents of the TOS byte in the IP header.
     uint8_t tos_{0};
     // UDP control message specified by save_cmsg_config in QUIC config.
-    Buffer::RawSlice saved_cmsg_;
+    Buffer::OwnedImpl saved_cmsg_;
   };
 
   /**
@@ -293,15 +295,15 @@ public:
 
   /**
    * Get local address (ip:port pair)
-   * @return local address as @ref Address::InstanceConstSharedPtr
+   * @return local address as @ref Address::InstanceConstSharedPtr or error status.
    */
-  virtual Address::InstanceConstSharedPtr localAddress() PURE;
+  virtual absl::StatusOr<Address::InstanceConstSharedPtr> localAddress() PURE;
 
   /**
    * Get peer's address (ip:port pair)
-   * @return peer's address as @ref Address::InstanceConstSharedPtr
+   * @return peer's address as @ref Address::InstanceConstSharedPtr or error status.
    */
-  virtual Address::InstanceConstSharedPtr peerAddress() PURE;
+  virtual absl::StatusOr<Address::InstanceConstSharedPtr> peerAddress() PURE;
 
   /**
    * Duplicates the handle. This is intended to be used only on listener sockets. (see man dup)

@@ -139,7 +139,7 @@ public:
 
   // Http::FilterChainFactory
   bool createFilterChain(
-      Http::FilterChainManager& manager, bool = false,
+      Http::FilterChainManager& manager,
       const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
   using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
@@ -155,7 +155,7 @@ public:
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
     return request_id_extension_;
   }
-  const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_log_on_tunnel_successfully_established_;
@@ -292,7 +292,7 @@ private:
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
-  std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   bool flush_log_on_tunnel_successfully_established_{false};
@@ -351,7 +351,7 @@ private:
   Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-  const LocalReply::LocalReplyPtr local_reply_;
+  LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
 
@@ -377,7 +377,7 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+  static absl::StatusOr<std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>>
   createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,

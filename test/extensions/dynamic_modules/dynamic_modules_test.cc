@@ -10,7 +10,7 @@ namespace Extensions {
 namespace DynamicModules {
 
 TEST(DynamicModuleTestGeneral, InvalidPath) {
-  absl::StatusOr<DynamicModuleSharedPtr> result = newDynamicModule("invalid_name", false);
+  absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
@@ -20,16 +20,16 @@ INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Val
 
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   std::string language = GetParam();
-  using GetSomeVariableFuncType = int (*)();
-  absl::StatusOr<DynamicModuleSharedPtr> module =
+  using GetSomeVariableFuncType = int (*)(void);
+  absl::StatusOr<DynamicModulePtr> module =
       newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_NE(getSomeVariable, nullptr);
-  EXPECT_EQ(getSomeVariable(), 1);
-  EXPECT_EQ(getSomeVariable(), 2);
-  EXPECT_EQ(getSomeVariable(), 3);
+  EXPECT_TRUE(getSomeVariable.ok());
+  EXPECT_EQ(getSomeVariable.value()(), 1);
+  EXPECT_EQ(getSomeVariable.value()(), 2);
+  EXPECT_EQ(getSomeVariable.value()(), 3);
 
   // Release the module, and reload it.
   module->reset();
@@ -40,10 +40,10 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   // This module must be reloaded and the variable must be reset.
   const auto getSomeVariable2 =
       (module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable"));
-  EXPECT_NE(getSomeVariable2, nullptr);
-  EXPECT_EQ(getSomeVariable2(), 1); // Start from 1 again.
-  EXPECT_EQ(getSomeVariable2(), 2);
-  EXPECT_EQ(getSomeVariable2(), 3);
+  EXPECT_TRUE(getSomeVariable2.ok());
+  EXPECT_EQ(getSomeVariable2.value()(), 1); // Start from 1 again.
+  EXPECT_EQ(getSomeVariable2.value()(), 2);
+  EXPECT_EQ(getSomeVariable2.value()(), 3);
 
   // Release the module, and reload it.
   module->reset();
@@ -53,30 +53,44 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   // This module must be the already loaded one, and the variable must be kept.
   const auto getSomeVariable3 =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_NE(getSomeVariable3, nullptr);
-  EXPECT_EQ(getSomeVariable3(), 4); // Start from 4.
+  EXPECT_TRUE(getSomeVariable3.ok());
+  EXPECT_EQ(getSomeVariable3.value()(), 4); // Start from 4.
 }
 
-TEST_P(DynamicModuleTestLanguages, LoadNoOp) {
-  std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> module =
-      newDynamicModule(testSharedObjectPath("no_op", language), false);
-  EXPECT_TRUE(module.ok());
+TEST(DynamicModuleTestLanguages, InitFunctionOnlyCalledOnce) {
+  const auto path = testSharedObjectPath("program_init_assert", "c");
+  absl::StatusOr<DynamicModulePtr> m1 = newDynamicModule(path, false);
+  EXPECT_TRUE(m1.ok());
+  // At this point, m1 is alive, so the init function should have been called.
+  // When creating a new module with the same path, the init function should not be called again.
+  absl::StatusOr<DynamicModulePtr> m2 = newDynamicModule(path, false);
+  EXPECT_TRUE(m2.ok());
+  m1->reset();
+  m2->reset();
+
+  // Even with the do_not_close=true, init function should only be called once.
+  m1 = newDynamicModule(path, true);
+  EXPECT_TRUE(m1.ok());
+  m1->reset(); // Closing the module, but the module is still alive in the process.
+  // This m2 should point to the same module as m1 whose handle is already freed, but
+  // the init function should not be called again.
+  m2 = newDynamicModule(path, true);
+  EXPECT_TRUE(m2.ok());
 }
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> result =
+  absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("no_program_init", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("undefined symbol: envoy_dynamic_module_on_program_init"));
+              testing::HasSubstr("Failed to resolve symbol envoy_dynamic_module_on_program_init"));
 }
 
 TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> result =
+  absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("program_init_fail", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
@@ -86,7 +100,7 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> result =
+  absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
@@ -101,14 +115,14 @@ TEST(CreateDynamicModulesByName, OK) {
           "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
       1);
 
-  absl::StatusOr<DynamicModuleSharedPtr> module = newDynamicModuleByName("no_op", false);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_TRUE(module.ok());
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
 TEST(CreateDynamicModulesByName, EnvVarNotSet) {
   // Without setting the search path, this should fail.
-  absl::StatusOr<DynamicModuleSharedPtr> module = newDynamicModuleByName("no_op", false);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(module.status().message(),

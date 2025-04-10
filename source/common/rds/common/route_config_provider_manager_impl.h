@@ -52,11 +52,13 @@ public:
               std::make_shared<Envoy::Config::OpaqueResourceDecoderImpl<RouteConfiguration>>(
                   factory_context.messageValidationContext().dynamicValidationVisitor(),
                   getNameFieldName());
-          auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-              std::move(config_update), std::move(resource_decoder), rds.config_source(),
-              rds.route_config_name(), manager_identifier, factory_context,
-              stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
-              absl::AsciiStrToUpper(getRdsName()), manager_);
+          auto subscription = THROW_OR_RETURN_VALUE(
+              RdsRouteConfigSubscription::create(
+                  std::move(config_update), std::move(resource_decoder), rds.config_source(),
+                  rds.route_config_name(), manager_identifier, factory_context,
+                  stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
+                  absl::AsciiStrToUpper(getRdsName()), manager_),
+              std::unique_ptr<RdsRouteConfigSubscription>);
           auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
                                                                        factory_context);
           return std::make_pair(provider, &provider->subscription().initTarget());
@@ -77,11 +79,12 @@ private:
   ConfigTraitsImpl<RouteConfiguration, ConfigImpl, NullConfigImpl> config_traits_;
   ProtoTraitsImpl<RouteConfiguration, 1> proto_traits_;
 
-  std::string getRdsName() { return Rds().GetDescriptor()->name(); }
+  std::string getRdsName() { return std::string(Rds().GetDescriptor()->name()); }
 
   std::string getNameFieldName() {
     ASSERT(RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber));
-    return RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber)->name();
+    return std::string(
+        RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber)->name());
   }
 };
 

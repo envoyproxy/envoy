@@ -70,6 +70,7 @@ envoy_extension_cc_test(
         "//source/extensions/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
+        "//source/extensions/filters/http/header_to_metadata:config",
         "//source/extensions/filters/http/rbac:config",
         "//source/extensions/key_value/file_based:config_lib",
         "//source/extensions/matching/http/cel_input:cel_input_lib",

@@ -10,6 +10,13 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "aligned_allocator_test",
+    srcs = ["aligned_allocator_test.cc"],
+    rbe_pool = "6gig",
+    deps = ["//source/common/memory:aligned_allocator_lib"],
+)
+
+envoy_cc_test(
     name = "debug_test",
     srcs = ["debug_test.cc"],
     rbe_pool = "6gig",

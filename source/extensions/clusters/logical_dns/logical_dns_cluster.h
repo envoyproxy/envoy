@@ -8,6 +8,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/empty_string.h"
@@ -41,8 +43,14 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
+  static absl::StatusOr<std::unique_ptr<LogicalDnsCluster>>
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+         ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
+
 protected:
   LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                    const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
                     ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
                     absl::Status& creation_status);
 

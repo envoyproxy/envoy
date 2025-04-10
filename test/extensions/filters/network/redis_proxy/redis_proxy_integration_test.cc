@@ -691,6 +691,9 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
     IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
     const std::string& auth_username, const std::string& auth_password) {
   redis_client->clearData();
+  if (fake_upstream_connection.get() != nullptr) {
+    fake_upstream_connection->clearData();
+  }
   ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(upstream, request, response, fake_upstream_connection,
@@ -713,6 +716,7 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     expect_auth_command = (!auth_password.empty());
     EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
   }
+
   if (expect_auth_command) {
     std::string auth_command = (auth_username.empty())
                                    ? makeBulkStringArray({"auth", auth_password})
@@ -876,13 +880,65 @@ TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
 
 // This test sends an invalid Redis command from a fake
 // downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, UnknownCommand) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'foo', with args beginning with: "
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"foo"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, UnknownCommandWithArgs) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, HelloCommand) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
 // with an invalid request error.
 
 TEST_P(RedisProxyIntegrationTest, InvalidRequest) {
   std::stringstream error_response;
   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"foo"}), error_response.str());
+  simpleProxyResponse(makeBulkStringArray({"keys"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an invalid request error.
+
+TEST_P(RedisProxyIntegrationTest, InvalidArgsRequest) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "wrong number of arguments for 'keys' command"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"keys", "a*", "b*"}), error_response.str());
 }
 
 // This test sends a simple Redis command to a fake upstream
@@ -1466,6 +1522,80 @@ TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
   redis_client->close();
 }
 
+TEST_P(RedisProxyIntegrationTest, UnwatchNoTransactionNoOp) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"unwatch"}), "+OK\r\n");
+}
+
+TEST_P(RedisProxyIntegrationTest, UnwatchWithTransactionNoOp) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client);
+
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchNoTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchUnrelatedTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  // MULTI will create a new connection, for the transaction.
+  FakeRawConnectionPtr fake_upstream_conn2;
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"multi"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn2, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client,
+                          fake_upstream_conn2, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  EXPECT_TRUE(fake_upstream_conn2->close());
+  redis_client->close();
+}
 // This test discards an empty transaction. The proxy responds
 // with an OK.
 
@@ -1479,17 +1609,31 @@ TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
   redis_client->close();
 }
 
-// This test tries to insert a multi-key command in a transaction, which is not
-// supported. The proxy responds with an error.
-
+// MultiKey commands are allowed to go through. The underlying server may fail with
+// CROSSSLOT or MOVED errors, and the client must handle it.
 TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
-  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"mget", "foo1", "foo2"}),
-                    "-'mget' command is not supported within transaction\r\n", redis_client);
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
 
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"del", "b"})));
+  expectUpstreamRequestResponse(upstream,
+                                makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"del", "b"}),
+                                "+QUEUED\r\n", fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "a"}),
+                          "-ERR MOVED 15495 0.0.0.0:6379\r\n", redis_client, fake_upstream_conn, "",
+                          "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "b", "a"}),
+                          "-ERR CROSSSLOT Keys in request don't hash to the same slot\r\n",
+                          redis_client, fake_upstream_conn, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
   redis_client->close();
 }
 

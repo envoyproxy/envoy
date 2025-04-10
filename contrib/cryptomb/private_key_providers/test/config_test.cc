@@ -5,7 +5,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
@@ -37,7 +37,8 @@ public:
   CryptoMbConfigTest() : api_(Api::createApiForTest(store_, time_system_)) {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(tls_));
-    ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+    ON_CALL(factory_context_.server_context_, sslContextManager())
+        .WillByDefault(ReturnRef(context_manager_));
     ON_CALL(context_manager_, privateKeyMethodManager())
         .WillByDefault(ReturnRef(private_key_method_manager_));
   }
@@ -48,7 +49,8 @@ public:
     Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
         cryptomb_private_key_method_factory(cryptomb_factory);
 
-    return factory_context_.sslContextManager()
+    return factory_context_.serverFactoryContext()
+        .sslContextManager()
         .privateKeyMethodManager()
         .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_);
   }

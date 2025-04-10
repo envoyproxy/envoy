@@ -145,9 +145,8 @@ TEST(IoSocketHandleImpl, NullptrIfaddrs) {
             return {0, 0};
           }));
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
-      .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
-        return {0, 0};
-      }));
+      .WillOnce(
+          Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {0, 0}; }));
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
   EXPECT_FALSE(maybe_interface_name.has_value());
@@ -177,6 +176,108 @@ TEST(IoSocketHandleImpl, ErrnoIfaddrs) {
   EXPECT_FALSE(maybe_interface_name.has_value());
 }
 
+TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillRepeatedly(Invoke([](int /*fd*/, msghdr* msg_hdr, int /*flags*/) {
+        msg_hdr->msg_iovlen = 1;
+        msg_hdr->msg_flags = 0;
+
+        sockaddr_in peer_address{};
+        peer_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        peer_address.sin_family = AF_INET;
+        peer_address.sin_port = htons(12345);
+        memcpy(msg_hdr->msg_name, &peer_address, sizeof(peer_address));
+        msg_hdr->msg_namelen = sizeof(peer_address);
+
+        struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(msg_hdr->msg_control);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SO_RXQ_OVFL;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+        uint32_t dropped = 5;
+        memcpy(CMSG_DATA(cmsg), &dropped, sizeof(uint32_t));
+        msg_hdr->msg_controllen = cmsg->cmsg_len;
+
+        return Api::SysCallSizeResult{1, 0};
+      }));
+
+  uint32_t dropped_packets = 0;
+
+  char buffer[128] = {};
+  Buffer::RawSlice slice{buffer, sizeof(buffer)};
+
+  Network::IoHandle::RecvMsgOutput output(1, &dropped_packets);
+
+  IoSocketHandleImpl io_handle;
+  auto result = io_handle.recvmsg(&slice, 1, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+  EXPECT_EQ(dropped_packets, 5);
+
+  result = io_handle.recvmsg(&slice, 1, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+
+  // Since the SO_RXQ_OVFL control message represents the number of dropped datagrams since socket
+  // creation It's expected to see the same value after the second recvmsg call.
+  EXPECT_EQ(dropped_packets, 5);
+}
+
+TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _))
+      .WillRepeatedly(Invoke([](int /*fd*/, mmsghdr* mmsg_hdr, unsigned int /*num*/, int /*flags*/,
+                                timespec* /*tp*/) {
+        mmsg_hdr[0].msg_len = 100;
+        mmsg_hdr[0].msg_hdr.msg_flags = 0;
+
+        sockaddr_in peer_address{};
+        peer_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        peer_address.sin_family = AF_INET;
+        peer_address.sin_port = htons(12345);
+        memcpy(mmsg_hdr[0].msg_hdr.msg_name, &peer_address, sizeof(peer_address));
+        mmsg_hdr[0].msg_hdr.msg_namelen = sizeof(peer_address);
+
+        struct cmsghdr* cmsg = reinterpret_cast<struct cmsghdr*>(mmsg_hdr[0].msg_hdr.msg_control);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SO_RXQ_OVFL;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+        uint32_t dropped = 5;
+        memcpy(CMSG_DATA(cmsg), &dropped, sizeof(uint32_t));
+        mmsg_hdr[0].msg_hdr.msg_controllen = cmsg->cmsg_len;
+
+        return Api::SysCallIntResult{1, 0};
+      }));
+
+  uint32_t dropped_packets = 0;
+
+  char buffer[128] = {};
+  Buffer::RawSlice slice{buffer, sizeof(buffer)};
+  RawSliceArrays slices = {{slice}};
+
+  Network::IoHandle::RecvMsgOutput output(slices.size(), &dropped_packets);
+
+  IoSocketHandleImpl io_handle;
+  auto result = io_handle.recvmmsg(slices, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+  EXPECT_EQ(output.msg_[0].msg_len_, 100);
+  EXPECT_EQ(dropped_packets, 5);
+
+  result = io_handle.recvmmsg(slices, 1111, IoHandle::UdpSaveCmsgConfig(), output);
+  EXPECT_EQ(result.return_value_, 1);
+  EXPECT_EQ(output.msg_[0].msg_len_, 100);
+
+  // Since the SO_RXQ_OVFL control message represents the number of dropped datagrams since socket
+  // creation It's expected to see the same value after the second recvmmsg call.
+  EXPECT_EQ(dropped_packets, 5);
+}
+
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -197,5 +298,89 @@ TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
 }
 
 } // namespace
+
+// This test wrapper is a friend class of IoSocketHandleImpl, so it has access to its private and
+// protected methods.
+class IoSocketHandleImplTestWrapper {
+public:
+  void runGetAddressTests(const int cache_size) {
+    IoSocketHandleImpl io_handle(-1, false, absl::nullopt, cache_size);
+
+    // New address.
+    sockaddr_storage ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1235", 51235);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1235]:51235");
+
+    // Access the first entry to test moving recently used entries in the cache.
+    ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+    // Access the last entry to test moving recently used entries in the cache.
+    ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1236", 51236);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1236]:51236");
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1237", 51237);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1237]:51237");
+
+    // Access the second entry to test moving recently used entries in the cache.
+    ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1238", 51238);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1238]:51238");
+    // New address.
+    ss = Test::getV4SockAddr("213.0.113.101", 50234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.101:50234");
+    ss = Test::getV4SockAddr("213.0.113.102", 50235);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.102:50235");
+    ss = Test::getV4SockAddr("213.0.113.103", 50236);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.103:50236");
+
+    // Access a middle entry.
+    ss = Test::getV4SockAddr("213.0.113.101", 50234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.101:50234");
+  }
+};
+
+TEST(IoSocketHandleImpl, GetOrCreateEnvoyAddressInstance) {
+  IoSocketHandleImplTestWrapper wrapper;
+
+  // No cache.
+  wrapper.runGetAddressTests(/*cache_size=*/0);
+
+  // Cache size 1.
+  wrapper.runGetAddressTests(/*cache_size=*/1);
+
+  // Cache size 3.
+  wrapper.runGetAddressTests(/*cache_size=*/3);
+
+  // Cache size 4.
+  wrapper.runGetAddressTests(/*cache_size=*/4);
+
+  // Cache size 6.
+  wrapper.runGetAddressTests(/*cache_size=*/6);
+
+  // Cache size 10.
+  wrapper.runGetAddressTests(/*cache_size=*/10);
+}
+
 } // namespace Network
 } // namespace Envoy

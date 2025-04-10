@@ -178,6 +178,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/grpc:context_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",
@@ -196,6 +197,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
+        "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

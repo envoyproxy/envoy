@@ -250,6 +250,7 @@ public:
                const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info),
               (const));
+  MOCK_METHOD(bool, applyOnStreamDone, (), (const));
 
   uint64_t stage_{};
   std::string disable_key_;
@@ -650,10 +651,10 @@ public:
   MOCK_METHOD(OptRef<const Network::Connection>, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
-  MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
-  MOCK_METHOD(void, decode1xxHeaders, (Http::ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr&&));
+  MOCK_METHOD(void, decode1xxHeaders, (Http::ResponseHeaderMapPtr&&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
-  MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+  MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr&&));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));

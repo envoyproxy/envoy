@@ -38,6 +38,9 @@ public:
     return result;
   }
 
+  // CompiledMatcher
+  const std::string& pattern() const override { return regex_.pattern(); }
+
 protected:
   explicit CompiledGoogleReMatcher(const std::string& regex) : regex_(regex, re2::RE2::Quiet) {
     ENVOY_BUG(regex_.ok(), "Invalid regex");
@@ -86,14 +89,14 @@ enum class Type { Re2, StdRegex };
 class Utility {
 public:
   template <class RegexMatcherType>
-  static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher, Engine& engine) {
+  static absl::StatusOr<CompiledMatcherPtr> parseRegex(const RegexMatcherType& matcher,
+                                                       Engine& engine) {
     // Fallback deprecated engine type in regex matcher.
     if (matcher.has_google_re2()) {
-      return THROW_OR_RETURN_VALUE(CompiledGoogleReMatcher::create(matcher),
-                                   std::unique_ptr<CompiledGoogleReMatcher>);
+      return CompiledGoogleReMatcher::create(matcher);
     }
 
-    return THROW_OR_RETURN_VALUE(engine.matcher(matcher.regex()), CompiledMatcherPtr);
+    return engine.matcher(matcher.regex());
   }
 };
 

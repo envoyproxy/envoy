@@ -48,8 +48,10 @@ TEST(ReverseBridgeFilterFactoryTest, ReverseBridgeFilterRouteSpecificConfig) {
   cfg.set_disabled(true);
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      config_factory.createRouteSpecificFilterConfig(*proto_config, factory_context,
-                                                     ProtobufMessage::getNullValidationVisitor());
+      config_factory
+          .createRouteSpecificFilterConfig(*proto_config, factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   EXPECT_TRUE(route_config.get());
 
   const auto* inflated = dynamic_cast<const FilterConfigPerRoute*>(route_config.get());

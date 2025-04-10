@@ -320,7 +320,7 @@ envoy_cc_test(
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:test_runtime_lib",
@@ -397,7 +397,7 @@ envoy_cc_test(
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/tls:context_config_lib",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
@@ -423,6 +423,24 @@ envoy_cc_test(
     deps = [
         "//source/common/quic:cert_compression_lib",
         "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "connection_id_matchers",
+    hdrs = ["connection_id_matchers.h"],
+    deps = ["//test/mocks/network:network_mocks"],
+)
+
+envoy_cc_test(
+    name = "envoy_deterministic_connection_id_generator_test",
+    srcs = ["envoy_deterministic_connection_id_generator_test.cc"],
+    rbe_pool = "6gig",
+    tags = ["nofips"],
+    deps = [
+        ":connection_id_matchers",
+        "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 

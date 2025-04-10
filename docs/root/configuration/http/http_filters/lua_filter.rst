@@ -52,21 +52,12 @@ Configuration
 A simple example of configuring Lua HTTP filter that contains only :ref:`default source code
 <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>` is as follow:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.lua
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    default_source_code:
-      inline_string: |
-        -- Called on the request path.
-        function envoy_on_request(request_handle)
-          -- Do something.
-        end
-        -- Called on the response path.
-        function envoy_on_response(response_handle)
-          -- Do something.
-        end
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 34-46
+    :lineno-start: 34
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
 By default, Lua script defined in ``default_source_code`` will be treated as a ``default`` script. Envoy will
 execute it for every HTTP request. This ``default`` script is optional.
@@ -88,62 +79,49 @@ LuaPerRoute provides two ways of overriding the ``default`` Lua script:
 
 As a concrete example, given the following Lua filter configuration:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.lua
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    default_source_code:
-      inline_string:
-        function envoy_on_request(request_handle)
-          -- do something
-        end
-    source_codes:
-      hello.lua:
-        inline_string: |
-          function envoy_on_request(request_handle)
-            request_handle:logInfo("Hello World.")
-          end
-      bye.lua:
-        inline_string: |
-          function envoy_on_response(response_handle)
-            response_handle:logInfo("Bye Bye.")
-          end
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 58-76
+    :lineno-start: 58
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the
 :ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration as
 follow:
 
-.. code-block:: yaml
-
-  typed_per_filter_config:
-    envoy.filters.http.lua:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-      disabled: true
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 31-34
+    :lineno-start: 31
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
 The ``default`` Lua script will be overridden by the referenced script:
 
-.. code-block:: yaml
-
-  typed_per_filter_config:
-    envoy.filters.http.lua:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-      name: hello.lua
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 40-43
+    :lineno-start: 40
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``default``
 Lua script as follows:
 
-.. code-block:: yaml
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 49-56
+    :lineno-start: 49
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
-  typed_per_filter_config:
-    envoy.filters.http.lua:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-      source_code:
-        inline_string: |
-          function envoy_on_response(response_handle)
-            response_handle:logInfo("Goodbye.")
-          end
+Upstream Filter
+---------------
+
+The lua filter can be used as an upstream filter. Upstream filters cannot clear the route cache (as
+routing decision has already been made). Clearing the route cache will be a no-op in this case.
 
 Statistics
 ----------
@@ -278,7 +256,7 @@ Or, through ``bodyChunks()`` API, which let Envoy to skip buffering the upstream
 Complete example
 ----------------
 
-A complete example using Docker is available in :repo:`/examples/lua`.
+A complete example using Docker is available in `here <https://github.com/envoyproxy/examples/tree/main/lua>`__.
 
 Stream handle API
 -----------------
@@ -307,8 +285,8 @@ response API.
 
 The following methods on the stream handle are supported:
 
-headers()
-^^^^^^^^^
+``headers()``
+^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -321,8 +299,8 @@ situation.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
-body()
-^^^^^^
+``body()``
+^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -339,8 +317,8 @@ original body exists or not.
 
 Returns a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
-bodyChunks()
-^^^^^^^^^^^^
+``bodyChunks()``
+^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -358,8 +336,8 @@ used by a script to inspect data as it is streaming by.
 
 Each chunk the iterator returns is a :ref:`buffer object <config_http_filters_lua_buffer_wrapper>`.
 
-trailers()
-^^^^^^^^^^
+``trailers()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -372,22 +350,10 @@ to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
-log*()
-^^^^^^
+.. include:: ../../../_include/lua_common.rst
 
-.. code-block:: lua
-
-  handle:logTrace(message)
-  handle:logDebug(message)
-  handle:logInfo(message)
-  handle:logWarn(message)
-  handle:logErr(message)
-  handle:logCritical(message)
-
-Logs a message using Envoy's application logging. *message* is a string to log.
-
-httpCall()
-^^^^^^^^^^
+``httpCall()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -477,8 +443,8 @@ Some examples of specifying *options* are shown below:
   local request_options = {["asynchronous"] = false, ["trace_sampled"] = false, ["timeout_ms"] = 1000 }
 
 
-respond()
-^^^^^^^^^^
+``respond()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -502,31 +468,28 @@ passed to subsequent filters. Meaning, the following Lua code is invalid:
 Note that the *:status* header must be set. *body* is a string and supplies the optional response
 body. May be nil.
 
-metadata()
-^^^^^^^^^^
+``metadata()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
   local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
+under the filter name i.e. ``envoy.filters.http.lua``. Below is an example of a ``metadata`` in a
 :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
-.. code-block:: yaml
-
-  metadata:
-    filter_metadata:
-      envoy.filters.http.lua:
-        foo: bar
-        baz:
-          - bad
-          - baz
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 26-32
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
-streamInfo()
-^^^^^^^^^^^^^
+``streamInfo()``
+^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -536,8 +499,8 @@ Returns :repo:`information <envoy/stream_info/stream_info.h>` related to the cur
 
 Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 
-connection()
-^^^^^^^^^^^^
+``connection()``
+^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -547,8 +510,8 @@ Returns the current request's underlying :repo:`connection <envoy/network/connec
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
-connectionStreamInfo()
-^^^^^^^^^^^^^^^^^^^^^^
+``connectionStreamInfo()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -558,8 +521,64 @@ Returns connection-level :repo:`information <envoy/stream_info/stream_info.h>` r
 
 Returns a connection-level :ref:`stream info object <config_http_filters_lua_cx_stream_info_wrapper>`.
 
-importPublicKey()
-^^^^^^^^^^^^^^^^^
+``setUpstreamOverrideHost()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  handle:setUpstreamOverrideHost(host, strict)
+
+Sets an upstream address override for the request. When the overridden host is available and can be selected directly,
+the load balancer bypasses its algorithm and routes traffic directly to the specified host. The strict flag determines
+whether the HTTP request must strictly use the overridden destination. If the destination is unavailable and strict is
+set to true, Envoy responds with a 503 Service Unavailable error.
+
+The function takes two arguments:
+
+* ``host`` (string): The upstream host address to use for the request. This must be a valid IP address; otherwise, the
+  Lua script will throw an error.
+* ``strict`` (boolean, optional): Determines whether the HTTP request must be strictly routed to the requested
+  destination. When set to ``true``, if the requested destination is unavailable, Envoy will return a 503 status code.
+  The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
+  requested destination is not found, the request will be routed according to the load balancing algorithm.
+
+Example:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Override upstream host without strict mode
+    request_handle:setUpstreamOverrideHost("192.168.21.13", false)
+
+    -- Override upstream host with strict mode
+    request_handle:setUpstreamOverrideHost("192.168.21.13", true)
+  end
+
+.. _config_http_filters_lua_stream_handle_api_clear_route_cache:
+
+``clearRouteCache()``
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  handle:clearRouteCache()
+
+To clear the route cache for the current request. This will force the route to be recomputed. If you
+updated the request headers, metadata, or other information that affects the route and expect the route
+to be recomputed, you can call this function to clear the route cache. Then the route will be recomputed
+when the route is accessed next time.
+
+Example:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Clear the route cache
+    request_handle:clearRouteCache()
+  end
+
+``importPublicKey()``
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -569,8 +588,8 @@ Returns public key which is used by :ref:`verifySignature <verify_signature>` to
 
 .. _verify_signature:
 
-verifySignature()
-^^^^^^^^^^^^^^^^^
+``verifySignature()``
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -586,16 +605,16 @@ which means signature is verified; otherwise, the second element will store the 
 
 .. _config_http_filters_lua_stream_handle_api_base64_escape:
 
-base64Escape()
-^^^^^^^^^^^^^^
+``base64Escape()``
+^^^^^^^^^^^^^^^^^^
 .. code-block:: lua
 
   local base64_encoded = handle:base64Escape("input string")
 
 Encodes the input string as base64. This can be useful for escaping binary data.
 
-timestamp()
-^^^^^^^^^^^
+``timestamp()``
+^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -607,8 +626,8 @@ The function returns timestamp in milliseconds since epoch by default if format 
 
 .. _config_http_filters_lua_stream_handle_api_timestamp_string:
 
-timestampString()
-^^^^^^^^^^^^^^^^^
+``timestampString()``
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -624,8 +643,10 @@ Default resolution is millisecond if *resolution* is not set.
 Header object API
 -----------------
 
-add()
-^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``add()``
+^^^^^^^^^
 
 .. code-block:: lua
 
@@ -634,8 +655,8 @@ add()
 Adds a header. *key* is a string that supplies the header key. *value* is a string that supplies
 the header value.
 
-get()
-^^^^^
+``get()``
+^^^^^^^^^
 
 .. code-block:: lua
 
@@ -645,8 +666,8 @@ Gets a header. *key* is a string that supplies the header key. Returns a string 
 value or nil if there is no such header. If there are multiple headers in the same case-insensitive
 key, their values will be combined with a *,* separator and returned as a string.
 
-getAtIndex()
-^^^^^^^^^^^^
+``getAtIndex()``
+^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -657,8 +678,8 @@ given header has multiple values. *key* is a string that supplies the header key
 an integer that supplies the position. It returns a string that is the header value or nil if
 there is no such header or if there is no value at the specified index.
 
-getNumValues()
-^^^^^^^^^^^^^^
+``getNumValues()``
+^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -668,8 +689,8 @@ Gets the number of values of a given header. It can be used to fetch the total n
 the given header has multiple values. *key* is a string that supplies the header key. It returns
 an integer with the value size for the given header or *0* if there is no such header.
 
-__pairs()
-^^^^^^^^^
+``__pairs()``
+^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -685,8 +706,8 @@ that supplies the header value.
   it is necessary to modify headers after an iteration, the iteration must first be completed. This means that
   ``break`` or any other way to exit the loop early must not be used. This may be more flexible in the future.
 
-remove()
-^^^^^^^^
+``remove()``
+^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -694,8 +715,8 @@ remove()
 
 Removes a header. *key* supplies the header key to remove.
 
-replace()
-^^^^^^^^^
+``replace()``
+^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -704,8 +725,8 @@ replace()
 Replaces a header. *key* is a string that supplies the header key. *value* is a string that supplies
 the header value. If the header does not exist, it is added as per the *add()* function.
 
-setHttp1ReasonPhrase()
-^^^^^^^^^^^^^^^^^^^^^^
+``setHttp1ReasonPhrase()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -720,8 +741,10 @@ effects HTTP/1 connections. It will have no effect if the client is HTTP/2 or HT
 Buffer API
 ----------
 
-length()
-^^^^^^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``length()``
+^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -729,8 +752,8 @@ length()
 
 Gets the size of the buffer in bytes. Returns an integer.
 
-getBytes()
-^^^^^^^^^^
+``getBytes()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -743,8 +766,8 @@ less than the buffer length.
 
 .. _config_http_filters_lua_buffer_wrapper_api_set_bytes:
 
-setBytes()
-^^^^^^^^^^
+``setBytes()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -757,8 +780,10 @@ Set the content of wrapped buffer with the input string.
 Metadata object API
 -------------------
 
-get()
-^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``get()``
+^^^^^^^^^
 
 .. code-block:: lua
 
@@ -768,8 +793,8 @@ Gets a metadata. *key* is a string that supplies the metadata key. Returns the c
 value of the given metadata key. The type of the value can be: *nil*, *boolean*, *number*,
 *string* and *table*.
 
-__pairs()
-^^^^^^^^^
+``__pairs()``
+^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -784,8 +809,10 @@ key. *value* is a *metadata* entry value.
 Stream info object API
 -----------------------
 
-protocol()
-^^^^^^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``protocol()``
+^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -794,8 +821,61 @@ protocol()
 Returns the string representation of :repo:`HTTP protocol <envoy/http/protocol.h>`
 used by the current request. The possible values are: ``HTTP/1.0``, ``HTTP/1.1``, ``HTTP/2`` and ``HTTP/3*``.
 
-downstreamLocalAddress()
+.. _config_http_filters_lua_stream_info_route_name:
+
+``routeName()``
+^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:routeName()
+
+Returns the name of the route matched by the filter chain. Returns an empty string if no route was matched.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local route_name = request_handle:streamInfo():routeName()
+    request_handle:logInfo("Matched route: " .. route_name)
+  end
+
+.. _config_http_filters_lua_stream_info_virtual_cluster_name:
+
+``virtualClusterName()``
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:virtualClusterName()
+
+Returns the name of the virtual cluster matched for the current request. Returns an empty string if no virtual cluster
+was matched.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local virtual_cluster = request_handle:streamInfo():virtualClusterName()
+    request_handle:logInfo("Matched virtual cluster: " .. virtual_cluster)
+  end
+
+.. _config_http_filters_lua_stream_info_downstream_direct_local_address:
+
+``downstreamDirectLocalAddress()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamDirectLocalAddress()
+
+Returns the string representation of :repo:`downstream direct local address <envoy/stream_info/stream_info.h>`
+used by the current request. This is always the physical local address of the connection.
+
+``downstreamLocalAddress()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -806,8 +886,8 @@ used by the current request.
 
 .. _config_http_filters_lua_stream_info_downstream_direct_remote_address:
 
-downstreamDirectRemoteAddress()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``downstreamDirectRemoteAddress()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -818,8 +898,8 @@ used by the current request. This is equivalent to the address of the physical c
 
 .. _config_http_filters_lua_stream_info_downstream_remote_address:
 
-downstreamRemoteAddress()
-^^^^^^^^^^^^^^^^^^^^^^^^^
+``downstreamRemoteAddress()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -829,8 +909,8 @@ Returns the string representation of the downstream remote address for the curre
 :ref:`downstreamDirectRemoteAddress() <config_http_filters_lua_stream_info_downstream_direct_remote_address>` depending upon the setting of
 :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
 
-dynamicMetadata()
-^^^^^^^^^^^^^^^^^
+``dynamicMetadata()``
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -838,8 +918,8 @@ dynamicMetadata()
 
 Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
-downstreamSslConnection()
-^^^^^^^^^^^^^^^^^^^^^^^^^
+``downstreamSslConnection()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -851,8 +931,8 @@ Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_s
 
 .. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
-requestedServerName()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``requestedServerName()``
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -866,8 +946,10 @@ Returns the string representation of :repo:`requested server name <envoy/stream_
 Connection stream info object API
 ---------------------------------
 
-dynamicMetadata()
-^^^^^^^^^^^^^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``dynamicMetadata()``
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -878,8 +960,10 @@ Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dyn
 Dynamic metadata object API
 ---------------------------
 
-get()
-^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``get()``
+^^^^^^^^^
 
 .. code-block:: lua
 
@@ -891,8 +975,8 @@ get()
 Gets an entry in dynamic metadata struct. *filterName* is a string that supplies the filter name, e.g. *envoy.lb*.
 Returns the corresponding *table* of a given *filterName*.
 
-set()
-^^^^^
+``set()``
+^^^^^^^^^
 
 .. code-block:: lua
 
@@ -919,8 +1003,8 @@ its keys can only be *string* or *numeric*.
   end
 
 
-__pairs()
-^^^^^^^^^
+``__pairs()``
+^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -935,8 +1019,10 @@ key. *value* is a *dynamicMetadata* entry value.
 Connection object API
 ---------------------
 
-ssl()
-^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``ssl()``
+^^^^^^^^^
 
 .. code-block:: lua
 
@@ -956,8 +1042,10 @@ Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_
 SSL connection object API
 -------------------------
 
-peerCertificatePresented()
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``peerCertificatePresented()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -967,8 +1055,8 @@ peerCertificatePresented()
 
 Returns a bool representing whether the peer certificate is presented.
 
-peerCertificateValidated()
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+``peerCertificateValidated()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -988,8 +1076,8 @@ Returns bool whether the peer certificate was validated.
    setting both :ref:`disable_stateless_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
    and :ref:`disable_stateful_session_resumption <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>` on the DownstreamTlsContext.
 
-uriSanLocalCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^
+``uriSanLocalCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1002,8 +1090,8 @@ uriSanLocalCertificate()
 Returns the URIs (as a table) in the SAN field of the local certificate. Returns an empty table if
 there is no local certificate, or no SAN field, or no URI SAN entries.
 
-sha256PeerCertificateDigest()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``sha256PeerCertificateDigest()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1012,8 +1100,8 @@ sha256PeerCertificateDigest()
 Returns the SHA256 digest of the peer certificate. Returns ``""`` if there is no peer certificate
 which can happen in TLS (non-mTLS) connections.
 
-serialNumberPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``serialNumberPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1022,8 +1110,8 @@ serialNumberPeerCertificate()
 Returns the serial number field of the peer certificate. Returns ``""`` if there is no peer
 certificate, or no serial number.
 
-issuerPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^
+``issuerPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1032,8 +1120,8 @@ issuerPeerCertificate()
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
 
-subjectPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^
+``subjectPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1042,8 +1130,8 @@ subjectPeerCertificate()
 Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no subject.
 
-parsedSubjectPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``parsedSubjectPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1058,8 +1146,8 @@ certificate. Returns nil if there is no peer certificate.
 
 Returns a :ref:`parsed name object <config_http_filters_lua_parsed_name>`.
 
-uriSanPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^
+``uriSanPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1068,8 +1156,8 @@ uriSanPeerCertificate()
 Returns the URIs (as a table) in the SAN field of the peer certificate. Returns an empty table if
 there is no peer certificate, or no SAN field, or no URI SAN entries.
 
-subjectLocalCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^
+``subjectLocalCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1078,8 +1166,8 @@ subjectLocalCertificate()
 Returns the subject field of the local certificate in RFC 2253 format. Returns ``""`` if there is no
 local certificate, or no subject.
 
-urlEncodedPemEncodedPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``urlEncodedPemEncodedPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1088,8 +1176,8 @@ urlEncodedPemEncodedPeerCertificate()
 Returns the URL-encoded PEM-encoded representation of the peer certificate. Returns ``""`` if there
 is no peer certificate or encoding fails.
 
-urlEncodedPemEncodedPeerCertificateChain()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``urlEncodedPemEncodedPeerCertificateChain()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1098,8 +1186,8 @@ urlEncodedPemEncodedPeerCertificateChain()
 Returns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
 leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
 
-dnsSansPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^
+``dnsSansPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1108,8 +1196,8 @@ dnsSansPeerCertificate()
 Returns the DNS entries (as a table) in the SAN field of the peer certificate. Returns an empty
 table if there is no peer certificate, or no SAN field, or no DNS SAN entries.
 
-dnsSansLocalCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^
+``dnsSansLocalCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1118,8 +1206,8 @@ dnsSansLocalCertificate()
 Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
 table if there is no local certificate, or no SAN field, or no DNS SAN entries.
 
-oidsPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^
+``oidsPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1129,8 +1217,8 @@ Returns the string representation of OIDs (as a table) from the peer certificate
 reading the OID strings from the certificate, not the extension values associated with OIDs.
 Returns an empty table if there is no peer certificate or no OIDs.
 
-oidsLocalCertificate()
-^^^^^^^^^^^^^^^^^^^^^^
+``oidsLocalCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1140,8 +1228,8 @@ Returns the string representation of OIDs (as a table) from the local certificat
 reading the OID strings from the certificate, not the extension values associated with OIDs.
 Returns an empty table if there is no local certificate or no OIDs.
 
-validFromPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+``validFromPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1152,8 +1240,8 @@ be considered valid from. Returns ``0`` if there is no peer certificate.
 
 In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
 
-expirationPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``expirationPeerCertificate()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1164,8 +1252,8 @@ be considered valid after. Returns ``0`` if there is no peer certificate.
 
 In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
 
-sessionId()
-^^^^^^^^^^^
+``sessionId()``
+^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1173,8 +1261,8 @@ sessionId()
 
 Returns the hex-encoded TLS session ID as defined in RFC 5246.
 
-ciphersuiteId()
-^^^^^^^^^^^^^^^^
+``ciphersuiteId()``
+^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1183,8 +1271,8 @@ ciphersuiteId()
 Returns the standard ID (hex-encoded) for the ciphers used in the established TLS connection.
 Returns ``"0xffff"`` if there is no current negotiated ciphersuite.
 
-ciphersuiteString()
-^^^^^^^^^^^^^^^^^^^
+``ciphersuiteString()``
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1193,8 +1281,8 @@ ciphersuiteString()
 Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns
 ``""`` if there is no current negotiated ciphersuite.
 
-tlsVersion()
-^^^^^^^^^^^^
+``tlsVersion()``
+^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1207,8 +1295,10 @@ Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS con
 Parsed name object API
 ----------------------
 
-commonName()
-^^^^^^^^^^^^
+.. include:: ../../../_include/lua_common.rst
+
+``commonName()``
+^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1217,8 +1307,8 @@ commonName()
 Returns the string representation of CN field from the X.509 name. Returns ``""`` if there is no such
 field or if the field can't be converted to UTF8 string.
 
-organizationName()
-^^^^^^^^^^^^^^^^^^
+``organizationName()``
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 

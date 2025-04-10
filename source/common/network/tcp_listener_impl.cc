@@ -87,8 +87,12 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
 
     // Get the local address from the new socket if the listener is listening on IP ANY
     // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
-    const Address::InstanceConstSharedPtr& local_address =
-        local_address_ ? local_address_ : io_handle->localAddress();
+    Address::InstanceConstSharedPtr local_address = local_address_;
+    if (!local_address) {
+      auto address_or_error = io_handle->localAddress();
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      local_address = std::move(address_or_error.value());
+    }
 
     // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
     // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
@@ -100,12 +104,14 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
 
     Address::InstanceConstSharedPtr remote_address;
     if (remote_addr.ss_family == AF_UNIX) {
-      remote_address = io_handle->peerAddress();
+      auto address_or_error = io_handle->peerAddress();
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      remote_address = std::move(address_or_error.value());
     } else {
       auto address_or_error = Address::addressFromSockAddr(
           remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
       RETURN_IF_NOT_OK_REF(address_or_error.status());
-      remote_address = *address_or_error;
+      remote_address = std::move(address_or_error.value());
     }
 
     cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,

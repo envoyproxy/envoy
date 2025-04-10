@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
@@ -21,6 +23,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -34,6 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -73,4 +77,32 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "expr_context_benchmark",
+    srcs = ["expr_context_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:filter_state_dst_address_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+        "//source/extensions/filters/common/expr:cel_state_lib",
+        "//source/extensions/filters/common/expr:context_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "expr_context_benchmark_test",
+    benchmark_binary = "expr_context_benchmark",
 )

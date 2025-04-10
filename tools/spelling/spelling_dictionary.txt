@@ -28,11 +28,15 @@ BEL
 BBR
 BIDIRECTIONAL
 CCL
+CGROUP
+CROSSSLOT
 ECN
 ECS
 EKS
+Millicores
 NID
 NIST
+NORMALISATION
 bm
 BSON
 BPF
@@ -41,6 +45,7 @@ Bencoded
 CIO
 cbegin
 cend
+constness
 deadcode
 DFP
 Dynatrace
@@ -236,6 +241,7 @@ IANA
 IDL
 IETF
 IFADDRS
+IMUsed
 INADDR
 INET
 INVAL
@@ -313,7 +319,10 @@ NODATA
 NODELAY
 NODELETE
 NOLINT
+NOLINTBEGIN
+NOLINTEND
 NOLINTNEXTLINE
+NOLOAD
 NONAME
 NONBLOCK
 NONCES
@@ -329,6 +338,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+msan
 mutators
 mybucket
 myobject
@@ -357,6 +367,7 @@ PEM
 PERF
 PGV
 PID
+PKCE
 PKCS12
 PKTINFO
 PNG
@@ -432,7 +443,9 @@ SPD
 SPDY
 SPIFFE
 SPKI
+SQE
 SQL
+SQPOLL
 SR
 SRCDIR
 SRDS
@@ -633,6 +646,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
@@ -940,6 +954,8 @@ lightstep
 linearization
 linearize
 linearized
+linkability
+linkable
 linux
 livelock
 llvm
@@ -1051,7 +1067,6 @@ oneof
 oneway
 oob
 opcode
-opencensus
 openssl
 opentracing
 optimizations
@@ -1097,6 +1112,7 @@ plaintext
 pluggable
 pointee
 poller
+polymorphism
 popen
 pos
 posix
@@ -1199,6 +1215,10 @@ regexes
 reified
 reify
 reimplements
+reinitialization
+reinitializations
+reinitialize
+reinitializes
 rele
 releasor
 reloadable
@@ -1448,6 +1468,7 @@ upvalue
 uring
 urlencoded
 urls
+useragent
 userdata
 userinfo
 username

@@ -8,6 +8,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "quiche/quic/core/quic_ack_listener_interface.h"
+#include "quiche/quic/platform/api/quic_flags.h"
 
 namespace Envoy {
 namespace Quic {
@@ -19,7 +20,11 @@ public:
   explicit QuicStatsGatherer(Envoy::TimeSource* time_source) : time_source_(time_source) {}
   ~QuicStatsGatherer() override {
     if (!logging_done_) {
-      maybeDoDeferredLog(false);
+      if (notify_ack_listener_before_soon_to_be_destroyed_) {
+        ENVOY_LOG_MISC(error, "Stream destroyed without logging.");
+      } else {
+        maybeDoDeferredLog(false);
+      }
     }
   }
 
@@ -35,8 +40,8 @@ public:
   // Log this stream using available stream info and access loggers.
   void maybeDoDeferredLog(bool record_ack_timing = true);
   // Set list of pointers to access loggers.
-  void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
-    access_log_handlers_ = handlers;
+  void setAccessLogHandlers(AccessLog::InstanceSharedPtrVector handlers) {
+    access_log_handlers_ = std::move(handlers);
   }
   // Set headers, trailers, and stream info used for deferred logging.
   void
@@ -51,11 +56,14 @@ public:
   }
   bool loggingDone() { return logging_done_; }
   uint64_t bytesOutstanding() { return bytes_outstanding_; }
+  bool notify_ack_listener_before_soon_to_be_destroyed() const {
+    return notify_ack_listener_before_soon_to_be_destroyed_;
+  }
 
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
+  AccessLog::InstanceSharedPtrVector access_log_handlers_{};
   Http::RequestHeaderMapConstSharedPtr request_header_map_;
   Http::ResponseHeaderMapConstSharedPtr response_header_map_;
   Http::ResponseTrailerMapConstSharedPtr response_trailer_map_;
@@ -65,6 +73,10 @@ private:
   bool logging_done_ = false;
   uint64_t retransmitted_packets_ = 0;
   uint64_t retransmitted_bytes_ = 0;
+
+  const bool notify_ack_listener_before_soon_to_be_destroyed_{
+      GetQuicReloadableFlag(quic_notify_ack_listener_earlier) &&
+      GetQuicReloadableFlag(quic_notify_stream_soon_to_destroy)};
 };
 
 } // namespace Quic

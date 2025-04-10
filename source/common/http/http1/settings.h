@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Http {
@@ -13,9 +14,11 @@ namespace Http1 {
  * envoy::config::core::v3::Http1ProtocolOptions config.
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
+                                 Server::Configuration::CommonFactoryContext& context,
                                  ProtobufMessage::ValidationVisitor& validation_visitor);
 
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
+                                 Server::Configuration::CommonFactoryContext& context,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const ProtobufWkt::BoolValue& hcm_stream_error,
                                  bool validate_scheme);

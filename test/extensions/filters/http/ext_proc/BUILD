@@ -39,18 +39,22 @@ envoy_extension_cc_test(
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
     rbe_pool = "2core",
+    shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
         ":utils_lib",
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
+        "//envoy/registry",
         "//source/common/http:context_lib",
         "//source/common/http:rds_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
         "//test/common/http:common_lib",
         "//test/common/http:conn_manager_impl_test_base_lib",
         "//test/mocks/event:event_mocks",
@@ -60,7 +64,10 @@ envoy_extension_cc_test(
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -181,12 +188,15 @@ envoy_extension_cc_test(
         ":tracer_test_filter_lib",
         ":utils_lib",
         "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:common_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -196,6 +206,33 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_proc_misc_test",
+    srcs = ["ext_proc_misc_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+    ],
+    rbe_pool = "2core",
+    tags = ["skip_on_windows"],
+    deps = [
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
 
@@ -252,7 +289,7 @@ envoy_extension_cc_test_library(
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
-        "//source/extensions/filters/http/ext_proc:client_interface",
+        "//source/extensions/filters/http/ext_proc:client_lib",
     ],
 )
 
@@ -264,7 +301,14 @@ envoy_extension_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -158,20 +158,7 @@ protected:
     return per_priority_load_.degraded_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
-  uint64_t random(bool peeking) {
-    if (peeking) {
-      stashed_random_.push_back(random_.random());
-      return stashed_random_.back();
-    } else {
-      if (!stashed_random_.empty()) {
-        auto random = stashed_random_.front();
-        stashed_random_.pop_front();
-        return random;
-      } else {
-        return random_.random();
-      }
-    }
-  }
+  uint64_t random(bool peeking);
 
   ClusterLbStats& stats_;
   Runtime::Loader& runtime_;
@@ -237,7 +224,7 @@ class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 public:
   using LocalityLbConfig = envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig;
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
 
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
@@ -441,6 +428,7 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;
+  const bool force_locality_direct_routing_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;
@@ -491,10 +479,6 @@ protected:
   void initialize();
 
   virtual void refresh(uint32_t priority);
-
-  // Return `true` if refresh() should always use EDF scheduler, even if host
-  // weights are all equal. Default to `false`.
-  virtual bool alwaysUseEdfScheduler() const;
 
   bool isSlowStartEnabled() const;
   bool noHostsAreInSlowStart() const;

@@ -68,6 +68,12 @@ public:
   std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
     return nullptr;
   }
+  std::unique_ptr<Server::HdsDelegateApi>
+  maybeCreateHdsDelegate(Server::Configuration::ServerFactoryContext&, Stats::Scope&,
+                         Grpc::RawAsyncClientPtr&&, Envoy::Stats::Store&,
+                         Ssl::ContextManager&) override {
+    return nullptr;
+  }
 };
 
 EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : options_(options) {
@@ -92,10 +98,11 @@ EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : op
         server->initialize(local_address, component_factory);
         return server;
       };
-  base_ = std::make_unique<StrippedMainBase>(
-      *options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-      std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(), nullptr,
-      create_instance);
+  auto random_generator = std::make_unique<Random::RandomGeneratorImpl>();
+  base_ = std::make_unique<StrippedMainBase>(*options_, prod_component_factory_,
+                                             std::make_unique<PlatformImpl>(), *random_generator);
+  base_->init(real_time_system_, default_listener_hooks_, std::move(random_generator), nullptr,
+              create_instance);
   // Disabling signal handling in the options makes it so that the server's event dispatcher _does
   // not_ listen for termination signals such as SIGTERM, SIGINT, etc
   // (https://github.com/envoyproxy/envoy/blob/048f4231310fbbead0cbe03d43ffb4307fff0517/source/server/server.cc#L519).

@@ -89,6 +89,7 @@ envoy_cc_test(
     srcs = ["cluster_manager_impl_test.cc"],
     rbe_pool = "4core",
     deps = [
+        ":metadata_writer_lb_proto_cc_proto",
         ":test_cluster_manager",
         "//envoy/config:config_validator_interface",
         "//source/common/router:context_lib",
@@ -326,6 +327,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
@@ -432,7 +434,7 @@ envoy_cc_test(
         "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -459,6 +461,8 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
+        "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
@@ -538,6 +542,7 @@ envoy_cc_test_library(
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -681,4 +686,9 @@ envoy_cc_test_library(
         "//envoy/upstream:upstream_interface",
         "@com_google_absl//absl/types:optional",
     ],
+)
+
+envoy_proto_library(
+    name = "metadata_writer_lb_proto",
+    srcs = ["metadata_writer_lb.proto"],
 )

@@ -1315,13 +1315,19 @@ WasmResult Context::getMetric(uint32_t metric_id, uint64_t* result_uint64_ptr) {
 Context::~Context() {
   // Cancel any outstanding requests.
   for (auto& p : http_request_) {
-    p.second.request_->cancel();
+    if (p.second.request_ != nullptr) {
+      p.second.request_->cancel();
+    }
   }
   for (auto& p : grpc_call_request_) {
-    p.second.request_->cancel();
+    if (p.second.request_ != nullptr) {
+      p.second.request_->cancel();
+    }
   }
   for (auto& p : grpc_stream_) {
-    p.second.stream_->resetStream();
+    if (p.second.stream_ != nullptr) {
+      p.second.stream_->resetStream();
+    }
   }
 }
 
@@ -1654,6 +1660,14 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
   }
   if (buffering_request_body_) {
     decoder_callbacks_->addDecodedData(data, false);
+    if (destroyed_) {
+      // The data adding have triggered a local reply (413) and we needn't to continue to
+      // call the VM.
+      // Note this is not perfect way. If the local reply processing is stopped by other
+      // filters, this filter will still try to call the VM. But at least we can ensure
+      // the VM has valid context.
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
   }
   request_body_buffer_ = &data;
   end_of_stream_ = end_stream;
@@ -1727,6 +1741,14 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
   }
   if (buffering_response_body_) {
     encoder_callbacks_->addEncodedData(data, false);
+    if (destroyed_) {
+      // The data adding have triggered a local reply (413) and we needn't to continue to
+      // call the VM.
+      // Note this is not perfect way. If the local reply processing is stopped by other
+      // filters, this filter will still try to call the VM. But at least we can ensure
+      // the VM has valid context.
+      return Http::FilterDataStatus::StopIterationAndBuffer;
+    }
   }
   response_body_buffer_ = &data;
   end_of_stream_ = end_stream;

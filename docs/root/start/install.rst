@@ -20,7 +20,7 @@ Install Envoy on Debian-based Linux
    .. code-tab:: console Debian bookworm
 
       $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bookworm main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bookworm main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
       $ envoy --version
@@ -28,7 +28,7 @@ Install Envoy on Debian-based Linux
    .. code-tab:: console Debian bullseye
 
       $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bullseye main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bullseye main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
       $ envoy --version
@@ -36,7 +36,7 @@ Install Envoy on Debian-based Linux
    .. code-tab:: console Ubuntu focal
 
       $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
       $ envoy --version
@@ -44,7 +44,7 @@ Install Envoy on Debian-based Linux
    .. code-tab:: console Ubuntu jammy
 
       $ wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io jammy main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io jammy main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
       $ envoy --version
@@ -62,6 +62,28 @@ You can install Envoy on Mac OSX using the official brew repositories.
 
       $ brew update
       $ brew install envoy
+
+.. _start_install_kubernetes:
+
+Install Envoy on Kubernetes using Envoy Gateway
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can run Envoy as a Kubernetes Ingress Gateway by installing Envoy Gateway on your Kubernetes cluster.
+
+The following commands will:
+- Install the Gateway API CRDs and Envoy Gateway
+- Wait for Envoy Gateway to become available
+- Install the GatewayClass, Gateway, HTTPRoute and an example app
+
+.. tabs::
+
+   .. code-tab:: console
+
+      $ helm install eg oci://docker.io/envoyproxy/gateway-helm --version v0.0.0-latest -n envoy-gateway-system --create-namespace
+      $ kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
+      $ kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/latest/quickstart.yaml -n default
+
+For more information on how to run Envoy as a Kubernetes Ingress Gateway, check out the Envoy Gateway Docs site on `gateway.envoyproxy.io/docs/ <https://gateway.envoyproxy.io/docs/>`_.
 
 .. _start_install_docker:
 

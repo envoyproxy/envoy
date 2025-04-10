@@ -274,14 +274,20 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         absl::string_view data, milliseconds timeout) {
-  auto succeeded = waitForData(client_dispatcher, data.length(), timeout);
-  if (succeeded) {
-    Buffer::OwnedImpl buffer(data.data(), data.length());
-    if (!TestUtility::buffersEqual(body(), buffer)) {
-      return AssertionFailure() << body().toString() << " not equal to " << data;
-    }
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_,
+          [this, &data]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+            Buffer::OwnedImpl buffer(data.data(), data.length());
+            if (!TestUtility::buffersEqual(body_, buffer)) {
+              return AssertionFailure() << body_.toString() << " not equal to " << data;
+            }
+            return AssertionSuccess();
+          },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
   }
-  return succeeded;
+  return AssertionSuccess();
 }
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
@@ -314,6 +320,17 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   if (!time_system_.waitFor(lock_, absl::Condition(&saw_reset_), timeout)) {
     return AssertionFailure() << "Timed out waiting for reset.";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult FakeStream::waitForReset(Event::Dispatcher& client_dispatcher,
+                                         std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_, [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return saw_reset_; },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for reset of stream.";
   }
   return AssertionSuccess();
 }
@@ -963,7 +980,7 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
 
 void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
   ASSERT(!dispatcher_->isThreadSafe());
-  dispatcher_->post([&]() { cb(); });
+  dispatcher_->post([cb = std::move(cb)]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
@@ -1037,7 +1054,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << fmt::format(
-               "Timed out waiting for data. Got '{}', waiting for {} bytes.", data_, num_bytes);
+               "Timed out waiting for data. Got '{}', expected {} bytes, waiting for {} bytes.",
+               data_, data_.size(), num_bytes);
   }
   if (data != nullptr) {
     *data = data_;
@@ -1082,7 +1100,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 }
 
 ABSL_MUST_USE_RESULT
-AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
+AssertionResult FakeHttpConnection::waitForInexactRawData(absl::string_view data, std::string& out,
                                                           std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -1096,12 +1114,13 @@ AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std:
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find(data);
+    const auto data_len = data.length();
     if (index != absl::string_view::npos) {
       Buffer::OwnedImpl buffer;
-      *out = std::string(peek_data.data(), index + 4);
+      out = std::string(peek_data.data(), index + data_len);
       auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
                         ->ioHandle()
-                        .recv(peek_buf, index + 4, 0);
+                        .recv(peek_buf, index + data_len, 0);
       return true;
     }
     return false;

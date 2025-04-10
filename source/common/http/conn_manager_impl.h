@@ -68,7 +68,8 @@ public:
                         Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager& overload_manager, TimeSource& time_system);
+                        Server::OverloadManager& overload_manager, TimeSource& time_system,
+                        envoy::config::core::v3::TrafficDirection direction);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -189,18 +190,30 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
-          filter_manager_.accessLogHandlers());
-      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
-          connection_manager_.config_->accessLogs());
+
+    void sendGoAwayAndClose() override { return connection_manager_.sendGoAwayAndClose(); }
+
+    AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
+      const AccessLog::InstanceSharedPtrVector& config_log_handlers =
+          connection_manager_.config_->accessLogs();
+      const AccessLog::InstanceSharedPtrVector& filter_log_handlers =
+          filter_manager_.accessLogHandlers();
+
+      AccessLog::InstanceSharedPtrVector combined_log_handlers;
+      combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
+
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+
       } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
       }
       return combined_log_handlers;
     }
@@ -274,11 +287,6 @@ private:
     }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
-    void upgradeFilterChainCreated() override {
-      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-      state_.successful_upgrade_ = true;
-    }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
@@ -588,6 +596,8 @@ private:
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
+  void sendGoAwayAndClose();
+
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than
   // the stream was alive for short period of time. This period is specified
@@ -637,6 +647,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  bool go_away_sent_{false};
   bool remote_close_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
@@ -653,6 +664,7 @@ private:
   uint32_t requests_during_dispatch_count_{0};
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
+  const envoy::config::core::v3::TrafficDirection direction_;
 
   // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
   // protocols the stream is destroyed after both request and response are complete i.e. reach their

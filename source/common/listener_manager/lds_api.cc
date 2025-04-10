@@ -75,7 +75,9 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
   std::string message;
 
   for (const auto& resource : added_resources) {
-    envoy::config::listener::v3::Listener listener;
+    // Holds a reference to the name of the currently parsed listener resource.
+    // This is needed for the onError clause below.
+    absl::string_view listener_name = EMPTY_STRING;
 
     auto onError = [&](std::string error_message) {
       failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
@@ -84,16 +86,17 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
       state->mutable_failed_configuration()->PackFrom(resource.get().resource());
 #endif
-      absl::StrAppend(&message, listener.name(), ": ", error_message, "\n");
+      absl::StrAppend(&message, listener_name, ": ", error_message, "\n");
     };
 
     TRY_ASSERT_MAIN_THREAD {
-      listener =
+      const envoy::config::listener::v3::Listener& listener =
           dynamic_cast<const envoy::config::listener::v3::Listener&>(resource.get().resource());
+      listener_name = listener.name();
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully
         // applied.
-        onError(fmt::format("duplicate listener {} found", listener.name()));
+        onError(fmt::format("duplicate listener {} found", listener_name));
         continue;
       }
       absl::StatusOr<bool> update_or_error =
@@ -103,10 +106,10 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
         continue;
       }
       if (update_or_error.value()) {
-        ENVOY_LOG(info, "lds: add/update listener '{}'", listener.name());
+        ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
         any_applied = true;
       } else {
-        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
+        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
       }
     }
     END_TRY

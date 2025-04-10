@@ -1,5 +1,6 @@
 #include "test/mocks/server/instance.h"
 
+#include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
@@ -31,6 +32,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, xdsManager()).WillByDefault(ReturnRef(xds_manager_));
   ON_CALL(*this, httpServerPropertiesCacheManager())
       .WillByDefault(ReturnRef(http_server_properties_cache_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -55,6 +57,9 @@ MockInstance::MockInstance()
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
   ON_CALL(*this, enableReusePortDefault()).WillByDefault(Return(true));
+
+  ON_CALL(*server_factory_context_, sslContextManager())
+      .WillByDefault(ReturnRef(ssl_context_manager_));
 }
 
 MockInstance::~MockInstance() = default;

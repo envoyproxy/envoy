@@ -179,8 +179,7 @@ public:
         max_age_(config.max_age()) {
     for (const auto& string_match : config.allow_origin_string_match()) {
       allow_origins_.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              string_match, factory_context));
+          std::make_unique<Matchers::StringMatcherImpl>(string_match, factory_context));
     }
     if (config.has_allow_credentials()) {
       allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -279,6 +278,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const std::string& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override {
     if (rate_limit_policy_ != nullptr) {
@@ -359,6 +359,7 @@ private:
                              scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
+  const std::string name_;
   const Stats::StatNameManagedStorage stat_name_storage_;
   Stats::ScopeSharedPtr vcluster_scope_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
@@ -507,7 +508,7 @@ public:
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  bool traceSampled() const override { return trace_sampled_; }
+  absl::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
 
 private:
@@ -517,7 +518,7 @@ private:
   const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
-  bool trace_sampled_;
+  absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
 };
 
@@ -538,8 +539,9 @@ public:
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
 private:
-  const uint32_t initial_requests_;
   const envoy::type::v3::FractionalPercent additional_request_chance_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t initial_requests_;
   const bool hedge_on_per_try_timeout_;
 };
 using DefaultHedgePolicy = ConstSingleton<HedgePolicyImpl>;
@@ -660,17 +662,7 @@ protected:
 public:
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
-  bool isRedirect() const {
-    if (!isDirectResponse()) {
-      return false;
-    }
-    if (redirect_config_ == nullptr) {
-      return false;
-    }
-    return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
-           !redirect_config_->prefix_rewrite_redirect_.empty() ||
-           redirect_config_->regex_rewrite_redirect_ != nullptr;
-  }
+  bool isRedirect() const;
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
@@ -1242,6 +1234,7 @@ private:
   HeaderParserPtr response_headers_parser_;
   RouteMetadataPackPtr metadata_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
+  const std::vector<Envoy::Matchers::FilterStateMatcherPtr> filter_state_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -1307,9 +1300,7 @@ private:
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
@@ -1342,9 +1333,7 @@ private:
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().exact() : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
@@ -1376,10 +1365,7 @@ private:
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().safe_regex().regex()
-                                    : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
@@ -1443,9 +1429,7 @@ private:
 class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable

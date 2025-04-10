@@ -95,7 +95,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       THROW_IF_NOT_OK_REF(factory_or_error.status());
       Grpc::AsyncClientFactoryPtr&& factory = std::move(factory_or_error.value());
       const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
-          factory->createUncachedRawAsyncClient();
+          THROW_OR_RETURN_VALUE(factory->createUncachedRawAsyncClient(), Grpc::RawAsyncClientPtr);
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
     } else if (opentelemetry_config.has_http_service()) {
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
@@ -119,15 +119,16 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   const auto span_kind = getSpanKind(config);
   if (!extractor.propagationHeaderPresent()) {
     // No propagation header, so we can create a fresh span with the given decision.
-    Tracing::SpanPtr new_open_telemetry_span = tracer.startSpan(
-        operation_name, stream_info.startTime(), tracing_decision, trace_context, span_kind);
+    Tracing::SpanPtr new_open_telemetry_span =
+        tracer.startSpan(operation_name, stream_info, stream_info.startTime(), tracing_decision,
+                         trace_context, span_kind);
     return new_open_telemetry_span;
   } else {
     // Try to extract the span context. If we can't, just return a null span.
     absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
     if (span_context.ok()) {
-      return tracer.startSpan(operation_name, stream_info.startTime(), span_context.value(),
-                              trace_context, span_kind);
+      return tracer.startSpan(operation_name, stream_info, stream_info.startTime(),
+                              span_context.value(), trace_context, span_kind);
     } else {
       ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
       return std::make_unique<Tracing::NullSpan>();

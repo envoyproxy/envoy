@@ -72,3 +72,22 @@ envoy_cc_test_library(
         "//test/integration/filters:common_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "ssl_upstream_integration_test",
+    size = "large",
+    srcs = [
+        "ssl_upstream_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

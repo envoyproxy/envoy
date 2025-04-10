@@ -1,4 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_import")
 load("//bazel:android_debug_info.bzl", "android_debug_info")
 
 licenses(["notice"])  # Apache 2
@@ -36,10 +37,9 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = select({
-        "@envoy//bazel:linux": ["//bazel:jni"],
-        "@envoy//bazel:apple": ["//bazel:jni"],
         # On Android, we should use the JNI provided by the system.
-        "//conditions:default": [],
+        "@envoy//bazel:android": [],
+        "//conditions:default": ["//bazel:jni"],
     }) + [
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
@@ -47,6 +47,22 @@ envoy_cc_library(
         "@com_google_absl//absl/strings:str_format",
         "@envoy//source/common/common:assert_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "jni_init_lib",
+    srcs = [
+        "jni_init.cc",
+    ],
+    hdrs = [
+        "jni_init.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":jni_helper_lib",
+        ":jni_utility_lib",
+    ],
+    alwayslink = True,
 )
 
 # Implementations of the various "native" Java methods for classes
@@ -59,6 +75,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
+        ":jni_init_lib",
         ":jni_utility_lib",
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib",
@@ -110,14 +127,6 @@ envoy_cc_library(
     alwayslink = True,
 )
 
-config_setting(
-    name = "android_armeabi",
-    constraint_values = [
-        "@platforms//cpu:armv7",
-        "@platforms//os:android",
-    ],
-)
-
 # Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
@@ -130,6 +139,9 @@ cc_binary(
         # included in the build, but several parts of Envoy rely on libm, for
         # example, for std::pow, so we link it in here.
         "-lm",
+        # See libpthread below.
+        "-L$(GENDIR)/{}".format(package_name()),
+        "-latomic",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
@@ -137,6 +149,7 @@ cc_binary(
     linkshared = True,
     deps = [
         ":envoy_jni_lib",
+        ":libpthread",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
@@ -166,4 +179,17 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+# Create a fake pthread library so that -lpthread works on Android.
+# See #6 here https://github.com/bazelbuild/rules_android_ndk/issues/5
+cc_import(
+    name = "libpthread",
+    static_library = ":pthread",
+)
+
+envoy_cc_library(
+    name = "pthread",
+    srcs = ["//bazel:objc_dummy"],
+    repository = "@envoy",
 )

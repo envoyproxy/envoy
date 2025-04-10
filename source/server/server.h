@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -39,7 +40,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/health_discovery_service.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -178,6 +178,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return server_.xdsManager(); }
   Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
     return server_.httpServerPropertiesCacheManager();
   }
@@ -187,6 +188,9 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
+  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+    return server_.transportSocketFactoryContext();
+  };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Stats::Scope& serverScope() override { return *server_scope_; }
@@ -208,11 +212,11 @@ public:
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
-  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
-  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -259,6 +263,10 @@ public:
   virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<HdsDelegateApi>
+  maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+                         Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
+                         Ssl::ContextManager& ssl_context_manager) PURE;
 
   void run() override;
 
@@ -346,8 +354,7 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
@@ -411,8 +418,7 @@ private:
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Config::XdsManagerPtr xds_manager_;
-  Upstream::ProdClusterInfoFactory info_factory_;
-  Upstream::HdsDelegatePtr hds_delegate_;
+  std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;

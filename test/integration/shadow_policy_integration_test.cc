@@ -993,5 +993,47 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffi
   EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
 }
 
+TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* metadata_match = hcm.mutable_route_config()
+                                   ->mutable_virtual_hosts(0)
+                                   ->mutable_routes(0)
+                                   ->mutable_route()
+                                   ->mutable_metadata_match();
+        TestUtility::loadFromYaml(R"EOF(
+            filterMetadata:
+              envoy.lb:
+                stack: "default"
+        )EOF",
+                                  *metadata_match);
+      });
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto clusters = bootstrap.mutable_static_resources()->mutable_clusters();
+    for (auto& cluster : *clusters) {
+      TestUtility::loadFromYaml(R"EOF(
+            subsetSelectors:
+              - keys:
+                - "stack"
+          )EOF",
+                                *cluster.mutable_lb_subset_config());
+
+      auto lb_endpoint =
+          cluster.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+
+      TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    stack: "default"
+                )EOF",
+                                *lb_endpoint->mutable_metadata());
+    }
+  });
+  initialize();
+  sendRequestAndValidateResponse();
+}
+
 } // namespace
 } // namespace Envoy

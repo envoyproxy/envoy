@@ -28,7 +28,8 @@ namespace Network {
   GAUGE(pending_resolutions, NeverImport)                                                          \
   COUNTER(not_found)                                                                               \
   COUNTER(get_addr_failure)                                                                        \
-  COUNTER(timeouts)
+  COUNTER(timeouts)                                                                                \
+  COUNTER(reinits)
 
 /**
  * Struct definition for all DNS stats. @see stats_macros.h
@@ -59,10 +60,7 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
-  void resetNetworking() override {
-    // Dirty the channel so that the next query will recreate it.
-    dirty_channel_ = true;
-  }
+  void resetNetworking() override { reinitializeChannel(); }
 
 private:
   friend class DnsResolverImplPeer;
@@ -159,7 +157,7 @@ private:
     // perform resolutions on both families concurrently.
     bool dual_resolution_ = false;
     // The number of outstanding pending resolutions. This should always be 0 or 1 for all lookup
-    // types other than All. For all, this can be be 0-2 as both queries are issued in parallel.
+    // types other than All. For all, this can be 0-2 as both queries are issued in parallel.
     // This is used mostly for assertions but is used in the ARES_EDESTRUCTION path to make sure
     // all concurrent queries are unwound before cleaning up the resolution.
     uint32_t pending_resolutions_ = 0;
@@ -179,6 +177,8 @@ private:
   // c-ares callback when a socket state changes, indicating that libevent
   // should listen for read/write events.
   void onAresSocketStateChange(os_fd_t fd, int read, int write);
+  // Re-initialize the c-ares channel.
+  void reinitializeChannel();
   // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
   // Check if the only nameserver available is the c-ares default.
@@ -193,12 +193,14 @@ private:
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
   ares_channel channel_;
-  bool dirty_channel_{};
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const bool use_resolvers_as_fallback_;
   const uint32_t udp_max_queries_;
+  const uint64_t query_timeout_seconds_;
+  const uint32_t query_tries_;
+  const bool rotate_nameservers_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;

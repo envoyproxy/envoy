@@ -22,6 +22,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
@@ -2139,6 +2140,84 @@ TEST_P(Http1ServerConnectionImplTest, IgnoreUpgradeH2cCloseEtc) {
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
 
+TEST_P(Http1ServerConnectionImplTest, IgnoreSpecificTLSVersionUpgradeRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("TLS/1.2");
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
+
+  initialize();
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: Upgrade\r\n"
+                           "Upgrade: TLS/1.2\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_P(Http1ServerConnectionImplTest, IgnorePrefixUpgradeRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("TLS/");
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
+
+  initialize();
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: Upgrade\r\n"
+                           "Upgrade: TLS/1.1, TLS/1.2\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_P(Http1ServerConnectionImplTest, PartialIgnoreUpgradeRequest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("TLS/1.2");
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  matchers.push_back(std::make_unique<Envoy::Matchers::StringMatcherImpl>(matcher, context));
+  codec_settings_.ignore_upgrade_matchers_ =
+      std::make_shared<const std::vector<Matchers::StringMatcherPtr>>(std::move(matchers));
+
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {"connection", "upgrade"}, {"upgrade", "TLS/1.1"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl buffer(
+      "GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: TLS/1.1, TLS/1.2\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_P(Http1ServerConnectionImplTest, NoIgnoreUpgradeRequest) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {"connection", "upgrade"}, {"upgrade", "TLS/1.2"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  ;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: TLS/1.2\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_P(Http1ServerConnectionImplTest, UpgradeRequest) {
   initialize();
 
@@ -2427,6 +2506,39 @@ TEST_P(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchO
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   const auto status = codec_->dispatch(buffer);
 
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(isEnvoyOverloadError(status));
+}
+
+TEST_P(Http1ServerConnectionImplTest, LoadShedPointForAlreadyResetStream) {
+  InSequence sequence;
+
+  Server::MockLoadShedPoint mock_abort_dispatch;
+  EXPECT_CALL(overload_manager_, getLoadShedPoint(_)).WillOnce(Return(&mock_abort_dispatch));
+  initialize();
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(false));
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl request_line_buffer("GET / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(request_line_buffer);
+  EXPECT_EQ(0, request_line_buffer.length());
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillRepeatedly(Return(true));
+  Buffer::OwnedImpl headers_buffer("final-header: value\r\n\r\n");
+
+  // The reset stream can be triggered in the middle of dispatching.
+  connection_.dispatcher_.post(
+      [&] { response_encoder->getStream().resetStream(StreamResetReason::LocalReset); });
+
+  status = codec_->dispatch(headers_buffer);
   EXPECT_FALSE(status.ok());
   EXPECT_TRUE(isEnvoyOverloadError(status));
 }
@@ -4219,30 +4331,6 @@ TEST_P(Http1ServerConnectionImplTest, ValidMethodFirstCharacter) {
   status = codec_->dispatch(buffer2);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(0u, buffer2.length());
-}
-
-// Receiving a first byte that cannot start a valid method name is an error.
-TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
-#ifdef ENVOY_ENABLE_UHV
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    // BalsaParser allows custom methods if UHV is enabled.
-    return;
-  }
-#endif
-
-  initialize();
-
-  StrictMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-  EXPECT_CALL(decoder,
-              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
-
-  // There is no known method name starting with "E".
-  Buffer::OwnedImpl buffer("E");
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
-  EXPECT_EQ(1u, buffer.length());
 }
 
 // Receiving a first byte that cannot start a valid response is an error.
