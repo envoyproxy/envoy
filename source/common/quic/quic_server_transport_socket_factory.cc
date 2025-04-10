@@ -31,7 +31,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 
   auto factory_or_error = QuicServerTransportSocketFactory::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
-      context.statsScope(), std::move(server_config), context.sslContextManager(), server_names);
+      context.statsScope(), std::move(server_config),
+      context.serverFactoryContext().sslContextManager(), server_names);
   RETURN_IF_NOT_OK(factory_or_error.status());
   (*factory_or_error)->initialize();
   return std::move(*factory_or_error);

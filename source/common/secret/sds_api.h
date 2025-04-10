@@ -69,7 +69,7 @@ protected:
   // Creates new secrets.
   virtual void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
   // Refresh secrets, e.g. re-resolve symlinks in secret paths.
-  virtual void resolveSecret(const FileContentMap& /*files*/){};
+  virtual void resolveSecret(const FileContentMap& /*files*/) {};
   virtual void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
   Common::CallbackManager<> update_callback_manager_;
 

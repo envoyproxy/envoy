@@ -5367,9 +5367,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
 
   ASSERT_TRUE(
-      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_headers_response"));
+      dynamic_metadata_.filter_metadata().contains("envoy-test-ext_proc-request_headers_response"));
   const auto& request_headers_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_headers_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-request_headers_response");
   ProtobufWkt::Struct expected_request_headers;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5412,9 +5412,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
   ASSERT_TRUE(dynamic_metadata_.filter_metadata().contains(
-      "envoy.test.ext_proc.response_headers_response"));
+      "envoy-test-ext_proc-response_headers_response"));
   const auto& response_headers_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_headers_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-response_headers_response");
   ProtobufWkt::Struct expected_response_headers;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5632,9 +5632,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   ASSERT_TRUE(
-      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_body_response"));
+      dynamic_metadata_.filter_metadata().contains("envoy-test-ext_proc-request_body_response"));
   const auto& request_body_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_body_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-request_body_response");
   ProtobufWkt::Struct expected_request_body;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5666,9 +5666,9 @@ TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   EXPECT_EQ("Hello, World!", buffered_response_data.toString());
 
   ASSERT_TRUE(
-      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.response_body_response"));
+      dynamic_metadata_.filter_metadata().contains("envoy-test-ext_proc-response_body_response"));
   const auto& response_body_struct_metadata =
-      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_body_response");
+      dynamic_metadata_.filter_metadata().at("envoy-test-ext_proc-response_body_response");
   ProtobufWkt::Struct expected_response_body;
   TestUtility::loadFromJson(R"EOF(
 {
@@ -5792,108 +5792,6 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
   checkGrpcCallHeaderOnlyStats(envoy::config::core::v3::TrafficDirection::INBOUND);
-  expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
-
-  expectFilterState(Envoy::ProtobufWkt::Struct());
-}
-
-TEST_F(HttpFilterTest, SaveImmediateResponseOnError) {
-  SaveProcessingResponseFactory factory;
-  Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  disable_immediate_response: true
-  on_processing_response:
-    name: "abc"
-    typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_immediate_response:
-        save_response: true
-        save_on_error: true
-  )EOF");
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  test_time_->advanceTimeWait(std::chrono::microseconds(10));
-  TestResponseHeaderMapImpl immediate_response_headers;
-  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
-  auto* immediate_response = resp1->mutable_immediate_response();
-  immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
-  immediate_response->set_body("Bad request");
-  immediate_response->set_details("Got a bad request");
-  auto* immediate_headers = immediate_response->mutable_headers();
-  auto* hdr1 = immediate_headers->add_set_headers();
-  hdr1->mutable_header()->set_key("content-type");
-  hdr1->mutable_header()->set_raw_value("text/plain");
-  auto* hdr2 = immediate_headers->add_set_headers();
-  hdr2->mutable_append()->set_value(true);
-  hdr2->mutable_header()->set_key("x-another-thing");
-  hdr2->mutable_header()->set_raw_value("1");
-  auto* hdr3 = immediate_headers->add_set_headers();
-  hdr3->mutable_append()->set_value(true);
-  hdr3->mutable_header()->set_key("x-another-thing");
-  hdr3->mutable_header()->set_raw_value("2");
-  stream_callbacks_->onReceiveMessage(std::move(resp1));
-
-  Buffer::OwnedImpl req_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
-  Buffer::OwnedImpl resp_data("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
-  Buffer::OwnedImpl empty_data;
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
-      SaveProcessingResponseFilterState::kFilterStateName);
-  ASSERT_TRUE(filter_state->response.has_value());
-  envoy::service::ext_proc::v3::ProcessingResponse expected_response;
-  TestUtility::loadFromJson(
-      R"EOF(
-{
-  "immediateResponse": {
-    "status": {
-      "code": "BadRequest"
-    },
-    "headers": {
-      "setHeaders": [{
-        "header": {
-          "key": "content-type",
-          "rawValue": "dGV4dC9wbGFpbg=="
-        }
-      }, {
-        "header": {
-          "key": "x-another-thing",
-          "rawValue": "MQ=="
-        },
-        "append": true
-      }, {
-        "header": {
-          "key": "x-another-thing",
-          "rawValue": "Mg=="
-        },
-        "append": true
-      }]
-    },
-    "body": "QmFkIHJlcXVlc3Q=",
-    "details": "Got a bad request"
-  }
-})EOF",
-      expected_response);
-
-  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
-                                      expected_response));
-
-  filter_state->response.reset();
-
-  filter_->onDestroy();
-
-  EXPECT_EQ(1, config_->stats().streams_started_.value());
-  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
-  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(1, config_->stats().streams_closed_.value());
-
   expectNoGrpcCall(envoy::config::core::v3::TrafficDirection::OUTBOUND);
 
   expectFilterState(Envoy::ProtobufWkt::Struct());
