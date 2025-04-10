@@ -513,21 +513,12 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
 absl::Status
 ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                    const ListenerImpl& existing_listener) {
-  bool same_socket_options = true;
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
   }
 
-  same_socket_options = existing_listener.socketOptionsEqual(new_listener);
-  if (!same_socket_options && new_listener.reusePort() == false) {
-    return absl::InvalidArgumentError(
-        fmt::format("Listener {}: doesn't support update any socket options "
-                    "when the reuse port isn't enabled",
-                    new_listener.name()));
-  }
-
-  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+  if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
@@ -640,9 +631,21 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
+bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& listener_list,
                                                            const ListenerImpl& listener) {
-  for (const auto& existing_listener : list) {
+  // This is new listener or new version of existing listener but with different addresses
+  // or different socket options.
+  // Check if the listener has duplicated address with existing listeners.
+
+  for (const auto& existing_listener : listener_list) {
+    if (listener.reusePort() && existing_listener->name() == listener.name()) {
+      // If reuse port is enabled, we can skip the check between different versions of the
+      // same listener as they can create their own sockets anyway.
+      // If reuse port is disabled, the duplicated addresses check is necessary to to avoid
+      // attempting to bind to the same address when creating new sockets for the listener.
+      continue;
+    }
+
     if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
@@ -672,25 +675,26 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
-  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
-    draining_it->listener_->debugLog("removing draining listener");
-    for (const auto& worker : workers_) {
-      // Once the drain time has completed via the drain manager's timer, we tell the workers
-      // to remove the listener.
-      worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-        // The remove listener completion is called on the worker thread. We post back to the
-        // main thread to avoid locking. This makes sure that we don't destroy the listener
-        // while filters might still be using its context (stats, etc.).
-        server_.dispatcher().post([this, draining_it]() -> void {
-          if (--draining_it->workers_pending_removal_ == 0) {
-            draining_it->listener_->debugLog("draining listener removal complete");
-            draining_listeners_.erase(draining_it);
-            stats_.total_listeners_draining_.set(draining_listeners_.size());
-          }
-        });
+  draining_it->listener_->localDrainManager().startDrainSequence(
+      Network::DrainDirection::All, [this, draining_it]() -> void {
+        draining_it->listener_->debugLog("removing draining listener");
+        for (const auto& worker : workers_) {
+          // Once the drain time has completed via the drain manager's timer, we tell the workers
+          // to remove the listener.
+          worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
+            // The remove listener completion is called on the worker thread. We post back to the
+            // main thread to avoid locking. This makes sure that we don't destroy the listener
+            // while filters might still be using its context (stats, etc.).
+            server_.dispatcher().post([this, draining_it]() -> void {
+              if (--draining_it->workers_pending_removal_ == 0) {
+                draining_it->listener_->debugLog("draining listener removal complete");
+                draining_listeners_.erase(draining_it);
+                stats_.total_listeners_draining_.set(draining_listeners_.size());
+              }
+            });
+          });
+        }
       });
-    }
-  });
 
   updateWarmingActiveGauges();
 }
@@ -1030,10 +1034,17 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
       stopListener(listener, options, [this, listener_tag]() {
-        stats_.listener_stopped_.inc();
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            maybeCloseSocketsForListener(*listener);
+        // Only stop the listener if we don't have a record of its tag.
+        // This prevents us from double incrementing if listeners are stopped twice.
+        // This can happen if the admin endpoint is triggered for inbound_only and then
+        // all. We perform the check in the callback to ensure it's done on the main thread
+        if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
+          stats_.listener_stopped_.inc();
+          stopped_listener_tags_.insert(listener_tag);
+          for (auto& listener : active_listeners_) {
+            if (listener->listenerTag() == listener_tag) {
+              maybeCloseSocketsForListener(*listener);
+            }
           }
         }
       });
@@ -1141,7 +1152,9 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
   if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
       hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
-        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
+        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener, "
+                    "to check if the listener has duplicated addresses with other listeners or "
+                    "'enable_reuse_port' is set to 'false' for the listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
     return absl::InvalidArgumentError(message);
@@ -1181,6 +1194,9 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
     }
   }
 
+  // TODO(wbpcode): if we cannot clone the socket factory from the draining listener, we should
+  // check the duplicated addresses again the draining listeners to avoid the creation failure
+  // of the sockets.
   if (draining_listener_ptr != nullptr) {
     RETURN_IF_NOT_OK(listener.cloneSocketFactoryFrom(*draining_listener_ptr));
   } else {

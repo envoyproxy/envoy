@@ -338,8 +338,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                           }),
       transport_factory_context_(
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
-              parent_.server_.serverFactoryContext(), parent_.server_.sslContextManager(),
-              listenerScope(), parent_.server_.clusterManager(), validation_visitor_)),
+              parent_.server_.serverFactoryContext(), listenerScope(), validation_visitor_)),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
@@ -736,7 +735,7 @@ void ListenerImpl::buildListenSocketOptions(
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
     }
-    if (!config.socket_options().empty()) {
+    if (!address_opts_list[i].get().empty()) {
       addListenSocketOptions(
           listen_socket_options_list_[i],
           Network::SocketOptionFactory::buildLiteralOptions(address_opts_list[i]));
@@ -1174,15 +1173,13 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   return initial_reuse_port_value;
 }
 
-bool ListenerImpl::socketOptionsEqual(const ListenerImpl& other) const {
-  return ListenerMessageUtil::socketOptionsEqual(config(), other.config());
-}
-
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
-  if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size())) {
+  // First, check if the listener has the same socket type and the same number of addresses.
+  if (socket_type_ != other.socket_type_ || addresses_.size() != other.addresses().size()) {
     return false;
   }
 
+  // Second, check if the listener has the same addresses.
   // The listener support listening on the zero port address for test. Multiple zero
   // port addresses are also supported. For comparing two listeners with multiple
   // zero port addresses, only need to ensure there are the same number of zero
@@ -1199,17 +1196,12 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
     }
     other_addresses.erase(iter);
   }
-  return true;
+
+  // Third, check if the listener has the same socket options.
+  return ListenerMessageUtil::socketOptionsEqual(config(), other.config());
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
-  // Skip the duplicate address check if this is the case of a listener update with new socket
-  // options.
-  if ((name_ == other.name_) &&
-      !ListenerMessageUtil::socketOptionsEqual(config(), other.config())) {
-    return false;
-  }
-
   if (socket_type_ != other.socket_type_) {
     return false;
   }

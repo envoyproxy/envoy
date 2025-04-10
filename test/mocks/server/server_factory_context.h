@@ -28,6 +28,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_lifecycle_notifier.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -75,6 +76,10 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
+              (const, override));
+  MOCK_METHOD(Secret::SecretManager&, secretManager, ());
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
@@ -90,6 +95,10 @@ public:
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+
+  // Useful for when a test needs to change a static secret, which normally cannot be changed or
+  // re-added after it is set. This creates a new secret manager and deletes the old one.
+  void resetSecretManager();
 
   testing::NiceMock<Config::MockXdsManager> xds_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -119,6 +128,12 @@ public:
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
   Regex::GoogleReEngine regex_engine_;
+
+  // Secret manager.
+  testing::NiceMock<MockConfigTracker> config_tracker_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  // SSL context manager.
+  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {
@@ -132,6 +147,21 @@ public:
   MOCK_METHOD(Init::Manager&, initManager, ());
 
   NiceMock<MockServerFactoryContext> server_factory_context_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
+  testing::NiceMock<Init::MockManager> init_manager_;
+};
+
+class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
+public:
+  MockTransportSocketFactoryContext();
+  ~MockTransportSocketFactoryContext() override;
+
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+  MOCK_METHOD(Stats::Scope&, statsScope, ());
+  MOCK_METHOD(Init::Manager&, initManager, ());
+
+  testing::NiceMock<MockServerFactoryContext> server_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   testing::NiceMock<Init::MockManager> init_manager_;
 };
@@ -161,6 +191,8 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
+              (const, override));
   MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());
@@ -176,6 +208,8 @@ public:
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  MOCK_METHOD(Secret::SecretManager&, secretManager, ());
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
 };
 
 } // namespace Configuration

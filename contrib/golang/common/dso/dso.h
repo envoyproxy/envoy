@@ -22,7 +22,7 @@ public:
   /*
    * Clean up resources that are referenced on the Golang side.
    */
-  virtual void cleanup(){};
+  virtual void cleanup() {};
 
 protected:
   const std::string dso_name_;
@@ -32,7 +32,7 @@ protected:
 
 class HttpFilterDso : public Dso {
 public:
-  HttpFilterDso(const std::string dso_name) : Dso(dso_name){};
+  HttpFilterDso(const std::string dso_name) : Dso(dso_name) {};
   ~HttpFilterDso() override = default;
 
   virtual GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) PURE;
@@ -93,7 +93,7 @@ private:
 
 class ClusterSpecifierDso : public Dso {
 public:
-  ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name){};
+  ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name) {};
   ~ClusterSpecifierDso() override = default;
 
   virtual GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
@@ -125,7 +125,7 @@ using ClusterSpecifierDsoPtr = std::shared_ptr<ClusterSpecifierDso>;
 class NetworkFilterDso : public Dso {
 public:
   NetworkFilterDso() = default;
-  NetworkFilterDso(const std::string dso_name) : Dso(dso_name){};
+  NetworkFilterDso(const std::string dso_name) : Dso(dso_name) {};
   ~NetworkFilterDso() override = default;
 
   virtual GoUint64 envoyGoFilterOnNetworkFilterConfig(GoUint64 library_id_ptr,
@@ -204,7 +204,7 @@ using NetworkFilterDsoPtr = std::shared_ptr<NetworkFilterDso>;
 class HttpTcpBridgeDso : public Dso {
 public:
   HttpTcpBridgeDso() = default;
-  HttpTcpBridgeDso(const std::string dso_name) : Dso(dso_name){};
+  HttpTcpBridgeDso(const std::string dso_name) : Dso(dso_name) {};
   ~HttpTcpBridgeDso() override = default;
 
   virtual GoUint64 envoyGoHttpTcpBridgeOnConfig(httpConfig* p0) PURE;

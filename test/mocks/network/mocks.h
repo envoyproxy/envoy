@@ -107,6 +107,7 @@ public:
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
   MOCK_METHOD(void, upstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(bool, startUpstreamSecureTransport, ());
+  MOCK_METHOD(void, disableClose, (bool disable));
 
   testing::NiceMock<MockConnection> connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -133,6 +134,7 @@ public:
   MOCK_METHOD(Connection&, connection, ());
   MOCK_METHOD(const Socket&, socket, ());
   MOCK_METHOD(void, injectWriteDataToFilterChain, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, disableClose, (bool disable));
 
   testing::NiceMock<MockConnection> connection_;
 };
@@ -198,8 +200,9 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
-  MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
+  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb,
+              (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {

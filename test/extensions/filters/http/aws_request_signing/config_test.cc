@@ -699,8 +699,9 @@ match_excluded_headers:
 
   AwsRequestSigningProtoConfig proto_config;
 
-  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
-                          EnvoyException, "Proto constraint validation failed");
+  EXPECT_THROW_WITH_REGEX(
+      { TestUtility::loadFromYamlAndValidate(yaml, proto_config); }, EnvoyException,
+      "Proto constraint validation failed");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidHighExpirationTime) {
@@ -718,8 +719,9 @@ match_excluded_headers:
 
   AwsRequestSigningProtoConfig proto_config;
 
-  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
-                          EnvoyException, "Proto constraint validation failed");
+  EXPECT_THROW_WITH_REGEX(
+      { TestUtility::loadFromYamlAndValidate(yaml, proto_config); }, EnvoyException,
+      "Proto constraint validation failed");
 }
 
 } // namespace AwsRequestSigningFilter

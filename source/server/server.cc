@@ -103,10 +103,16 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+  // Register the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
+}
 
 InstanceBase::~InstanceBase() {
   terminate();
+
+  // Clear the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::clear();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
@@ -153,7 +159,7 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
-  drain_manager_->startDrainSequence([] {});
+  drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
 void InstanceBase::failHealthcheck(bool fail) {
@@ -754,12 +760,18 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Create the xDS-Manager that will be passed to the cluster manager when it
   // is initialized below.
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(validation_context_);
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, *local_info_,
+                                                          validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+
+  // Now that the worker thread are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onWorkerThreadInitialized();
+  }
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl

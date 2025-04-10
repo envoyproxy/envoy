@@ -2,13 +2,16 @@
 
 #include <utility>
 
+#include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
+#include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,14 +66,14 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                 const CredentialsProviderSharedPtr& credentials_provider,
+                 const CredentialsProviderChainSharedPtr& credentials_provider_chain,
                  Server::Configuration::CommonFactoryContext& context,
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region),
         excluded_header_matchers_(defaultMatchers(context)),
-        credentials_provider_(credentials_provider), query_string_(query_string),
+        credentials_provider_chain_(credentials_provider_chain), query_string_(query_string),
         expiration_time_(expiration_time), time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
@@ -88,6 +91,9 @@ public:
                                 const absl::string_view override_region = "") override;
   absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
                                    const absl::string_view override_region = "") override;
+
+  // Used to request notification when credentials are available from a pending credentials provider
+  bool addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) override;
 
 protected:
   std::string getRegion() const;
@@ -151,13 +157,13 @@ protected:
       Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
       "x-amzn-trace-id"};
   std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
-  CredentialsProviderSharedPtr credentials_provider_;
+  CredentialsProviderChainSharedPtr credentials_provider_chain_;
   const bool query_string_;
   const uint16_t expiration_time_;
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
-  const std::string blank_str_;
+  const std::string invalid_signature_ = "invalidSignature";
 };
 
 } // namespace Aws

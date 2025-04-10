@@ -28,6 +28,17 @@ This filter is a work in progress. Most of the major bits of functionality
 are complete. The updated list of supported features and implementation status may
 be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
 
+Runtime
+-------
+
+The HTTP external processing filter supports the following global runtime settings:
+
+envoy.filters.http.ext_proc.remote_close_timeout_milliseconds
+  Duration in milliseconds that gRPC client will wait for the external processing service to complete
+  the stream by sending trailers. The stream is reset if the timeout expires. This duration does not affect
+  processing of the downstream request or response and only determine how long Envoy keeps gRPC stream objects
+  in memory while waiting for the server to close the stream gracefully. The default value is 1 second.
+
 Statistics
 ----------
 This filter outputs statistics in the

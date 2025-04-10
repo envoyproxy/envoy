@@ -57,7 +57,8 @@ public:
                  Http::AsyncClient::FailureReason reason) override;
 
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span& /*span*/,
-                                    const Http::ResponseHeaderMap* /*response_headers*/) override{};
+                                    const Http::ResponseHeaderMap* /*response_headers*/) override {
+  };
 
   const SamplerConfig& getSamplerConfig() const override;
 

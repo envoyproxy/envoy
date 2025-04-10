@@ -2,6 +2,9 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/subscription_factory.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/status/status.h"
@@ -26,10 +29,12 @@ public:
   /**
    * Initializes the xDS-Manager.
    * This should be called after the cluster-manager is created.
+   * @param boostrap - the bootstrap config of Envoy.
    * @param cm - a pointer to a valid cluster manager.
    * @return Ok if the initialization was successful, or an error otherwise.
    */
-  virtual absl::Status initialize(Upstream::ClusterManager* cm) PURE;
+  virtual absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  Upstream::ClusterManager* cm) PURE;
 
   /**
    * Shuts down the xDS-Manager and all the configured connections to the config
@@ -46,6 +51,32 @@ public:
    */
   virtual absl::Status
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) PURE;
+
+  /**
+   * Returns the XdsConfigTracker if defined by the bootstrap.
+   * The object will be initialized (if configured) after the call to initialize().
+   * TODO(adisuissa): this method will be removed once all the ADS-related objects
+   * are moved out of the cluster-manager to the xds-manager.
+   * @return the XdsConfigTracker if defined, or nullopt if not.
+   */
+  virtual OptRef<XdsConfigTracker> xdsConfigTracker() PURE;
+
+  /**
+   * Returns the XdsResourcesDelegate if defined by the bootstrap.
+   * The object will be initialized (if configured) after the call to initialize().
+   * TODO(adisuissa): this method will be removed once all the ADS-related objects
+   * are moved out of the cluster-manager to the xds-manager.
+   * @return the XdsResourcesDelegate if defined, or nullopt if not.
+   */
+  virtual XdsResourcesDelegateOptRef xdsResourcesDelegate() PURE;
+
+  /**
+   * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
+   * upstream component, the factory is a facet of the cluster manager.
+   *
+   * @return Config::SubscriptionFactory& the subscription factory.
+   */
+  virtual SubscriptionFactory& subscriptionFactory() PURE;
 };
 
 using XdsManagerPtr = std::unique_ptr<XdsManager>;

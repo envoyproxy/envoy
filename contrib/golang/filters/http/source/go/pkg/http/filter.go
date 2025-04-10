@@ -171,6 +171,10 @@ func (s *processState) AddData(data []byte, isStreaming bool) {
 	cAPI.HttpAddData(unsafe.Pointer(s), data, isStreaming)
 }
 
+func (s *processState) InjectData(data []byte) {
+	cAPI.HttpInjectData(unsafe.Pointer(s), data)
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &r.streamInfo
 }
@@ -278,6 +282,14 @@ func (r *httpRequest) GetProperty(key string) (string, error) {
 
 func (r *httpRequest) Finalize(reason int) {
 	cAPI.HttpFinalize(unsafe.Pointer(r), reason)
+}
+
+func (r *httpRequest) SecretManager() api.SecretManager {
+	return r
+}
+
+func (r *httpRequest) GetGenericSecret(name string) (string, bool) {
+	return cAPI.HttpGetStringSecret(unsafe.Pointer(r), name)
 }
 
 type streamInfo struct {

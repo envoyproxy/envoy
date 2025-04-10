@@ -80,6 +80,7 @@ public:
     }
     close(type);
   }
+
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   ReadDisableStatus readDisable(bool disable) override;
@@ -124,6 +125,17 @@ public:
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
+  void closeConnection(ConnectionCloseAction close_action) override {
+    ASSERT(close_action.isLocalClose() || close_action.isRemoteClose());
+    if (close_action.closeSocket()) {
+      // The socket will be directly closed.
+      closeSocket(close_action.event_);
+    } else {
+      // It will go through the normal close() process.
+      ASSERT(close_action.isLocalClose());
+      closeInternal(close_action.type_);
+    }
+  }
 
   // Network::ReadBufferSource
   StreamBuffer getReadBuffer() override { return {*read_buffer_, read_end_stream_}; }
@@ -173,6 +185,7 @@ protected:
 
   // Network::ConnectionImplBase
   void closeConnectionImmediately() final;
+  void closeThroughFilterManager(ConnectionCloseAction close_action);
 
   void closeSocket(ConnectionEvent close_type);
 
@@ -229,6 +242,8 @@ private:
   // Set the detected close type for this connection.
   void setDetectedCloseType(DetectedCloseType close_type);
 
+  void closeInternal(ConnectionCloseType type);
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
@@ -261,6 +276,7 @@ private:
   // be used as a reverse connection. The socket for such a connection is closed upon draining
   // of the owning listener.
   bool reuse_connection_ : 1;
+  bool enable_close_through_filter_manager_ : 1;
 };
 
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
