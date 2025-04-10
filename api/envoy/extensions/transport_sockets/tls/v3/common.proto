@@ -323,6 +323,13 @@ message SubjectAltNameMatcher {
 
   // Matcher for SAN value.
   //
+  // If the :ref:`san_type <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher.san_type>`
+  // is :ref:`DNS <envoy_v3_api_enum_value_extensions.transport_sockets.tls.v3.SubjectAltNameMatcher.SanType.DNS>`
+  // and the matcher type is :ref:`exact <envoy_v3_api_field_type.matcher.v3.StringMatcher.exact>`, DNS wildcards are evaluated
+  // according to the rules in https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3.
+  // For example, ``*.example.com`` would match ``test.example.com`` but not ``example.com`` and not
+  // ``a.b.example.com``.
+  //
   // The string matching for OTHER_NAME SAN values depends on their ASN.1 type:
   //
   //          * OBJECT: Validated against its dotted numeric notation (e.g., "1.2.3.4")
