@@ -40,6 +40,9 @@ message MaxMindConfig {
 
   // Full file path to the Maxmind ISP database, e.g. /etc/GeoLite2-ISP.mmdb.
   // Database file is expected to have .mmdb extension.
+  // The type of the database should be a ASN database if the flag
+  // ``envoy.reloadable_features.geoip_maxmind_provider_isp_db_load_asn_db`` is set, allowing
+  // the previous behaviorwhen the the maxmind geoip_provider was introduced.
   string isp_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
