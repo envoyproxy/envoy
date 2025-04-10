@@ -50,7 +50,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -142,7 +141,7 @@ public:
     }
     if (for_quic) {
       creation_status = absl::InvalidArgumentError("does not supported for quic");
-      return Ssl::TlsCertificateSelectorFactory();
+      return {};
     }
     return [&config, this](const Ssl::ServerContextConfig&,
                            Ssl::TlsCertificateSelectorContext& selector_ctx) {

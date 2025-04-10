@@ -1,0 +1,1013 @@
+From 20966b68881ab9ce3395d0d3fa83066a234f26be Mon Sep 17 00:00:00 2001
+From: Kuat Yessenov <kuat@google.com>
+Date: Fri, 4 Apr 2025 16:37:00 +0000
+Subject: [PATCH] remove interfering Bazel files
+
+Signed-off-by: Kuat Yessenov <kuat@google.com>
+---
+ .bazelignore                                  |   2 -
+ third_party/googletest/BUILD.bazel            | 219 -------
+ third_party/googletest/WORKSPACE              |  27 -
+ .../googletest/googlemock/test/BUILD.bazel    | 118 ----
+ .../googletest/googletest/test/BUILD.bazel    | 595 ------------------
+ 5 files changed, 961 deletions(-)
+ delete mode 100644 .bazelignore
+ delete mode 100644 third_party/googletest/BUILD.bazel
+ delete mode 100644 third_party/googletest/WORKSPACE
+ delete mode 100644 third_party/googletest/googlemock/test/BUILD.bazel
+ delete mode 100644 third_party/googletest/googletest/test/BUILD.bazel
+
+diff --git a/.bazelignore b/.bazelignore
+deleted file mode 100644
+index 9dad64c6a..000000000
+--- a/.bazelignore
++++ /dev/null
+@@ -1,2 +0,0 @@
+-third_party/googletest
+-util/bazel-example
+diff --git a/third_party/googletest/BUILD.bazel b/third_party/googletest/BUILD.bazel
+deleted file mode 100644
+index b1e3b7fba..000000000
+--- a/third_party/googletest/BUILD.bazel
++++ /dev/null
+@@ -1,219 +0,0 @@
+-# Copyright 2017 Google Inc.
+-# All Rights Reserved.
+-#
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-#
+-#     * Redistributions of source code must retain the above copyright
+-# notice, this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above
+-# copyright notice, this list of conditions and the following disclaimer
+-# in the documentation and/or other materials provided with the
+-# distribution.
+-#     * Neither the name of Google Inc. nor the names of its
+-# contributors may be used to endorse or promote products derived from
+-# this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-#
+-#   Bazel Build for Google C++ Testing Framework(Google Test)
+-
+-package(default_visibility = ["//visibility:public"])
+-
+-licenses(["notice"])
+-
+-exports_files(["LICENSE"])
+-
+-config_setting(
+-    name = "qnx",
+-    constraint_values = ["@platforms//os:qnx"],
+-)
+-
+-config_setting(
+-    name = "windows",
+-    constraint_values = ["@platforms//os:windows"],
+-)
+-
+-config_setting(
+-    name = "freebsd",
+-    constraint_values = ["@platforms//os:freebsd"],
+-)
+-
+-config_setting(
+-    name = "openbsd",
+-    constraint_values = ["@platforms//os:openbsd"],
+-)
+-
+-config_setting(
+-    name = "msvc_compiler",
+-    flag_values = {
+-        "@bazel_tools//tools/cpp:compiler": "msvc-cl",
+-    },
+-    visibility = [":__subpackages__"],
+-)
+-
+-config_setting(
+-    name = "has_absl",
+-    values = {"define": "absl=1"},
+-)
+-
+-# Library that defines the FRIEND_TEST macro.
+-cc_library(
+-    name = "gtest_prod",
+-    hdrs = ["googletest/include/gtest/gtest_prod.h"],
+-    includes = ["googletest/include"],
+-)
+-
+-# Google Test including Google Mock
+-cc_library(
+-    name = "gtest",
+-    srcs = glob(
+-        include = [
+-            "googletest/src/*.cc",
+-            "googletest/src/*.h",
+-            "googletest/include/gtest/**/*.h",
+-            "googlemock/src/*.cc",
+-            "googlemock/include/gmock/**/*.h",
+-        ],
+-        exclude = [
+-            "googletest/src/gtest-all.cc",
+-            "googletest/src/gtest_main.cc",
+-            "googlemock/src/gmock-all.cc",
+-            "googlemock/src/gmock_main.cc",
+-        ],
+-    ),
+-    hdrs = glob([
+-        "googletest/include/gtest/*.h",
+-        "googlemock/include/gmock/*.h",
+-    ]),
+-    copts = select({
+-        ":qnx": [],
+-        ":windows": [],
+-        "//conditions:default": ["-pthread"],
+-    }),
+-    defines = select({
+-        ":has_absl": ["GTEST_HAS_ABSL=1"],
+-        "//conditions:default": [],
+-    }),
+-    features = select({
+-        ":windows": ["windows_export_all_symbols"],
+-        "//conditions:default": [],
+-    }),
+-    includes = [
+-        "googlemock",
+-        "googlemock/include",
+-        "googletest",
+-        "googletest/include",
+-    ],
+-    linkopts = select({
+-        ":qnx": ["-lregex"],
+-        ":windows": [],
+-        ":freebsd": [
+-            "-lm",
+-            "-pthread",
+-        ],
+-        ":openbsd": [
+-            "-lm",
+-            "-pthread",
+-        ],
+-        "//conditions:default": ["-pthread"],
+-    }),
+-    deps = select({
+-        ":has_absl": [
+-            "@com_google_absl//absl/container:flat_hash_set",
+-            "@com_google_absl//absl/debugging:failure_signal_handler",
+-            "@com_google_absl//absl/debugging:stacktrace",
+-            "@com_google_absl//absl/debugging:symbolize",
+-            "@com_google_absl//absl/flags:flag",
+-            "@com_google_absl//absl/flags:parse",
+-            "@com_google_absl//absl/flags:reflection",
+-            "@com_google_absl//absl/flags:usage",
+-            "@com_google_absl//absl/strings",
+-            "@com_google_absl//absl/types:any",
+-            "@com_google_absl//absl/types:optional",
+-            "@com_google_absl//absl/types:variant",
+-            "@com_googlesource_code_re2//:re2",
+-        ],
+-        "//conditions:default": [],
+-    }),
+-)
+-
+-cc_library(
+-    name = "gtest_main",
+-    srcs = ["googlemock/src/gmock_main.cc"],
+-    features = select({
+-        ":windows": ["windows_export_all_symbols"],
+-        "//conditions:default": [],
+-    }),
+-    deps = [":gtest"],
+-)
+-
+-# The following rules build samples of how to use gTest.
+-cc_library(
+-    name = "gtest_sample_lib",
+-    srcs = [
+-        "googletest/samples/sample1.cc",
+-        "googletest/samples/sample2.cc",
+-        "googletest/samples/sample4.cc",
+-    ],
+-    hdrs = [
+-        "googletest/samples/prime_tables.h",
+-        "googletest/samples/sample1.h",
+-        "googletest/samples/sample2.h",
+-        "googletest/samples/sample3-inl.h",
+-        "googletest/samples/sample4.h",
+-    ],
+-    features = select({
+-        ":windows": ["windows_export_all_symbols"],
+-        "//conditions:default": [],
+-    }),
+-)
+-
+-cc_test(
+-    name = "gtest_samples",
+-    size = "small",
+-    # All Samples except:
+-    #   sample9 (main)
+-    #   sample10 (main and takes a command line option and needs to be separate)
+-    srcs = [
+-        "googletest/samples/sample1_unittest.cc",
+-        "googletest/samples/sample2_unittest.cc",
+-        "googletest/samples/sample3_unittest.cc",
+-        "googletest/samples/sample4_unittest.cc",
+-        "googletest/samples/sample5_unittest.cc",
+-        "googletest/samples/sample6_unittest.cc",
+-        "googletest/samples/sample7_unittest.cc",
+-        "googletest/samples/sample8_unittest.cc",
+-    ],
+-    linkstatic = 0,
+-    deps = [
+-        "gtest_sample_lib",
+-        ":gtest_main",
+-    ],
+-)
+-
+-cc_test(
+-    name = "sample9_unittest",
+-    size = "small",
+-    srcs = ["googletest/samples/sample9_unittest.cc"],
+-    deps = [":gtest"],
+-)
+-
+-cc_test(
+-    name = "sample10_unittest",
+-    size = "small",
+-    srcs = ["googletest/samples/sample10_unittest.cc"],
+-    deps = [":gtest"],
+-)
+diff --git a/third_party/googletest/WORKSPACE b/third_party/googletest/WORKSPACE
+deleted file mode 100644
+index f819ffe61..000000000
+--- a/third_party/googletest/WORKSPACE
++++ /dev/null
+@@ -1,27 +0,0 @@
+-workspace(name = "com_google_googletest")
+-
+-load("//:googletest_deps.bzl", "googletest_deps")
+-googletest_deps()
+-
+-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+-
+-http_archive(
+-  name = "rules_python",  # 2023-07-31T20:39:27Z
+-  sha256 = "1250b59a33c591a1c4ba68c62e95fc88a84c334ec35a2e23f46cbc1b9a5a8b55",
+-  strip_prefix = "rules_python-e355becc30275939d87116a4ec83dad4bb50d9e1",
+-  urls = ["https://github.com/bazelbuild/rules_python/archive/e355becc30275939d87116a4ec83dad4bb50d9e1.zip"],
+-)
+-
+-http_archive(
+-  name = "bazel_skylib",  # 2023-05-31T19:24:07Z
+-  sha256 = "08c0386f45821ce246bbbf77503c973246ed6ee5c3463e41efc197fa9bc3a7f4",
+-  strip_prefix = "bazel-skylib-288731ef9f7f688932bd50e704a91a45ec185f9b",
+-  urls = ["https://github.com/bazelbuild/bazel-skylib/archive/288731ef9f7f688932bd50e704a91a45ec185f9b.zip"],
+-)
+-
+-http_archive(
+-  name = "platforms",  # 2023-07-28T19:44:27Z
+-  sha256 = "40eb313613ff00a5c03eed20aba58890046f4d38dec7344f00bb9a8867853526",
+-  strip_prefix = "platforms-4ad40ef271da8176d4fc0194d2089b8a76e19d7b",
+-  urls = ["https://github.com/bazelbuild/platforms/archive/4ad40ef271da8176d4fc0194d2089b8a76e19d7b.zip"],
+-)
+diff --git a/third_party/googletest/googlemock/test/BUILD.bazel b/third_party/googletest/googlemock/test/BUILD.bazel
+deleted file mode 100644
+index d4297c80f..000000000
+--- a/third_party/googletest/googlemock/test/BUILD.bazel
++++ /dev/null
+@@ -1,118 +0,0 @@
+-# Copyright 2017 Google Inc.
+-# All Rights Reserved.
+-#
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-#
+-#     * Redistributions of source code must retain the above copyright
+-# notice, this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above
+-# copyright notice, this list of conditions and the following disclaimer
+-# in the documentation and/or other materials provided with the
+-# distribution.
+-#     * Neither the name of Google Inc. nor the names of its
+-# contributors may be used to endorse or promote products derived from
+-# this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-#
+-#   Bazel Build for Google C++ Testing Framework(Google Test)-googlemock
+-
+-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+-
+-licenses(["notice"])
+-
+-# Tests for GMock itself
+-cc_test(
+-    name = "gmock_all_test",
+-    size = "small",
+-    srcs = glob(include = ["gmock-*.cc"]) + ["gmock-matchers_test.h"],
+-    linkopts = select({
+-        "//:qnx": [],
+-        "//:windows": [],
+-        "//conditions:default": ["-pthread"],
+-    }),
+-    deps = ["//:gtest"],
+-)
+-
+-# Python tests
+-py_library(
+-    name = "gmock_test_utils",
+-    testonly = 1,
+-    srcs = ["gmock_test_utils.py"],
+-    deps = [
+-        "//googletest/test:gtest_test_utils",
+-    ],
+-)
+-
+-cc_binary(
+-    name = "gmock_leak_test_",
+-    testonly = 1,
+-    srcs = ["gmock_leak_test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-py_test(
+-    name = "gmock_leak_test",
+-    size = "medium",
+-    srcs = ["gmock_leak_test.py"],
+-    data = [
+-        ":gmock_leak_test_",
+-        ":gmock_test_utils",
+-    ],
+-    tags = [
+-        "no_test_msvc2015",
+-        "no_test_msvc2017",
+-    ],
+-)
+-
+-cc_test(
+-    name = "gmock_link_test",
+-    size = "small",
+-    srcs = [
+-        "gmock_link2_test.cc",
+-        "gmock_link_test.cc",
+-        "gmock_link_test.h",
+-    ],
+-    deps = ["//:gtest_main"],
+-)
+-
+-cc_binary(
+-    name = "gmock_output_test_",
+-    srcs = ["gmock_output_test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "gmock_output_test",
+-    size = "medium",
+-    srcs = ["gmock_output_test.py"],
+-    data = [
+-        ":gmock_output_test_",
+-        ":gmock_output_test_golden.txt",
+-    ],
+-    tags = [
+-        "no_test_msvc2015",
+-        "no_test_msvc2017",
+-    ],
+-    deps = [":gmock_test_utils"],
+-)
+-
+-cc_test(
+-    name = "gmock_test",
+-    size = "small",
+-    srcs = ["gmock_test.cc"],
+-    deps = ["//:gtest_main"],
+-)
+diff --git a/third_party/googletest/googletest/test/BUILD.bazel b/third_party/googletest/googletest/test/BUILD.bazel
+deleted file mode 100644
+index 1890b6ff9..000000000
+--- a/third_party/googletest/googletest/test/BUILD.bazel
++++ /dev/null
+@@ -1,595 +0,0 @@
+-# Copyright 2017 Google Inc.
+-# All Rights Reserved.
+-#
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-#
+-#     * Redistributions of source code must retain the above copyright
+-# notice, this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above
+-# copyright notice, this list of conditions and the following disclaimer
+-# in the documentation and/or other materials provided with the
+-# distribution.
+-#     * Neither the name of Google Inc. nor the names of its
+-# contributors may be used to endorse or promote products derived from
+-# this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-#
+-# Bazel BUILD for The Google C++ Testing Framework (Google Test)
+-
+-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+-
+-licenses(["notice"])
+-
+-package(default_visibility = ["//:__subpackages__"])
+-
+-#on windows exclude gtest-tuple.h
+-cc_test(
+-    name = "gtest_all_test",
+-    size = "small",
+-    srcs = glob(
+-        include = [
+-            "gtest-*.cc",
+-            "googletest-*.cc",
+-            "*.h",
+-            "googletest/include/gtest/**/*.h",
+-        ],
+-        exclude = [
+-            "gtest-unittest-api_test.cc",
+-            "googletest/src/gtest-all.cc",
+-            "gtest_all_test.cc",
+-            "gtest-death-test_ex_test.cc",
+-            "gtest-listener_test.cc",
+-            "gtest-unittest-api_test.cc",
+-            "googletest-param-test-test.cc",
+-            "googletest-param-test2-test.cc",
+-            "googletest-catch-exceptions-test_.cc",
+-            "googletest-color-test_.cc",
+-            "googletest-env-var-test_.cc",
+-            "googletest-failfast-unittest_.cc",
+-            "googletest-filter-unittest_.cc",
+-            "googletest-global-environment-unittest_.cc",
+-            "googletest-break-on-failure-unittest_.cc",
+-            "googletest-listener-test.cc",
+-            "googletest-message-test.cc",
+-            "googletest-output-test_.cc",
+-            "googletest-list-tests-unittest_.cc",
+-            "googletest-shuffle-test_.cc",
+-            "googletest-setuptestsuite-test_.cc",
+-            "googletest-uninitialized-test_.cc",
+-            "googletest-death-test_ex_test.cc",
+-            "googletest-param-test-test",
+-            "googletest-throw-on-failure-test_.cc",
+-            "googletest-param-test-invalid-name1-test_.cc",
+-            "googletest-param-test-invalid-name2-test_.cc",
+-        ],
+-    ) + select({
+-        "//:windows": [],
+-        "//conditions:default": [],
+-    }),
+-    copts = select({
+-        "//:windows": ["-DGTEST_USE_OWN_TR1_TUPLE=0"],
+-        "//conditions:default": ["-DGTEST_USE_OWN_TR1_TUPLE=1"],
+-    }) + select({
+-        # Ensure MSVC treats source files as UTF-8 encoded.
+-        "//:msvc_compiler": ["-utf-8"],
+-        "//conditions:default": [],
+-    }),
+-    includes = [
+-        "googletest",
+-        "googletest/include",
+-        "googletest/include/internal",
+-        "googletest/test",
+-    ],
+-    linkopts = select({
+-        "//:qnx": [],
+-        "//:windows": [],
+-        "//conditions:default": ["-pthread"],
+-    }),
+-    deps = ["//:gtest_main"],
+-)
+-
+-# Tests death tests.
+-cc_test(
+-    name = "googletest-death-test-test",
+-    size = "medium",
+-    srcs = ["googletest-death-test-test.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-cc_test(
+-    name = "gtest_test_macro_stack_footprint_test",
+-    size = "small",
+-    srcs = ["gtest_test_macro_stack_footprint_test.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-#These googletest tests have their own main()
+-cc_test(
+-    name = "googletest-listener-test",
+-    size = "small",
+-    srcs = ["googletest-listener-test.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-cc_test(
+-    name = "gtest-unittest-api_test",
+-    size = "small",
+-    srcs = [
+-        "gtest-unittest-api_test.cc",
+-    ],
+-    deps = [
+-        "//:gtest",
+-    ],
+-)
+-
+-cc_test(
+-    name = "googletest-param-test-test",
+-    size = "small",
+-    srcs = [
+-        "googletest-param-test-test.cc",
+-        "googletest-param-test-test.h",
+-        "googletest-param-test2-test.cc",
+-    ],
+-    deps = ["//:gtest"],
+-)
+-
+-cc_test(
+-    name = "gtest_unittest",
+-    size = "small",
+-    srcs = ["gtest_unittest.cc"],
+-    shard_count = 2,
+-    deps = ["//:gtest_main"],
+-)
+-
+-#  Py tests
+-
+-py_library(
+-    name = "gtest_test_utils",
+-    testonly = 1,
+-    srcs = ["gtest_test_utils.py"],
+-    imports = ["."],
+-)
+-
+-cc_binary(
+-    name = "gtest_help_test_",
+-    testonly = 1,
+-    srcs = ["gtest_help_test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-py_test(
+-    name = "gtest_help_test",
+-    size = "small",
+-    srcs = ["gtest_help_test.py"],
+-    args = select({
+-        "//:has_absl": ["--has_absl_flags"],
+-        "//conditions:default": [],
+-    }),
+-    data = [":gtest_help_test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-output-test_",
+-    testonly = 1,
+-    srcs = ["googletest-output-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-output-test",
+-    size = "small",
+-    srcs = ["googletest-output-test.py"],
+-    args = select({
+-        "//:has_absl": [],
+-        "//conditions:default": ["--no_stacktrace_support"],
+-    }),
+-    data = [
+-        "googletest-output-test-golden-lin.txt",
+-        ":googletest-output-test_",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-color-test_",
+-    testonly = 1,
+-    srcs = ["googletest-color-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-color-test",
+-    size = "small",
+-    srcs = ["googletest-color-test.py"],
+-    data = [":googletest-color-test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-env-var-test_",
+-    testonly = 1,
+-    srcs = ["googletest-env-var-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-env-var-test",
+-    size = "medium",
+-    srcs = ["googletest-env-var-test.py"],
+-    data = [":googletest-env-var-test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-failfast-unittest_",
+-    testonly = 1,
+-    srcs = ["googletest-failfast-unittest_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-failfast-unittest",
+-    size = "medium",
+-    srcs = ["googletest-failfast-unittest.py"],
+-    data = [":googletest-failfast-unittest_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-filter-unittest_",
+-    testonly = 1,
+-    srcs = ["googletest-filter-unittest_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-filter-unittest",
+-    size = "medium",
+-    srcs = ["googletest-filter-unittest.py"],
+-    data = [":googletest-filter-unittest_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-global-environment-unittest_",
+-    testonly = 1,
+-    srcs = ["googletest-global-environment-unittest_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-global-environment-unittest",
+-    size = "medium",
+-    srcs = ["googletest-global-environment-unittest.py"],
+-    data = [":googletest-global-environment-unittest_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-break-on-failure-unittest_",
+-    testonly = 1,
+-    srcs = ["googletest-break-on-failure-unittest_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-break-on-failure-unittest",
+-    size = "small",
+-    srcs = ["googletest-break-on-failure-unittest.py"],
+-    data = [":googletest-break-on-failure-unittest_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_test(
+-    name = "gtest_assert_by_exception_test",
+-    size = "small",
+-    srcs = ["gtest_assert_by_exception_test.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-cc_binary(
+-    name = "googletest-throw-on-failure-test_",
+-    testonly = 1,
+-    srcs = ["googletest-throw-on-failure-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-throw-on-failure-test",
+-    size = "small",
+-    srcs = ["googletest-throw-on-failure-test.py"],
+-    data = [":googletest-throw-on-failure-test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-list-tests-unittest_",
+-    testonly = 1,
+-    srcs = ["googletest-list-tests-unittest_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-cc_test(
+-    name = "gtest_skip_test",
+-    size = "small",
+-    srcs = ["gtest_skip_test.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-cc_test(
+-    name = "gtest_skip_in_environment_setup_test",
+-    size = "small",
+-    srcs = ["gtest_skip_in_environment_setup_test.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-py_test(
+-    name = "gtest_skip_check_output_test",
+-    size = "small",
+-    srcs = ["gtest_skip_check_output_test.py"],
+-    data = [":gtest_skip_test"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-py_test(
+-    name = "gtest_skip_environment_check_output_test",
+-    size = "small",
+-    srcs = ["gtest_skip_environment_check_output_test.py"],
+-    data = [
+-        ":gtest_skip_in_environment_setup_test",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-py_test(
+-    name = "googletest-list-tests-unittest",
+-    size = "small",
+-    srcs = ["googletest-list-tests-unittest.py"],
+-    data = [":googletest-list-tests-unittest_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-shuffle-test_",
+-    srcs = ["googletest-shuffle-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-shuffle-test",
+-    size = "small",
+-    srcs = ["googletest-shuffle-test.py"],
+-    data = [":googletest-shuffle-test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-catch-exceptions-no-ex-test_",
+-    testonly = 1,
+-    srcs = ["googletest-catch-exceptions-test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-cc_binary(
+-    name = "googletest-catch-exceptions-ex-test_",
+-    testonly = 1,
+-    srcs = ["googletest-catch-exceptions-test_.cc"],
+-    copts = ["-fexceptions"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-py_test(
+-    name = "googletest-catch-exceptions-test",
+-    size = "small",
+-    srcs = ["googletest-catch-exceptions-test.py"],
+-    data = [
+-        ":googletest-catch-exceptions-ex-test_",
+-        ":googletest-catch-exceptions-no-ex-test_",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "gtest_xml_output_unittest_",
+-    testonly = 1,
+-    srcs = ["gtest_xml_output_unittest_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-cc_test(
+-    name = "gtest_no_test_unittest",
+-    size = "small",
+-    srcs = ["gtest_no_test_unittest.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "gtest_xml_output_unittest",
+-    size = "small",
+-    srcs = [
+-        "gtest_xml_output_unittest.py",
+-        "gtest_xml_test_utils.py",
+-    ],
+-    args = select({
+-        "//:has_absl": [],
+-        "//conditions:default": ["--no_stacktrace_support"],
+-    }),
+-    data = [
+-        # We invoke gtest_no_test_unittest to verify the XML output
+-        # when the test program contains no test definition.
+-        ":gtest_no_test_unittest",
+-        ":gtest_xml_output_unittest_",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "gtest_xml_outfile1_test_",
+-    testonly = 1,
+-    srcs = ["gtest_xml_outfile1_test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-cc_binary(
+-    name = "gtest_xml_outfile2_test_",
+-    testonly = 1,
+-    srcs = ["gtest_xml_outfile2_test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-py_test(
+-    name = "gtest_xml_outfiles_test",
+-    size = "small",
+-    srcs = [
+-        "gtest_xml_outfiles_test.py",
+-        "gtest_xml_test_utils.py",
+-    ],
+-    data = [
+-        ":gtest_xml_outfile1_test_",
+-        ":gtest_xml_outfile2_test_",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-setuptestsuite-test_",
+-    testonly = 1,
+-    srcs = ["googletest-setuptestsuite-test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-py_test(
+-    name = "googletest-setuptestsuite-test",
+-    size = "medium",
+-    srcs = ["googletest-setuptestsuite-test.py"],
+-    data = [":googletest-setuptestsuite-test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "googletest-uninitialized-test_",
+-    testonly = 1,
+-    srcs = ["googletest-uninitialized-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-uninitialized-test",
+-    size = "medium",
+-    srcs = ["googletest-uninitialized-test.py"],
+-    data = ["googletest-uninitialized-test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-cc_binary(
+-    name = "gtest_testbridge_test_",
+-    testonly = 1,
+-    srcs = ["gtest_testbridge_test_.cc"],
+-    deps = ["//:gtest_main"],
+-)
+-
+-# Tests that filtering via testbridge works
+-py_test(
+-    name = "gtest_testbridge_test",
+-    size = "small",
+-    srcs = ["gtest_testbridge_test.py"],
+-    data = [":gtest_testbridge_test_"],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-py_test(
+-    name = "googletest-json-outfiles-test",
+-    size = "small",
+-    srcs = [
+-        "googletest-json-outfiles-test.py",
+-        "gtest_json_test_utils.py",
+-    ],
+-    data = [
+-        ":gtest_xml_outfile1_test_",
+-        ":gtest_xml_outfile2_test_",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-py_test(
+-    name = "googletest-json-output-unittest",
+-    size = "medium",
+-    srcs = [
+-        "googletest-json-output-unittest.py",
+-        "gtest_json_test_utils.py",
+-    ],
+-    args = select({
+-        "//:has_absl": [],
+-        "//conditions:default": ["--no_stacktrace_support"],
+-    }),
+-    data = [
+-        # We invoke gtest_no_test_unittest to verify the JSON output
+-        # when the test program contains no test definition.
+-        ":gtest_no_test_unittest",
+-        ":gtest_xml_output_unittest_",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-# Verifies interaction of death tests and exceptions.
+-cc_test(
+-    name = "googletest-death-test_ex_catch_test",
+-    size = "medium",
+-    srcs = ["googletest-death-test_ex_test.cc"],
+-    copts = ["-fexceptions"],
+-    defines = ["GTEST_ENABLE_CATCH_EXCEPTIONS_=1"],
+-    deps = ["//:gtest"],
+-)
+-
+-cc_binary(
+-    name = "googletest-param-test-invalid-name1-test_",
+-    testonly = 1,
+-    srcs = ["googletest-param-test-invalid-name1-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-cc_binary(
+-    name = "googletest-param-test-invalid-name2-test_",
+-    testonly = 1,
+-    srcs = ["googletest-param-test-invalid-name2-test_.cc"],
+-    deps = ["//:gtest"],
+-)
+-
+-py_test(
+-    name = "googletest-param-test-invalid-name1-test",
+-    size = "small",
+-    srcs = ["googletest-param-test-invalid-name1-test.py"],
+-    data = [":googletest-param-test-invalid-name1-test_"],
+-    tags = [
+-        "no_test_msvc2015",
+-        "no_test_msvc2017",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-
+-py_test(
+-    name = "googletest-param-test-invalid-name2-test",
+-    size = "small",
+-    srcs = ["googletest-param-test-invalid-name2-test.py"],
+-    data = [":googletest-param-test-invalid-name2-test_"],
+-    tags = [
+-        "no_test_msvc2015",
+-        "no_test_msvc2017",
+-    ],
+-    deps = [":gtest_test_utils"],
+-)
+-- 
+2.49.0.504.g3bcea36a83-goog
+

@@ -8,6 +8,7 @@
 #include "source/common/common/posix/thread_impl.h"
 #include "source/common/common/thread.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "absl/types/optional.h"
 #include "extension_registry.h"
@@ -111,7 +112,7 @@ public:
 
   // These functions are wrappers around networkConnectivityManager functions, which hand off
   // to networkConnectivityManager after doing a dispatcher post (thread context switch)
-  envoy_status_t setProxySettings(const char* host, const uint16_t port);
+  envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
   envoy_status_t resetConnectivityState();
 
   /**

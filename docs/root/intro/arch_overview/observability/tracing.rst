@@ -22,8 +22,8 @@ sources of latency. Envoy supports three features related to system wide tracing
 
   - External tracers which are part of the Envoy code base, like `Zipkin <https://zipkin.io/>`_,
     `Jaeger <https://github.com/jaegertracing/>`_,
-    `Datadog <https://datadoghq.com>`_, `SkyWalking <http://skywalking.apache.org/>`_, and
-    `AWS X-Ray <https://docs.aws.amazon.com/xray/latest/devguide/xray-gettingstarted.html>`_.
+    `Datadog <https://datadoghq.com>`_, `SkyWalking <http://skywalking.apache.org/>`_,
+    `AWS X-Ray <https://docs.aws.amazon.com/xray/latest/devguide/xray-gettingstarted.html>`_, and `Fluentd <https://www.fluentd.org/>`_.
   - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
 
 How to initiate a trace
@@ -159,7 +159,7 @@ Tracing providers have varying level of support for getting and setting baggage:
 
 * Lightstep (and any OpenTelemetry-compliant tracer) can read/write baggage
 * Zipkin support is not yet implemented
-* X-Ray doesn't support baggage
+* X-Ray and Fluentd don't support baggage
 
 Different types of span
 -----------------------

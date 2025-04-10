@@ -23,7 +23,6 @@
 #include "server_lifecycle_notifier.h"
 #include "tracer_factory.h"
 #include "tracer_factory_context.h"
-#include "transport_socket_factory_context.h"
 #include "watch_dog.h"
 #include "worker.h"
 #include "worker_factory.h"

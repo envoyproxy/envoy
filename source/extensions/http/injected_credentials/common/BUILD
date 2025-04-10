@@ -27,7 +27,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "credential_config_interface",
     hdrs = ["factory.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":credential_interface",
         "//envoy/config:typed_config_interface",

@@ -14,7 +14,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/connection.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
@@ -232,7 +232,7 @@ public:
   PersistentQuicInfoPtr quic_connection_persistent_info_;
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
   std::shared_ptr<Upstream::HostImpl> host_;
-  Upstream::HostDescriptionImpl::AddressVector address_list_{};
+  Upstream::HostDescriptionImpl::AddressVector address_list_;
 
   NiceMock<ConnPoolCallbacks> callbacks_;
   NiceMock<MockResponseDecoder> decoder_;
@@ -1677,7 +1677,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context_.context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(factory_context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);

@@ -14,8 +14,7 @@ namespace {
 static void deathTestWorker() {
   ManagerImpl manager;
 
-  manager.get(
-      "foo", [] { return nullptr; }, false);
+  manager.get("foo", [] { return nullptr; }, false);
 }
 
 TEST(SingletonManagerImplDeathTest, NotRegistered) {
@@ -42,11 +41,9 @@ TEST(SingletonManagerImplTest, Basic) {
   ManagerImpl manager;
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
-  EXPECT_EQ(singleton, manager.get(
-                           "test_singleton", [singleton] { return singleton; }, false));
+  EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }, false));
   EXPECT_EQ(1UL, singleton.use_count());
-  EXPECT_EQ(singleton, manager.get(
-                           "test_singleton", [] { return nullptr; }, false));
+  EXPECT_EQ(singleton, manager.get("test_singleton", [] { return nullptr; }, false));
 
   EXPECT_CALL(*singleton, onDestroy());
   singleton.reset();
@@ -60,8 +57,7 @@ TEST(SingletonManagerImplTest, NonConstructingGetTyped) {
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
   // Use a construct on first use getter.
-  EXPECT_EQ(singleton, manager.get(
-                           "test_singleton", [singleton] { return singleton; }, false));
+  EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }, false));
   // Now access should return the constructed singleton.
   EXPECT_EQ(singleton, manager.getTyped<TestSingleton>("test_singleton"));
   EXPECT_EQ(1UL, singleton.use_count());

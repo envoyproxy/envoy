@@ -94,7 +94,8 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
   } else {
     if (config.has_private_key_provider()) {
       private_key_method_ =
-          factory_context.sslContextManager()
+          factory_context.serverFactoryContext()
+              .sslContextManager()
               .privateKeyMethodManager()
               .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context);
       if (private_key_method_ == nullptr ||
