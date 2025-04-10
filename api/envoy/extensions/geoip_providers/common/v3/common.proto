@@ -38,8 +38,11 @@ message CommonGeoipProviderConfig {
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // This field is being deprecated, use ``anon`` instead.
-    string is_anon = 5
-        [deprecated = true, (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string is_anon = 5 [
+      deprecated = true,
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true},
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
+    ];
 
     // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
     // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.

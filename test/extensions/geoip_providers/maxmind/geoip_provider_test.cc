@@ -226,7 +226,7 @@ TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("78.26.243.166");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
@@ -248,7 +248,7 @@ TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("::12.96.16.1");
   Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult &&)> lookup_cb;
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
