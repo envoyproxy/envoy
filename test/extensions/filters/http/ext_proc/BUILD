@@ -65,6 +65,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg_cc_proto",
