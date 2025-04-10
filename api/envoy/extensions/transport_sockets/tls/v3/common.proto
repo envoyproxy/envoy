@@ -49,6 +49,7 @@ message TlsParameters {
     NONE = 0;
 
     // FIPS_202205 configures a TLS connection to use:
+    //
     //   * TLS 1.2 or 1.3
     //   * For TLS 1.2, only ECDHE_[RSA|ECDSA]_WITH_AES_*_GCM_SHA*.
     //   * For TLS 1.3, only AES-GCM
@@ -56,11 +57,10 @@ message TlsParameters {
     //   * For server signatures, only ``PKCS#1/PSS`` with ``SHA256/384/512``, or ECDSA
     //     with P-256 or P-384.
     //
-    // Note: this policy can be configured even if BoringSSL has not been built in
-    // FIPS mode.
+    // .. attention::
     //
-    // Note: this setting aids with compliance with NIST requirements but does not
-    // guarantee it. Careful reading of SP 800-52r2 is recommended.
+    //   Please refer to `BoringSSL policies <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20240913.0/include/openssl/ssl.h#5608>`_
+    //   for details.
     FIPS_202205 = 1;
   }
 

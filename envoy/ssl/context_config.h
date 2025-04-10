@@ -19,14 +19,6 @@
 namespace Envoy {
 namespace Ssl {
 
-// CompliancePolicy is defined in BoringSSL to enforce NIST policy restrictions.
-enum class CompliancePolicy {
-  // No policy restrictions are applied.
-  None,
-  // This corresponds to `ssl_compliance_policy_fips_202205' in BoringSSL.
-  FIPS_202205,
-};
-
 /**
  * Supplies the configuration for an SSL context.
  */
