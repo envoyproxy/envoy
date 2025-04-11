@@ -98,6 +98,9 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "false"}});
+
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -151,8 +154,6 @@ protected:
     EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     HttpTestUtility::addDefaultHeaders(request_headers_);
     request_headers_.setMethod("POST");
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_append_default_true", "false"}});
   }
 
   void initializeTestSendAll() {
@@ -834,7 +835,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulFalse) {
 
   // Set the runtime to false to force append default to be false, which is legacy behavior.
   scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_append_default_true", "false"}});
+      {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "false"}});
 
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -864,7 +865,8 @@ TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulTrue) {
   )EOF");
 
   // Set the runtime to true to force append default to be true.
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_append_default_true", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "true"}});
 
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));

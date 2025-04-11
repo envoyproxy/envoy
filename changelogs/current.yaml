@@ -330,12 +330,12 @@ new_features:
     :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
 - area: ext_proc
   change: |
-    Added runtime guard ``envoy.reloadable_features.ext_proc_append_default_true`` and set it to false by default to keep the
-    legacy behavior.
-    When this runtime guard is true, the default value of:ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
-    in :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` is true.
-    When this runtime guard is false, the default value of:ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>`
-    in :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` is false.
+    Added runtime guard ``envoy.reloadable_features.ext_proc_modified_append_default_value`` and keep the default as true.
+    The default value of:ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` in
+    :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` is set to this runtime value.
+    This is a breaking change for those users who have their ext_proc servers not explictly encoding ``append`` to false,
+    and leave it as default. Users with this kind of ext_proc servers should flip the runtime guard to false first to revert to
+    the legacy behavior, at same time start to change the ext_proc server to always explictly encode ``append``.
 - area: http
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`

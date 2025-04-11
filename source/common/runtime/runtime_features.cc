@@ -42,6 +42,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_udp_proxy_outlier_detection);
 RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_modified_append_default_value);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
 RUNTIME_GUARD(envoy_reloadable_features_filter_access_loggers_first);
@@ -179,7 +180,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_append_default_true);
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

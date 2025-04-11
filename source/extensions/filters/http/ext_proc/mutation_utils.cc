@@ -162,12 +162,8 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       return absl::InvalidArgumentError("Invalid character in set_headers mutation.");
     }
     const LowerCaseString header_name(sh.header().key());
-    bool append;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_append_default_true")) {
-      append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, true);
-    } else {
-      append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
-    }
+    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_modified_append_default_value"));
     const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
                                                                         : CheckOperation::SET;
     auto check_result = checker.check(check_op, header_name, header_value);
