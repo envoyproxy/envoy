@@ -14,6 +14,19 @@
 namespace Envoy {
 namespace Grpc {
 
+namespace {
+std::string enhancedGrpcMessage(const std::string& original_message,
+                                const Http::AsyncClient::Stream* stream) {
+  const auto& http_response_code_details = (stream && stream->streamInfo().responseCodeDetails())
+                                               ? *stream->streamInfo().responseCodeDetails()
+                                               : EMPTY_STRING;
+  return original_message.empty() ? http_response_code_details
+         : http_response_code_details.empty()
+             ? original_message
+             : absl::StrCat(original_message, "{", http_response_code_details, "}");
+}
+} // namespace
+
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(Upstream::ClusterManager& cm,
                         const envoy::config::core::v3::GrpcService& config,
@@ -286,7 +299,7 @@ void AsyncStreamImpl::notifyRemoteClose(Grpc::Status::GrpcStatus status,
   }
   current_span_->finishSpan();
   if (!waiting_to_delete_on_remote_close_) {
-    callbacks_.onRemoteClose(status, message);
+    callbacks_.onRemoteClose(status, enhancedGrpcMessage(message, stream_));
   }
 }
 
