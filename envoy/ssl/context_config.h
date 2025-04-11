@@ -121,6 +121,11 @@ public:
 
 class ClientContextConfig : public virtual ContextConfig {
 public:
+  struct PerHostSessionCacheConfig {
+    size_t max_hosts_;                 // Maximum number of hosts in session cache.
+    size_t max_session_keys_per_host_; // Maximum number of session keys per host.
+  };
+
   /**
    * @return The server name indication if it's set and ssl enabled
    * Otherwise, ""
@@ -155,6 +160,12 @@ public:
    * and incompatible with the TLS usage is enabled.
    */
   virtual bool enforceRsaKeyUsage() const PURE;
+
+  /**
+   * @return per host session cache configuration if it is set.
+   */
+  virtual const absl::optional<const PerHostSessionCacheConfig>
+  perHostSessionCacheConfig() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
