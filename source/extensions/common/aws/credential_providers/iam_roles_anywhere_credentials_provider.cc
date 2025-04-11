@@ -58,24 +58,35 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 
-  Json::ObjectUniquePtr json_object = std::make_unique<Json::ObjectImpl>();
+  auto json_message = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *json_message->mutable_fields();
+  fields["profileArn"].set_string_value(profile_arn_);
+  fields["roleArn"].set_string_value(role_arn_);
+  fields["trustAnchorArn"].set_string_value(trust_anchor_arn_);
   
-  json_object["a"]=1;
-
-  std::string body_data;
-  body_data.append("{");
   if (session_duration_.has_value()) {
-    body_data.append(fmt::format("\"durationSeconds\": {}, ", session_duration_.value()));
+    fields["durationSeconds"].set_number_value(session_duration_.value());
   }
-  body_data.append(fmt::format("\"profileArn\": \"{}\", ", profile_arn_));
-  body_data.append(fmt::format("\"roleArn\": \"{}\", ", role_arn_));
-  body_data.append(fmt::format("\"trustAnchorArn\": \"{}\"", trust_anchor_arn_));
   if (!role_session_name_.empty()) {
-    body_data.append(fmt::format(", \"roleSessionName\": \"{}\"", role_session_name_));
+    fields["roleSessionName"].set_string_value(role_session_name_);
   }
-  body_data.append("}");
-  message.body().add(body_data);
-  ENVOY_LOG(debug, "IAM Roles Anywhere /sessions payload: {}", body_data);
+
+  // std::string body_data;
+  // body_data.append("{");
+  // if (session_duration_.has_value()) {
+  //   body_data.append(fmt::format("\"durationSeconds\": {}, ", session_duration_.value()));
+  // }
+  // body_data.append(fmt::format("\"profileArn\": \"{}\", ", profile_arn_));
+  // body_data.append(fmt::format("\"roleArn\": \"{}\", ", role_arn_));
+  // body_data.append(fmt::format("\"trustAnchorArn\": \"{}\"", trust_anchor_arn_));
+  // if (!role_session_name_.empty()) {
+  //   body_data.append(fmt::format(", \"roleSessionName\": \"{}\"", role_session_name_));
+  // }
+  // body_data.append("}");
+  auto body_data = Json::Factory::loadFromProtobufStruct(*json_message);
+  
+  message.body().add(body_data->asJsonString());
+  ENVOY_LOG(debug, "IAM Roles Anywhere /sessions payload: {}", body_data->asJsonString());
 
   auto status = roles_anywhere_signer_->sign(message, true, region_);
   if (!status.ok()) {

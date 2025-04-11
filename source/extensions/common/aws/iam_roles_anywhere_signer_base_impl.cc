@@ -1,4 +1,4 @@
-#include "source/extensions/common/aws/iam_roles_anywhere_signer_base.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
