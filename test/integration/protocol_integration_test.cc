@@ -41,6 +41,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
@@ -3006,7 +3007,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTr
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
-  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
+  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100 * TIMEOUT_FACTOR));
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
