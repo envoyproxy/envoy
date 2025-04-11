@@ -559,7 +559,7 @@ TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
       TestMetadata{{Http::LowerCaseString("foo"), "bar"},
                    {Http::LowerCaseString("baz"), "blah"},
                    {Http::LowerCaseString("hello-world-in-japanese-bin"),
-                    // Heh, Google base64 encoding doesn't do padding.
+                    // Google base64 encoding doesn't do padding.
                     clientType() == ClientType::EnvoyGrpc ? "44GT44KT44Gr44Gh44GvIOS4lueVjA=="
                                                           : "44GT44KT44Gr44Gh44GvIOS4lueVjA"}});
 
