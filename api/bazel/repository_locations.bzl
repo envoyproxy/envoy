@@ -47,13 +47,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_jvm_external/blob/{version}/LICENSE",
     ),
+    # DONOTSUBMIT using forked source to test while waiting for the API change to be merged.
     com_github_cncf_xds = dict(
         project_name = "xDS API",
         project_desc = "xDS API Working Group (xDS-WG)",
-        project_url = "https://github.com/cncf/xds",
+        project_url = "https://github.com/bsurber/xds",
         # During the UDPA -> xDS migration, we aren't working with releases.
-        version = "b4127c9b8d78b77423fd25169f05b7476b6ea932",
-        sha256 = "aa5f1596bbef3f277dcf4700e4c1097b34301ae66f3b79cd731e3adfbaff2f8f",
+        version = "42edf51096e977f2f5f7dba71110f93ac54379f2",
+        sha256 = "a1d477d82d1186094b64aaaf160934e2c67bf20bdfdae6cc626b4631ac06cf80",
         release_date = "2024-09-05",
         strip_prefix = "xds-{version}",
         urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
