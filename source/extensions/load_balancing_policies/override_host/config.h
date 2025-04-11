@@ -3,7 +3,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/extensions/load_balancing_policies/dynamic_forwarding/v3/dynamic_forwarding.pb.h"
+#include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -18,7 +18,7 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace DynamicForwarding {
 
-using ::envoy::extensions::load_balancing_policies::dynamic_forwarding::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
 using ::Envoy::Random::RandomGenerator;
 using ::Envoy::Runtime::Loader;
 using ::Envoy::Upstream::ClusterInfo;
@@ -28,7 +28,7 @@ class DynamicForwardingLoadBalancerFactory
     : public Upstream::TypedLoadBalancerFactoryBase<DynamicForwarding> {
 public:
   DynamicForwardingLoadBalancerFactory()
-      : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.dynamic_forwarding") {}
+      : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.override_host") {}
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,

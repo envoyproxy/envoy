@@ -15,7 +15,7 @@ constexpr absl::string_view kSelectedEndpointsKey = "envoy.lb";
 // fallback endpoint in the request metadata under this key.
 // If this metadata is not present, the primary endpoint is used.
 constexpr absl::string_view kEndpointsFallbackIndexKey =
-    "envoy.extensions.load_balancing_policies.dynamic_forwarding.fallback_index";
+    "envoy.extensions.load_balancing_policies.override_host.fallback_index";
 constexpr absl::string_view kEndpointsFallbackIndexFieldName = "index";
 
 // This message is represented as a protobuf Struct using the following schema:

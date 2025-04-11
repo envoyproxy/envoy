@@ -14,11 +14,9 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace DynamicForwarding {
 
-// The SelectedHosts struct is used to represent parsed proto.
+// The SelectedHosts struct is used to represent parsed proto or headers with
+// the pre-selected primary and retry hosts.
 // The structure is immutable and can only be created via the factory methods.
-// See
-// net/envoy/source/extensions/filters/http/dynamic_forwarding/common/metadata.proto
-// for the schema of the untyped proto for selected endpoints.
 struct SelectedHosts {
   struct Endpoint {
   public:

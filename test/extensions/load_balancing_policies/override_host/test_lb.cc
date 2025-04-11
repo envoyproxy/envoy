@@ -1,4 +1,4 @@
-#include "test/extensions/load_balancing_policies/dynamic_forwarding/test_lb.h"
+#include "test/extensions/load_balancing_policies/override_host/test_lb.h"
 
 #include <cstdint>
 #include <memory>
@@ -12,7 +12,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "test/extensions/load_balancing_policies/dynamic_forwarding/test_lb.pb.h"
+#include "test/extensions/load_balancing_policies/override_host/test_lb.pb.h"
 
 #include "absl/log/check.h"
 #include "absl/status/status.h"

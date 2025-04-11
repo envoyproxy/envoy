@@ -12,7 +12,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/load_balancer_factory_base.h"
 
-#include "test/extensions/load_balancing_policies/dynamic_forwarding/test_lb.pb.h"
+#include "test/extensions/load_balancing_policies/override_host/test_lb.pb.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -22,13 +22,13 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace DynamicForwarding {
 
-constexpr absl::string_view kTestLoadBalancerName = "envoy.load_balancers.dynamic_forwarding.test";
+constexpr absl::string_view kTestLoadBalancerName = "envoy.load_balancers.override_host.test";
 
 using ::Envoy::Random::RandomGenerator;
 using ::Envoy::Runtime::Loader;
 using ::Envoy::Upstream::ClusterInfo;
 using ::Envoy::Upstream::PrioritySet;
-using ::test::load_balancing_policies::dynamic_forwarding::Config;
+using ::test::load_balancing_policies::override_host::Config;
 
 // This is a test load balancing policy extension that is used to validate that
 // the dynamic forwarding load balancing is correctly calling LB configured in

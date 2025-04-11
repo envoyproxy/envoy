@@ -1,7 +1,7 @@
 #include <utility>
 
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/selected_hosts.h"
+#include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include "test/test_common/status_utility.h"
 

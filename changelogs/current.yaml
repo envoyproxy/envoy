@@ -371,7 +371,7 @@ new_features:
     default socket interface to support io_uring.
 - area: load_balancing
   change: |
-    Added Dynamic Forwarding Load Balancing policy. See
+    Added Override Host Load Balancing policy. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
 - area: golang
   change: |

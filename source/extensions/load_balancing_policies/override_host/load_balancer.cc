@@ -1,4 +1,4 @@
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/load_balancer.h"
+#include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
 
 #include <cstdint>
 #include <memory>
@@ -10,7 +10,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/load_balancing_policies/dynamic_forwarding/v3/dynamic_forwarding.pb.h"
+#include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
 #include "envoy/upstream/load_balancer.h"
@@ -21,8 +21,8 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/metadata_keys.h"
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/selected_hosts.h"
+#include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
+#include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/log/check.h"
@@ -39,7 +39,7 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace DynamicForwarding {
 
-using ::envoy::extensions::load_balancing_policies::dynamic_forwarding::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
 using ::Envoy::Http::HeaderMap;
 using ::Envoy::Server::Configuration::ServerFactoryContext;
 using ::Envoy::Upstream::HostConstSharedPtr;

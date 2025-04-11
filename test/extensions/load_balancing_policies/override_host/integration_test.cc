@@ -46,9 +46,9 @@ typed_config:
 constexpr absl::string_view kLbConfigWithMetadataOnlyEndpointSelection = R"EOF(
 policies:
 - typed_extension_config:
-    name: envoy.load_balancing_policies.dynamic_forwarding
+    name: envoy.load_balancing_policies.override_host
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.dynamic_forwarding.v3.DynamicForwarding
+        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.DynamicForwarding
         fallback_picking_policy:
           policies:
           - typed_extension_config:
@@ -61,9 +61,9 @@ policies:
 constexpr absl::string_view kLbConfigWithHeaderEndpointSelection = R"EOF(
 policies:
 - typed_extension_config:
-    name: envoy.load_balancing_policies.dynamic_forwarding
+    name: envoy.load_balancing_policies.override_host
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.dynamic_forwarding.v3.DynamicForwarding
+        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.DynamicForwarding
         use_http_headers_for_endpoints: true
         fallback_picking_policy:
           policies:
@@ -76,16 +76,16 @@ policies:
 constexpr absl::string_view kLbConfigWithTestLb = R"EOF(
 policies:
 - typed_extension_config:
-    name: envoy.load_balancing_policies.dynamic_forwarding
+    name: envoy.load_balancing_policies.override_host
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.dynamic_forwarding.v3.DynamicForwarding
+        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.DynamicForwarding
         use_http_headers_for_endpoints: true
         fallback_picking_policy:
           policies:
           - typed_extension_config:
-              name: com.google.load_balancers.dynamic_forwarding.test
+              name: com.google.load_balancers.override_host.test
               typed_config:
-                  "@type": type.googleapis.com/test.load_balancing_policies.dynamic_forwarding.Config
+                  "@type": type.googleapis.com/test.load_balancing_policies.override_host.Config
 )EOF";
 
 class DynamicForwardingIntegrationTest : public testing::TestWithParam<IpVersion>,

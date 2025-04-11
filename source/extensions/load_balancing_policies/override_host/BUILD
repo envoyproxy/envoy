@@ -29,7 +29,7 @@ envoy_cc_extension(
         "//source/common/upstream:load_balancer_factory_base_lib",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status:statusor",
-        "@envoy_api//envoy/extensions/load_balancing_policies/dynamic_forwarding/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/override_host/v3:pkg_cc_proto",
     ],
 )
 
@@ -62,7 +62,7 @@ envoy_cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/dynamic_forwarding/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/override_host/v3:pkg_cc_proto",
     ],
 )
 

@@ -1,4 +1,4 @@
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/selected_hosts.h"
+#include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include <cstdint>
 #include <memory>
@@ -9,7 +9,7 @@
 #include "envoy/network/address.h"
 
 #include "source/common/network/utility.h"
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/metadata_keys.h"
+#include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"

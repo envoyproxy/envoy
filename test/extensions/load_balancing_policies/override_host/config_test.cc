@@ -1,13 +1,13 @@
 #include <memory>
 
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/extensions/load_balancing_policies/dynamic_forwarding/v3/dynamic_forwarding.pb.h"
+#include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/config/utility.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/extensions/load_balancing_policies/dynamic_forwarding/test_lb.pb.h"
+#include "test/extensions/load_balancing_policies/override_host/test_lb.pb.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host_set.h"
@@ -27,21 +27,21 @@ namespace {
 
 using ::Envoy::EnvoyException;
 using ::Envoy::Config::Utility;
-using ::envoy::extensions::load_balancing_policies::dynamic_forwarding::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
 using ::Envoy::Upstream::MockHostSet;
-using ::test::load_balancing_policies::dynamic_forwarding::Config;
+using ::test::load_balancing_policies::override_host::Config;
 using ::testing::HasSubstr;
 
 TEST(DynamicForwardingLbonfigTest, NoFallbackLb) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancers.dynamic_forwarding");
+  config.set_name("envoy.load_balancers.override_host");
   DynamicForwarding config_msg;
   config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
-  EXPECT_EQ("envoy.load_balancing_policies.dynamic_forwarding", factory.name());
+  EXPECT_EQ("envoy.load_balancing_policies.override_host", factory.name());
 
   EXPECT_THROW_WITH_REGEX(factory.loadConfig(context, config_msg).value(), EnvoyException,
                           "value is required");
@@ -51,7 +51,7 @@ TEST(DynamicForwardingLbonfigTest, NoFallbackPolicies) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancers.dynamic_forwarding");
+  config.set_name("envoy.load_balancers.override_host");
   DynamicForwarding config_msg;
   config_msg.mutable_fallback_picking_policy();
   config.mutable_typed_config()->PackFrom(config_msg);
@@ -68,7 +68,7 @@ TEST(DynamicForwardingLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancers.dynamic_forwarding");
+  config.set_name("envoy.load_balancers.override_host");
   DynamicForwarding config_msg;
 
   ProtobufWkt::Struct invalid_policy;
@@ -82,7 +82,7 @@ TEST(DynamicForwardingLbonfigTest, FirstValidFallbackPolicyIsUsed) {
                                ->add_policies()
                                ->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
-  typed_extension_config->set_name("envoy.load_balancers.dynamic_forwarding.test");
+  typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
   config.mutable_typed_config()->PackFrom(config_msg);
 
@@ -100,14 +100,14 @@ TEST(DynamicForwardingLbonfigTest, FallbackLbCalledToChooseHost) {
   NiceMock<Envoy::Upstream::MockLoadBalancerContext> load_balancer_context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancers.dynamic_forwarding");
+  config.set_name("envoy.load_balancers.override_host");
   DynamicForwarding config_msg;
   Config fallback_picker_config;
   auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
                                      ->add_policies()
                                      ->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
-  typed_extension_config->set_name("envoy.load_balancers.dynamic_forwarding.test");
+  typed_extension_config->set_name("envoy.load_balancers.override_host.test");
   config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);

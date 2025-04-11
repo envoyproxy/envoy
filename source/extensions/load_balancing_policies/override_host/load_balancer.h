@@ -11,7 +11,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/load_balancing_policies/dynamic_forwarding/v3/dynamic_forwarding.pb.h"
+#include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
@@ -19,8 +19,8 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/metadata_keys.h"
-#include "source/extensions/load_balancing_policies/dynamic_forwarding/selected_hosts.h"
+#include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
+#include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -31,7 +31,7 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace DynamicForwarding {
 
-using ::envoy::extensions::load_balancing_policies::dynamic_forwarding::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
 
 using ::Envoy::Random::RandomGenerator;
 using ::Envoy::Runtime::Loader;
@@ -85,7 +85,7 @@ private:
 // Load balancer for the dynamic forwarding, supporting external endpoint
 // selection by LbTrafficExtension.
 // The load balancer uses host list supplied in the request metadata under the
-// `com.google.envoy.dynamic_forwarding.localities_and_endpoints` key to pick
+// `com.google.envoy.override_host.localities_and_endpoints` key to pick
 // the next backend. TODO(yavlasov): Add a link to the proto describing the
 // format of the host list when it is committed.
 //

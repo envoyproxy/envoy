@@ -337,7 +337,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
-/*/extensions/load_balancing_policies/dynamic_forwarding @yanavlasov @tonya11en
+/*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
