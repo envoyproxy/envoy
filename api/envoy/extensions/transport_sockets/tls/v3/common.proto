@@ -177,10 +177,10 @@ message TlsParameters {
   //   ecdsa_sha1
   repeated string signature_algorithms = 5;
 
-  // Compliance policy configures various aspects of the TLS based on the given policy.
+  // Compliance policies configure various aspects of the TLS based on the given policy.
   // The policies are applied last during configuration and may override the other TLS
-  // parameters.
-  CompliancePolicy compliance_policy = 6;
+  // parameters, or any previous policy.
+  repeated CompliancePolicy compliance_policies = 6 [(validate.rules).repeated = {max_items: 1}];
 }
 
 // BoringSSL private key method configuration. The private key methods are used for external

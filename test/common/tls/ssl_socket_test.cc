@@ -5688,7 +5688,7 @@ TEST_P(SslSocketTest, CipherSuitesWithPolicy) {
   testUtilV2(test_options);
 
   // Client connects with an unsupported client cipher suite for a server policy, connection fails.
-  server_params->set_compliance_policy(
+  server_params->add_compliance_policies(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::FIPS_202205);
   updateFilterChain(tls_context, *filter_chain);
   TestUtilOptionsV2 error_test_options(listener, client, false, version_);

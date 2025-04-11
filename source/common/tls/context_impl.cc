@@ -356,27 +356,27 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   // Compliance policy must be applied last to have a defined behavior.
-  switch (config.compliancePolicy()) {
-    using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
-  case ProtoPolicy::FIPS_202205:
-    if (!fips_mode) {
-      ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
-    }
-    for (auto& tls_context : tls_contexts_) {
-      int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
-                                             ssl_compliance_policy_fips_202205);
-      if (rc != 1) {
-        creation_status = absl::InvalidArgumentError(
-            absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
-                         Utility::getLastCryptoError().value_or("")));
+  if (const auto policy = config.compliancePolicy(); policy.has_value()) {
+    switch (policy.value()) {
+      using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    case ProtoPolicy::FIPS_202205:
+      if (!fips_mode) {
+        ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
       }
+      for (auto& tls_context : tls_contexts_) {
+        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
+                                               ssl_compliance_policy_fips_202205);
+        if (rc != 1) {
+          creation_status = absl::InvalidArgumentError(
+              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
+                           Utility::getLastCryptoError().value_or("")));
+        }
+      }
+      break;
+    default:
+      creation_status = absl::InvalidArgumentError("Unknown compliance policy");
+      return;
     }
-    break;
-  case ProtoPolicy::NONE:
-    break;
-  default:
-    creation_status = absl::InvalidArgumentError("Unknown compliance policy");
-    return;
   }
 }
 

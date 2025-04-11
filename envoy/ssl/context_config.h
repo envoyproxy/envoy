@@ -122,7 +122,8 @@ public:
   /**
    * @return the compiance policy for the TLS context.
    */
-  virtual envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy
+  virtual absl::optional<
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
   compliancePolicy() const PURE;
 };
 
