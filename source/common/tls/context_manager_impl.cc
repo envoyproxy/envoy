@@ -84,6 +84,14 @@ absl::optional<uint64_t> ContextManagerImpl::secondsUntilFirstOcspResponseExpire
   return ret;
 }
 
+void ContextManagerImpl::updateTlsCertificateExpiryStats() {
+  for (auto& ctx : contexts_) {
+    if (ctx) {
+      ctx->updateTlsCertificateExpiryStats();
+    }
+  }
+}
+
 void ContextManagerImpl::iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) {
   for (const auto& context : contexts_) {
     if (context) {
