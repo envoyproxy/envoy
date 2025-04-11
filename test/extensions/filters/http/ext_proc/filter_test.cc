@@ -36,6 +36,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -97,6 +98,9 @@ static const std::string filter_config_name = "scooby.dooby.doo";
 class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "false"}});
+
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
@@ -663,6 +667,7 @@ protected:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -819,6 +824,69 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulFalse) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  // Set the runtime to false to force append default to be false, which is legacy behavior.
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "false"}});
+
+  request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-some-other-header");
+        add1->mutable_header()->set_raw_value("no");
+      });
+
+  // We should now have changed the original header a bit
+  TestRequestHeaderMapImpl expected{{":path", "/"},
+                                    {":method", "POST"},
+                                    {":scheme", "http"},
+                                    {"host", "host"},
+                                    {"x-some-other-header", "no"}};
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulTrue) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  // Set the runtime to true to force append default to be true.
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "true"}});
+
+  request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-some-other-header");
+        add1->mutable_header()->set_raw_value("no");
+      });
+
+  // We should now have changed the original header a bit
+  TestRequestHeaderMapImpl expected{{":path", "/"},
+                                    {":method", "POST"},
+                                    {":scheme", "http"},
+                                    {"host", "host"},
+                                    {"x-some-other-header", "yes"},
+                                    {"x-some-other-header", "no"}};
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+  filter_->onDestroy();
 }
 
 // Using the default configuration, test the filter with a processor that
