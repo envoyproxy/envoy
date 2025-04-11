@@ -28,7 +28,8 @@ public:
   virtual bool match(const absl::string_view value) const PURE;
 
   /**
-   * Return whether a passed string value matches with context
+   * Return whether a passed string value matches with context.
+   * Because most implementations don't use the context, provides a default implementation.
    */
   virtual bool match(const absl::string_view value, const Context&) const { return match(value); }
 };
