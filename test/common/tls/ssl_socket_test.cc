@@ -51,7 +51,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -462,7 +461,7 @@ void testUtil(const TestUtilOptions& options) {
       test_private_key_method_factory(test_factory);
   PrivateKeyMethodManagerImpl private_key_method_manager;
   if (options.expectedPrivateKeyMethod()) {
-    EXPECT_CALL(transport_socket_factory_context, sslContextManager())
+    EXPECT_CALL(transport_socket_factory_context.server_context_, sslContextManager())
         .WillOnce(ReturnRef(context_manager))
         .WillRepeatedly(ReturnRef(context_manager));
     EXPECT_CALL(context_manager, privateKeyMethodManager())
@@ -955,7 +954,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   auto factory_or_error = ServerSslSocketFactory::create(
       std::move(server_cfg), manager, *server_stats_store.rootScope(), server_names);
-  THROW_IF_NOT_OK(factory_or_error.status());
+  THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto server_ssl_socket_factory = std::move(*factory_or_error);
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
@@ -978,7 +977,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       *ClientContextConfigImpl::create(options.clientCtxProto(), client_factory_context);
   auto client_factory_or_error = ClientSslSocketFactory::create(std::move(client_cfg), manager,
                                                                 *client_stats_store.rootScope());
-  THROW_IF_NOT_OK(client_factory_or_error.status());
+  THROW_IF_NOT_OK_REF(client_factory_or_error.status());
   auto client_ssl_socket_factory = std::move(*client_factory_or_error);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1150,9 +1149,9 @@ void updateFilterChain(
 }
 
 struct OptionalServerConfig {
-  absl::optional<std::string> cert_hash{};
-  absl::optional<std::string> trusted_ca{};
-  absl::optional<bool> allow_expired_cert{};
+  absl::optional<std::string> cert_hash;
+  absl::optional<std::string> trusted_ca;
+  absl::optional<bool> allow_expired_cert;
 };
 
 void configureServerAndExpiredClientCertificate(
