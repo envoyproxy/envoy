@@ -37,9 +37,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
-using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 using ::Envoy::Http::HeaderMap;
 using ::Envoy::Server::Configuration::ServerFactoryContext;
 using ::Envoy::Upstream::HostConstSharedPtr;
@@ -56,9 +56,9 @@ Http::LowerCaseString copyValueOrDefault(absl::string_view value, absl::string_v
 }
 } // namespace
 
-DynamicForwardingLbConfig::DynamicForwardingLbConfig(
-    const DynamicForwarding& config, TypedLoadBalancerFactory* fallback_load_balancer_factory,
-    LoadBalancerConfigPtr&& fallback_load_balancer_config)
+OverrideHostLbConfig::OverrideHostLbConfig(const OverrideHost& config,
+                                           TypedLoadBalancerFactory* fallback_load_balancer_factory,
+                                           LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
                                  std::move(fallback_load_balancer_config)},
       primary_endpoint_header_name_(
@@ -72,8 +72,8 @@ DynamicForwardingLbConfig::DynamicForwardingLbConfig(
                     config.fallback_endpoint_list_http_header_name(), kFallbackEndpointsHeaderName))
               : absl::nullopt) {}
 
-absl::StatusOr<std::unique_ptr<DynamicForwardingLbConfig>>
-DynamicForwardingLbConfig::make(const DynamicForwarding& config, ServerFactoryContext& context) {
+absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>>
+OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& context) {
   // Must be validated before calling this function.
   ASSERT(config.has_fallback_picking_policy());
   absl::InlinedVector<absl::string_view, 4> missing_policies;
@@ -90,7 +90,7 @@ DynamicForwardingLbConfig::make(const DynamicForwarding& config, ServerFactoryCo
 
       auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
       RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
-      return std::unique_ptr<DynamicForwardingLbConfig>(new DynamicForwardingLbConfig(
+      return std::unique_ptr<OverrideHostLbConfig>(new OverrideHostLbConfig(
           config, factory, std::move(fallback_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());
@@ -101,22 +101,23 @@ DynamicForwardingLbConfig::make(const DynamicForwarding& config, ServerFactoryCo
                    absl::StrJoin(missing_policies, ", ")));
 }
 
-Upstream::ThreadAwareLoadBalancerPtr
-DynamicForwardingLbConfig::create(const ClusterInfo& cluster_info, const PrioritySet& priority_set,
-                                  Loader& runtime, RandomGenerator& random,
-                                  TimeSource& time_source) const {
+Upstream::ThreadAwareLoadBalancerPtr OverrideHostLbConfig::create(const ClusterInfo& cluster_info,
+                                                                  const PrioritySet& priority_set,
+                                                                  Loader& runtime,
+                                                                  RandomGenerator& random,
+                                                                  TimeSource& time_source) const {
   return fallback_picker_lb_config_.load_balancer_factory->create(
       makeOptRefFromPtr<const LoadBalancerConfig>(
           fallback_picker_lb_config_.load_balancer_config.get()),
       cluster_info, priority_set, runtime, random, time_source);
 }
 
-absl::Status DynamicForwardingLoadBalancer::initialize() {
+absl::Status OverrideHostLoadBalancer::initialize() {
   DCHECK(fallback_picker_lb_ != nullptr); // Always needs a locality picker LB.
   return fallback_picker_lb_->initialize();
 }
 
-LoadBalancerFactorySharedPtr DynamicForwardingLoadBalancer::factory() {
+LoadBalancerFactorySharedPtr OverrideHostLoadBalancer::factory() {
   // Must be called from main thread.
   DCHECK(Envoy::Thread::SkipAsserts::skip() || Envoy::Thread::TestThread::isTestThread() ||
          Envoy::Thread::MainThread::isMainThread());
@@ -127,13 +128,13 @@ LoadBalancerFactorySharedPtr DynamicForwardingLoadBalancer::factory() {
 }
 
 HostConstSharedPtr
-DynamicForwardingLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext* context) {
+OverrideHostLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext* context) {
   // TODO(yavlasov): Return a host from request metadata if present.
   return fallback_picker_lb_->peekAnotherHost(context);
 }
 
 HostSelectionResponse
-DynamicForwardingLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
   if (!context || !context->requestStreamInfo()) {
     // If there is no context or no request stream info, we can't use the
     // metadata, so we just return a host from the fallback picker.
@@ -171,7 +172,7 @@ DynamicForwardingLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext*
 }
 
 absl::StatusOr<std::unique_ptr<SelectedHosts>>
-DynamicForwardingLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
+OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
     const ::envoy::config::core::v3::Metadata& metadata) {
   std::unique_ptr<SelectedHosts> selected_hosts;
   // Check the metadata specified in OSS proposal.
@@ -192,7 +193,7 @@ DynamicForwardingLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
 }
 
 absl::StatusOr<std::unique_ptr<SelectedHosts>>
-DynamicForwardingLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
+OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
     const Envoy::Http::RequestHeaderMap* header_map) {
   DCHECK(config_.primaryEndpointHeaderName().has_value());
   std::unique_ptr<SelectedHosts> selected_hosts;
@@ -221,7 +222,7 @@ DynamicForwardingLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
 }
 
 absl::StatusOr<std::unique_ptr<SelectedHosts>>
-DynamicForwardingLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext* context) {
+OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext* context) {
   // First check if header based host selection is enabled and if header is
   // present.
   if (config_.primaryEndpointHeaderName().has_value()) {
@@ -253,7 +254,7 @@ std::string makeAddressKey(const SelectedHosts::Endpoint::Address& address) {
 } // namespace
 
 HostConstSharedPtr
-DynamicForwardingLoadBalancer::LoadBalancerImpl::findHost(const SelectedHosts::Endpoint& endpoint) {
+OverrideHostLoadBalancer::LoadBalancerImpl::findHost(const SelectedHosts::Endpoint& endpoint) {
   HostMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
   if (hosts == nullptr) {
     return nullptr;
@@ -283,7 +284,7 @@ void updateFallbackIndexMetadata(::envoy::config::core::v3::Metadata& metadata,
 }
 } // namespace
 
-HostConstSharedPtr DynamicForwardingLoadBalancer::LoadBalancerImpl::getEndpoint(
+HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(
     const SelectedHosts& selected_hosts, ::envoy::config::core::v3::Metadata& metadata) {
   uint32_t fallback_index = 0;
   if (!metadata.filter_metadata().contains(kEndpointsFallbackIndexKey)) {
@@ -330,14 +331,14 @@ HostConstSharedPtr DynamicForwardingLoadBalancer::LoadBalancerImpl::getEndpoint(
 }
 
 LoadBalancerPtr
-DynamicForwardingLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+OverrideHostLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
   LoadBalancerPtr fallback_picker_lb = fallback_picker_lb_factory_->create(params);
   DCHECK(fallback_picker_lb != nullptr); // Factory can not create null LB.
   return std::make_unique<LoadBalancerImpl>(config_, std::move(fallback_picker_lb),
                                             params.priority_set);
 }
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

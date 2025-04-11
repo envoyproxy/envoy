@@ -22,22 +22,22 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 namespace {
 
 using ::Envoy::EnvoyException;
 using ::Envoy::Config::Utility;
-using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 using ::Envoy::Upstream::MockHostSet;
 using ::test::load_balancing_policies::override_host::Config;
 using ::testing::HasSubstr;
 
-TEST(DynamicForwardingLbonfigTest, NoFallbackLb) {
+TEST(OverrideHostLbonfigTest, NoFallbackLb) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
-  DynamicForwarding config_msg;
+  OverrideHost config_msg;
   config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
@@ -47,12 +47,12 @@ TEST(DynamicForwardingLbonfigTest, NoFallbackLb) {
                           "value is required");
 }
 
-TEST(DynamicForwardingLbonfigTest, NoFallbackPolicies) {
+TEST(OverrideHostLbonfigTest, NoFallbackPolicies) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
-  DynamicForwarding config_msg;
+  OverrideHost config_msg;
   config_msg.mutable_fallback_picking_policy();
   config.mutable_typed_config()->PackFrom(config_msg);
 
@@ -64,12 +64,12 @@ TEST(DynamicForwardingLbonfigTest, NoFallbackPolicies) {
                                                "fallback load balancer factory with names from "));
 }
 
-TEST(DynamicForwardingLbonfigTest, FirstValidFallbackPolicyIsUsed) {
+TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
-  DynamicForwarding config_msg;
+  OverrideHost config_msg;
 
   ProtobufWkt::Struct invalid_policy;
   auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
@@ -92,7 +92,7 @@ TEST(DynamicForwardingLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   EXPECT_TRUE(result.ok());
 }
 
-TEST(DynamicForwardingLbonfigTest, FallbackLbCalledToChooseHost) {
+TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
   NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
   auto cluster_info = std::make_shared<NiceMock<Envoy::Upstream::MockClusterInfo>>();
   NiceMock<Envoy::Upstream::MockPrioritySet> main_thread_priority_set;
@@ -101,7 +101,7 @@ TEST(DynamicForwardingLbonfigTest, FallbackLbCalledToChooseHost) {
 
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
-  DynamicForwarding config_msg;
+  OverrideHost config_msg;
   Config fallback_picker_config;
   auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
                                      ->add_policies()
@@ -137,7 +137,7 @@ TEST(DynamicForwardingLbonfigTest, FallbackLbCalledToChooseHost) {
 }
 
 } // namespace
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

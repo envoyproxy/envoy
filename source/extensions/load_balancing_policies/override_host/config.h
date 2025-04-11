@@ -16,18 +16,18 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
-using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 using ::Envoy::Random::RandomGenerator;
 using ::Envoy::Runtime::Loader;
 using ::Envoy::Upstream::ClusterInfo;
 using ::Envoy::Upstream::PrioritySet;
 
-class DynamicForwardingLoadBalancerFactory
-    : public Upstream::TypedLoadBalancerFactoryBase<DynamicForwarding> {
+class OverrideHostLoadBalancerFactory
+    : public Upstream::TypedLoadBalancerFactoryBase<OverrideHost> {
 public:
-  DynamicForwardingLoadBalancerFactory()
+  OverrideHostLoadBalancerFactory()
       : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.override_host") {}
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
@@ -40,7 +40,7 @@ public:
          RandomGenerator& random, TimeSource& time_source) override;
 };
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

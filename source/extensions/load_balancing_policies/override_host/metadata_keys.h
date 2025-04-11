@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
 // This key name is currently used by OSS proposal.
 // https://github.com/kubernetes-sigs/gateway-api-inference-extension/tree/main/docs/proposals/004-endpoint-picker-protocol
@@ -31,7 +31,7 @@ constexpr absl::string_view kFallbackSingleEndpointHeaderName =
 constexpr absl::string_view kFallbackEndpointsHeaderName =
     "x-gateway-destination-endpoint-fallbacks";
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

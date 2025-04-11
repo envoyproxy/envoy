@@ -20,7 +20,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
 namespace {
 // This function parses address from the string representation of the address.
@@ -89,7 +89,7 @@ SelectedHosts::make(const Envoy::ProtobufWkt::Struct& selected_endpoints) {
   return selected_hosts;
 }
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

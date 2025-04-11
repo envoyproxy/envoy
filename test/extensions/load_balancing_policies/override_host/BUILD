@@ -60,7 +60,6 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings:string_view",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/override_host/v3:pkg_cc_proto",

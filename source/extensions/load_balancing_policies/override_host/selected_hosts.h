@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
 // The SelectedHosts struct is used to represent parsed proto or headers with
 // the pre-selected primary and retry hosts.
@@ -35,7 +35,7 @@ struct SelectedHosts {
   make(const Envoy::ProtobufWkt::Struct& selected_endpoints);
 };
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

@@ -1,22 +1,22 @@
 syntax = "proto3";
 
-package envoy.extensions.load_balancing_policies.dynamic_forwarding.v3;
+package envoy.extensions.load_balancing_policies.override_host.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.dynamic_forwarding.v3";
-option java_outer_classname = "DynamicForwardingProto";
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.override_host.v3";
+option java_outer_classname = "OverrideHostProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/dynamic_forwarding/v3;dynamic_forwardingv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/override_host/v3;override_hostv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Dynamic Forwarding Load Balancing Policy]
-// [#extension: envoy.load_balancing_policies.dynamic_forwarding]
+// [#protodoc-title: Override Host Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.override_host]
 
-// Configuration for the Dynamic Forwarding Load Balancing policy.
+// Configuration for the Override Host Load Balancing policy.
 //
 // This policy allows endpoint picking to be implemented in an external to Envoy
 // component. While it can work with a built in HTTP filter it is primarily intended to
@@ -32,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
 //
 // If the header is not present Envoy uses untyped request metadata under the ``envoy.lb`` key. The metadata ``protobuf.Struct``
-// contains a string value with the string value under the ``x-gateway-destination-endpoint`` key. The value has the same
+// contains a string value under the ``x-gateway-destination-endpoint`` key. The value has the same
 // format as the ``x-gateway-destination-endpoint`` header.
 //
 // If neither header nor metadata is present or there were errors parsing header or metadata values the
@@ -43,9 +43,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // overview<arch_overview_load_balancing_types>` for more information.
 //
 // [#next-free-field: 6]
-message DynamicForwarding {
-  // The child LB policy to create for initial locality picking, or fallback
-  // endpoint picking.
+message OverrideHost {
+  // The child LB policy to use in case neither header nor metadata with selected
+  // hosts is present.
   config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1
       [(validate.rules).message = {required: true}];
 

@@ -18,39 +18,38 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
-using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 
-absl::StatusOr<Upstream::LoadBalancerConfigPtr> DynamicForwardingLoadBalancerFactory::loadConfig(
-    Server::Configuration::ServerFactoryContext& context, const Protobuf::Message& config) {
-  const DynamicForwarding& override_host_config =
-      MessageUtil::downcastAndValidate<const DynamicForwarding&>(
-          config, context.messageValidationVisitor());
+absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+OverrideHostLoadBalancerFactory::loadConfig(Server::Configuration::ServerFactoryContext& context,
+                                            const Protobuf::Message& config) {
+  const OverrideHost& override_host_config = MessageUtil::downcastAndValidate<const OverrideHost&>(
+      config, context.messageValidationVisitor());
   if (!override_host_config.has_fallback_picking_policy()) {
     return absl::InvalidArgumentError("The fallback picking policy must be set.");
   }
-  return DynamicForwardingLbConfig::make(override_host_config, context);
+  return OverrideHostLbConfig::make(override_host_config, context);
 }
 
 Upstream::ThreadAwareLoadBalancerPtr
-DynamicForwardingLoadBalancerFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
-                                             const ClusterInfo& cluster_info,
-                                             const PrioritySet& priority_set, Loader& runtime,
-                                             RandomGenerator& random, TimeSource& time_source) {
+OverrideHostLoadBalancerFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
+                                        const ClusterInfo& cluster_info,
+                                        const PrioritySet& priority_set, Loader& runtime,
+                                        RandomGenerator& random, TimeSource& time_source) {
   ASSERT(lb_config.has_value()); // Factory can not work without config.
-  const auto& override_host_lb_config =
-      dynamic_cast<const DynamicForwardingLbConfig&>(lb_config.ref());
+  const auto& override_host_lb_config = dynamic_cast<const OverrideHostLbConfig&>(lb_config.ref());
   Upstream::ThreadAwareLoadBalancerPtr locality_picker_lb =
       override_host_lb_config.create(cluster_info, priority_set, runtime, random, time_source);
   ASSERT(locality_picker_lb != nullptr); // Factory can not create null LB.
-  return std::make_unique<DynamicForwardingLoadBalancer>(override_host_lb_config,
-                                                         std::move(locality_picker_lb));
+  return std::make_unique<OverrideHostLoadBalancer>(override_host_lb_config,
+                                                    std::move(locality_picker_lb));
 }
 
-REGISTER_FACTORY(DynamicForwardingLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
+REGISTER_FACTORY(OverrideHostLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

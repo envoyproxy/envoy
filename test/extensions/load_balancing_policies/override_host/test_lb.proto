@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package test.load_balancing_policies.dynamic_forwarding;
+package test.load_balancing_policies.override_host;
 
 message Config {
 }

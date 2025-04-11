@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 namespace {
 
 TEST(SelectedHostsTest, ValidProto) {
@@ -137,7 +137,7 @@ TEST(SelectedHostsTest, ProtoInvalidMultipleEndpoints) {
 }
 
 } // namespace
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

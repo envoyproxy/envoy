@@ -21,7 +21,6 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/utility.h"
 
-#include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,11 +28,11 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 namespace {
 
 using ::envoy::config::core::v3::Locality;
-using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 using ::Envoy::Upstream::HostConstSharedPtr;
 using ::Envoy::Upstream::HostMap;
 using ::Envoy::Upstream::MockHostSet;
@@ -42,7 +41,7 @@ using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
-class DynamicForwardingLoadBalancerTest : public ::testing::Test {
+class OverrideHostLoadBalancerTest : public ::testing::Test {
 public:
   void SetUp() override {
     ON_CALL(load_balancer_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
@@ -51,7 +50,7 @@ public:
   }
 
 protected:
-  void createLoadBalancer(const DynamicForwarding& config) {
+  void createLoadBalancer(const OverrideHost& config) {
     lb_config_ = factory_.loadConfig(server_factory_context_, config).value();
     thread_aware_lb_ =
         factory_.create(*lb_config_, *cluster_info_, main_thread_priority_set_,
@@ -62,8 +61,8 @@ protected:
     load_balancer_ = thread_local_lb_factory_->create(lb_params_);
   }
 
-  DynamicForwarding makeDefaultConfig() {
-    DynamicForwarding config;
+  OverrideHost makeDefaultConfig() {
+    OverrideHost config;
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_picking_policy()->add_policies()->mutable_typed_extension_config();
@@ -72,9 +71,9 @@ protected:
     return config;
   }
 
-  DynamicForwarding makeDefaultConfigWithHeadersEnabled(absl::string_view primary_header_name,
-                                                        absl::string_view fallback_header_name) {
-    DynamicForwarding config;
+  OverrideHost makeDefaultConfigWithHeadersEnabled(absl::string_view primary_header_name,
+                                                   absl::string_view fallback_header_name) {
+    OverrideHost config;
     Config locality_picker_config;
     auto* typed_extension_config =
         config.mutable_fallback_picking_policy()->add_policies()->mutable_typed_extension_config();
@@ -124,7 +123,7 @@ protected:
   NiceMock<Envoy::Upstream::MockPrioritySet> thread_local_priority_set_;
   NiceMock<Envoy::Upstream::MockLoadBalancerContext> load_balancer_context_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
-  DynamicForwardingLoadBalancerFactory factory_;
+  OverrideHostLoadBalancerFactory factory_;
   Envoy::Upstream::LoadBalancerConfigPtr lb_config_;
   Envoy::Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Envoy::Upstream::LoadBalancerFactorySharedPtr thread_local_lb_factory_;
@@ -132,7 +131,7 @@ protected:
   LoadBalancerPtr load_balancer_;
 };
 
-TEST_F(DynamicForwardingLoadBalancerTest, NoMetadatOrHeaders) {
+TEST_F(OverrideHostLoadBalancerTest, NoMetadatOrHeaders) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -156,7 +155,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, NoMetadatOrHeaders) {
   EXPECT_EQ(load_balancer_->peekAnotherHost(&load_balancer_context_), nullptr);
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, NullptrHeaders) {
+TEST_F(OverrideHostLoadBalancerTest, NullptrHeaders) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -177,7 +176,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, NullptrHeaders) {
   EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, NullptrCrossPriorityHostMap) {
+TEST_F(OverrideHostLoadBalancerTest, NullptrCrossPriorityHostMap) {
   thread_local_priority_set_.cross_priority_host_map_ = nullptr;
   createLoadBalancer(makeDefaultConfig());
 
@@ -192,7 +191,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, NullptrCrossPriorityHostMap) {
   EXPECT_EQ(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, PrimaryAddressDoesNotExist) {
+TEST_F(OverrideHostLoadBalancerTest, PrimaryAddressDoesNotExist) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
   Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
   Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
@@ -231,7 +230,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, PrimaryAddressDoesNotExist) {
   EXPECT_EQ(host->address()->asString(), "[fda3:e722:ac3:cc00:172:b9fb:a00:2]:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, HeaderIsPreferredOverMetadata) {
+TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
   Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
   Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
@@ -274,7 +273,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, UparseableHeaderValueUsesFallback) {
+TEST_F(OverrideHostLoadBalancerTest, UparseableHeaderValueUsesFallback) {
   // Validate that metadata is ignored if the header is present but its
   // value is not a valid IP address.
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
@@ -319,7 +318,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, UparseableHeaderValueUsesFallback) {
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, SelectIpv4EndpointWithHeader) {
+TEST_F(OverrideHostLoadBalancerTest, SelectIpv4EndpointWithHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -343,7 +342,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, SelectIpv4EndpointWithHeader) {
   EXPECT_EQ(host->address()->asString(), "5.6.7.8:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, SelectIpv6EndpointWithHeader) {
+TEST_F(OverrideHostLoadBalancerTest, SelectIpv6EndpointWithHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -367,7 +366,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, SelectIpv6EndpointWithHeader) {
   EXPECT_EQ(host->address()->asString(), "[::2]:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, WrongHeaderName) {
+TEST_F(OverrideHostLoadBalancerTest, WrongHeaderName) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -398,7 +397,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, WrongHeaderName) {
   EXPECT_EQ(host->address()->asString(), "[::2]:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, NullptrFromFallbackLb) {
+TEST_F(OverrideHostLoadBalancerTest, NullptrFromFallbackLb) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   thread_local_priority_set_.getMockHostSet(0);
@@ -411,7 +410,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, NullptrFromFallbackLb) {
   EXPECT_EQ(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, SelectIpv4EndpointUsingMetadata) {
+TEST_F(OverrideHostLoadBalancerTest, SelectIpv4EndpointUsingMetadata) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -434,7 +433,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, SelectIpv4EndpointUsingMetadata) {
   EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, SelectEndpointUsingMetadataMissingEndpoint) {
+TEST_F(OverrideHostLoadBalancerTest, SelectEndpointUsingMetadataMissingEndpoint) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -457,7 +456,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, SelectEndpointUsingMetadataMissingEndp
   EXPECT_NE(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, SelectIPv6UsingMetadata) {
+TEST_F(OverrideHostLoadBalancerTest, SelectIPv6UsingMetadata) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
   Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
   Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
@@ -492,7 +491,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, SelectIPv6UsingMetadata) {
   EXPECT_EQ(host->address()->asString(), "[fda3:e722:ac3:cc00:172:b9fb:a00:3]:80");
 }
 
-TEST_F(DynamicForwardingLoadBalancerTest, SelectEndpointBadMetadata) {
+TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadata) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
@@ -517,7 +516,7 @@ TEST_F(DynamicForwardingLoadBalancerTest, SelectEndpointBadMetadata) {
 }
 
 } // namespace
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

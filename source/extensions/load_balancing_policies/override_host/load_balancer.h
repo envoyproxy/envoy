@@ -29,9 +29,9 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 
-using ::envoy::extensions::load_balancing_policies::override_host::v3::DynamicForwarding;
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
 
 using ::Envoy::Random::RandomGenerator;
 using ::Envoy::Runtime::Loader;
@@ -52,12 +52,12 @@ using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 // Parsed configuration for the dynamic forwarding load balancer. It contains
 // factory and config for the load balancer specified in the
-// `fallback_picking_policy` field of the DynamicForwarding config
+// `fallback_picking_policy` field of the OverrideHost config
 // proto.
-class DynamicForwardingLbConfig : public Upstream::LoadBalancerConfig {
+class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
-  static absl::StatusOr<std::unique_ptr<DynamicForwardingLbConfig>>
-  make(const DynamicForwarding& config, ServerFactoryContext& context);
+  static absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>> make(const OverrideHost& config,
+                                                                    ServerFactoryContext& context);
 
   ThreadAwareLoadBalancerPtr create(const ClusterInfo& cluster_info,
                                     const PrioritySet& priority_set, Loader& runtime,
@@ -68,9 +68,9 @@ public:
   }
 
 private:
-  DynamicForwardingLbConfig(const DynamicForwarding& config,
-                            TypedLoadBalancerFactory* fallback_load_balancer_factory,
-                            LoadBalancerConfigPtr&& fallback_load_balancer_config);
+  OverrideHostLbConfig(const OverrideHost& config,
+                       TypedLoadBalancerFactory* fallback_load_balancer_factory,
+                       LoadBalancerConfigPtr&& fallback_load_balancer_config);
   // Group the factory and config together to make them const in the
   // configuration object.
   struct FallbackLbConfig {
@@ -101,11 +101,11 @@ private:
 //
 // Once the initial locality is picked, the load balancer will use the host list
 // from the request metadata to pick the next backend.
-class DynamicForwardingLoadBalancer : public Upstream::ThreadAwareLoadBalancer,
-                                      protected Logger::Loggable<Logger::Id::upstream> {
+class OverrideHostLoadBalancer : public Upstream::ThreadAwareLoadBalancer,
+                                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  DynamicForwardingLoadBalancer(const DynamicForwardingLbConfig& config,
-                                ThreadAwareLoadBalancerPtr fallback_picker_lb)
+  OverrideHostLoadBalancer(const OverrideHostLbConfig& config,
+                           ThreadAwareLoadBalancerPtr fallback_picker_lb)
       : config_(config), fallback_picker_lb_(std::move(fallback_picker_lb)) {}
 
   LoadBalancerFactorySharedPtr factory() override;
@@ -116,7 +116,7 @@ private:
   // Thread-local LB implementation.
   class LoadBalancerImpl : public Upstream::LoadBalancer {
   public:
-    LoadBalancerImpl(const DynamicForwardingLbConfig& config, LoadBalancerPtr fallback_picker_lb,
+    LoadBalancerImpl(const OverrideHostLbConfig& config, LoadBalancerPtr fallback_picker_lb,
                      const PrioritySet& priority_set)
         : config_(config), fallback_picker_lb_(std::move(fallback_picker_lb)),
           priority_set_(priority_set) {}
@@ -159,7 +159,7 @@ private:
     absl::StatusOr<std::unique_ptr<SelectedHosts>>
     getSelectedHostsFromHeader(const Http::RequestHeaderMap* header_map);
 
-    const DynamicForwardingLbConfig& config_;
+    const OverrideHostLbConfig& config_;
     const LoadBalancerPtr fallback_picker_lb_;
     const PrioritySet& priority_set_;
   };
@@ -169,7 +169,7 @@ private:
   // appropriate mutexes.
   class LoadBalancerFactoryImpl : public Upstream::LoadBalancerFactory {
   public:
-    LoadBalancerFactoryImpl(const DynamicForwardingLbConfig& config,
+    LoadBalancerFactoryImpl(const OverrideHostLbConfig& config,
                             LoadBalancerFactorySharedPtr fallback_picker_lb_factory)
         : config_(config), fallback_picker_lb_factory_(std::move(fallback_picker_lb_factory)) {}
 
@@ -178,17 +178,17 @@ private:
 
   private:
     // Hosts in the load balancer. Owned by the cluster manager.
-    const DynamicForwardingLbConfig& config_;
+    const OverrideHostLbConfig& config_;
     LoadBalancerFactorySharedPtr fallback_picker_lb_factory_;
   };
 
-  const DynamicForwardingLbConfig& config_;
+  const OverrideHostLbConfig& config_;
   // Shared factory used to create new thread-local LB implementations.
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
   const ThreadAwareLoadBalancerPtr fallback_picker_lb_;
 };
 
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy

@@ -23,7 +23,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolices {
-namespace DynamicForwarding {
+namespace OverrideHost {
 namespace {
 
 using ::Envoy::TestEnvironment;
@@ -48,7 +48,7 @@ policies:
 - typed_extension_config:
     name: envoy.load_balancing_policies.override_host
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.DynamicForwarding
+        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
         fallback_picking_policy:
           policies:
           - typed_extension_config:
@@ -63,7 +63,7 @@ policies:
 - typed_extension_config:
     name: envoy.load_balancing_policies.override_host
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.DynamicForwarding
+        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
         use_http_headers_for_endpoints: true
         fallback_picking_policy:
           policies:
@@ -78,7 +78,7 @@ policies:
 - typed_extension_config:
     name: envoy.load_balancing_policies.override_host
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.DynamicForwarding
+        "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
         use_http_headers_for_endpoints: true
         fallback_picking_policy:
           policies:
@@ -88,10 +88,10 @@ policies:
                   "@type": type.googleapis.com/test.load_balancing_policies.override_host.Config
 )EOF";
 
-class DynamicForwardingIntegrationTest : public testing::TestWithParam<IpVersion>,
-                                         public ::Envoy::HttpIntegrationTest {
+class OverrideHostIntegrationTest : public testing::TestWithParam<IpVersion>,
+                                    public ::Envoy::HttpIntegrationTest {
 public:
-  DynamicForwardingIntegrationTest() : HttpIntegrationTest(CodecType::HTTP1, GetParam()) {
+  OverrideHostIntegrationTest() : HttpIntegrationTest(CodecType::HTTP1, GetParam()) {
     setUpstreamCount(3);
   }
 
@@ -175,12 +175,12 @@ public:
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicForwardingIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideHostIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 // Validate that without the selected endpoints metadata the fallback LB is used
-TEST_P(DynamicForwardingIntegrationTest, WithoutMetadataOrHeaderFallbackLbIsUsed) {
+TEST_P(OverrideHostIntegrationTest, WithoutMetadataOrHeaderFallbackLbIsUsed) {
   initializeConfig();
   runLoadBalancing([](absl::Span<const uint64_t> indexs) {
     // Fallback picking LB is Round Robin, so the indexes are expected to be
@@ -194,7 +194,7 @@ TEST_P(DynamicForwardingIntegrationTest, WithoutMetadataOrHeaderFallbackLbIsUsed
 
 // Set the first endpoint in the selected endpoints metadata and validate that
 // no other endpoints were used in proxying requests.
-TEST_P(DynamicForwardingIntegrationTest, UseFirstEndpoint) {
+TEST_P(OverrideHostIntegrationTest, UseFirstEndpoint) {
   set_metadata_filter_config_modifier_ = [this]() {
     config_helper_.prependFilter(fmt::format(kSetMetadataFilterConfigPrimaryOnly,
                                              fake_upstreams_[0]->localAddress()->asStringView()));
@@ -210,7 +210,7 @@ TEST_P(DynamicForwardingIntegrationTest, UseFirstEndpoint) {
 }
 
 // TODO(yanavlasov): Add support for header and metadata with fallback endpoints
-TEST_P(DynamicForwardingIntegrationTest, RetriesUseFallbackLb) {
+TEST_P(OverrideHostIntegrationTest, RetriesUseFallbackLb) {
   // Only set primary endpoint in the SelectedEndpoints metadata.
   set_metadata_filter_config_modifier_ = [this]() {
     config_helper_.prependFilter(fmt::format(kSetMetadataFilterConfigPrimaryOnly,
@@ -255,7 +255,7 @@ TEST_P(DynamicForwardingIntegrationTest, RetriesUseFallbackLb) {
 
 // Set the second endpoint in the selected endpoint header and validate that
 // no other endpoints were used in proxying requests.
-TEST_P(DynamicForwardingIntegrationTest, UseFirstEndpointFromHeaders) {
+TEST_P(OverrideHostIntegrationTest, UseFirstEndpointFromHeaders) {
   // Set the first endpoint in the metadata
   set_metadata_filter_config_modifier_ = [this]() {
     config_helper_.prependFilter(fmt::format(kSetMetadataFilterConfigPrimaryOnly,
@@ -276,7 +276,7 @@ TEST_P(DynamicForwardingIntegrationTest, UseFirstEndpointFromHeaders) {
 }
 
 } // namespace
-} // namespace DynamicForwarding
+} // namespace OverrideHost
 } // namespace LoadBalancingPolices
 } // namespace Extensions
 } // namespace Envoy
