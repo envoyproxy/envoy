@@ -28,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // .. code-block:: none
 //
-//     session-header: "MS4yLjMuNDo4MA=="
+//     session-header: "MS4yLjMuNDo4MA==" # base64("1.2.3.4:80")
 //
 // When processing the upstream response, if ``1.2.3.4:80`` is indeed the final choice the extension
 // does nothing. If ``1.2.3.4:80`` is not the final choice, the new selected host will be set to
@@ -36,7 +36,39 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.http.stateful_session.header]
 message HeaderBasedSessionState {
-  // The name that will be used to obtain header value from downstream HTTP request or generate
-  // new header for downstream.
+  enum Mode {
+    // If the upstream host address is different from the request header value (or if the request
+    // header is not present), the extension will set the response header value to upstream host
+    // address. This is the default mode.
+    OVERRIDE = 0;
+
+    // Iff the header specified by the :ref:`name
+    // <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>`
+    // (assume the ``name`` is set to ``session-header`` and original header value is ``xxxxxx``)
+    // is present, then the upstream host address and value of ``name`` field specified header will
+    // be encoded in following format and the output will be used to update the ``name`` field
+    // specified header in the response:
+    //
+    // .. code-block:: none
+    //
+    //   session-header: "MS4yLjMuNDo4MDtvcmlnaW46eHh4eHh4Cg==" # base64("1.2.3.4:80;origin:xxxxxx")
+    //
+    // The ``origin`` part is used to store the original header value of ``name`` field specified
+    // header. And the ``origin`` part should always be last part of the new header value.
+    //
+    // If this mode is used then we will assume that the header in the request will also be in the
+    // same format and contains the ``origin`` part. This extension will parse the upstream host
+    // address and update the ``name`` field specified header in the request to the ``origin`` part.
+    //
+    // This mode is used for the protocols or scenarios where the server will generate and set the
+    // session id in the initial response and the client will use the same header to send the session
+    // id in the subsequent requests without any modification.
+    PACKAGES = 1;
+  }
+
+  // The name that will be used to obtain header value from downstream HTTP request and generate
+  // new response header for downstream.
   string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  Mode mode = 2 [(validate.rules).enum = {defined_only: true}];
 }
