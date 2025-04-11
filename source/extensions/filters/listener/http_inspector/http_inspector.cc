@@ -23,7 +23,8 @@ Config::Config(Stats::Scope& scope)
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
-Filter::Filter(const ConfigSharedPtr config) : config_(config) {
+Filter::Filter(const ConfigSharedPtr config)
+    : config_(config), requested_read_bytes_(Config::DEFAULT_INITIAL_BUFFER_SIZE) {
   http_parser_init(&parser_, HTTP_REQUEST);
 }
 
@@ -44,6 +45,24 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     done(true);
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
+    ENVOY_LOG(trace, "http inspector: need more bytes");
+
+    // If we have requested the maximum amount of data, then close the connection
+    // the request line is too large to determine the http version.
+    if (static_cast<size_t>(parser_.nread) >= Config::MAX_INSPECT_SIZE) {
+      ENVOY_LOG(warn, "http inspector: reached max buffer without determining HTTP version, "
+                      "dropping connection");
+      config_->stats().read_error_.inc();
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
+    }
+
+    // Otherwise, double the buffer size and try again
+    if (static_cast<size_t>(parser_.nread) >= requested_read_bytes_) {
+      requested_read_bytes_ =
+          std::min<uint32_t>(2 * requested_read_bytes_, Config::MAX_INSPECT_SIZE);
+    }
+
     return Network::FilterStatus::StopIteration;
   }
   PANIC_DUE_TO_CORRUPT_ENUM
