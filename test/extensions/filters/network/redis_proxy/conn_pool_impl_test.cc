@@ -456,6 +456,35 @@ TEST_F(RedisConnPoolImplTest, ShardNoHost) {
   tls_.shutdownThread();
 };
 
+TEST_F(RedisConnPoolImplTest, ShardSizeDuplicateHosts) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+
+  uint16_t max_hosts = 5;
+  std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> mock_hosts;
+  for (uint16_t i = 0; i < max_hosts; i++) {
+    mock_hosts.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+  }
+
+  uint16_t call_count = 0;
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillRepeatedly(
+          Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+            EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+            EXPECT_EQ(context->downstreamConnection(), nullptr);
+            return mock_hosts[call_count++ % max_hosts];
+          }));
+  // shardSize() should only count max_hosts, ignoring duplicates
+  EXPECT_EQ(conn_pool_->shardSize(), max_hosts);
+  EXPECT_GT(call_count, max_hosts);
+
+  tls_.shutdownThread();
+};
+
 TEST_F(RedisConnPoolImplTest, BasicRespVariant) {
   InSequence s;
 
