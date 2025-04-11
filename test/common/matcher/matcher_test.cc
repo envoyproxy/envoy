@@ -137,32 +137,32 @@ using ::testing::IsEmpty;
 
 TEST_F(MatcherTest, TestMatcher) {
   const std::string yaml = R"EOF(
-  matcher_tree:
-    input:
-      name: outer_input
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
-    exact_match_map:
-      map:
-        value:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  exact_match_map:
+    map:
+      value:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: expected!
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: expected!
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.BoolValue
-                    value_match:
-                      exact: foo
-    )EOF";
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -184,32 +184,32 @@ TEST_F(MatcherTest, TestMatcher) {
 
 TEST_F(MatcherTest, TestPrefixMatcher) {
   const std::string yaml = R"EOF(
-  matcher_tree:
-    input:
-      name: outer_input
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
-    prefix_match_map:
-      map:
-        val:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  prefix_match_map:
+    map:
+      val:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: expected!
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: expected!
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.BoolValue
-                    value_match:
-                      exact: foo
-    )EOF";
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -231,32 +231,32 @@ TEST_F(MatcherTest, TestPrefixMatcher) {
 
 TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
   const std::string yaml = R"EOF(
-  matcher_tree:
-    input:
-      name: outer_input
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.FloatValue
-    prefix_match_map:
-      map:
-        3.14:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  prefix_match_map:
+    map:
+      3.14:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: not expected
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: not expected
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.BoolValue
-                    value_match:
-                      exact: foo
-    )EOF";
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -279,32 +279,32 @@ TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
 
 TEST_F(MatcherTest, TestInvalidFloatExactMapMatcher) {
   const std::string yaml = R"EOF(
-  matcher_tree:
-    input:
-      name: outer_input
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.FloatValue
-    exact_match_map:
-      map:
-        3.14:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  exact_match_map:
+    map:
+      3.14:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: not expected
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
                     typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: not expected
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.BoolValue
-                    value_match:
-                      exact: foo
-    )EOF";
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -325,24 +325,24 @@ TEST_F(MatcherTest, TestInvalidFloatExactMapMatcher) {
 
 TEST_F(MatcherTest, InvalidDataInput) {
   const std::string yaml = R"EOF(
-  matcher_list:
-    matchers:
-    - on_match:
-        action:
-          name: test_action
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: not expected
+    predicate:
+      single_predicate:
+        input:
+          name: generic
           typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
-            value: not expected
-      predicate:
-        single_predicate:
-          input:
-            name: generic
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.FloatValue
-          value_match:
-            exact: 3.14
+            "@type": type.googleapis.com/google.protobuf.FloatValue
+        value_match:
+          exact: 3.14
 
-    )EOF";
+  )EOF";
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
 
@@ -360,33 +360,33 @@ TEST_F(MatcherTest, InvalidDataInput) {
 
 TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
   const std::string yaml = R"EOF(
-    matcher_list:
-      matchers:
-      - on_match:
-          action:
-            name: test_action
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: not expected
-        predicate:
-          and_matcher:
-            predicate:
-            - single_predicate:
-                input:
-                  name: inner_input
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.FloatValue
-                value_match:
-                  exact: 3.14
-            - single_predicate:
-                input:
-                  name: inner_input
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.FloatValue
-                value_match:
-                  exact: 3.14
+  matcher_list:
+    matchers:
+    - on_match:
+        action:
+          name: test_action
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: not expected
+      predicate:
+        and_matcher:
+          predicate:
+          - single_predicate:
+              input:
+                name: inner_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.FloatValue
+              value_match:
+                exact: 3.14
+          - single_predicate:
+              input:
+                name: inner_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.FloatValue
+              value_match:
+                exact: 3.14
 
-    )EOF";
+  )EOF";
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
 
@@ -405,13 +405,13 @@ TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
 
 TEST_F(MatcherTest, TestAnyMatcher) {
   const std::string yaml = R"EOF(
-  on_no_match:
-    action:
-      name: test_action
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
-        value: expected!
-    )EOF";
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: expected!
+  )EOF";
 
   xds::type::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -426,24 +426,24 @@ TEST_F(MatcherTest, TestAnyMatcher) {
 
 TEST_F(MatcherTest, CustomGenericInput) {
   const std::string yaml = R"EOF(
-  matcher_list:
-    matchers:
-    - on_match:
-        action:
-          name: test_action
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: expected!
+    predicate:
+      single_predicate:
+        input:
+          name: generic
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
-            value: expected!
-      predicate:
-        single_predicate:
-          input:
-            name: generic
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-          value_match:
-            exact: foo
+        value_match:
+          exact: foo
 
-    )EOF";
+  )EOF";
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
 
@@ -458,26 +458,26 @@ TEST_F(MatcherTest, CustomGenericInput) {
 
 TEST_F(MatcherTest, CustomMatcher) {
   const std::string yaml = R"EOF(
-  matcher_list:
-    matchers:
-    - on_match:
-        action:
-          name: test_action
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: expected!
+    predicate:
+      single_predicate:
+        input:
+          name: inner_input
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.BoolValue
+        custom_match:
+          name: custom_match
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
-            value: expected!
-      predicate:
-        single_predicate:
-          input:
-            name: inner_input
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.BoolValue
-          custom_match:
-            name: custom_match
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: custom_foo
-    )EOF";
+            value: custom_foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -501,41 +501,41 @@ TEST_F(MatcherTest, CustomMatcher) {
 
 TEST_F(MatcherTest, TestAndMatcher) {
   const std::string yaml = R"EOF(
-  matcher_tree:
-    input:
-      name: outer_input
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
-    exact_match_map:
-      map:
-        value:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: expected!
-                predicate:
-                  and_matcher:
-                    predicate:
-                    - single_predicate:
-                        input:
-                          name: inner_input
-                          typed_config:
-                            "@type": type.googleapis.com/google.protobuf.BoolValue
-                        value_match:
-                          exact: foo
-                    - single_predicate:
-                        input:
-                          name: inner_input
-                          typed_config:
-                            "@type": type.googleapis.com/google.protobuf.BoolValue
-                        value_match:
-                          exact: foo
-    )EOF";
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  exact_match_map:
+    map:
+      value:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: expected!
+              predicate:
+                and_matcher:
+                  predicate:
+                  - single_predicate:
+                      input:
+                        name: inner_input
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
+                      value_match:
+                        exact: foo
+                  - single_predicate:
+                      input:
+                        name: inner_input
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
+                      value_match:
+                        exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -558,41 +558,41 @@ TEST_F(MatcherTest, TestAndMatcher) {
 
 TEST_F(MatcherTest, TestOrMatcher) {
   const std::string yaml = R"EOF(
-  matcher_tree:
-    input:
-      name: outer_input
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
-    exact_match_map:
-      map:
-        value:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: expected!
-                predicate:
-                  or_matcher:
-                    predicate:
-                    - single_predicate:
-                        input:
-                          name: inner_input
-                          typed_config:
-                            "@type": type.googleapis.com/google.protobuf.BoolValue
-                        value_match:
-                          exact: bar
-                    - single_predicate:
-                        input:
-                          name: inner_input
-                          typed_config:
-                            "@type": type.googleapis.com/google.protobuf.BoolValue
-                        value_match:
-                          exact: foo
-    )EOF";
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  exact_match_map:
+    map:
+      value:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: expected!
+              predicate:
+                or_matcher:
+                  predicate:
+                  - single_predicate:
+                      input:
+                        name: inner_input
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
+                      value_match:
+                        exact: bar
+                  - single_predicate:
+                      input:
+                        name: inner_input
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
+                      value_match:
+                        exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -615,24 +615,24 @@ TEST_F(MatcherTest, TestOrMatcher) {
 
 TEST_F(MatcherTest, TestNotMatcher) {
   const std::string yaml = R"EOF(
-  matcher_list:
-    matchers:
-    - on_match:
-        action:
-          name: test_action
-          typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
-            value: not expected
-      predicate:
-        not_matcher:
-          single_predicate:
-            input:
-              name: inner_input
-              typed_config:
-                "@type": type.googleapis.com/google.protobuf.StringValue
-            value_match:
-              exact: foo
-    )EOF";
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: not expected
+    predicate:
+      not_matcher:
+        single_predicate:
+          input:
+            name: inner_input
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+          value_match:
+            exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -652,35 +652,35 @@ TEST_F(MatcherTest, TestNotMatcher) {
 
 TEST_F(MatcherTest, TestRecursiveMatcher) {
   const std::string yaml = R"EOF(
-  matcher_list:
-    matchers:
-    - on_match:
-        matcher:
-          matcher_list:
-            matchers:
-            - on_match:
-                action:
-                  name: test_action
+matcher_list:
+  matchers:
+  - on_match:
+      matcher:
+        matcher_list:
+          matchers:
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: expected!
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
                   typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: expected!
-              predicate:
-                single_predicate:
-                  input:
-                    name: inner_input
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.BoolValue
-                  value_match:
-                    exact: foo
-      predicate:
-        single_predicate:
-          input:
-            name: inner_input
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.BoolValue
-          value_match:
-            exact: foo
-    )EOF";
+                    "@type": type.googleapis.com/google.protobuf.BoolValue
+                value_match:
+                  exact: foo
+    predicate:
+      single_predicate:
+        input:
+          name: inner_input
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.BoolValue
+        value_match:
+          exact: foo
+  )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
@@ -733,129 +733,129 @@ INSTANTIATE_TEST_SUITE_P(UseXdsMatcherType, MatcherAmbiguousTest, ::testing::Boo
 
 TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
   const std::string yaml = R"EOF(
-      matcher_list:
-        matchers:
-        - on_match:
-            matcher:
-              matcher_list:
-                matchers:
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: match-1
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: no-match-1
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: bar
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: match-2
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-              on_no_match:
-                action:
-                  name: test_action
+matcher_list:
+  matchers:
+  - on_match:
+      matcher:
+        matcher_list:
+          matchers:
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: match-1
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: on-no-match-nested-1
-          predicate:
-            single_predicate:
-              input:
-                name: inner_input
+                value_match:
+                  exact: foo
+          - on_match:
+              action:
+                name: test_action
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
-              value_match:
-                exact: foo
-        - on_match:
-            matcher:
-              matcher_list:
-                matchers:
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: match-3
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: no-match-2
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: bar
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: match-4
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-          predicate:
-            single_predicate:
-              input:
-                name: inner_input
+                  value: no-match-1
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: bar
+          - on_match:
+              action:
+                name: test_action
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
-              value_match:
-                exact: foo
-      on_no_match:
-        action:
-          name: test_action
+                  value: match-2
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+        on_no_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: on-no-match-nested-1
+    predicate:
+      single_predicate:
+        input:
+          name: inner_input
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
-            value: on-no-match
-        )EOF";
+        value_match:
+          exact: foo
+  - on_match:
+      matcher:
+        matcher_list:
+          matchers:
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: match-3
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: no-match-2
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: bar
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: match-4
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+    predicate:
+      single_predicate:
+        input:
+          name: inner_input
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+        value_match:
+          exact: foo
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: on-no-match
+  )EOF";
 
   // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
   xds::type::matcher::v3::Matcher xds_matcher;
@@ -924,132 +924,132 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
   // recorded. Second parent matcher is not set to skip matches, so nested matchers determine
   // skipping behaviors.
   const std::string yaml = R"EOF(
-      matcher_list:
-        matchers:
-        - on_match:
-            keep_matching: true
-            matcher:
-              matcher_list:
-                matchers:
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: skipped - no match 1
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: bar
-                - on_match:
-                    keep_matching: true
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: skipped - keep matching 1
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: skipped - match 2
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-              on_no_match:
-                action:
-                  name: test_action
+matcher_list:
+  matchers:
+  - on_match:
+      keep_matching: true
+      matcher:
+        matcher_list:
+          matchers:
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: skipped - no match 1
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: skipped - nested on no match 1
-          predicate:
-            single_predicate:
-              input:
-                name: inner_input
+                value_match:
+                  exact: bar
+          - on_match:
+              keep_matching: true
+              action:
+                name: test_action
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
-              value_match:
-                exact: foo
-        - on_match:
-            matcher:
-              matcher_list:
-                matchers:
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: match 3
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-                - on_match:
-                    keep_matching: true
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: keep matching 2
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-                - on_match:
-                    action:
-                      name: test_action
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: match 4
-                  predicate:
-                    single_predicate:
-                      input:
-                        name: inner_input
-                        typed_config:
-                          "@type": type.googleapis.com/google.protobuf.StringValue
-                      value_match:
-                        exact: foo
-          predicate:
-            single_predicate:
-              input:
-                name: inner_input
+                  value: skipped - keep matching 1
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+          - on_match:
+              action:
+                name: test_action
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
-              value_match:
-                exact: foo
-      on_no_match:
-        action:
-          name: test_action
+                  value: skipped - match 2
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+        on_no_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: skipped - nested on no match 1
+    predicate:
+      single_predicate:
+        input:
+          name: inner_input
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
-            value: on no match
-        )EOF";
+        value_match:
+          exact: foo
+  - on_match:
+      matcher:
+        matcher_list:
+          matchers:
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: match 3
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+          - on_match:
+              keep_matching: true
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: keep matching 2
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+          - on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: match 4
+            predicate:
+              single_predicate:
+                input:
+                  name: inner_input
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                value_match:
+                  exact: foo
+    predicate:
+      single_predicate:
+        input:
+          name: inner_input
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+        value_match:
+          exact: foo
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: on no match
+  )EOF";
 
   // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
   xds::type::matcher::v3::Matcher xds_matcher;
@@ -1106,21 +1106,21 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   // ExactMapMatcher does not support reentry, so we expect a no-match result when hitting a
   // keep_matching matcher.
   const std::string yaml = R"EOF(
-      matcher_tree:
-        input:
-          name: inner_input
+matcher_tree:
+  input:
+    name: inner_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  exact_match_map:
+    map:
+      foo:
+        keep_matching: true
+        action:
+          name: test_action
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
-        exact_match_map:
-          map:
-            foo:
-              keep_matching: true
-              action:
-                name: test_action
-                typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
-                  value: keep matching
-        )EOF";
+            value: keep matching
+  )EOF";
 
   // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
   xds::type::matcher::v3::Matcher xds_matcher;
