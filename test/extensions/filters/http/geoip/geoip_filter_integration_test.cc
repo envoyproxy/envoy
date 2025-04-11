@@ -168,31 +168,6 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIsp) {
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.hit")->value());
 }
 
-TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUsingIspDbAsAsnDb) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.geoip_maxmind_provider_isp_db_load_asn_db", "true");
-  config_helper_.prependFilter(TestEnvironment::substitute(ConfigIspAndAsn));
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"},
-                                                 {"x-forwarded-for", "::12.96.16.1,9.10.11.12"}};
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-  EXPECT_EQ("Boxford", headerValue("x-geo-city"));
-  EXPECT_EQ("ENG", headerValue("x-geo-region"));
-  EXPECT_EQ("GB", headerValue("x-geo-country"));
-  EXPECT_EQ("7018", headerValue("x-geo-asn"));
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
-  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
-  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
-  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
-  EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
-}
-
 TEST_P(GeoipFilterIntegrationTest, GeoHeadersOverridenInRequest) {
   config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
   initialize();

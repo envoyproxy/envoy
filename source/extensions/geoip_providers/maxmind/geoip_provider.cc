@@ -177,11 +177,7 @@ void GeoipProvider::lookup(Geolocation::LookupRequest&& request,
   auto& remote_address = request.remoteAddress();
   auto lookup_result = absl::flat_hash_map<std::string, std::string>{};
   lookupInCityDb(remote_address, lookup_result);
-  // When the runtimeFeature is disabled we lookup in the ASN DB.
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.geoip_maxmind_provider_isp_db_load_asn_db")) {
-    lookupInAsnDb(remote_address, lookup_result);
-  }
+  lookupInAsnDb(remote_address, lookup_result);
   lookupInAnonDb(remote_address, lookup_result);
   lookupInIspDb(remote_address, lookup_result);
   cb(std::move(lookup_result));
@@ -332,90 +328,52 @@ void GeoipProvider::lookupInIspDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.geoip_maxmind_provider_isp_db_load_asn_db")) {
-    ENVOY_LOG(info, "Loading ASN database as ISP database");
-    if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
-      int mmdb_error;
-      auto isp_db_ptr = getIspDb();
-      // Used for testing.
-      synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
-      if (!isp_db_ptr) {
-        IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
-        return;
-      }
-      MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-          isp_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-          &mmdb_error);
-      const uint32_t n_prev_hits = lookup_result.size();
-      if (!mmdb_error) {
-        MMDB_entry_data_list_s* entry_data_list;
-        int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
-        if (status == MMDB_SUCCESS) {
-          if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
-            populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
-                                    MMDB_ASN_LOOKUP_ARGS[0]);
-          }
-
-          MMDB_free_entry_data_list(entry_data_list);
-          if (lookup_result.size() > n_prev_hits) {
-            config_->incHit(ISP_DB_TYPE);
-          }
-        } else {
-          config_->incLookupError(ISP_DB_TYPE);
-        }
-      }
-      config_->incTotal(ISP_DB_TYPE);
+  if (config_->isLookupEnabledForHeader(config_->ispHeader()) ||
+      config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader())) {
+    int mmdb_error;
+    auto isp_db_ptr = getIspDb();
+    // Used for testing.
+    synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
+    if (!isp_db_ptr) {
+      IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
+      return;
     }
-  } else {
-    if (config_->isLookupEnabledForHeader(config_->ispHeader()) ||
-        config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader())) {
-      int mmdb_error;
-      auto isp_db_ptr = getIspDb();
-      // Used for testing.
-      synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
-      if (!isp_db_ptr) {
-        IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
-        return;
-      }
-      MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-          isp_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-          &mmdb_error);
-      const uint32_t n_prev_hits = lookup_result.size();
-      if (!mmdb_error) {
-        MMDB_entry_data_list_s* entry_data_list;
-        int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
-        if (status == MMDB_SUCCESS) {
+    MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
+        isp_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
+        &mmdb_error);
+    const uint32_t n_prev_hits = lookup_result.size();
+    if (!mmdb_error) {
+      MMDB_entry_data_list_s* entry_data_list;
+      int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
+      if (status == MMDB_SUCCESS) {
 
-          if (config_->isLookupEnabledForHeader(config_->ispHeader())) {
-            populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->ispHeader().value(),
-                                    MMDB_ISP_LOOKUP_ARGS[0]);
-          }
-          if (config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader())) {
-            populateGeoLookupResult(mmdb_lookup_result, lookup_result,
-                                    config_->applePrivateRelayHeader().value(),
-                                    MMDB_ISP_LOOKUP_ARGS[0]);
-            if (lookup_result.find(config_->applePrivateRelayHeader().value()) !=
-                    lookup_result.end() &&
-                lookup_result[config_->applePrivateRelayHeader().value()] ==
-                    "iCloud Private Relay") {
-              lookup_result[config_->applePrivateRelayHeader().value()] = "true";
-            } else {
-              lookup_result[config_->applePrivateRelayHeader().value()] = "false";
-            }
-          }
-          MMDB_free_entry_data_list(entry_data_list);
-          std::cout << "lookup_result size: " << lookup_result.size() << "n_prev" << n_prev_hits
-                    << std::endl;
-          if (lookup_result.size() > n_prev_hits) {
-            config_->incHit(ISP_DB_TYPE);
-          }
-        } else {
-          config_->incLookupError(ISP_DB_TYPE);
+        if (config_->isLookupEnabledForHeader(config_->ispHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->ispHeader().value(),
+                                  MMDB_ISP_LOOKUP_ARGS[0]);
         }
+        if (config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->applePrivateRelayHeader().value(),
+                                  MMDB_ISP_LOOKUP_ARGS[0]);
+          if (lookup_result.find(config_->applePrivateRelayHeader().value()) !=
+                  lookup_result.end() &&
+              lookup_result[config_->applePrivateRelayHeader().value()] == "iCloud Private Relay") {
+            lookup_result[config_->applePrivateRelayHeader().value()] = "true";
+          } else {
+            lookup_result[config_->applePrivateRelayHeader().value()] = "false";
+          }
+        }
+        MMDB_free_entry_data_list(entry_data_list);
+        std::cout << "lookup_result size: " << lookup_result.size() << "n_prev" << n_prev_hits
+                  << std::endl;
+        if (lookup_result.size() > n_prev_hits) {
+          config_->incHit(ISP_DB_TYPE);
+        }
+      } else {
+        config_->incLookupError(ISP_DB_TYPE);
       }
-      config_->incTotal(ISP_DB_TYPE);
     }
+    config_->incTotal(ISP_DB_TYPE);
   }
 }
 

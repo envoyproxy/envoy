@@ -180,10 +180,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
-// This feature can be removed once the geoip filter users confirm that they are using the correct
-// behavior for the isp_db.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_geoip_maxmind_provider_isp_db_load_asn_db);
-
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
