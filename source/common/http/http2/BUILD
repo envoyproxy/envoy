@@ -83,6 +83,7 @@ envoy_cc_library(
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
     deps = [
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",

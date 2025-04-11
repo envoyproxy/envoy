@@ -1182,5 +1182,26 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
 }
 
+TEST_F(MultiConnectionBaseImplTest, MoveSocket) {
+  setupMultiConnectionImpl(2);
+
+  // The method should panic when called
+  EXPECT_DEATH(impl_->moveSocket(), "not implemented");
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetConnectionReused) {
+  setupMultiConnectionImpl(2);
+
+  // The method should panic when called
+  EXPECT_DEATH(impl_->setConnectionReused(true), "not implemented");
+}
+
+TEST_F(MultiConnectionBaseImplTest, IsConnectionReused) {
+  setupMultiConnectionImpl(2);
+
+  // The method should panic when called
+  EXPECT_DEATH(impl_->isConnectionReused(), "not implemented");
+}
+
 } // namespace Network
 } // namespace Envoy

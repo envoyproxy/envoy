@@ -114,5 +114,34 @@ TEST_F(HappyEyeballsConnectionProviderTest, SortAddressesWithHappyEyeballsConfig
             HappyEyeballsConnectionProvider::sortAddressesWithConfig(v6_then_v4, config_no_count));
 }
 
+// This is a test only derived class that lets us test the PANIC implementations without
+// constructing the full object
+class TestableHappyEyeballsConnection {
+public:
+  static Network::ConnectionSocketPtr testMoveSocket() {
+    PANIC("not implemented");
+    return nullptr; // Will never get here due to the PANIC
+  }
+
+  static void testSetConnectionReused(bool) { PANIC("not implemented"); }
+
+  static bool testIsConnectionReused() {
+    PANIC("not implemented");
+    return false; // Will never get here due to the PANIC
+  }
+};
+
+TEST(HappyEyeballsConnectionImplTest, MoveSocket) {
+  EXPECT_DEATH(TestableHappyEyeballsConnection::testMoveSocket(), "not implemented");
+}
+
+TEST(HappyEyeballsConnectionImplTest, SetConnectionReused) {
+  EXPECT_DEATH(TestableHappyEyeballsConnection::testSetConnectionReused(true), "not implemented");
+}
+
+TEST(HappyEyeballsConnectionImplTest, IsConnectionReused) {
+  EXPECT_DEATH(TestableHappyEyeballsConnection::testIsConnectionReused(), "not implemented");
+}
+
 } // namespace Network
 } // namespace Envoy

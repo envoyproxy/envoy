@@ -263,6 +263,17 @@ public:
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
 
   /**
+   * @return host-id to be used to retrieve reverse connection sockets from
+   * reverse connection handler.
+   */
+  virtual const absl::string_view getHostId() const PURE;
+
+  /*
+   * Set the current host-id.
+   */
+  virtual void setHostId(const std::string host_id) PURE;
+
+  /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
    * active health checking.
    */
