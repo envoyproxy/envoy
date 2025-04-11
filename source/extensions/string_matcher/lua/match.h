@@ -20,8 +20,7 @@ public:
   ~LuaStringMatcher() override = default;
 
   // Matchers::StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> context = absl::nullopt) const override;
+  bool match(const absl::string_view value) const override;
 
 private:
   CSmartPtr<lua_State, lua_close> state_;

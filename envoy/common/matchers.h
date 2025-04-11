@@ -25,8 +25,12 @@ public:
   /**
    * Return whether a passed string value matches.
    */
-  virtual bool match(const absl::string_view value,
-                     OptRef<const Context> context = absl::nullopt) const PURE;
+  virtual bool match(const absl::string_view value) const PURE;
+
+  /**
+   * Return whether a passed string value matches with context
+   */
+  virtual bool match(const absl::string_view value, const Context&) const { return match(value); }
 };
 
 using StringMatcherPtr = std::unique_ptr<const StringMatcher>;

@@ -1387,7 +1387,7 @@ dynamic_scoped_route_configs:
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump3));
 
   NiceMock<MockStringMatcher> mock_matcher;
-  EXPECT_CALL(mock_matcher, match("dynamic-foo", _)).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(false));
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
 dynamic_scoped_route_configs:
@@ -1406,7 +1406,7 @@ dynamic_scoped_route_configs:
           *message_ptr);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
 
-  EXPECT_CALL(mock_matcher, match("dynamic-foo", _)).WillOnce(Return(true));
+  EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(true));
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
 dynamic_scoped_route_configs:

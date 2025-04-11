@@ -894,8 +894,8 @@ dynamic_route_configs:
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
 
   MockStringMatcher mock_name_matcher;
-  EXPECT_CALL(mock_name_matcher, match("foo", _)).WillOnce(Return(true));
-  EXPECT_CALL(mock_name_matcher, match("foo_route_config", _)).WillOnce(Return(false));
+  EXPECT_CALL(mock_name_matcher, match("foo")).WillOnce(Return(true));
+  EXPECT_CALL(mock_name_matcher, match("foo_route_config")).WillOnce(Return(false));
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       mock_name_matcher);
   const auto& route_config_dump4 =
@@ -918,8 +918,8 @@ static_route_configs:
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump4.DebugString());
 
-  EXPECT_CALL(mock_name_matcher, match("foo", _)).WillOnce(Return(false));
-  EXPECT_CALL(mock_name_matcher, match("foo_route_config", _)).WillOnce(Return(true));
+  EXPECT_CALL(mock_name_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_name_matcher, match("foo_route_config")).WillOnce(Return(true));
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       mock_name_matcher);
   const auto& route_config_dump5 =

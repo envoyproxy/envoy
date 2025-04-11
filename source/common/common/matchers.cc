@@ -222,9 +222,8 @@ bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) c
   return value_matcher_->match(value) ^ matcher_.invert();
 }
 
-bool PathMatcher::match(const absl::string_view path,
-                        OptRef<const StringMatcher::Context> context) const {
-  return matcher_.match(Http::PathUtil::removeQueryAndFragment(path), context);
+bool PathMatcher::match(const absl::string_view path) const {
+  return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,

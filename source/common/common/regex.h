@@ -29,10 +29,7 @@ public:
   create(const xds::type::matcher::v3::RegexMatcher& config);
 
   // CompiledMatcher
-  bool match(absl::string_view value,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const override {
-    return re2::RE2::FullMatch(value, regex_);
-  }
+  bool match(absl::string_view value) const override { return re2::RE2::FullMatch(value, regex_); }
 
   // CompiledMatcher
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {

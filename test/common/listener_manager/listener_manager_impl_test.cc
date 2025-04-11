@@ -1694,7 +1694,7 @@ filter_chains:
 TEST_P(ListenerManagerImplTest, AddOrUpdateListener) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   NiceMock<Matchers::MockStringMatcher> mock_matcher;
-  ON_CALL(mock_matcher, match(_, _)).WillByDefault(Return(false));
+  ON_CALL(mock_matcher, match(_)).WillByDefault(Return(false));
   InSequence s;
 
   auto* lds_api = new MockLdsApi();

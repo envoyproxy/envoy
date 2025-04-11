@@ -85,10 +85,7 @@ private:
 
 class UniversalStringMatcher : public StringMatcher {
 public:
-  bool match(absl::string_view,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const override {
-    return true;
-  }
+  bool match(absl::string_view) const override { return true; }
 };
 
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
@@ -101,8 +98,7 @@ public:
       : exact_(exact), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const {
+  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::EqualsIgnoreCase(value, exact_) : value == exact_;
   }
 
@@ -120,8 +116,7 @@ public:
       : prefix_(prefix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const {
+  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::StartsWithIgnoreCase(value, prefix_)
                         : absl::StartsWith(value, prefix_);
   }
@@ -141,8 +136,7 @@ public:
       : suffix_(suffix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const {
+  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::EndsWithIgnoreCase(value, suffix_) : absl::EndsWith(value, suffix_);
   }
 
@@ -167,8 +161,7 @@ public:
   RegexStringMatcher(RegexStringMatcher&& other) noexcept { regex_ = std::move(other.regex_); }
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const {
+  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return regex_->match(value);
   }
 
@@ -186,8 +179,7 @@ public:
         ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> = absl::nullopt) const {
+  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::StrContains(absl::AsciiStrToLower(value), contents_)
                         : absl::StrContains(value, contents_);
   }
@@ -214,9 +206,12 @@ public:
       : custom_(getExtensionStringMatcher(custom, context)) {}
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> context = absl::nullopt) const {
-    return custom_->match(value, context);
+  bool match(const absl::string_view value, OptRef<const StringMatcher::Context> context) const {
+    if (context) {
+      return custom_->match(value, context.ref());
+    }
+
+    return custom_->match(value);
   }
 
   const std::string& stringRepresentation() const { return EMPTY_STRING; }
@@ -245,14 +240,9 @@ public:
   }
 
   // StringMatcher
-  bool match(const absl::string_view value,
-             OptRef<const StringMatcher::Context> context = absl::nullopt) const override {
-    // Implementing polymorphism for match(absl::string_value) on the different
-    // types that can be in the matcher_ variant.
-    auto call_match = [value, context](const auto& obj) -> bool {
-      return obj.match(value, context);
-    };
-    return absl::visit(call_match, matcher_);
+  bool match(const absl::string_view value) const override { return doMatch(value, absl::nullopt); }
+  bool match(const absl::string_view value, const StringMatcher::Context& context) const override {
+    return doMatch(value, makeOptRef(context));
   }
 
   // ValueMatcher
@@ -261,7 +251,7 @@ public:
       return false;
     }
 
-    return match(value.string_value(), absl::nullopt);
+    return match(value.string_value());
   }
 
   /**
@@ -325,6 +315,16 @@ private:
       ExceptionUtil::throwEnvoyException(
           fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
     }
+  }
+
+  bool doMatch(const absl::string_view value, OptRef<const StringMatcher::Context> context) const {
+    // Implementing polymorphism for match(absl::string_value) on the different
+    // types that can be in the matcher_ variant.
+    auto call_match = [value, context](const auto& obj) -> bool {
+      return obj.match(value, context);
+    };
+
+    return absl::visit(call_match, matcher_);
   }
 
   StringMatcherVariant matcher_;
@@ -421,8 +421,7 @@ public:
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const absl::string_view path,
-             OptRef<const StringMatcher::Context> context = absl::nullopt) const override;
+  bool match(const absl::string_view path) const override;
   const std::string& stringRepresentation() const { return matcher_.stringRepresentation(); }
 
 private:
