@@ -102,6 +102,7 @@ message Matcher {
     repeated FieldMatcher matchers = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
+  // [#next-free-field: 6]
   message MatcherTree {
     // A map of configured matchers. Used to allow using a map within a oneof.
     message MatchMap {
@@ -124,6 +125,11 @@ message Matcher {
 
       // Extension for custom matching logic.
       core.v3.TypedExtensionConfig custom_match = 4;
+
+      // Longest matching prefix wins. In the event that the sub-matcher within that matcher
+      // doesn't find a match, will try the next longest matching prefix, repeatedly, until
+      // either a match is found or there are no further prefix matches in the map.
+      MatchMap prefix_match_map_with_retry = 5;
     }
   }
 
