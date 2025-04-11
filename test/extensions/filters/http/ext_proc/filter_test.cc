@@ -834,7 +834,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulFalse) {
 
   // Set the runtime to false to force append default to be false, which is legacy behavior.
   scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_append_default_true", "false"}});
+      {{"envoy.reloadable_features.ext_proc_append_default_true", "false"}});
 
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -864,8 +864,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulTrue) {
   )EOF");
 
   // Set the runtime to true to force append default to be true.
-  scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_append_default_true", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_append_default_true", "true"}});
 
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -887,8 +886,6 @@ TEST_F(HttpFilterTest, PostAndChangeHeadersAppendDefaulTrue) {
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
   filter_->onDestroy();
 }
-
-
 
 // Using the default configuration, test the filter with a processor that
 // replies to the request_headers message with an "immediate response" message
