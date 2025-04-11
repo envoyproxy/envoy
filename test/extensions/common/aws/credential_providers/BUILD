@@ -22,7 +22,8 @@ envoy_cc_test(
     srcs = ["iam_roles_anywhere_credentials_provider_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/common/aws/credential_providers:config_credentials_provider_lib",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//test/extensions/common/aws:aws_mocks",

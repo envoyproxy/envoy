@@ -11,6 +11,7 @@
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
