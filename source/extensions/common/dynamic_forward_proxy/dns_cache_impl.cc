@@ -345,6 +345,7 @@ void DnsCacheImpl::forceRefreshHosts() {
 }
 
 void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) {
+        std::cerr << "==> AAB setIpVersionToRemove" << std::endl;
   bool has_changed = false;
   {
     absl::MutexLock lock{&ip_version_to_remove_lock_};
@@ -359,6 +360,7 @@ void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersi
     absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
     for (auto& primary_host : primary_hosts_) {
       for (auto* callbacks : update_callbacks_) {
+        std::cerr << "==> AAB onDnsHostAddOrUpdate: 1" << std::endl;
         auto status = callbacks->callbacks_.onDnsHostAddOrUpdate(primary_host.first,
                                                                  primary_host.second->host_info_);
         if (!status.ok()) {
@@ -586,6 +588,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 absl::Status DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
                                                  const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
+    std::cerr << "==> AAB onDnsHostAddOrUpdate: 2" << std::endl;
     RETURN_IF_NOT_OK(callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info));
   }
   return absl::OkStatus();
