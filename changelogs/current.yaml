@@ -52,6 +52,9 @@ minor_behavior_changes:
 - area: tls
   change: |
     FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
+- area: grpc-json
+  change: |
+    Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
