@@ -111,7 +111,7 @@ private:
 
 class AltsProxyTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  AltsProxyTest() : version_(GetParam()){};
+  AltsProxyTest() : version_(GetParam()) {};
   void startFakeHandshakerService(const std::vector<HandshakerReq>& expected_requests,
                                   grpc::Status status_to_return,
                                   bool return_error_response = false) {

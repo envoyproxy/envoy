@@ -87,6 +87,30 @@ enum class DetectedCloseType {
 };
 
 /**
+ * Combines connection event and close type for connection close operations
+ */
+struct ConnectionCloseAction {
+  ConnectionEvent event_;
+  bool close_socket_;
+  ConnectionCloseType type_;
+
+  ConnectionCloseAction(ConnectionEvent event_type = ConnectionEvent::Connected,
+                        bool close_socket = false,
+                        ConnectionCloseType close_type = ConnectionCloseType::NoFlush)
+      : event_(event_type), close_socket_(close_socket), type_(close_type) {}
+
+  bool operator==(const ConnectionCloseAction& other) const {
+    return event_ == other.event_ && type_ == other.type_ && close_socket_ == other.close_socket_;
+  }
+
+  bool operator!=(const ConnectionCloseAction& other) const { return !(*this == other); }
+
+  bool closeSocket() const { return close_socket_; }
+  bool isLocalClose() const { return event_ == ConnectionEvent::LocalClose; }
+  bool isRemoteClose() const { return event_ == ConnectionEvent::RemoteClose; }
+};
+
+/**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
 class Connection : public Event::DeferredDeletable,

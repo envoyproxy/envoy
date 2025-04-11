@@ -35,9 +35,8 @@ TEST_F(HotRestartingBaseTest, SendMsgRetryFailsAfterRetries) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, const msghdr*, int) {
-        return Api::SysCallSizeResult{0, ECONNREFUSED};
-      }));
+      .WillRepeatedly(Invoke(
+          [&](os_fd_t, const msghdr*, int) { return Api::SysCallSizeResult{0, ECONNREFUSED}; }));
 
   std::string dst_path = "/tmp/dst";
   sockaddr_un sun;

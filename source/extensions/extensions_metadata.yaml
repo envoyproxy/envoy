@@ -694,6 +694,13 @@ envoy.filters.network.ext_authz:
   status: stable
   type_urls:
   - envoy.extensions.filters.network.ext_authz.v3.ExtAuthz
+envoy.filters.network.ext_proc:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
 envoy.filters.network.http_connection_manager:
   categories:
   - envoy.filters.network
@@ -1247,6 +1254,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tracers.fluentd:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.fluentd.v3.FluentdConfig
 envoy.tracers.datadog:
   categories:
   - envoy.tracers
@@ -1322,7 +1336,7 @@ envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream
   - envoy.transport_sockets.upstream
-  security_posture: requires_trusted_downstream_and_upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
@@ -1484,6 +1498,13 @@ envoy.rbac.matchers.upstream_ip_port:
   status: alpha
   type_urls:
   - envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+envoy.rbac.principals.mtls_authenticated:
+  categories:
+  - envoy.rbac.principals
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.rbac.principals.mtls_authenticated.v3.Config
 envoy.http.stateful_session.cookie:
   categories:
   - envoy.http.stateful_session
@@ -1717,7 +1738,7 @@ envoy.load_balancing_policies.client_side_weighted_round_robin:
   categories:
   - envoy.load_balancing_policies
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
 envoy.load_balancing_policies.dynamic_forwarding:
@@ -1902,7 +1923,9 @@ envoy.generic_proxy.codecs.http1:
 envoy.filters.http.dynamic_modules:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter

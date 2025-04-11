@@ -16,6 +16,7 @@ filters.
   dubbo_proxy_filter
   echo_filter
   ext_authz_filter
+  ext_proc_filter
   generic_proxy_filter
   golang_filter
   kafka_broker_filter

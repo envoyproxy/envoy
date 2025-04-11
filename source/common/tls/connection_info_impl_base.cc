@@ -3,6 +3,8 @@
 #include <openssl/stack.h>
 
 #include "source/common/common/hex.h"
+#include "source/common/http/utility.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -176,8 +178,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
         size_t length;
         RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
         absl::string_view pem(reinterpret_cast<const char*>(output), length);
-        return absl::StrReplaceAll(
-            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(pem);
       });
 }
 
@@ -201,13 +202,34 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
           RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
 
           absl::string_view pem(reinterpret_cast<const char*>(output), length);
-          absl::StrAppend(
-              &result,
-              absl::StrReplaceAll(
-                  pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
+          absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
         }
         return result;
       });
+}
+
+bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const {
+  const bssl::UniquePtr<GENERAL_NAMES>& sans =
+      getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
+          CachedValueTag::PeerCertificateSanMatches,
+          [](SSL* ssl) -> bssl::UniquePtr<GENERAL_NAMES> {
+            bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+            if (!cert) {
+              return nullptr;
+            }
+            return bssl::UniquePtr<GENERAL_NAMES>(static_cast<GENERAL_NAMES*>(
+                X509_get_ext_d2i(cert.get(), NID_subject_alt_name, nullptr, nullptr)));
+          });
+
+  if (sans != nullptr) {
+    for (const GENERAL_NAME* san : sans.get()) {
+      if (matcher.match(san)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() const {

@@ -175,10 +175,8 @@ TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_CALL(request_callbacks_, newStream()).Times(0);
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke(
-          [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
-            return {nullptr, false};
-          }));
+      .WillOnce(Invoke([](Buffer::Instance&, MessageMetadataSharedPtr)
+                           -> std::pair<ContextSharedPtr, bool> { return {nullptr, false}; }));
 
   RequestDecoder decoder(protocol_, request_callbacks_);
 

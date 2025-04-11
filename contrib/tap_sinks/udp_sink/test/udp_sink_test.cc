@@ -105,8 +105,8 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
 // re Mock class UdpPacketWriter and not use existing Network::MockUdpPacketWriter
 class MockUdpPacketWriterNew : public Network::UdpPacketWriter {
 public:
-  MockUdpPacketWriterNew(bool isReturnOk) : isReturnOkForwritePacket_(isReturnOk){};
-  ~MockUdpPacketWriterNew() override{};
+  MockUdpPacketWriterNew(bool isReturnOk) : isReturnOkForwritePacket_(isReturnOk) {};
+  ~MockUdpPacketWriterNew() override {};
 
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
                                       const Network::Address::Ip* local_ip,

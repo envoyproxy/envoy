@@ -430,7 +430,9 @@ protected:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
+    EXPECT_TRUE(xds_manager_.subscription_factory_.callbacks_
+                    ->onConfigUpdate(decoded_resources.refvec_, {}, "")
+                    .ok());
   }
 
   void addEndpoint(envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment,
@@ -444,10 +446,6 @@ protected:
     socket_address->set_address("1.2.3.4");
     socket_address->set_port_value(port);
   }
-
-  NiceMock<MockConfigSubscriptionFactory> factory_;
-  Registry::InjectFactory<Config::ConfigSubscriptionFactory> registered_{factory_};
-  Config::SubscriptionCallbacks* callbacks_{nullptr};
 };
 
 // TODO(kbaichoo): when Eds Cluster supports getting its config via
@@ -491,12 +489,6 @@ TEST_P(EdsTest, ShouldMergeAddingHosts) {
             refresh_delay: 1s
     )EOF";
 
-  EXPECT_CALL(factory_, create(_))
-      .WillOnce(testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-        callbacks_ = &data.callbacks_;
-        return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-      }));
-
   EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
@@ -539,14 +531,6 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
 
   auto bootstrap = parseBootstrapFromV3YamlEnableDeferredCluster(bootstrap_yaml);
   create(bootstrap);
-
-  EXPECT_CALL(factory_, create(_))
-      .Times(2)
-      .WillRepeatedly(
-          testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-            callbacks_ = &data.callbacks_;
-            return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-          }));
 
   const std::string eds_cluster_yaml = R"EOF(
       name: cluster_1
@@ -634,12 +618,6 @@ TEST_P(EdsTest, ShouldNotHaveRemovedHosts) {
             refresh_delay: 1s
     )EOF";
 
-  EXPECT_CALL(factory_, create(_))
-      .WillOnce(testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-        callbacks_ = &data.callbacks_;
-        return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-      }));
-
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
@@ -705,12 +683,6 @@ TEST_P(EdsTest, ShouldHaveHostThatWasAddedAfterRemoval) {
             - eds
             refresh_delay: 1s
     )EOF";
-
-  EXPECT_CALL(factory_, create(_))
-      .WillOnce(testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-        callbacks_ = &data.callbacks_;
-        return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-      }));
 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
@@ -782,12 +754,6 @@ TEST_P(EdsTest, MultiplePrioritiesShouldMergeCorrectly) {
             refresh_delay: 1s
     )EOF";
 
-  EXPECT_CALL(factory_, create(_))
-      .WillOnce(testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-        callbacks_ = &data.callbacks_;
-        return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-      }));
-
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
@@ -853,12 +819,6 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
             - eds
             refresh_delay: 1s
     )EOF";
-
-  EXPECT_CALL(factory_, create(_))
-      .WillOnce(testing::Invoke([this](Config::ConfigSubscriptionFactory::SubscriptionData& data) {
-        callbacks_ = &data.callbacks_;
-        return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-      }));
 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));

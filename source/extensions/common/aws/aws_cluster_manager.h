@@ -84,7 +84,8 @@ private:
  */
 class AwsClusterManagerImpl : public AwsClusterManager,
                               public Envoy::Singleton::Instance,
-                              public Upstream::ClusterUpdateCallbacks {
+                              public Upstream::ClusterUpdateCallbacks,
+                              public Logger::Loggable<Logger::Id::aws> {
   // Friend class for testing callbacks
   friend class AwsClusterManagerFriend;
 
@@ -134,7 +135,7 @@ private:
   struct CredentialsProviderCluster {
     CredentialsProviderCluster(envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
                                std::string uri)
-        : uri_(uri), cluster_type_(cluster_type){};
+        : uri_(uri), cluster_type_(cluster_type) {};
 
     std::string uri_;
     envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;

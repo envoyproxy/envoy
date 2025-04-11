@@ -418,6 +418,28 @@ TEST_P(ProtocolIntegrationTest, MixedCaseScheme) {
   EXPECT_TRUE(scheme.empty() || scheme == "http");
 }
 
+TEST_P(ProtocolIntegrationTest, SchemeTransformation) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_scheme_header_transformation()->set_scheme_to_overwrite("https");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setScheme("Http");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  auto scheme = upstream_request_->headers().getSchemeValue();
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    EXPECT_EQ(scheme, "https");
+  } else {
+    // For H/1 upstreams the test fake upstream does not have :scheme, since it is set in HCM
+    EXPECT_TRUE(scheme.empty());
+  }
+}
+
 TEST_P(ProtocolIntegrationTest, AccessLogOnRequestStartTest) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
@@ -5666,6 +5688,57 @@ TEST_P(DownstreamProtocolIntegrationTest, ConfigureAsyncLbWhenUnsupported) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, EmptyCookieHeader) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto request_headers = default_request_headers_;
+  request_headers.addCopy("cookie", "");
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+
+  const bool has_empty_cookie =
+      !upstream_request_->headers().get(Http::LowerCaseString("cookie")).empty();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_cookie")) {
+    if (downstreamProtocol() == Http::CodecType::HTTP1 &&
+        upstreamProtocol() == Http::CodecType::HTTP1) {
+      EXPECT_TRUE(has_empty_cookie);
+    } else {
+      EXPECT_FALSE(has_empty_cookie);
+    }
+  } else {
+    if (downstreamProtocol() == Http::CodecType::HTTP2 ||
+        upstreamProtocol() == Http::CodecType::HTTP2) {
+      EXPECT_FALSE(has_empty_cookie);
+    } else {
+      EXPECT_TRUE(has_empty_cookie);
+    }
+  }
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, DownstreamCxStats) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_tx_bytes_total", 512);
 }
 
 } // namespace Envoy

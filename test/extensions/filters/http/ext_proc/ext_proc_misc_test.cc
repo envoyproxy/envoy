@@ -38,7 +38,7 @@ protected:
 
     // Create separate "upstreams" for ExtProc gRPC servers
     for (int i = 0; i < grpc_upstream_count_; ++i) {
-      grpc_upstreams_.push_back(&addFakeUpstream(Http::CodecType::HTTP2));
+      grpc_upstreams_.push_back(&addFakeUpstream(http_codec_type_));
     }
   }
 
@@ -175,12 +175,60 @@ protected:
 
   bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
+  void websocketExtProcTest() {
+    if (!IsEnvoyGrpc()) {
+      return;
+    }
+
+    http_codec_type_ = Http::CodecType::HTTP1;
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
+    auto* forward_rules = proto_config_.mutable_forward_rules();
+    auto* allowed_headers = forward_rules->mutable_allowed_headers();
+    allowed_headers->add_patterns()->set_exact("upgrade");
+    allowed_headers->add_patterns()->set_exact("connection");
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); });
+
+    const std::string local_reply_yaml = R"EOF(
+body_format:
+  json_format:
+    code: "%RESPONSE_CODE%"
+    message: "%LOCAL_REPLY_BODY%"
+  )EOF";
+    envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig
+        local_reply_config;
+    TestUtility::loadFromYaml(local_reply_yaml, local_reply_config);
+    config_helper_.setLocalReply(local_reply_config);
+
+    initializeConfig();
+    HttpIntegrationTest::initialize();
+
+    auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
+      headers.addCopy(LowerCaseString("upgrade"), "websocket");
+      headers.addCopy(LowerCaseString("connection"), "Upgrade");
+    });
+
+    processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "401"}}, true);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
+      processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+    }
+    verifyDownstreamResponse(*response, 401);
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
   TestScopedRuntime scoped_runtime_;
   int grpc_upstream_count_ = 2;
+  Http::CodecType http_codec_type_ = Http::CodecType::HTTP2;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcMiscIntegrationTest,
@@ -244,6 +292,23 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
+}
+
+// Test Ext_Proc filter and WebSocket configuration combination.
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.skip_ext_proc_on_local_reply", "true"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "false"}});
+  websocketExtProcTest();
+}
+
+// TODO(yanjunxiang-google): Delete this test after both runtime flags are removed.
+TEST_P(ExtProcMiscIntegrationTest, UpstreamRequestEncoderDanglingPointerTest) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.skip_ext_proc_on_local_reply", "false"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.router_filter_resetall_on_local_reply", "true"}});
+  websocketExtProcTest();
 }
 
 } // namespace Envoy
