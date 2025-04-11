@@ -340,7 +340,19 @@ absl::optional<size_t> Filter::lenV2Address(const char* buf) {
   return len;
 }
 
-bool Filter::parseV2Header(const char* buf) {
+namespace {
+SocketProtocol getSocketProtocol(uint8_t proto_family) {
+  if ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) {
+    return SocketProtocol::Tcp;
+  }
+  if ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM) {
+    return SocketProtocol::Udp;
+  }
+  return SocketProtocol::Unknown;
+}
+} // namespace
+
+bool Parser::parseV2Header(const char* buf, absl::optional<WireHeader>& proxy_protocol_header) {
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   uint8_t upper_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
   uint8_t lower_byte = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
@@ -349,7 +361,7 @@ bool Filter::parseV2Header(const char* buf) {
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
     // This is locally-initiated, e.g. health-check, and should not override remote address.
     // According to the spec, this address length should be zero for local connection.
-    proxy_protocol_header_.emplace(WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, 0, 0});
+    proxy_protocol_header.emplace(WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, 0, 0});
     return true;
   }
 
@@ -358,8 +370,8 @@ bool Filter::parseV2Header(const char* buf) {
   // use the real-remote info
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_ONBEHALF_OF) {
     uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
-    if (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
-        ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM)) {
+    auto protocol = getSocketProtocol(proto_family);
+    if (protocol != SocketProtocol::Unknown) {
       if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET) {
         PACKED_STRUCT(struct pp_ipv4_addr {
           uint32_t src_addr;
@@ -395,10 +407,10 @@ bool Filter::parseV2Header(const char* buf) {
           return false;
         }
 
-        proxy_protocol_header_.emplace(
+        proxy_protocol_header.emplace(
             WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
                        hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
-                       *remote_address_status, *local_address_status});
+                       *remote_address_status, *local_address_status, protocol});
 
         return true;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
@@ -436,10 +448,10 @@ bool Filter::parseV2Header(const char* buf) {
           return false;
         }
 
-        proxy_protocol_header_.emplace(WireHeader{
+        proxy_protocol_header.emplace(WireHeader{
             PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
-            *remote_address_status, *local_address_status});
+            *remote_address_status, *local_address_status, protocol});
         return true;
       }
     }
@@ -484,8 +496,9 @@ bool Filter::parseV1Header(const char* buf, size_t len) {
       if (remote_address == nullptr || local_address == nullptr) {
         return false;
       }
-      proxy_protocol_header_.emplace(
-          WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v4, remote_address, local_address});
+      proxy_protocol_header_.emplace(WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v4,
+                                                remote_address, local_address,
+                                                SocketProtocol::Tcp});
       return true;
     } else if (line_parts[1] == "TCP6") {
       const Network::Address::InstanceConstSharedPtr remote_address =
@@ -498,8 +511,9 @@ bool Filter::parseV1Header(const char* buf, size_t len) {
       if (remote_address == nullptr || local_address == nullptr) {
         return false;
       }
-      proxy_protocol_header_.emplace(
-          WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v6, remote_address, local_address});
+      proxy_protocol_header_.emplace(WireHeader{len, 0, 0, 0, Network::Address::IpVersion::v6,
+                                                remote_address, local_address,
+                                                SocketProtocol::Tcp});
       return true;
     } else {
       ENVOY_LOG(debug, "failed to read proxy protocol");
@@ -692,7 +706,7 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
     if (raw_slice.len_ >= static_cast<size_t>(PROXY_PROTO_V2_HEADER_LEN + addr_len)) {
       // The TLV remain, they are parsed in `parseTlvs()` which is called from the
       // parent (if needed).
-      if (parseV2Header(buf)) {
+      if (Parser::parseV2Header(buf, proxy_protocol_header_)) {
         return ReadOrParseState::Done;
       } else {
         return ReadOrParseState::Error;
@@ -732,6 +746,45 @@ ReadOrParseState Filter::readProxyHeader(Network::ListenerFilterBuffer& buffer) 
   }
 
   return ReadOrParseState::TryAgainLater;
+}
+
+Network::FilterStatus UdpFilter::onData(Network::UdpRecvData& data) {
+  auto raw_slice = data.buffer_->frontSlice();
+  const char* buf = static_cast<const char*>(raw_slice.mem_);
+
+  // Only support PROXY protocol V2.
+  if (!data.buffer_->startsWith(PROXY_PROTO_V2_SIGNATURE)) {
+    return Network::FilterStatus::StopIteration;
+  }
+
+  absl::optional<WireHeader> header;
+  if (!Parser::parseV2Header(buf, header)) {
+    return Network::FilterStatus::StopIteration;
+  }
+  if (!header.has_value()) {
+    return Network::FilterStatus::StopIteration;
+  }
+  if (header->socket_protocol_ != SocketProtocol::Udp) {
+    return Network::FilterStatus::StopIteration;
+  }
+
+  // Remove PROXY header from the payload.
+  data.buffer_->drain(header->wholeHeaderLength());
+
+  // For LOCAL command, preserve the original addresses and ignore the protocol block.
+  if (header->local_command_) {
+    return Network::FilterStatus::Continue;
+  }
+
+  data.addresses_.local_ = header->local_address_;
+  data.addresses_.peer_ = header->remote_address_;
+
+  return Network::FilterStatus::Continue;
+}
+
+Network::FilterStatus UdpFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
+  UNREFERENCED_PARAMETER(error_code);
+  return Network::FilterStatus::StopIteration;
 }
 
 } // namespace ProxyProtocol
