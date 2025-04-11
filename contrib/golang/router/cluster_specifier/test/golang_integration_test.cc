@@ -201,6 +201,59 @@ TEST_F(GolangClusterSpecifierIntegrationTest, Panic_Unknown) {
   cleanupUpstreamAndDownstream();
 }
 
+// Go plugin return cluster: "cluster_unknown"
+TEST_F(GolangClusterSpecifierIntegrationTest, GetAllHeaders_UnknownCluster) {
+  auto so_id = "simple";
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "");
+  initializeRoute(yaml_string);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},         {":path", "/test"},          {":scheme", "http"},
+      {":authority", "test.com"}, {"custom_header_1", "true"}, {"custom_header_1", "false"}};
+
+  // custom_header_1 has at least one "true" value which will result in "cluster_unknown" being
+  // returned.
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Go plugin choose cluster: "cluster_0"
+TEST_F(GolangClusterSpecifierIntegrationTest, GetAllHeaders_DefaultCluster) {
+  auto so_id = "simple";
+  auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), "");
+  initializeRoute(yaml_string);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"server", "envoy"},
+      {":status", "200"},
+  };
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"},
+                                                 {"custom_header_1", "false"}};
+
+  // custom_header_1 has a single value set to "false" which will result in "cluster_0" being
+  // returned.
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
 } // namespace Golang
 } // namespace Router

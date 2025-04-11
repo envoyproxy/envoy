@@ -12,6 +12,19 @@ type clusterSpecifier struct {
 	panicPrefix   string
 }
 
+func headerHasTrueValue(headers map[string][]string, key string) bool {
+	values, ok := headers[key]
+	if !ok {
+		return false
+	}
+	for _, element := range values {
+		if element == "true" {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *clusterSpecifier) Cluster(header api.RequestHeaderMap) string {
 	path, _ := header.Get(":path")
 
@@ -28,6 +41,10 @@ func (s *clusterSpecifier) Cluster(header api.RequestHeaderMap) string {
 	// panic, will using the default_cluster in the C++ side.
 	if strings.HasPrefix(path, s.panicPrefix) {
 		panic("test")
+	}
+
+	if headerHasTrueValue(header.GetAllHeaders(), "custom_header_1") {
+		return "cluster_unknown"
 	}
 
 	return "cluster_0"
