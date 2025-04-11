@@ -2167,7 +2167,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     EXPECT_NE(absl::nullopt, result.host_info_);
-    EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+    EXPECT_EQ(1, result.host_info_.value()->addressList(/*filtered=*/false).size());
   }
 
   {
@@ -2176,7 +2176,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     ASSERT_NE(absl::nullopt, result.host_info_);
-    EXPECT_EQ(2, result.host_info_.value()->addressList().size());
+    EXPECT_EQ(2, result.host_info_.value()->addressList(/*filtered=*/false).size());
   }
 }
 
@@ -2246,7 +2246,7 @@ TEST_F(DnsCacheImplTest, SingleAddressCache) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   ASSERT_NE(absl::nullopt, result.host_info_);
-  EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+  EXPECT_EQ(1, result.host_info_.value()->addressList(/*filtered=*/false).size());
 }
 
 TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
