@@ -135,7 +135,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     downstream_cluster_ = std::string(headers.getEnvoyDownstreamServiceClusterValue());
     if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
-          downstream_cluster_, config_->scope().symbolTable());
+          downstream_cluster_, config_->statsScope().symbolTable());
     }
 
     downstream_cluster_delay_percent_key_ =
@@ -169,7 +169,7 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
         [this, &request_headers]() -> void { postDelayInjection(request_headers); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
-    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
+    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->statsScope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected);
     auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
@@ -221,7 +221,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
       [](uint64_t, bool, std::chrono::milliseconds) {
         // write stats callback.
       },
-      config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
+      config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->statsScope());
 }
 
 bool FaultFilter::faultOverflow() {

@@ -7,9 +7,10 @@ namespace Wasm {
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-          context.listenerInfo().direction(), &context.listenerInfo().metadata(), false) {}
+    : Extensions::Common::Wasm::PluginConfig(config.config(), context.serverFactoryContext(),
+                                             context.statsScope(), context.initManager(),
+                                             context.listenerInfo().direction(),
+                                             &context.listenerInfo().metadata(), false) {}
 
 } // namespace Wasm
 } // namespace NetworkFilters

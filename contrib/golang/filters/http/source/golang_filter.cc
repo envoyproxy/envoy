@@ -1524,8 +1524,9 @@ FilterConfig::FilterConfig(
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
-      stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
+      stats_(GolangFilterStats::generateStats(stats_prefix, context.statsScope())),
+      dso_lib_(dso_lib),
+      metric_store_(std::make_shared<MetricStore>(context.statsScope().createScope(""))),
       secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
 void FilterConfig::newGoPluginConfig() {
@@ -1785,7 +1786,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::GenericFactoryContext& transport_socket_factory,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
@@ -1802,7 +1803,7 @@ SecretReader::SecretReader(
   if (proto_config.generic_secrets_size() > 0) {
     auto& secret_manager =
         context.serverFactoryContext().clusterManager().clusterManagerFactory().secretManager();
-    auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+    auto& transport_socket_factory = context.getGenericFactoryContext();
     auto& init_manager = context.initManager();
     auto& tls = context.serverFactoryContext().threadLocal();
     auto& api = context.serverFactoryContext().api();

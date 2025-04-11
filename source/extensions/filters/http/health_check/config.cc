@@ -21,7 +21,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   ASSERT(proto_config.has_pass_through_mode());
 
   auto stats = std::make_shared<HealthCheckFilterStats>(
-      HealthCheckFilterStats::generateStats(stats_prefix, context.scope()));
+      HealthCheckFilterStats::generateStats(stats_prefix, context.statsScope()));
   const bool pass_through_mode = proto_config.pass_through_mode().value();
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
 

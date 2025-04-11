@@ -160,8 +160,7 @@ public:
               (const Protobuf::Message& config, Server::Configuration::FactoryContext&),
               (override));
   MOCK_METHOD(SinkPtr, createTransportSinkPtr,
-              (const Protobuf::Message& config,
-               Server::Configuration::TransportSocketFactoryContext&),
+              (const Protobuf::Message& config, Server::Configuration::GenericFactoryContext&),
               (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
@@ -230,7 +229,7 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
 
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   TestConfigImpl(tap_config, nullptr, factory_context);
 }
 
@@ -256,7 +255,7 @@ TEST(TypedExtensionConfigTest, BufferedAdminNoAdminStreamerRejected) {
       }));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(tap_config, nullptr, factory_context), EnvoyException,
       "Output sink type BufferedAdmin requires that the admin output will be configured via admin");
@@ -284,7 +283,7 @@ TEST(TypedExtensionConfigTest, StreamingAdminNoAdminStreamerRejected) {
       }));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(TestConfigImpl(tap_config, nullptr, factory_context), EnvoyException,
                             "Output sink type StreamingAdmin requires that the admin output will "
                             "be configured via admin");

@@ -73,7 +73,7 @@ protected:
                     bool auto_sni_san_match, const unsigned default_min_protocol_version,
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
-                    Server::Configuration::TransportSocketFactoryContext& factory_context,
+                    Server::Configuration::GenericFactoryContext& factory_context,
                     absl::Status& creation_status);
   Api::Api& api_;
   const Server::Options& options_;
@@ -112,7 +112,7 @@ private:
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
   Ssl::SslCtxCb sslctx_cb_;
-  Server::Configuration::TransportSocketFactoryContext& factory_context_;
+  Server::Configuration::GenericFactoryContext& factory_context_;
   const std::string tls_keylog_path_;
   std::unique_ptr<Network::Address::IpList> tls_keylog_local_;
   std::unique_ptr<Network::Address::IpList> tls_keylog_remote_;
@@ -125,7 +125,7 @@ public:
 
   static absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-         Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
+         Server::Configuration::GenericFactoryContext& secret_provider_context);
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
@@ -138,7 +138,7 @@ public:
 private:
   ClientContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       absl::Status& creation_status);
 
   static const unsigned DEFAULT_MIN_VERSION;

@@ -21,7 +21,7 @@ envoy_cc_test(
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:transport_socket_config_lib",
+        "//source/server:generic_factory_context_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",

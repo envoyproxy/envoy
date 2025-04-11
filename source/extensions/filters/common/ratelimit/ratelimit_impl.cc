@@ -141,7 +141,7 @@ ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
       context.serverFactoryContext()
           .clusterManager()
           .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.statsScope(), true);
   THROW_IF_NOT_OK_REF(client_or_error.status());
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(client_or_error.value(),
                                                                       timeout);

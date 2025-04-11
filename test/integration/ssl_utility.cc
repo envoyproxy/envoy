@@ -113,7 +113,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   initializeUpstreamTlsContextConfig(options, tls_context);
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context,
                                                                                  mock_factory_ctx);
@@ -129,7 +129,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context(), use_http3);
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
   ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context, mock_factory_ctx, false);
@@ -154,9 +154,9 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   return *config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
-Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
-    const std::string& upstream_cert_name, ContextManager& context_manager,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+Network::DownstreamTransportSocketFactoryPtr
+createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
+                             Server::Configuration::GenericFactoryContext& factory_context) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto* common_tls_context = tls_context.mutable_common_tls_context();
   auto* tls_cert = common_tls_context->add_tls_certificates();

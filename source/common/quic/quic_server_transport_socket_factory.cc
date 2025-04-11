@@ -14,7 +14,7 @@ namespace Quic {
 
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
+    const Protobuf::Message& config, Server::Configuration::GenericFactoryContext& context,
     const std::vector<std::string>& server_names) {
   auto quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(

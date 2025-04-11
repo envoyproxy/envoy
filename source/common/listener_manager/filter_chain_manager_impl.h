@@ -61,11 +61,11 @@ public:
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
-  Stats::Scope& scope() override;
+  Stats::Scope& statsScope() override;
   const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  Configuration::GenericFactoryContext& getGenericFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
   void startDraining() override { is_draining_.store(true); }

@@ -34,7 +34,7 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
     return Common::Statsd::TcpStatsdSink::create(server.localInfo(), statsd_sink.tcp_cluster_name(),
                                                  server.threadLocal(), server.clusterManager(),
-                                                 server.scope(), statsd_sink.prefix());
+                                                 server.statsScope(), statsd_sink.prefix());
   case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::STATSD_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC
   }

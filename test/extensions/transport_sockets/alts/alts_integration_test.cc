@@ -362,7 +362,7 @@ public:
 
     fake_handshaker_server_ci_.waitReady();
 
-    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+    NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
     // We fake the singleton manager for the client, since it doesn't need to manage ALTS global
     // state, this is done by the test server instead.
     class FakeSingletonManager : public Singleton::Manager {

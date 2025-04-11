@@ -357,7 +357,7 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   Secret::SecretManagerImpl secret_manager{config_tracker};
   envoy::config::core::v3::ConfigSource config_source;
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Api::ApiPtr api = Api::createApiForTest();
   NiceMock<Init::MockManager> init_manager;

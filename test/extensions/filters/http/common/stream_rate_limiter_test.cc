@@ -43,7 +43,7 @@ public:
         [](uint64_t /*len*/, bool, std::chrono::milliseconds) {
           // config->stats().decode_allowed_size_.set(len);
         },
-        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope(), token_bucket,
+        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.statsScope(), token_bucket,
         std::chrono::milliseconds(fill_interval));
   }
 
@@ -62,7 +62,7 @@ public:
         [](uint64_t /*len*/, bool, std::chrono::milliseconds) {
           // config->stats().decode_allowed_size_.set(len);
         },
-        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.scope());
+        time_system_, decoder_callbacks_.dispatcher_, decoder_callbacks_.statsScope());
   }
 
   uint64_t fillInterval() { return limiter_->fill_interval_.count(); }

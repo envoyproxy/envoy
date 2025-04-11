@@ -315,7 +315,7 @@ int TestPrivateKeyMethodProvider::ecdsaConnectionIndex() {
 
 TestPrivateKeyMethodProvider::TestPrivateKeyMethodProvider(
     const ProtobufWkt::Any& typed_config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+    Server::Configuration::GenericFactoryContext& factory_context) {
   std::string private_key_path;
 
   auto config = MessageUtil::anyConvert<ProtobufWkt::Struct>(typed_config);

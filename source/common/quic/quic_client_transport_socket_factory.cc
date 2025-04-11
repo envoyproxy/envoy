@@ -15,9 +15,8 @@ namespace Envoy {
 namespace Quic {
 
 absl::StatusOr<std::unique_ptr<QuicClientTransportSocketFactory>>
-QuicClientTransportSocketFactory::create(
-    Ssl::ClientContextConfigPtr config,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+QuicClientTransportSocketFactory::create(Ssl::ClientContextConfigPtr config,
+                                         Server::Configuration::GenericFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
   auto factory = std::unique_ptr<QuicClientTransportSocketFactory>(
       new QuicClientTransportSocketFactory(std::move(config), context, creation_status));
@@ -28,8 +27,7 @@ QuicClientTransportSocketFactory::create(
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& config,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::GenericFactoryContext& context) {
   auto quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport&>(
       config, context.messageValidationVisitor());
@@ -42,8 +40,7 @@ QuicClientTransportSocketConfigFactory::createTransportSocketFactory(
 
 QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     Ssl::ClientContextConfigPtr config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status)
+    Server::Configuration::GenericFactoryContext& factory_context, absl::Status& creation_status)
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
       tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
   auto factory_or_error = Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(

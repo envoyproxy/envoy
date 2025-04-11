@@ -79,7 +79,7 @@ public:
 using SinkPtr = std::unique_ptr<Sink>;
 using SinkContext =
     absl::variant<std::reference_wrapper<Server::Configuration::FactoryContext>,
-                  std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>;
+                  std::reference_wrapper<Server::Configuration::GenericFactoryContext>>;
 
 /**
  * Abstract tap sink factory. Produces a factory that can instantiate SinkPtr objects
@@ -103,7 +103,7 @@ public:
    */
   virtual SinkPtr
   createTransportSinkPtr(const Protobuf::Message& config,
-                         Server::Configuration::TransportSocketFactoryContext& tsf_context) PURE;
+                         Server::Configuration::GenericFactoryContext& tsf_context) PURE;
 };
 
 using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;

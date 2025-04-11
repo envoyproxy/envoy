@@ -122,7 +122,7 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
   auto process_context_impl = std::make_unique<Envoy::ProcessContextImpl>(
       static_cast<Envoy::ProcessObject&>(custom_process_object_for_test));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
@@ -148,7 +148,7 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
   auto process_context_impl = std::make_unique<Envoy::ProcessContextImpl>(
       static_cast<Envoy::ProcessObject&>(custom_process_object_for_test));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
@@ -174,7 +174,7 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
   auto process_context_impl = std::make_unique<Envoy::ProcessContextImpl>(
       static_cast<Envoy::ProcessObject&>(custom_process_object_for_test));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
@@ -285,7 +285,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   auto process_context_impl = std::make_unique<Envoy::ProcessContextImpl>(
       static_cast<Envoy::ProcessObject&>(custom_process_object_for_test));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
       .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 

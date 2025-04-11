@@ -54,8 +54,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
 
-  using TsfContextRef =
-      std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>;
+  using TsfContextRef = std::reference_wrapper<Server::Configuration::GenericFactoryContext>;
   using HttpContextRef = std::reference_wrapper<Server::Configuration::FactoryContext>;
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
@@ -105,7 +104,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     // extract message validation visitor from the context and use it to define config
     ProtobufTypes::MessagePtr config;
     if (absl::holds_alternative<TsfContextRef>(context)) {
-      Server::Configuration::TransportSocketFactoryContext& tsf_context =
+      Server::Configuration::GenericFactoryContext& tsf_context =
           absl::get<TsfContextRef>(context).get();
       config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
                                                             tsf_context.messageValidationVisitor(),
@@ -150,7 +149,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 
   Server::Configuration::CommonFactoryContext* server_context = nullptr;
   if (absl::holds_alternative<TsfContextRef>(context)) {
-    Server::Configuration::TransportSocketFactoryContext& tsf_context =
+    Server::Configuration::GenericFactoryContext& tsf_context =
         absl::get<TsfContextRef>(context).get();
     server_context = &tsf_context.serverFactoryContext();
   } else {

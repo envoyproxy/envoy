@@ -31,7 +31,7 @@ public:
                  const envoy::config::core::v3::GrpcService& grpc_service)
       : client_(context.clusterManager()
                     .grpcAsyncClientManager()
-                    .getOrCreateRawAsyncClient(grpc_service, context.scope(), true)
+                    .getOrCreateRawAsyncClient(grpc_service, context.statsScope(), true)
                     .value()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
 

@@ -119,7 +119,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
-        decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+        decoder_callbacks_->statsScope(), config.tokenBucket(), config.fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -186,7 +186,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
-        encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+        encoder_callbacks_->statsScope(), config.tokenBucket(), config.fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;

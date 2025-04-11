@@ -300,7 +300,7 @@ private:
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
     OptRef<const Tracing::Config> tracingConfig() const override;
-    const ScopeTrackedObject& scope() override;
+    const ScopeTrackedObject& statsScope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
     bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
 

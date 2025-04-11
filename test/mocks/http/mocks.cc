@@ -91,7 +91,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig())
       .WillByDefault(Return(makeOptRef<const Tracing::Config>(tracing_config_)));
-  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
       .WillByDefault(Invoke([this](Code code, absl::string_view body,
                                    std::function<void(ResponseHeaderMap & headers)> modify_headers,
@@ -150,7 +150,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig())
       .WillByDefault(Return(makeOptRef<const Tracing::Config>(tracing_config_)));
-  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(scope_));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {

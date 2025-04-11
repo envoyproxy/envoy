@@ -11,7 +11,7 @@ class QuicClientTransportSocketFactory : public Network::CommonUpstreamTransport
 public:
   static absl::StatusOr<std::unique_ptr<QuicClientTransportSocketFactory>>
   create(Ssl::ClientContextConfigPtr config,
-         Server::Configuration::TransportSocketFactoryContext& factory_context);
+         Server::Configuration::GenericFactoryContext& factory_context);
 
   void initialize() override;
   bool implementsSecureTransport() const override { return true; }
@@ -43,10 +43,9 @@ public:
   std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() override;
 
 protected:
-  QuicClientTransportSocketFactory(
-      Ssl::ClientContextConfigPtr config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context,
-      absl::Status& creation_status);
+  QuicClientTransportSocketFactory(Ssl::ClientContextConfigPtr config,
+                                   Server::Configuration::GenericFactoryContext& factory_context,
+                                   absl::Status& creation_status);
 
   // fallback_factory_ will update the context.
   absl::Status onSecretUpdated() override { return absl::OkStatus(); }
@@ -75,9 +74,9 @@ class QuicClientTransportSocketConfigFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
   // Server::Configuration::UpstreamTransportSocketConfigFactory
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override;
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override;
 
   // Server::Configuration::TransportSocketConfigFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

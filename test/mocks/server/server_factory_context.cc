@@ -22,7 +22,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
-  ON_CALL(*this, scope()).WillByDefault(ReturnRef(*store_.rootScope()));
+  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
@@ -61,13 +61,13 @@ MockGenericFactoryContext::~MockGenericFactoryContext() = default;
 
 MockGenericFactoryContext::MockGenericFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
-  ON_CALL(*this, scope()).WillByDefault(ReturnRef(*store_.rootScope()));
+  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {
+MockGenericFactoryContext::MockGenericFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_context_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
@@ -75,7 +75,7 @@ MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
+MockGenericFactoryContext::~MockGenericFactoryContext() = default;
 
 } // namespace Configuration
 } // namespace Server

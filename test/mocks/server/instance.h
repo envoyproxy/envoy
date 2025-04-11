@@ -61,7 +61,7 @@ public:
   MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
+  MOCK_METHOD(Configuration::GenericFactoryContext&, transportSocketFactoryContext, ());
   MOCK_METHOD(bool, enableReusePortDefault, ());
   MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates>&&));
 
@@ -108,7 +108,7 @@ public:
   std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
       server_factory_context_;
-  std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
+  std::shared_ptr<testing::NiceMock<Configuration::MockGenericFactoryContext>>
       transport_socket_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   Regex::GoogleReEngine regex_engine_;

@@ -103,11 +103,6 @@ public:
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
-   * @return Stats::Scope& the context's stats scope.
-   */
-  virtual Stats::Scope& scope() PURE;
-
-  /**
    * @return Stats::Scope& the server wide stats scope.
    */
   virtual Stats::Scope& serverScope() PURE;
@@ -154,6 +149,8 @@ public:
   virtual Regex::Engine& regexEngine() PURE;
 };
 
+class GenericFactoryContext;
+
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
@@ -185,9 +182,9 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   * @return GenericFactoryContext which lifetime is no shorter than the server.
    */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+  virtual GenericFactoryContext& getGenericFactoryContext() const PURE;
 
   /**
    * @return the init manager of the cluster. This can be used for extensions that need
@@ -277,7 +274,7 @@ public:
    * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
    *         backend implementation.
    */
-  virtual Stats::Scope& scope() PURE;
+  virtual Stats::Scope& statsScope() PURE;
 };
 
 /**
@@ -295,9 +292,9 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   * @return GenericFactoryContext which lifetime is no shorter than the server.
    */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+  virtual GenericFactoryContext& getGenericFactoryContext() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -349,7 +346,7 @@ class ListenerFactoryContext : public virtual FactoryContext {};
 /**
  * FactoryContext for ProtocolOptionsFactory.
  */
-using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
+using ProtocolOptionsFactoryContext = Server::Configuration::GenericFactoryContext;
 
 /**
  * FactoryContext for upstream HTTP filters.
@@ -376,7 +373,7 @@ public:
   /*
    * @return the stats scope of the cluster. This will last as long as the cluster is valid
    * */
-  virtual Stats::Scope& scope() PURE;
+  virtual Stats::Scope& statsScope() PURE;
 };
 
 } // namespace Configuration

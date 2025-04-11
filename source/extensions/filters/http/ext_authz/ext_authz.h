@@ -162,7 +162,7 @@ public:
     return deny_at_disable_.has_value() ? deny_at_disable_->enabled() : false;
   }
 
-  Stats::Scope& scope() { return scope_; }
+  Stats::Scope& statsScope() { return scope_; }
 
   Http::Context& httpContext() { return http_context_; }
 

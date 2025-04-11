@@ -21,7 +21,7 @@ class UpstreamAltsTransportSocketConfigFactory
 public:
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
-                               Server::Configuration::TransportSocketFactoryContext&) override;
+                               Server::Configuration::GenericFactoryContext&) override;
 };
 
 class DownstreamAltsTransportSocketConfigFactory
@@ -30,7 +30,7 @@ class DownstreamAltsTransportSocketConfigFactory
 public:
   absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
-                               Server::Configuration::TransportSocketFactoryContext&,
+                               Server::Configuration::GenericFactoryContext&,
                                const std::vector<std::string>&) override;
 };
 

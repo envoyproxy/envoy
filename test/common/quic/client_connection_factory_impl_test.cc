@@ -87,7 +87,7 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   Stats::IsolatedStoreImpl store_;

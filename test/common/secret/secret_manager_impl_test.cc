@@ -82,7 +82,7 @@ tls_certificate:
   ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> ctx;
   auto tls_config =
       Ssl::TlsCertificateConfigImpl::create(
           *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_)
@@ -265,7 +265,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
   Server::MockInstance server;
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
 
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -347,7 +347,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   Server::MockInstance server;
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -383,7 +383,7 @@ tls_certificate:
   EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> ctx;
   auto tls_config =
       Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
@@ -399,7 +399,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
   envoy::config::core::v3::ConfigSource config_source;
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -444,7 +444,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -482,7 +482,7 @@ tls_certificate:
   EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1")
                   .ok());
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> ctx;
   auto tls_config =
       Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config->certificateChain());
@@ -719,7 +719,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -866,7 +866,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -943,7 +943,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   Server::MockInstance server;
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -990,7 +990,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
   Server::MockInstance server;
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1070,7 +1070,7 @@ static_secrets:
 TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
   Server::MockInstance server;
   SecretManagerPtr secret_manager(new SecretManagerImpl(config_tracker_));
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
@@ -1117,7 +1117,7 @@ tls_certificate:
   // is incorrect.
   testing::NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   testing::NiceMock<Ssl::MockContextManager> ssl_context_manager;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> ctx;
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(ssl_context_manager, privateKeyMethodManager())

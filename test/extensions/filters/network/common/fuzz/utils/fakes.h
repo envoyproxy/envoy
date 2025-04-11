@@ -36,7 +36,7 @@ class FakeFactoryContext : public MockFactoryContext {
 public:
   const Network::DrainDecision& drainDecision() override { return drain_manager_; }
   Init::Manager& initManager() override { return init_manager_; }
-  Stats::Scope& scope() override { return scope_; }
+  Stats::Scope& statsScope() override { return scope_; }
   Stats::Scope& listenerScope() override { return listener_scope_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override {
     return ProtobufMessage::getStrictValidationVisitor();

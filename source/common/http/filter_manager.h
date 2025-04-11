@@ -156,7 +156,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
   OptRef<const Tracing::Config> tracingConfig() const override;
-  const ScopeTrackedObject& scope() override;
+  const ScopeTrackedObject& statsScope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
@@ -580,7 +580,7 @@ public:
   /**
    * Returns the tracked scope to use for this stream.
    */
-  virtual const ScopeTrackedObject& scope() PURE;
+  virtual const ScopeTrackedObject& statsScope() PURE;
 
   /**
    * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.

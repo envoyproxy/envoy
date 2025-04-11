@@ -48,7 +48,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   }
 
   return std::make_shared<const FilterConfigImpl>(
-      std::move(signer.value()), per_route_config.stat_prefix(), server_context.scope(),
+      std::move(signer.value()), per_route_config.stat_prefix(), server_context.statsScope(),
       per_route_config.aws_request_signing().host_rewrite(),
       per_route_config.aws_request_signing().use_unsigned_payload());
 }

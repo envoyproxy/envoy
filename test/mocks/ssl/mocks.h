@@ -225,7 +225,7 @@ public:
 
   MOCK_METHOD(PrivateKeyMethodProviderSharedPtr, createPrivateKeyMethodProvider,
               (const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
-               Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
+               Envoy::Server::Configuration::GenericFactoryContext& factory_context));
 };
 
 class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {

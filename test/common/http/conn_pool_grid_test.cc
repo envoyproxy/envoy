@@ -239,7 +239,7 @@ public:
 
   StreamInfo::MockStreamInfo info_;
   NiceMock<MockRequestEncoder> encoder_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
 

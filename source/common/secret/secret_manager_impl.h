@@ -52,23 +52,23 @@ public:
 
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) override;
 
   GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) override;
 
 private:
@@ -81,7 +81,7 @@ private:
     std::shared_ptr<SecretType>
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
-                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+                 Server::Configuration::GenericFactoryContext& secret_provider_context,
                  Init::Manager& init_manager) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);

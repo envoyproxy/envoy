@@ -21,7 +21,7 @@ MockInstance::MockInstance()
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
       transport_socket_factory_context_(
-          std::make_shared<NiceMock<Configuration::MockTransportSocketFactoryContext>>()),
+          std::make_shared<NiceMock<Configuration::MockGenericFactoryContext>>()),
       ssl_context_manager_(*server_factory_context_) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));

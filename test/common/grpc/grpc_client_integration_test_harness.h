@@ -748,7 +748,7 @@ public:
 
   bool use_client_cert_{};
   bool use_server_tls_13_{false};
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
 };
 
 } // namespace

@@ -67,7 +67,7 @@ public:
       return Ssl::TlsCertificateSelectorFactory();
     }
 
-    auto& scope = factory_context.scope();
+    auto& scope = factory_context.statsScope();
 
     return [mode, &scope](const Ssl::ServerContextConfig&,
                           Ssl::TlsCertificateSelectorContext& selector_ctx) {

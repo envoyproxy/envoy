@@ -32,7 +32,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
@@ -333,9 +333,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                               listener_init_target_.ready();
                             }
                           }),
-      transport_factory_context_(
-          std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
-              parent_.server_.serverFactoryContext(), listenerScope(), validation_visitor_)),
+      transport_factory_context_(std::make_shared<Server::GenericFactoryContextImpl>(
+          parent_.server_.serverFactoryContext(), listenerScope(), validation_visitor_)),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
@@ -915,8 +914,8 @@ PerListenerFactoryContextImpl::PerListenerFactoryContextImpl(
 
 Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
 
-Stats::Scope& PerListenerFactoryContextImpl::scope() {
-  return listener_factory_context_base_->scope();
+Stats::Scope& PerListenerFactoryContextImpl::statsScope() {
+  return listener_factory_context_base_->statsScope();
 }
 
 const Network::ListenerInfo& PerListenerFactoryContextImpl::listenerInfo() const {
@@ -930,9 +929,9 @@ PerListenerFactoryContextImpl::messageValidationVisitor() const {
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() const {
   return listener_factory_context_base_->serverFactoryContext();
 }
-Configuration::TransportSocketFactoryContext&
-PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return listener_factory_context_base_->getTransportSocketFactoryContext();
+Configuration::GenericFactoryContext&
+PerListenerFactoryContextImpl::getGenericFactoryContext() const {
+  return listener_factory_context_base_->getGenericFactoryContext();
 }
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();

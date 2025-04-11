@@ -328,7 +328,7 @@ public:
 
   // These functions are delegated to the downstream HCM/FM
   OptRef<const Tracing::Config> tracingConfig() const override;
-  const ScopeTrackedObject& scope() override;
+  const ScopeTrackedObject& statsScope() override;
   Tracing::Span& activeSpan() override;
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;

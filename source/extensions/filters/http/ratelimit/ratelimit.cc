@@ -224,7 +224,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
-    Http::CodeStats::ResponseStatInfo info{config_->scope(),
+    Http::CodeStats::ResponseStatInfo info{config_->statsScope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
                                            enumToInt(config_->rateLimitedStatus()),

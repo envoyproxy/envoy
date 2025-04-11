@@ -103,7 +103,7 @@ struct Config {
     if (proto_config.per_method_stat_specifier_case() ==
         envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
             kIndividualMethodStatsAllowlist) {
-      allowlist_.emplace(context.scope().symbolTable(),
+      allowlist_.emplace(context.statsScope().symbolTable(),
                          proto_config.individual_method_stats_allowlist());
     }
   }

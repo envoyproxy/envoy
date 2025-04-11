@@ -56,7 +56,7 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;
   NiceMock<ThreadLocal::MockInstance> tls_;

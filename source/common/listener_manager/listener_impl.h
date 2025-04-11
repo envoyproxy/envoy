@@ -24,7 +24,7 @@
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/factory_context_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Server {
@@ -178,11 +178,11 @@ public:
   // FactoryContext
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
-  Stats::Scope& scope() override;
+  Stats::Scope& statsScope() override;
   const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  Configuration::GenericFactoryContext& getGenericFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
 
@@ -478,8 +478,7 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
-  std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
-      transport_factory_context_;
+  std::shared_ptr<Server::GenericFactoryContextImpl> transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
   MissingListenerConfigStats missing_listener_config_stats_;

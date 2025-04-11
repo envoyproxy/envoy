@@ -837,7 +837,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
   if (!route.stat_prefix().empty()) {
     route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
-        factory_context.scope(), factory_context.routerContext().routeStatNames(),
+        factory_context.statsScope(), factory_context.routerContext().routeStatNames(),
         vhost->statName(), route.stat_prefix());
   }
 
@@ -1872,7 +1872,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : name_(virtual_host.name()),
-      stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+      stat_name_storage_(virtual_host.name(), factory_context.statsScope().symbolTable()),
       global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
@@ -2203,7 +2203,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
                            absl::Status& creation_status)
-    : vhost_scope_(factory_context.scope().scopeFromStatName(
+    : vhost_scope_(factory_context.statsScope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
   absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
@@ -2343,7 +2343,7 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator,
                                    absl::Status& creation_status)
-    : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
+    : name_(config.name()), symbol_table_(factory_context.statsScope().symbolTable()),
       per_filter_configs_(THROW_OR_RETURN_VALUE(
           PerFilterConfigs::create(config.typed_per_filter_config(), factory_context, validator),
           std::unique_ptr<PerFilterConfigs>)),
