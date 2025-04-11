@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "config_credentials_provider_test",
     srcs = ["config_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws/credential_providers:config_credentials_provider_lib",
     ],
@@ -20,7 +19,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "instance_profile_credentials_provider_test",
     srcs = ["instance_profile_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -34,7 +32,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "webidentity_credentials_provider_test",
     srcs = ["webidentity_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
@@ -50,7 +47,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "container_credentials_provider_test",
     srcs = ["container_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
@@ -66,7 +62,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "environment_credentials_provider_test",
     srcs = ["environment_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",
         "//test/test_common:environment_lib",
@@ -76,7 +71,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "inline_credentials_provider_test",
     srcs = ["inline_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -88,7 +82,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "credentials_file_credentials_provider_test",
     srcs = ["credentials_file_credentials_provider_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",

@@ -15,7 +15,6 @@ envoy_package()
 envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = ["envoy_quic_alarm_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_alarm_factory_lib",
@@ -30,7 +29,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_clock_test",
     srcs = ["envoy_quic_clock_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_clock_lib",
@@ -43,7 +41,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = ["envoy_quic_writer_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/network:io_socket_error_lib",
@@ -59,7 +56,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -80,7 +76,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_filter_manager_connection_impl_test",
     srcs = ["quic_filter_manager_connection_impl_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_filter_manager_connection_lib",
@@ -94,7 +89,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = ["quic_stat_names_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_stat_names_lib",
@@ -107,7 +101,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = ["envoy_quic_proof_verifier_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -126,7 +119,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = ["envoy_quic_server_stream_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -149,7 +141,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_stream_test",
     srcs = ["envoy_quic_client_stream_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -170,7 +161,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_server_session_test",
     srcs = ["envoy_quic_server_session_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
@@ -199,7 +189,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_client_session_test",
     srcs = ["envoy_quic_client_session_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -227,7 +216,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = ["active_quic_listener_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
@@ -256,7 +244,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_dispatcher_test",
     srcs = ["envoy_quic_dispatcher_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
@@ -305,7 +292,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "client_connection_factory_impl_test",
     srcs = ["client_connection_factory_impl_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -331,7 +317,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_io_handle_wrapper_test",
     srcs = ["quic_io_handle_wrapper_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_io_handle_wrapper_lib",
@@ -345,7 +330,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_utils_test",
     srcs = ["envoy_quic_utils_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_utils_lib",
@@ -358,7 +342,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_simulated_watermark_buffer_test",
     srcs = ["envoy_quic_simulated_watermark_buffer_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = ["//source/common/quic:envoy_quic_simulated_watermark_buffer_lib"],
 )
@@ -391,7 +374,6 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_server_transport_socket_factory_lib",
@@ -407,7 +389,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_datagram_handler_test",
     srcs = envoy_select_enable_http_datagrams(["http_datagram_handler_test.cc"]),
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = envoy_select_enable_http_datagrams([
         "//source/common/quic:http_datagram_handler",
@@ -435,7 +416,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "envoy_deterministic_connection_id_generator_test",
     srcs = ["envoy_deterministic_connection_id_generator_test.cc"],
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":connection_id_matchers",
@@ -466,7 +446,6 @@ envoy_cc_fuzz_test(
     name = "envoy_quic_h3_fuzz_test",
     srcs = ["envoy_quic_h3_fuzz_test.cc"],
     corpus = "envoy_quic_h3_fuzz_test_corpus",
-    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":envoy_quic_h3_fuzz_helper_lib",
