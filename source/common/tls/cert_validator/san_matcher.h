@@ -24,6 +24,9 @@ namespace Ssl {
 class SanMatcher {
 public:
   virtual bool match(GENERAL_NAME const*) const PURE;
+  virtual bool match(GENERAL_NAME const* general_name, const StreamInfo::StreamInfo&) const {
+    return match(general_name);
+  }
   virtual ~SanMatcher() = default;
 };
 
@@ -40,6 +43,8 @@ using Ssl::SanMatcherPtr;
 class StringSanMatcher : public SanMatcher {
 public:
   bool match(const GENERAL_NAME* general_name) const override;
+  bool match(const GENERAL_NAME* general_name,
+             const StreamInfo::StreamInfo& stream_info) const override;
   ~StringSanMatcher() override = default;
 
   StringSanMatcher(int general_name_type, envoy::type::matcher::v3::StringMatcher matcher,
@@ -55,6 +60,8 @@ public:
   }
 
 private:
+  bool typeCompatible(const GENERAL_NAME* general_name) const;
+
   const int general_name_type_;
   const Envoy::Matchers::StringMatcherImpl matcher_;
   bssl::UniquePtr<ASN1_OBJECT> general_name_oid_;

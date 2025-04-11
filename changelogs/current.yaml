@@ -35,6 +35,10 @@ minor_behavior_changes:
     AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
     credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
     then the original behaviour with a signing failure will occur.
+- area: string_matcher
+  change: |
+    The string matcher API extended with another method that allows passing a context for the matching operation.
+    The initial supporting use case is passing ``StreamInfo`` in the context when performing SAN matching.
 - area: formatter
   change: |
     The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
