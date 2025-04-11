@@ -54,8 +54,8 @@ minor_behavior_changes:
     FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
 - area: tls
   change: |
-    Added a :ref:`compliance policy
-    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.compliance_policy>`
+    Added :ref:`compliance policies
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsParameters.compliance_policies>`
     TLS parameter to enforce restrictions based on a given policy (e.g. FIPS).
 
 bug_fixes:
