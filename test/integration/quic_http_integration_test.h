@@ -336,7 +336,8 @@ public:
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
     ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
-    ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager_));
+    ON_CALL(context.server_context_, sslContextManager())
+        .WillByDefault(testing::ReturnRef(context_manager_));
     ON_CALL(context.server_context_, threadLocal())
         .WillByDefault(testing::ReturnRef(thread_local_));
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport

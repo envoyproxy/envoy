@@ -163,6 +163,7 @@ public:
     p.set_disable_id_token_set_cookie(disable_id_token_set_cookie);
     p.set_disable_access_token_set_cookie(disable_access_token_set_cookie);
     p.set_disable_refresh_token_set_cookie(disable_refresh_token_set_cookie);
+    p.set_stat_prefix("my_prefix");
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
     useRefreshToken->set_value(use_refresh_token);
@@ -313,10 +314,12 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
 
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "client", secret_context, init_manager);
-  auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto client_callback =
+      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "token", secret_context, init_manager);
-  auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto token_callback =
+      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
@@ -659,8 +662,8 @@ TEST_F(OAuth2Test, OAuthOkPass) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
 /**
@@ -703,8 +706,8 @@ TEST_F(OAuth2Test, OAuthOkPassButInvalidToken) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
 /**
@@ -751,8 +754,8 @@ TEST_F(OAuth2Test, OAuthOkPreserveForeignAuthHeader) {
   // Ensure that existing OAuth forwarded headers got sanitized.
   EXPECT_EQ(mock_request_headers, expected_headers);
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
 TEST_F(OAuth2Test, SetBearerToken) {
@@ -810,8 +813,8 @@ TEST_F(OAuth2Test, SetBearerToken) {
   filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
                                    std::chrono::seconds(600));
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
 /**
@@ -948,8 +951,8 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 1);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
 }
 
 /**
@@ -1218,9 +1221,9 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(request_headers, expected_headers);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_failure").value(), 0);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_passthrough").value(), 1);
-  EXPECT_EQ(scope_.counterFromString("test.oauth_success").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
 }
 
 /**

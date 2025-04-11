@@ -49,6 +49,9 @@ minor_behavior_changes:
 - area: golang
   change: |
     Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
+- area: tls
+  change: |
+    FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -220,6 +223,11 @@ new_features:
   change: |
     Added support to monitor container CPU utilization in Linux K8s environment using
     :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>`.
+- area: rbac
+  change: |
+    Added a new :ref:`principal type <envoy_v3_api_msg_extensions.rbac.principals.mtls_authenticated.v3.Config>` for validating
+    mTLS with more specific matches and better default behavior. Also added an extension point for
+    :ref:`custom <envoy_v3_api_field_config.rbac.v3.Principal.custom>` principals.
 - area: lua
   change: |
     Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
@@ -386,5 +394,17 @@ new_features:
     Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
     :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
     :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
+- area: oauth2
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.stat_prefix>` to allow
+    differentiating between different oauth2 filters in the same filter chain.
+- area: jwt_authn
+  change: |
+    Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.stat_prefix>` to allow
+    differentiating between different jwt_authn filters in the same filter chain.
+- area: connection
+  change: |
+    Added the close through the network filter manager support that allows a network filter to disable the close of connection. This
+    behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is false.
 
 deprecated:
