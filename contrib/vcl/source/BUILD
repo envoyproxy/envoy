@@ -74,6 +74,7 @@ envoy_cmake(
         "cpu:16",
         "skip_on_windows",
     ],
+    target_compatible_with = ["@platforms//os:linux"],
     targets = [
         "vppcom",
     ],

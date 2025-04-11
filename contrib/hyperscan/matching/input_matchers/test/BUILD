@@ -28,10 +28,10 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ] + select({
-        "//bazel:linux_x86_64": [
+        "@platforms//cpu:x86_64": [
             "//contrib/hyperscan/matching/input_matchers/source:hyperscan_matcher_lib",
         ],
-        "//bazel:linux_aarch64": [
+        "@platforms//cpu:aarch64": [
             "//contrib/hyperscan/matching/input_matchers/source:vectorscan_matcher_lib",
         ],
     }),
@@ -46,10 +46,10 @@ envoy_cc_benchmark_binary(
         "@com_github_google_benchmark//:benchmark",
         "@com_googlesource_code_re2//:re2",
     ] + select({
-        "//bazel:linux_x86_64": [
+        "@platforms//cpu:x86_64": [
             "//contrib/hyperscan/matching/input_matchers/source:hyperscan",
         ],
-        "//bazel:linux_aarch64": [
+        "@platforms//cpu:aarch64": [
             "//contrib/hyperscan/matching/input_matchers/source:vectorscan",
         ],
     }),
@@ -66,10 +66,10 @@ envoy_cc_benchmark_binary(
         "//test/mocks/event:event_mocks",
         "@com_github_google_benchmark//:benchmark",
     ] + select({
-        "//bazel:linux_x86_64": [
+        "@platforms//cpu:x86_64": [
             "//contrib/hyperscan/matching/input_matchers/source:hyperscan_matcher_lib",
         ],
-        "//bazel:linux_aarch64": [
+        "@platforms//cpu:aarch64": [
             "//contrib/hyperscan/matching/input_matchers/source:vectorscan_matcher_lib",
         ],
     }),
