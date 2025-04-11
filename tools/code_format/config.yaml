@@ -196,6 +196,7 @@ paths:
     - source/extensions/filters/network/thrift_proxy
     - source/extensions/filters/network/generic_proxy
     - source/extensions/filters/network/ratelimit
+    - source/extensions/filters/network/match_delegate
     - source/extensions/filters/common
     - source/extensions/filters/udp
     - source/extensions/filters/listener
