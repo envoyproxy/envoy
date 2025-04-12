@@ -59,6 +59,9 @@ public:
              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
              Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
              uint32_t hits_addend = 0) override;
+  StreamInfo::StreamInfo const* streamInfo() const override {
+    return request_ ? &request_->streamInfo() : nullptr;
+  }
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}

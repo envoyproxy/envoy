@@ -55,14 +55,68 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
+  // Initialize filter state for statistics collection if enabled
+  if (config_->emitFilterStateStats()) {
+    StreamInfo::FilterStateSharedPtr filter_state = callbacks_->streamInfo().filterState();
+    if (!filter_state->hasData<RateLimitLoggingInfo>(callbacks_->filterConfigName())) {
+      filter_state->setData(
+          callbacks_->filterConfigName(), std::make_shared<RateLimitLoggingInfo>(),
+          StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+
+      // This can return nullptr in cases where the key exists but holds a different type or is
+      // immutable, so we need to make sure to check that logging_info_ is not null later.
+      logging_info_ =
+          filter_state->getDataMutable<RateLimitLoggingInfo>(callbacks_->filterConfigName());
+    }
+  }
+
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
   populateRateLimitDescriptors(descriptors, headers, false);
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
+    // Store start time of rate limit filter call
+    start_time_ = callbacks_->dispatcher().timeSource().monotonicTime();
     client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
                    callbacks_->streamInfo(), getHitAddend());
     initiating_call_ = false;
+  }
+}
+
+void Filter::updateLoggingInfo() {
+  if (!config_->emitFilterStateStats() || logging_info_ == nullptr) {
+    return;
+  }
+
+  // Always set latency if we started the timer
+  if (start_time_.has_value()) {
+    logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
+        callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
+  }
+
+  // Get client-specific data
+  auto const* stream_info = client_->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  // Record bytes sent/received
+  const auto& bytes_meter = stream_info->getUpstreamBytesMeter();
+  if (bytes_meter != nullptr) {
+    logging_info_->setBytesSent(bytes_meter->wireBytesSent());
+    logging_info_->setBytesReceived(bytes_meter->wireBytesReceived());
+  }
+
+  // Record upstream host
+  if (stream_info->upstreamInfo().has_value()) {
+    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  }
+
+  // Record cluster info
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      stream_info->upstreamClusterInfo();
+  if (cluster_info) {
+    logging_info_->setClusterInfo(std::move(*cluster_info));
   }
 }
 
@@ -212,6 +266,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
     callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ratelimit", *dynamic_metadata);
   }
+
+  // Add stats to filter state if enabled
+  updateLoggingInfo();
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:

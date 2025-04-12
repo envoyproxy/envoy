@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -23,6 +24,7 @@ envoy_extension_cc_test(
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
+        "//source/extensions/filters/http/ratelimit:config",
         "//source/extensions/filters/http/ratelimit:ratelimit_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/extensions/filters/common/ratelimit:ratelimit_utils",
@@ -84,4 +86,27 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_extension_cc_test(
+    name = "ratelimit_logging_info_test",
+    srcs = ["ratelimit_logging_info_test.cc"],
+    extension_names = ["envoy.filters.http.ratelimit"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/common/ratelimit:ratelimit_lib",
+        "//source/extensions/filters/http/ratelimit:ratelimit_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/ratelimit:ratelimit_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "logging_test_filter_proto",
+    srcs = ["logging_test_filter.proto"],
 )

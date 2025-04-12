@@ -406,5 +406,9 @@ new_features:
   change: |
     Added the close through the network filter manager support that allows a network filter to disable the close of connection. This
     behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is false.
+- area: ratelimit
+  change: |
+    Added :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.emit_filter_state_stats>`
+    which when true enables filter state stats for access logging.
 
 deprecated:

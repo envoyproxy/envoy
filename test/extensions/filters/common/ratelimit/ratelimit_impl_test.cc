@@ -231,6 +231,39 @@ TEST_F(RateLimitGrpcClientTest, RequestWithPerDescriptorHitsAddend) {
   client_.onSuccess(std::move(response), span_);
 }
 
+// Test streamInfo method when request is null
+TEST_F(RateLimitGrpcClientTest, StreamInfoWithNullRequest) {
+  // When no request has been made, streamInfo() should return nullptr
+  EXPECT_EQ(nullptr, client_.streamInfo());
+}
+
+// Test streamInfo method when request is not null
+TEST_F(RateLimitGrpcClientTest, StreamInfoWithRequest) {
+  // Set up the mock async request to return our stream info
+  EXPECT_CALL(async_request_, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info_));
+
+  // Set up the mock client to return our async request
+  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
+
+  // Create a request to populate client_.request_
+  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+                stream_info_);
+
+  // Now streamInfo() should return the stream info from the request
+  EXPECT_EQ(&stream_info_, client_.streamInfo());
+
+  // Complete the request before the test completes
+  // This is important to avoid the assertion failure in the GrpcClientImpl destructor
+  std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse> response =
+      std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
+  response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+
+  EXPECT_CALL(span_, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
+
+  client_.onSuccess(std::move(response), span_);
+}
+
 } // namespace
 } // namespace RateLimit
 } // namespace Common

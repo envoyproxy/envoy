@@ -537,5 +537,29 @@ TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
 
+// Tests Ratelimit functionality with filter state stats enabled
+class RatelimitFilterStateStatsIntegrationTest : public RatelimitIntegrationTest {
+public:
+  RatelimitFilterStateStatsIntegrationTest() {
+    // Override the base filter config with filter state stats enabled
+    base_filter_config_ = R"EOF(
+      domain: some_domain
+      timeout: 0.5s
+      emit_filter_state_stats: true
+      response_headers_to_add:
+      - header:
+          key: x-global-ratelimit-service
+          value: rate_limit_service
+    )EOF";
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFilterStateStatsIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+// Test that basic rate limiting works with filter state stats
+TEST_P(RatelimitFilterStateStatsIntegrationTest, BasicFlow) { basicFlow(); }
+
 } // namespace
 } // namespace Envoy
