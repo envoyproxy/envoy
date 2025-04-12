@@ -476,8 +476,13 @@ body. May be nil.
   local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. ``envoy.filters.http.lua``. Below is an example of a ``metadata`` in a
-:ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
+under the :ref:`filter config name
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+If no entry could be find by the filter config name, then filter canonical name
+i.e. ``envoy.filters.http.lua`` will be used as alternative. But note this downgrade will be
+deprecated in the future.
+
+Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
