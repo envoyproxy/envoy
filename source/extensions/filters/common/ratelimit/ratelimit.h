@@ -92,6 +92,11 @@ public:
                      const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                      Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
                      uint32_t hits_addend) PURE;
+
+  /**
+   * Returns streamInfo of the current request if possible. By default just return a nullptr.
+   */
+  virtual StreamInfo::StreamInfo const* streamInfo() const { return nullptr; }
 };
 
 using ClientPtr = std::unique_ptr<Client>;

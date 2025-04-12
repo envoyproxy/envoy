@@ -1999,6 +1999,76 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAndOnStreamDone) {
                                nullptr);
 }
 
+// Test that the RateLimitLoggingInfo class is correctly initialized and used.
+TEST_F(HttpRateLimitFilterTest, RateLimitLoggingInfoClass) {
+  // Create a RateLimitLoggingInfo object
+  RateLimitLoggingInfo logging_info;
+
+  // Test default values
+  EXPECT_FALSE(logging_info.latency().has_value());
+  EXPECT_FALSE(logging_info.bytesSent().has_value());
+  EXPECT_FALSE(logging_info.bytesReceived().has_value());
+  EXPECT_EQ(nullptr, logging_info.clusterInfo());
+  EXPECT_EQ(nullptr, logging_info.upstreamHost());
+
+  // Test setting and getting values
+  const std::chrono::microseconds latency(100);
+  logging_info.setLatency(latency);
+  EXPECT_EQ(latency, logging_info.latency().value());
+
+  const uint64_t bytes_sent = 200;
+  logging_info.setBytesSent(bytes_sent);
+  EXPECT_EQ(bytes_sent, logging_info.bytesSent().value());
+
+  const uint64_t bytes_received = 300;
+  logging_info.setBytesReceived(bytes_received);
+  EXPECT_EQ(bytes_received, logging_info.bytesReceived().value());
+
+  // Test hasFieldSupport
+  EXPECT_TRUE(logging_info.hasFieldSupport());
+
+  // Test setting cluster info
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  logging_info.setClusterInfo(cluster_info);
+  EXPECT_EQ(cluster_info.get(), logging_info.clusterInfo().get());
+
+  // Test setting upstream host
+  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  logging_info.setUpstreamHost(host);
+  EXPECT_EQ(host, logging_info.upstreamHost());
+}
+
+// Test that the hits_addend object factory is correctly registered and used.
+TEST_F(HttpRateLimitFilterTest, HitsAddendObjectFactory) {
+  // Directly create and test the factory
+  const std::string key = "envoy.ratelimit.hits_addend";
+
+  // Find the factory through the registry
+  const auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(key, factory->name());
+
+  // Test with a valid string value
+  {
+    const std::string value = "42";
+    auto obj = factory->createFromBytes(value);
+    ASSERT_NE(nullptr, obj);
+
+    // Convert to UInt32Accessor and verify value
+    auto* accessor = dynamic_cast<StreamInfo::UInt32Accessor*>(obj.get());
+    ASSERT_NE(nullptr, accessor);
+    EXPECT_EQ(42, accessor->value());
+  }
+
+  // Test with invalid value
+  {
+    const std::string invalid_value = "not_a_number";
+    auto obj = factory->createFromBytes(invalid_value);
+    EXPECT_EQ(nullptr, obj);
+  }
+}
+
 } // namespace
 } // namespace RateLimitFilter
 } // namespace HttpFilters

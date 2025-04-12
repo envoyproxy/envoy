@@ -38,6 +38,39 @@ enum class FilterRequestType { Internal, External, Both };
 enum class VhRateLimitOptions { Override, Include, Ignore };
 
 /**
+ * Rate limit logging information stored in the filter state for access logging.
+ */
+class RateLimitLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  RateLimitLoggingInfo() {}
+
+  absl::optional<std::chrono::microseconds> latency() const { return latency_; };
+  absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
+  absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
+
+  void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
+  void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
+  void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
+  void setClusterInfo(Upstream::ClusterInfoConstSharedPtr cluster_info) {
+    cluster_info_ = std::move(cluster_info);
+  }
+  void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    upstream_host_ = std::move(upstream_host);
+  }
+
+  bool hasFieldSupport() const override { return true; }
+
+private:
+  absl::optional<std::chrono::microseconds> latency_;
+  absl::optional<uint64_t> bytes_sent_;
+  absl::optional<uint64_t> bytes_received_;
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
+};
+
+/**
  * Global configuration for the HTTP rate limit filter.
  */
 class FilterConfig {
@@ -58,7 +91,8 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
+        emit_filter_state_stats_(config.emit_filter_state_stats()), http_context_(http_context),
+        stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
         filter_enabled_(
@@ -89,6 +123,7 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
+  bool emitFilterStateStats() const { return emit_filter_state_stats_; }
   Http::Context& httpContext() { return http_context_; }
   Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
   Http::Code rateLimitedStatus() { return rate_limited_status_; }
@@ -135,6 +170,7 @@ private:
   const bool enable_x_ratelimit_headers_;
   const bool disable_x_envoy_ratelimited_header_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  const bool emit_filter_state_stats_{false};
   Http::Context& http_context_;
   Filters::Common::RateLimit::StatNames stat_names_;
   const Http::Code rate_limited_status_;
@@ -238,6 +274,7 @@ private:
   double getHitAddend();
   void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
   std::string getDomain();
+  void updateLoggingInfo();
 
   Http::Context& httpContext() { return config_->httpContext(); }
 
@@ -254,6 +291,8 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+  RateLimitLoggingInfo* logging_info_{nullptr};
+  absl::optional<MonotonicTime> start_time_;
 };
 
 /**
