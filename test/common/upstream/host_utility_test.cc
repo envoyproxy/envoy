@@ -151,40 +151,52 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
 }
 
 TEST(HostUtilityTest, SelectOverrideHostTest) {
+  constexpr auto expect_helper = [](std::pair<HostConstSharedPtr, bool> expected_result,
+                                    HostConstSharedPtr host, bool strict_mode) {
+    EXPECT_EQ(expected_result.first, host);
+    EXPECT_EQ(expected_result.second, strict_mode);
+  };
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  const HostUtility::HostStatusSet all_health_statuses = UnknownStatus | HealthyStatus |
-                                                         UnhealthyStatus | DrainingStatus |
-                                                         TimeoutStatus | DegradedStatus;
+  static const HostUtility::HostStatusSet AllStatuses = UnknownStatus | HealthyStatus |
+                                                        UnhealthyStatus | DrainingStatus |
+                                                        TimeoutStatus | DegradedStatus;
 
-  {
-    // No valid host map.
-    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(nullptr, all_health_statuses, &context));
-  }
   {
     // No valid load balancer context.
     auto host_map = std::make_shared<HostMap>();
-    EXPECT_EQ(nullptr,
-              HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, nullptr));
+    expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, nullptr), nullptr,
+                  false);
   }
+
   {
-    // No valid expected host.
+    // No expected host.
     EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
     auto host_map = std::make_shared<HostMap>();
-    EXPECT_EQ(nullptr,
-              HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
+    expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context), nullptr,
+                  false);
   }
 
   // Test overriding host in strict and non-strict mode.
   for (const bool strict_mode : {false, true}) {
+    {
+      // No host map.
+      LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
+      EXPECT_CALL(context, overrideHostToSelect())
+          .WillOnce(Return(absl::make_optional(override_host)));
+      expect_helper(HostUtility::selectOverrideHost(nullptr, AllStatuses, &context), nullptr,
+                    strict_mode);
+    }
+
     {
       // The host map does not contain the expected host.
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
           .WillOnce(Return(absl::make_optional(override_host)));
       auto host_map = std::make_shared<HostMap>();
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context), nullptr,
+                    strict_mode);
     }
     {
       auto mock_host = std::make_shared<NiceMock<MockHost>>();
@@ -198,16 +210,21 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
 
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context));
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context),
+                    mock_host, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context),
+                    mock_host, strict_mode);
 
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context));
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context),
+                    nullptr, strict_mode);
     }
     {
       auto mock_host = std::make_shared<NiceMock<MockHost>>();
@@ -220,17 +237,22 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context));
-      EXPECT_EQ(mock_host,
-                HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
 
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
-      EXPECT_EQ(nullptr,
-                HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context));
-      EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context));
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context),
+                    mock_host, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context),
+                    mock_host, strict_mode);
+
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context),
+                    nullptr, strict_mode);
+      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context),
+                    nullptr, strict_mode);
     }
   }
 }
