@@ -829,6 +829,9 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
                  read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr);
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
 
+  getStreamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
+      read_callbacks_->connection().dispatcher().timeSource());
+
   // getStreamInfo().downstreamTiming().onLastDownstreamTxByteSent(
   //     read_callbacks_->connection().dispatcher().timeSource());
 

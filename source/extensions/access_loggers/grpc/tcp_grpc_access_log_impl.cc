@@ -32,10 +32,14 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
       });
 }
 
+// Not sure if this is what we used when listener accesslog is enabled.
+// Likely so, see istio code, `func clickhouseTcpGrpcAccessLog(logName string) *accesslog.AccessLog {`
+// Configuring tcp typed.
 void TcpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
+  // Extract so not have to explicitly set the timing for upstream / downstream.
   GrpcCommon::Utility::extractCommonAccessLogProperties(
       *log_entry.mutable_common_properties(), context.requestHeaders(), stream_info,
       config_->common_config(), context.accessLogType());

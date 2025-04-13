@@ -256,6 +256,7 @@ void Utility::extractCommonAccessLogProperties(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
+  // Here is the extraction.
   dur = timing.lastUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_rx_byte()->MergeFrom(
