@@ -406,5 +406,8 @@ new_features:
   change: |
     Added the close through the network filter manager support that allows a network filter to disable the close of connection. This
     behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is false.
+- area: dns
+  change: |
+    Update c-ares to version 1.34.5 to address **CVE-2025-31498**.
 
 deprecated:
