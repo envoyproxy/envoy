@@ -2134,6 +2134,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithCanonicalName) {
   )EOF"};
 
   const std::string METADATA{R"EOF(
+    filter_metadata:
       envoy.filters.http.lua:
         foo.bar:
           name: foo-xxx
