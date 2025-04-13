@@ -238,6 +238,9 @@ TagNameValues::TagNameValues() {
 
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
+
+  // listener.[<address>.]tls_context.(<name>.)*
+  addRe2(TLS_CONTEXT_NAME, R"(^listener\..*?\.tls_context\.((<TAG_VALUE>)\.))", ".tls_context.");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
