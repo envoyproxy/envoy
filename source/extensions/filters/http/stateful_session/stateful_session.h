@@ -70,8 +70,7 @@ public:
 
 private:
   Http::SessionStatePtr session_state_;
-
-  StatefulSessionConfigSharedPtr config_{};
+  StatefulSessionConfigSharedPtr config_;
 };
 
 } // namespace StatefulSession

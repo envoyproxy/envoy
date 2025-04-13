@@ -69,7 +69,7 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTestInPackagesMode) {
   {
     HeaderBasedSessionStateProto config;
     config.set_name("session-header");
-    config.set_mode(HeaderBasedSessionStateProto::PACKAGES);
+    config.mutable_packages_mode_config();
 
     HeaderBasedSessionStateFactory factory(config);
 
@@ -106,7 +106,7 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTestInPackagesMode) {
   {
     HeaderBasedSessionStateProto config;
     config.set_name("session-header");
-    config.set_mode(HeaderBasedSessionStateProto::PACKAGES);
+    config.mutable_packages_mode_config();
 
     HeaderBasedSessionStateFactory factory(config);
 

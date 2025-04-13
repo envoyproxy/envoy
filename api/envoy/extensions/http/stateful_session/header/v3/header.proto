@@ -36,39 +36,53 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.http.stateful_session.header]
 message HeaderBasedSessionState {
-  enum Mode {
-    // If the upstream host address is different from the request header value (or if the request
-    // header is not present), the extension will set the response header value to upstream host
-    // address. This is the default mode.
-    OVERRIDE = 0;
+  // The override mode config for the header based session state extension.
+  message OverrideModeConfig {
+  }
 
-    // Iff the header specified by the :ref:`name
-    // <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.name>`
-    // (assume the ``name`` is set to ``session-header`` and original header value is ``xxxxxx``)
-    // is present, then the upstream host address and value of ``name`` field specified header will
-    // be encoded in following format and the output will be used to update the ``name`` field
-    // specified header in the response:
-    //
-    // .. code-block:: none
-    //
-    //   session-header: "MS4yLjMuNDo4MDtvcmlnaW46eHh4eHh4Cg==" # base64("1.2.3.4:80;origin:xxxxxx")
-    //
-    // The ``origin`` part is used to store the original header value of ``name`` field specified
-    // header. And the ``origin`` part should always be last part of the new header value.
-    //
-    // If this mode is used then we will assume that the header in the request will also be in the
-    // same format and contains the ``origin`` part. This extension will parse the upstream host
-    // address and update the ``name`` field specified header in the request to the ``origin`` part.
-    //
-    // This mode is used for the protocols or scenarios where the server will generate and set the
-    // session id in the initial response and the client will use the same header to send the session
-    // id in the subsequent requests without any modification.
-    PACKAGES = 1;
+  // The packages mode config for the header based session state extension.
+  message PackagesModeConfig {
   }
 
   // The name that will be used to obtain header value from downstream HTTP request and generate
-  // new response header for downstream.
+  // new response header for downstream. The Envoy assume the upstream server or the Envoy itself
+  // will generate the ``name`` field specified header in the response. The header value will
+  // contains the necessary information to do the host selection. And Envoy assume the clients
+  // will send the same header back in the subsequent requests if they receive the header and want
+  // to use the same session.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  Mode mode = 2 [(validate.rules).enum = {defined_only: true}];
+  // Set this to enable override mode. In this mode, if the upstream host address is different with
+  // the target host address parsed from the ``name`` field specified header in the request, or if
+  // the ``name`` field specified header is not present in the request, then the extension will set
+  // the ``name`` field specified header value to the upstream host address in the response anyway.
+  //
+  // Only one of ``override_mode_config`` or ``packages_mode_config`` should be set. This is the
+  // default if no any mode config is set.
+  OverrideModeConfig override_mode_config = 2;
+
+  // Set this to enable packages mode. In this mode, iff the header specified by the ``name`` field
+  // is present in the response (assume the ``name`` is set to ``session-header`` and original
+  // header value is ``xxxxxx``), then the upstream host address and value of ``name`` field
+  // specified header will be encoded in following format and the output will be used to update the
+  // ``name`` field specified header in the response:
+  //
+  // .. code-block:: none
+  //
+  //   session-header: "MS4yLjMuNDo4MDtvcmlnaW46eHh4eHh4Cg==" # base64("1.2.3.4:80;origin:xxxxxx")
+  //
+  // The ``origin`` part is used to store the original header value of ``name`` field specified
+  // header. And the ``origin`` part should always be last part of the new header value.
+  //
+  // If this mode is used then Envoy will assume that the header in the request will also be in the
+  // same format and contains the ``origin`` part. This extension will parse the upstream host
+  // address and update the ``name`` field specified header in the request to the ``origin`` part.
+  //
+  // This mode is used for the protocols or scenarios where the server will generate and set the
+  // session id in the initial response and the client will use the same header to send the session
+  // id in the subsequent requests without any modification.
+  //
+  // Only one of ``override_mode_config`` or ``packages_mode_config`` should be set. If this is set
+  // then it will take precedence over ``override_mode_config``.
+  PackagesModeConfig packages_mode_config = 3;
 }

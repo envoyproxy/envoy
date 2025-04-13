@@ -46,7 +46,7 @@ private:
   absl::optional<std::string> parseAddress(Envoy::Http::RequestHeaderMap& headers) const;
 
   const Envoy::Http::LowerCaseString name_;
-  const HeaderBasedSessionStateProto::Mode mode_{};
+  const bool packages_mode_{};
 };
 
 } // namespace Header

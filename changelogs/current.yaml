@@ -305,9 +305,10 @@ new_features:
     Added support for dynamic token buckets in local rate limit filter for http requests.
 - area: stateful_session
   change: |
-    Supports PACKAGES mode in header based stateful session extension to keep the exist session header value
-    from upstream server. See :ref:`specified mode
-    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.mode>` for more details.
+    Supports packages mode in header based stateful session extension to keep the exist session header value
+    from upstream server. See :ref:`packages_mode_config
+    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.packages_mode_config>`
+    for more details.
 - area: attributes
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.locality`` to obtain upstream locality information.

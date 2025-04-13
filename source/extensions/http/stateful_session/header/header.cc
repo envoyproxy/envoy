@@ -13,7 +13,7 @@ constexpr absl::string_view OriginPartFlag = ";origin:";
 void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
 
-  if (factory_.mode_ == HeaderBasedSessionStateProto::PACKAGES) {
+  if (factory_.packages_mode_) {
     auto origin_header = headers.get(factory_.name_);
     if (origin_header.size() != 1) {
       ENVOY_LOG(debug, "Header {} not exist or occurs multiple times", factory_.name_);
@@ -38,7 +38,7 @@ void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
 
 HeaderBasedSessionStateFactory::HeaderBasedSessionStateFactory(
     const HeaderBasedSessionStateProto& config)
-    : name_(config.name()), mode_(config.mode()) {
+    : name_(config.name()), packages_mode_(config.has_packages_mode_config()) {
   if (config.name().empty()) {
     throw EnvoyException("Header name cannot be empty for header based stateful sessions");
   }
@@ -54,7 +54,7 @@ HeaderBasedSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& head
   std::string content = Envoy::Base64::decode(hdr[0]->value().getStringView());
   absl::string_view content_view(content);
 
-  if (mode_ == HeaderBasedSessionStateProto::PACKAGES) {
+  if (packages_mode_) {
     const auto origin_pos = content_view.find(OriginPartFlag);
 
     absl::string_view origin;
