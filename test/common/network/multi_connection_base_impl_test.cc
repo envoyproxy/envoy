@@ -1185,22 +1185,17 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
 TEST_F(MultiConnectionBaseImplTest, MoveSocket) {
   setupMultiConnectionImpl(2);
 
-  // The method should panic when called
-  EXPECT_DEATH(impl_->moveSocket(), "not implemented");
+  EXPECT_EQ(impl_->moveSocket(), nullptr);
 }
 
 TEST_F(MultiConnectionBaseImplTest, SetConnectionReused) {
   setupMultiConnectionImpl(2);
-
-  // The method should panic when called
-  EXPECT_DEATH(impl_->setConnectionReused(true), "not implemented");
+  impl_->setConnectionReused(true);
 }
 
 TEST_F(MultiConnectionBaseImplTest, IsConnectionReused) {
   setupMultiConnectionImpl(2);
-
-  // The method should panic when called
-  EXPECT_DEATH(impl_->isConnectionReused(), "not implemented");
+  EXPECT_EQ(impl_->isConnectionReused(), false);
 }
 
 } // namespace Network

@@ -133,9 +133,9 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  Network::ConnectionSocketPtr moveSocket() override { PANIC("not implemented"); }
-  void setConnectionReused(bool) override { PANIC("not implemented"); }
-  bool isConnectionReused() override { PANIC("not implemented"); }
+  Network::ConnectionSocketPtr moveSocket() override { return nullptr; }
+  void setConnectionReused(bool) override {}
+  bool isConnectionReused() override { return false; }
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which
