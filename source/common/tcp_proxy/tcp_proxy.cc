@@ -461,6 +461,7 @@ void Filter::UpstreamCallbacks::onUpstreamData(Buffer::Instance& data, bool end_
   if (parent_) {
     parent_->onUpstreamData(data, end_stream);
   } else {
+    // TODO: drainer needs to double check.
     drainer_->onData(data, end_stream);
   }
 }
@@ -827,6 +828,12 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}, has upstream {}",
                  read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr);
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
+
+  // getStreamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+  //     read_callbacks_->connection().dispatcher().timeSource());
+
+  // TODO: check drainer case: downstream is closed, if this event is tracked.
+  // getStreamInfo().onl
   if (upstream_) {
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
@@ -930,6 +937,11 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
                  read_callbacks_->connection(), data.length(), end_stream);
   getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
+
+  // TODO: check drainer case: downstream is closed, if this event is tracked.
+  getStreamInfo().upstreamInfo()->upstreamTiming().onLastUpstreamRxByteReceived(
+      read_callbacks_->connection().dispatcher().timeSource());
+
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
