@@ -479,7 +479,9 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
     return FilterDataStatus::StopIterationNoBuffer;
   }
   request_in_.finish();
-  if (!json::accept(request_buffer_.toString())) {
+
+  json payload = json::parse(request_buffer_.toString(), nullptr, false);
+  if (payload.is_discarded()) {
     ENVOY_STREAM_LOG(error, "Failed to parse the transcoded request to build the path header.",
                      *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(
@@ -488,8 +490,6 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
         absl::StrCat(RcDetails::get().grpc_transcode_failed, "{failed_to_parse_request_body}"));
     return FilterDataStatus::StopIterationNoBuffer;
   }
-
-  json payload = json::parse(request_buffer_.toString());
 
   // Check if there is a request body to be sent with the HTTP request. If yes,
   // is it the entire gRPC request message or just a field from the request

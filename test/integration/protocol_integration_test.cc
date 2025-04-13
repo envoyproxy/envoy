@@ -5720,4 +5720,25 @@ TEST_P(DownstreamProtocolIntegrationTest, EmptyCookieHeader) {
   codec_client_->close();
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, DownstreamCxStats) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_tx_bytes_total", 512);
+}
+
 } // namespace Envoy

@@ -11,7 +11,7 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -278,7 +278,7 @@ TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

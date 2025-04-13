@@ -19,7 +19,7 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/config_tracker.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -380,7 +380,7 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
@@ -430,7 +430,7 @@ generic_secret:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
 
@@ -479,7 +479,7 @@ tls_certificate:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
@@ -527,7 +527,7 @@ validation_context:
   const auto decoded_resources_2 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources_2.refvec_, "validation-context-v1")
                   .ok());
   auto cert_validation_context = Ssl::CertificateValidationContextConfigImpl::create(
@@ -583,7 +583,7 @@ session_ticket_keys:
   const auto decoded_resources_3 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources_3.refvec_, "stek-context-v1")
                   .ok());
   EXPECT_EQ(stek_secret_provider->secret()->keys()[1].inline_string(), "DUMMY_INLINE_STRING");
@@ -648,7 +648,7 @@ generic_secret:
   TestUtility::loadFromYaml(TestEnvironment::substitute(generic_secret_yaml), typed_secret);
   const auto decoded_resources_4 = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources_4.refvec_, "signing-key-v1")
                   .ok());
 
@@ -1107,7 +1107,7 @@ tls_certificate:
   EXPECT_FALSE(typed_secret.tls_certificate().has_private_key());
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
+  EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
   EXPECT_TRUE(secret_provider->secret()->has_private_key_provider());
@@ -1122,7 +1122,8 @@ tls_certificate:
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(ssl_context_manager, privateKeyMethodManager())
       .WillRepeatedly(ReturnRef(private_key_method_manager));
-  EXPECT_CALL(ctx, sslContextManager()).WillRepeatedly(ReturnRef(ssl_context_manager));
+  EXPECT_CALL(ctx.server_context_, sslContextManager())
+      .WillRepeatedly(ReturnRef(ssl_context_manager));
   EXPECT_EQ(Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_)
                 .status()
                 .message(),

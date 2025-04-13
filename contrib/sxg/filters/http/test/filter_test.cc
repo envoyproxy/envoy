@@ -375,10 +375,12 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
 
   auto certificate_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "certificate", secret_context, init_manager);
-  auto certificate_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto certificate_callback =
+      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto private_key_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "private_key", secret_context, init_manager);
-  auto private_key_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto private_key_callback =
+      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(certificate_secret_provider),

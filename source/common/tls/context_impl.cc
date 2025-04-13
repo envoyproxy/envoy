@@ -314,7 +314,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
 
-#if BORINGSSL_API_VERSION >= 21
   // Register stat names based on lists reported by BoringSSL.
   std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
   SSL_get_all_cipher_names(list.data(), list.size());
@@ -331,55 +330,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   list.resize(SSL_get_all_version_names(nullptr, 0));
   SSL_get_all_version_names(list.data(), list.size());
   stat_name_set_->rememberBuiltins(list);
-#else
-  // Use the SSL library to iterate over the configured ciphers.
-  //
-  // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
-  for (Ssl::TlsContext& tls_context : tls_contexts_) {
-    for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
-      stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
-    }
-  }
-
-  // Add supported cipher suites from the TLS 1.3 spec:
-  // https://tools.ietf.org/html/rfc8446#appendix-B.4
-  // AES-CCM cipher suites are removed (no BoringSSL support).
-  //
-  // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins(
-      {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"});
-
-  // All supported curves. Source:
-  // https://github.com/google/boringssl/blob/3743aafdacff2f7b083615a043a37101f740fa53/ssl/ssl_key_share.cc#L302-L309
-  //
-  // Note that if a negotiated curve is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins({"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2"});
-
-  // All supported signature algorithms. Source:
-  // https://github.com/google/boringssl/blob/3743aafdacff2f7b083615a043a37101f740fa53/ssl/ssl_privkey.cc#L436-L453
-  //
-  // Note that if a negotiated algorithm is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins({
-      "rsa_pkcs1_md5_sha1",
-      "rsa_pkcs1_sha1",
-      "rsa_pkcs1_sha256",
-      "rsa_pkcs1_sha384",
-      "rsa_pkcs1_sha512",
-      "ecdsa_sha1",
-      "ecdsa_secp256r1_sha256",
-      "ecdsa_secp384r1_sha384",
-      "ecdsa_secp521r1_sha512",
-      "rsa_pss_rsae_sha256",
-      "rsa_pss_rsae_sha384",
-      "rsa_pss_rsae_sha512",
-      "ed25519",
-  });
-
-  // All supported protocol versions.
-  //
-  // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
-#endif
 
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
@@ -573,18 +523,12 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-#if defined(BORINGSSL_FIPS) && BORINGSSL_API_VERSION >= 18
-#error "Delete preprocessor check below; no longer needed"
-#endif
-
-#if BORINGSSL_API_VERSION >= 18
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
   // matched has been disabled.
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }
-#endif // BORINGSSL_API_VERSION
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {

@@ -198,7 +198,8 @@ public:
   }
 
 private:
-  static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  static FilterStats generateStats(const std::string& prefix,
+                                   const std::string& filter_stats_prefix, Stats::Scope& scope);
 
   const HttpUri oauth_token_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.

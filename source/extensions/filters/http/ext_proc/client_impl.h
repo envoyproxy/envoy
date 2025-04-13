@@ -9,7 +9,6 @@
 
 #include "source/common/http/sidestream_watermark.h"
 #include "source/extensions/filters/common/ext_proc/grpc_client.h"
-#include "source/extensions/filters/common/ext_proc/grpc_client_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,13 +32,8 @@ using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;
 
 using ClientBasePtr = CommonExtProc::ClientBasePtr<ProcessingRequest, ProcessingResponse>;
 
-inline ExternalProcessorClientPtr
-createExternalProcessorClient(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope) {
-  static constexpr char kExternalMethod[] = "envoy.service.ext_proc.v3.ExternalProcessor.Process";
-  return std::make_unique<
-      CommonExtProc::ProcessorClientImpl<ProcessingRequest, ProcessingResponse>>(
-      client_manager, scope, kExternalMethod);
-}
+ExternalProcessorClientPtr createExternalProcessorClient(Grpc::AsyncClientManager& client_manager,
+                                                         Stats::Scope& scope);
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

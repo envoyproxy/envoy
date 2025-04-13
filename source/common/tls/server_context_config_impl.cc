@@ -32,21 +32,25 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
   switch (config.session_ticket_keys_type_case()) {
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
       SessionTicketKeysTypeCase::kSessionTicketKeys:
-    return factory_context.secretManager().createInlineTlsSessionTicketKeysProvider(
-        config.session_ticket_keys());
+    return factory_context.serverFactoryContext()
+        .secretManager()
+        .createInlineTlsSessionTicketKeysProvider(config.session_ticket_keys());
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
       SessionTicketKeysTypeCase::kSessionTicketKeysSdsSecretConfig: {
     const auto& sds_secret_config = config.session_ticket_keys_sds_secret_config();
     if (sds_secret_config.has_sds_config()) {
       // Fetch dynamic secret.
-      return factory_context.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-          factory_context.initManager());
+      return factory_context.serverFactoryContext()
+          .secretManager()
+          .findOrCreateTlsSessionTicketKeysContextProvider(
+              sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+              factory_context.initManager());
     } else {
       // Load static secret.
       auto secret_provider =
-          factory_context.secretManager().findStaticTlsSessionTicketKeysContextProvider(
-              sds_secret_config.name());
+          factory_context.serverFactoryContext()
+              .secretManager()
+              .findStaticTlsSessionTicketKeysContextProvider(sds_secret_config.name());
       if (secret_provider) {
         return secret_provider;
       }

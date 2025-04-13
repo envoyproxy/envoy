@@ -1,7 +1,6 @@
 #include "source/extensions/http/injected_credentials/oauth2/config.h"
 
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "gtest/gtest.h"
 

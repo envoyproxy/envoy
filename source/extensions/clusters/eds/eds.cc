@@ -246,9 +246,11 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (transport_factory_context_->clusterManager().adsMux()) {
+  if (transport_factory_context_->serverFactoryContext().clusterManager().adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
+    maybe_resume_leds =
+        transport_factory_context_->serverFactoryContext().clusterManager().adsMux()->pause(
+            type_url);
   }
 
   update(cluster_load_assignment);

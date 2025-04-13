@@ -1,3 +1,4 @@
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -54,7 +55,7 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
-TEST(DynamiModulesTest, HeaderCallbacks) {
+TEST(DynamicModulesTest, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
@@ -101,7 +102,7 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   filter->onDestroy();
 }
 
-TEST(DynamiModulesTest, DynamicMetadataCallbacks) {
+TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   const std::string filter_name = "dynamic_metadata_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
@@ -159,7 +160,80 @@ TEST(DynamiModulesTest, DynamicMetadataCallbacks) {
   filter->onDestroy();
 }
 
-TEST(DynamiModulesTest, BodyCallbacks) {
+TEST(DynamicModulesTest, FilterStateCallbacks) {
+  const std::string filter_name = "filter_state_callbacks";
+  const std::string filter_config = "";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()));
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter->setDecoderFilterCallbacks(callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+  Http::TestRequestTrailerMapImpl request_trailers{};
+  Http::TestResponseHeaderMapImpl response_headers{};
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(data, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+
+  // Check filter state set by the filter during even hooks.
+  const auto* req_header_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_header_key");
+  ASSERT_NE(req_header_value, nullptr);
+  EXPECT_EQ(req_header_value->serializeAsString(), "req_header_value");
+  const auto* req_body_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_body_key");
+  ASSERT_NE(req_body_value, nullptr);
+  EXPECT_EQ(req_body_value->serializeAsString(), "req_body_value");
+  const auto* req_trailer_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("req_trailer_key");
+  ASSERT_NE(req_trailer_value, nullptr);
+  EXPECT_EQ(req_trailer_value->serializeAsString(), "req_trailer_value");
+  const auto* res_header_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_header_key");
+  ASSERT_NE(res_header_value, nullptr);
+  EXPECT_EQ(res_header_value->serializeAsString(), "res_header_value");
+  const auto* res_body_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_body_key");
+  ASSERT_NE(res_body_value, nullptr);
+  EXPECT_EQ(res_body_value->serializeAsString(), "res_body_value");
+  const auto* res_trailer_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("res_trailer_key");
+  ASSERT_NE(res_trailer_value, nullptr);
+  EXPECT_EQ(res_trailer_value->serializeAsString(), "res_trailer_value");
+  // There is no filter state named key set by the filter.
+  const auto* value = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("key");
+  ASSERT_EQ(value, nullptr);
+
+  filter->onStreamComplete();
+  const auto* stream_complete_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("stream_complete_key");
+  ASSERT_NE(stream_complete_value, nullptr);
+  EXPECT_EQ(stream_complete_value->serializeAsString(), "stream_complete_value");
+}
+
+TEST(DynamicModulesTest, BodyCallbacks) {
   const std::string filter_name = "body_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.

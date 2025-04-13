@@ -9,7 +9,7 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/integration/server.h"
 
 #include "tools/cpp/runfiles/runfiles.h"

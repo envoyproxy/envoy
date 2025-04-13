@@ -7,7 +7,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/http_server_properties_cache.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -66,7 +66,8 @@ protected:
     test_address_ = *Network::Utility::resolveUrl(absl::StrCat(
         "tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":", PEER_PORT));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(context));
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+        .WillOnce(Return(context));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
             new NiceMock<Ssl::MockClientContextConfig>),

@@ -87,6 +87,33 @@ public:
    *                   in the filter chain.
    */
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Control the filter close status for write filters.
+   *
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
+   *
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
+   *
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
+   */
+  virtual void disableClose(bool disabled) PURE;
 };
 
 /**
@@ -178,6 +205,33 @@ public:
    * mode to secure mode.
    */
   virtual bool startUpstreamSecureTransport() PURE;
+
+  /**
+   * Control the filter close status for read filters.
+   *
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
+   *
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
+   *
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
+   */
+  virtual void disableClose(bool disable) PURE;
 };
 
 /**

@@ -32,6 +32,7 @@ public:
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
+  bool peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
   absl::Span<const std::string> dnsSansPeerCertificate() const override;
@@ -82,6 +83,7 @@ private:
     OthernameSansPeerCertificate,
     UrlEncodedPemEncodedPeerCertificate,
     UrlEncodedPemEncodedPeerCertificateChain,
+    PeerCertificateSanMatches,
     DnsSansPeerCertificate,
     IpSansPeerCertificate,
     OidsPeerCertificate,
@@ -98,7 +100,8 @@ private:
   // having fixed space for cached data that isn't used is a waste. Instead, create a lookup
   // table of cached values that are created on demand. Use a node_hash_map so that returned
   // references are not invalidated when additional items are added.
-  using CachedValue = absl::variant<std::string, std::vector<std::string>, Ssl::ParsedX509NamePtr>;
+  using CachedValue = absl::variant<std::string, std::vector<std::string>, Ssl::ParsedX509NamePtr,
+                                    bssl::UniquePtr<GENERAL_NAMES>>;
   mutable absl::node_hash_map<CachedValueTag, CachedValue> cached_values_;
 };
 

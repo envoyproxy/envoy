@@ -9,7 +9,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -41,7 +41,7 @@ class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testi
 public:
   Http3ConnPoolImplTest() {
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(

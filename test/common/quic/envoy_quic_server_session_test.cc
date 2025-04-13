@@ -185,6 +185,7 @@ public:
           return quic::WriteResult{quic::WRITE_STATUS_OK, static_cast<int>(buf_len)};
         }));
     ON_CALL(crypto_stream_helper_, CanAcceptClientHello(_, _, _, _, _)).WillByDefault(Return(true));
+    EXPECT_CALL(write_total_, add(_)).Times(AnyNumber());
     EXPECT_CALL(*debug_visitor_factory_.mock_debug_visitor_, OnConnectionClosed(_, _));
   }
 
@@ -273,7 +274,8 @@ protected:
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
   testing::StrictMock<Stats::MockGauge> read_current_;
-  testing::StrictMock<Stats::MockCounter> write_total_;
+  // Currently QUIC only populates write_total_.
+  testing::NiceMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::ServerConnectionPtr http_connection_;
   Http::Http3::CodecStats stats_;
@@ -1112,6 +1114,19 @@ TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
   envoy_quic_session_.setHttp3Options(http3_options);
 
   EXPECT_EQ(envoy_quic_session_.qpack_maximum_dynamic_table_capacity(), 0);
+
+  installReadFilter();
+}
+
+TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  auto* quic_options = http3_options.mutable_quic_protocol_options();
+  quic_options->mutable_connection_keepalive()->mutable_max_interval()->set_seconds(0);
+  http3_options.set_allow_extended_connect(false);
+
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  EXPECT_FALSE(envoy_quic_session_.allow_extended_connect());
 
   installReadFilter();
 }

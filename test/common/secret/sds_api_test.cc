@@ -20,7 +20,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"

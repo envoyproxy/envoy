@@ -1179,25 +1179,32 @@ ClusterInfoImpl::ClusterInfoImpl(
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      traffic_stats_(generateStats(stats_scope_,
-                                   factory_context.clusterManager().clusterStatNames(),
-                                   server_context.statsConfig().enableDeferredCreationStats())),
-      config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
-                           *stats_scope_),
-      lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
-      endpoint_stats_(factory_context.clusterManager().clusterEndpointStatNames(), *stats_scope_),
+      traffic_stats_(generateStats(
+          stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
+          server_context.statsConfig().enableDeferredCreationStats())),
+      config_update_stats_(
+          factory_context.serverFactoryContext().clusterManager().clusterConfigUpdateStatNames(),
+          *stats_scope_),
+      lb_stats_(factory_context.serverFactoryContext().clusterManager().clusterLbStatNames(),
+                *stats_scope_),
+      endpoint_stats_(
+          factory_context.serverFactoryContext().clusterManager().clusterEndpointStatNames(),
+          *stats_scope_),
       load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(
-          generateLoadReportStats(*load_report_stats_store_.rootScope(),
-                                  factory_context.clusterManager().clusterLoadReportStatNames())),
-      optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
-                                  ? std::make_unique<OptionalClusterStats>(
-                                        config, *stats_scope_, factory_context.clusterManager())
-                                  : nullptr),
+      load_report_stats_(generateLoadReportStats(
+          *load_report_stats_store_.rootScope(),
+          factory_context.serverFactoryContext().clusterManager().clusterLoadReportStatNames())),
+      optional_cluster_stats_(
+          (config.has_track_cluster_stats() || config.track_timeout_budgets())
+              ? std::make_unique<OptionalClusterStats>(
+                    config, *stats_scope_, factory_context.serverFactoryContext().clusterManager())
+              : nullptr),
       features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
           config, *http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
-                         factory_context.clusterManager().clusterCircuitBreakersStatNames()),
+                         factory_context.serverFactoryContext()
+                             .clusterManager()
+                             .clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           THROW_OR_RETURN_VALUE(createUpstreamLocalAddressSelector(config, bind_config),
@@ -1213,7 +1220,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
       common_lb_config_(
-          factory_context.clusterManager().getCommonLbConfigPtr(config.common_lb_config())),
+          factory_context.serverFactoryContext().clusterManager().getCommonLbConfigPtr(
+              config.common_lb_config())),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
@@ -1389,8 +1397,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       filter_factories_.push_back(
           network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
               proto_config.config_discovery(), proto_config.name(), server_context,
-              upstream_context_, factory_context.clusterManager(), is_terminal, "network",
-              nullptr));
+              upstream_context_, factory_context.serverFactoryContext().clusterManager(),
+              is_terminal, "network", nullptr));
       continue;
     }
 
@@ -1421,7 +1429,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.clusterManager(), upstream_context_, prefix);
+                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
+                 prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
@@ -1589,8 +1598,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
   transport_factory_context_ =
       std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-          server_context, cluster_context.sslContextManager(), *stats_scope,
-          cluster_context.clusterManager(), cluster_context.messageValidationVisitor());
+          server_context, *stats_scope, cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
   auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);

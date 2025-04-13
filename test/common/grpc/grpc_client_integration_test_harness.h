@@ -35,7 +35,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/cluster_info.h"

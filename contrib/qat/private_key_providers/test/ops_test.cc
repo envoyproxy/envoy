@@ -6,7 +6,7 @@
 #include "source/common/tls/private_key/private_key_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -110,7 +110,7 @@ protected:
     rsa_ = EVP_PKEY_get0_RSA(pkey_.get());
     libqat_->setRsaKey(rsa_);
   }
-  bssl::UniquePtr<EVP_PKEY> pkey_{};
+  bssl::UniquePtr<EVP_PKEY> pkey_;
   RSA* rsa_{};
 };
 

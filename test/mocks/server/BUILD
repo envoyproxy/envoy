@@ -185,8 +185,8 @@ envoy_cc_mock(
     rbe_pool = "6gig",
     deps = [
         ":server_factory_context_mocks",
-        ":transport_socket_factory_context_mocks",
         "//envoy/server:instance_interface",
+        "//source/common/secret:secret_manager_impl_lib",
     ],
 )
 
@@ -233,6 +233,7 @@ envoy_cc_mock(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -250,19 +251,6 @@ envoy_cc_mock(
         ":overload_manager_mocks",
         ":server_lifecycle_notifier_mocks",
         "//source/common/router:context_lib",
-    ],
-)
-
-envoy_cc_mock(
-    name = "transport_socket_factory_context_mocks",
-    srcs = ["transport_socket_factory_context.cc"],
-    hdrs = ["transport_socket_factory_context.h"],
-    rbe_pool = "6gig",
-    deps = [
-        ":server_factory_context_mocks",
-        "//envoy/server:tracer_config_interface",
-        "//source/common/secret:secret_manager_impl_lib",
-        "//test/mocks/access_log:access_log_mocks",
     ],
 )
 
@@ -358,7 +346,6 @@ envoy_cc_mock(
         ":server_lifecycle_notifier_mocks",
         ":tracer_factory_context_mocks",
         ":tracer_factory_mocks",
-        ":transport_socket_factory_context_mocks",
         ":watch_dog_mocks",
         ":worker_factory_mocks",
         ":worker_mocks",

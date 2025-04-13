@@ -193,14 +193,13 @@ void EnvoyQuicServerSession::setHttp3Options(
     const uint64_t max_interval =
         PROTOBUF_GET_MS_OR_DEFAULT(http3_options_->quic_protocol_options().connection_keepalive(),
                                    max_interval, quic::kPingTimeoutSecs);
-    if (max_interval == 0) {
-      return;
-    }
-    if (initial_interval > 0) {
-      connection()->set_keep_alive_ping_timeout(
-          quic::QuicTime::Delta::FromMilliseconds(max_interval));
-      connection()->set_initial_retransmittable_on_wire_timeout(
-          quic::QuicTime::Delta::FromMilliseconds(initial_interval));
+    if (max_interval != 0) {
+      if (initial_interval > 0) {
+        connection()->set_keep_alive_ping_timeout(
+            quic::QuicTime::Delta::FromMilliseconds(max_interval));
+        connection()->set_initial_retransmittable_on_wire_timeout(
+            quic::QuicTime::Delta::FromMilliseconds(initial_interval));
+      }
     }
   }
   set_allow_extended_connect(http3_options_->allow_extended_connect());

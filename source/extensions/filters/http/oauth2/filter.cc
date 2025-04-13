@@ -405,7 +405,7 @@ FilterConfig::FilterConfig(
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
-      stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
@@ -474,8 +474,11 @@ FilterConfig::FilterConfig(
   }
 }
 
-FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+FilterStats FilterConfig::generateStats(const std::string& prefix,
+                                        const std::string& filter_stats_prefix,
+                                        Stats::Scope& scope) {
+  const std::string final_prefix = absl::StrCat(prefix, filter_stats_prefix);
+  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
 bool FilterConfig::shouldUseRefreshToken(

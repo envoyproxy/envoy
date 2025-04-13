@@ -77,8 +77,8 @@ envoy_cc_test_library(
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
+        "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/mocks/server:server_factory_context_mocks",
-        "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(
