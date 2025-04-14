@@ -9,7 +9,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http1/balsa_parser.h"
-#include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/http1/parser.h"
 
 #include "absl/container/flat_hash_set.h"

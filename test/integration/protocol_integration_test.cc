@@ -1578,10 +1578,9 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxying104) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
-  if (GetParam().http1_implementation != Http1ParserImpl::BalsaParser ||
-      GetParam().upstream_protocol != Http::CodecType::HTTP1 ||
+  if (GetParam().upstream_protocol != Http::CodecType::HTTP1 ||
       GetParam().downstream_protocol != Http::CodecType::HTTP1) {
-    GTEST_SKIP() << "This test is only relevant for HTTP1 BalsaParser";
+    GTEST_SKIP() << "This test is only relevant for HTTP1";
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1609,9 +1608,8 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitForFirstByte) {
-  if (GetParam().http1_implementation != Http1ParserImpl::BalsaParser ||
-      GetParam().upstream_protocol != Http::CodecType::HTTP1) {
-    GTEST_SKIP() << "This test is only relevant for HTTP1 upstream with BalsaParser";
+  if (GetParam().upstream_protocol != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This test is only relevant for HTTP1 upstream";
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1636,9 +1634,8 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102NoDelayBalsaReset) {
-  if (GetParam().http1_implementation != Http1ParserImpl::BalsaParser ||
-      GetParam().upstream_protocol != Http::CodecType::HTTP1) {
-    GTEST_SKIP() << "This test is only relevant for HTTP1 upstream with BalsaParser";
+  if (GetParam().upstream_protocol != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This test is only relevant for HTTP1 upstream";
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -5452,8 +5449,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
 
 TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
   disable_client_header_validation_ = true;
-  if (downstreamProtocol() == Http::CodecType::HTTP1 &&
-      GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // this test is unreliable in this case.
     return;
   }

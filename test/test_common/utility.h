@@ -136,12 +136,6 @@ public:
   static void callEnvoyBug() { ENVOY_BUG(false, ""); }
 };
 
-// See https://github.com/envoyproxy/envoy/issues/21245.
-enum class Http1ParserImpl {
-  HttpParser, // http-parser from node.js
-  BalsaParser // Balsa from QUICHE
-};
-
 class TestUtility {
 public:
   /**
@@ -542,17 +536,6 @@ public:
 #else
     return "127.0.0.9";
 #endif
-  }
-
-  // Allows pretty printed test names.
-  static std::string http1ParserImplToString(Http1ParserImpl impl) {
-    switch (impl) {
-    case Http1ParserImpl::HttpParser:
-      return "HttpParser";
-    case Http1ParserImpl::BalsaParser:
-      return "BalsaParser";
-    }
-    return "UnknownHttp1Impl";
   }
 
   static std::string ipVersionToString(Network::Address::IpVersion ip_version) {
