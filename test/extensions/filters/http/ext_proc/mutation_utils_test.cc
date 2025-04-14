@@ -88,8 +88,9 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   s = mutation.add_set_headers();
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("418");
+  // Default of "append" is "true" and mutations
+  // are applied in order.
   s = mutation.add_set_headers();
-  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_raw_value("nope");
   // Incomplete structures should be ignored
@@ -155,6 +156,7 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
       {"x-append-this", "2"},
       {"x-append-this", "3"},
       {"x-remove-and-append-this", "4"},
+      {"x-replace-this", "no"},
       {"x-replace-this", "nope"},
       {"x-envoy-strange-thing", "No"},
   };
