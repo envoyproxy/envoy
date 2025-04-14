@@ -1,3 +1,9 @@
+// [#protodoc-title: Proto API Scrubber]
+//
+// [#not-implemented-hide:] Implementation in progress.
+//
+// [#extension: envoy.filters.http.proto_api_scrubber]
+
 syntax = "proto3";
 
 package envoy.extensions.filters.http.proto_api_scrubber.v3;
@@ -16,12 +22,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Proto API Scrubber]
-//
-// [#not-implemented-hide:] Implementation in progress.
-//
-// [#extension: envoy.filters.http.proto_api_scrubber]
-//
 // Overview
 // --------
 // ProtoApiScrubber filter supports filtering of the request and
