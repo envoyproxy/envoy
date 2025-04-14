@@ -122,6 +122,8 @@ protected:
   void initializeConfig(ConfigOptions config_option = {},
                         const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
                                                                                      {1, 1}}) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.ext_proc_modified_append_default_value", "false"}});
     int total_cluster_endpoints = 0;
     std::for_each(
         cluster_endpoints.begin(), cluster_endpoints.end(),
