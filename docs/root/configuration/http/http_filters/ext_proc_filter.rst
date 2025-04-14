@@ -24,20 +24,8 @@ on a message-by-message basis. This allows for the construction of sophisticated
 that decide how to respond to each message individually to eliminate unnecessary
 stream requests from the proxy.
 
-This filter is a work in progress. Most of the major bits of functionality
-are complete. The updated list of supported features and implementation status may
-be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
-
-Runtime
--------
-
-The HTTP external processing filter supports the following global runtime settings:
-
-envoy.filters.http.ext_proc.remote_close_timeout_milliseconds
-  Duration in milliseconds that gRPC client will wait for the external processing service to complete
-  the stream by sending trailers. The stream is reset if the timeout expires. This duration does not affect
-  processing of the downstream request or response and only determine how long Envoy keeps gRPC stream objects
-  in memory while waiting for the server to close the stream gracefully. The default value is 1 second.
+The updated list of supported features can be found on the
+:ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
 
 Statistics
 ----------
@@ -61,5 +49,9 @@ The following statistics are supported:
   failure_mode_allowed, Counter, The number of times an error was ignored due to configuration
   message_timeouts, Counter, The number of times a message failed to receive a response within the configured timeout
   rejected_header_mutations, Counter, The number of rejected header mutations
+  override_message_timeout_received, Counter, The number of override_message_timeout messages received
+  override_message_timeout_ignored, Counter, The number of override_message_timeout messages ignored
   clear_route_cache_ignored, Counter, The number of clear cache request that were ignored
   clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled
+  clear_route_cache_upstream_ignored, Counter, The number of clear cache request that were ignored if the filter is in upstream
+  send_immediate_resp_upstream_ignored, Counter, The number of send immediate response messages that were ignored if the filter is in upstream
