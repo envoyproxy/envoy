@@ -52,6 +52,9 @@ minor_behavior_changes:
 - area: tls
   change: |
     FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
+- area: oauth2
+  change: |
+    The access token, id token and refresh token in the cookies are now encrypted using the HMCA secret.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
