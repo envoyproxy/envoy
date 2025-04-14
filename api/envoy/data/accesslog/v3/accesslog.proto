@@ -189,7 +189,7 @@ message AccessLogCommon {
   // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured
   // upstream transport socket. Common TLS failures are in
-  // :ref:`TLS Troubleshooting <arch_overview_ssl_trouble_shooting>`.
+  // :ref:`TLS troubleshooting <arch_overview_ssl_trouble_shooting>`.
   string upstream_transport_failure_reason = 18;
 
   // The name of the route
@@ -245,7 +245,7 @@ message AccessLogCommon {
 
   // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured downstream
-  // transport socket. Common TLS failures are in :ref:`TLS Troubleshooting <arch_overview_ssl_trouble_shooting>`.
+  // transport socket. Common TLS failures are in :ref:`TLS troubleshooting <arch_overview_ssl_trouble_shooting>`.
   string downstream_transport_failure_reason = 28;
 
   // For HTTP: Total number of bytes sent to the downstream by the http stream.
