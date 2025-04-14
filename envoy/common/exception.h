@@ -61,6 +61,13 @@ public:
     return temp_status;                                                                            \
   }
 
+// This macro is used to return from a function directly if the status is not ok
+// without returning a status value.
+#define RETURN_ONLY_IF_NOT_OK_REF(variable)                                                        \
+  if (!variable.ok()) {                                                                            \
+    return;                                                                                        \
+  }
+
 template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
   THROW_IF_NOT_OK_REF(type_or_error.status());
   return std::move(type_or_error.value());
