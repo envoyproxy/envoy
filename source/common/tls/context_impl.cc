@@ -370,6 +370,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
           creation_status = absl::InvalidArgumentError(
               absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
                            Utility::getLastCryptoError().value_or("")));
+          return;
         }
       }
       break;
