@@ -35,6 +35,10 @@ minor_behavior_changes:
     AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
     credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
     then the original behaviour with a signing failure will occur.
+- area: string_matcher
+  change: |
+    The string matcher API extended with another method that allows passing a context for the matching operation.
+    The initial supporting use case is passing ``StreamInfo`` in the context when performing SAN matching.
 - area: formatter
   change: |
     The formatter ``%CEL%`` and ``%METADATA%`` will be treated as built-in formatters and could be used directly in the
@@ -59,6 +63,9 @@ bug_fixes:
   change: |
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
+- area: eds
+  change: |
+    Fixed crash when creating an EDS cluster with invalid configuration.
 - area: http
   change: |
     Fixed http parser responding to newlines between requests with 400 Bad Request; per
@@ -402,6 +409,10 @@ new_features:
     Added ``upstream_rq_headers_count`` and ``upstream_rs_headers_count`` histograms to
     :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`. These will be added when the
     :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked.
+- area: matcher
+  change: |
+    Added the integration between :ref:`ExtensionWithMatcher
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` and network filters, and only SkipFilter is supported.
 - area: oauth2
   change: |
     Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.stat_prefix>` to allow
@@ -414,5 +425,8 @@ new_features:
   change: |
     Added the close through the network filter manager support that allows a network filter to disable the close of connection. This
     behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is false.
+- area: dns
+  change: |
+    Update c-ares to version 1.34.5 to address **CVE-2025-31498**.
 
 deprecated:
