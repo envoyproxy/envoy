@@ -63,6 +63,9 @@ bug_fixes:
   change: |
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
+- area: eds
+  change: |
+    Fixed crash when creating an EDS cluster with invalid configuration.
 - area: http
   change: |
     Fixed http parser responding to newlines between requests with 400 Bad Request; per
