@@ -26,8 +26,8 @@ KafkaMetricsFacadeImpl::KafkaMetricsFacadeImpl(Stats::Scope& scope, TimeSource& 
 KafkaMetricsFacadeImpl::KafkaMetricsFacadeImpl(TimeSource& time_source,
                                                RichRequestMetricsSharedPtr request_metrics,
                                                RichResponseMetricsSharedPtr response_metrics)
-    : time_source_{time_source}, request_metrics_{request_metrics}, response_metrics_{
-                                                                        response_metrics} {};
+    : time_source_{time_source}, request_metrics_{request_metrics},
+      response_metrics_{response_metrics} {};
 
 // When request is successfully parsed, increase type count and store its arrival timestamp.
 void KafkaMetricsFacadeImpl::onMessage(AbstractRequestSharedPtr request) {
@@ -77,8 +77,8 @@ KafkaBrokerFilter::KafkaBrokerFilter(Stats::Scope& scope, TimeSource& time_sourc
 KafkaBrokerFilter::KafkaBrokerFilter(const BrokerFilterConfigSharedPtr& filter_config,
                                      const KafkaMetricsFacadeSharedPtr& metrics)
     : metrics_{metrics}, request_handler_{new RequestHandlerImpl(filter_config)},
-      response_rewriter_{createRewriter(filter_config)}, response_decoder_{new ResponseDecoder(
-                                                             {metrics, response_rewriter_})},
+      response_rewriter_{createRewriter(filter_config)},
+      response_decoder_{new ResponseDecoder({metrics, response_rewriter_})},
       request_decoder_{new RequestDecoder(
           {std::make_shared<Forwarder>(*response_decoder_), metrics, request_handler_})} {};
 

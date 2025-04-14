@@ -124,6 +124,9 @@ public:
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 74ull));
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_count"), 5ull));
     router_->decodeHeaders(headers, false);
 
     EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
@@ -142,6 +145,9 @@ public:
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 1ull));
     Http::ResponseHeaderMapPtr response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     // NOLINTNEXTLINE: Silence null pointer access warning
@@ -857,6 +863,30 @@ TEST_F(RouterTest, DropOverloadDropped) {
                     .counter("upstream_rq_dropped")
                     .value());
   EXPECT_EQ(callbacks_.details(), "drop_overload");
+}
+
+// UnconditionalDropOverload drop test
+TEST_F(RouterTest, UnconditionalDropOverloadDropped) {
+  EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(1.0)));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"},
+                                                   {"content-length", "27"},
+                                                   {"content-type", "text/plain"},
+                                                   {"x-envoy-unconditional-drop-overload", "true"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnconditionalDropOverload));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_drop_overload")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_dropped")
+                    .value());
+  EXPECT_EQ(callbacks_.details(), "unconditional_drop_overload");
 }
 
 TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
@@ -2323,11 +2353,19 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
       .Times(3);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_count"), 5ull))
+      .Times(3);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 0ull))
       .Times(3);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull))
+      .Times(2);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 1ull))
       .Times(2);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
@@ -4913,7 +4951,7 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
 }
 
 // If the shadow stream watermark callbacks are invoked in the Router filter destructor,
-// it causes a potential use-after-free bug, as the FilterManger may have already been freed.
+// it causes a potential use-after-free bug, as the FilterManager may have already been freed.
 TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
   if (!streaming_shadow_) {
     GTEST_SKIP();

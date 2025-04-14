@@ -74,6 +74,12 @@ envoy_dynamic_module_on_http_filter_response_trailers(
   return envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue;
 }
 
+void envoy_dynamic_module_on_http_filter_stream_complete(
+  envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+  envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
+  assert(filter_module_ptr == &some_variable + 1);
+}
+
 void envoy_dynamic_module_on_http_filter_destroy(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
   assert(filter_module_ptr == &some_variable + 1);

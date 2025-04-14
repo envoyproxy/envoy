@@ -87,7 +87,7 @@ public:
 
 class TestFirstPacketReceivedFilterState : public StreamInfo::FilterState::Object {
 public:
-  explicit TestFirstPacketReceivedFilterState() {}
+  explicit TestFirstPacketReceivedFilterState() = default;
   static const absl::string_view key() { return "test.filter_state.quic_first_packet_received"; }
   void incrementPacketCount() { packet_count_++; }
   void setPacketLength(size_t packet_length) { packet_length_ = packet_length; }

@@ -124,8 +124,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
   while (true) {
     std::unique_ptr<PendingQuery> next_query;
     absl::optional<uint32_t> num_retries;
-    const bool treat_nodata_noname_as_success =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_nodata_noname_is_success");
     {
       absl::MutexLock guard(&mutex_);
       auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -195,17 +193,15 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       } else if (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA) {
-        // Treat NONAME and NODATA as DNS records with no results.
-        // NODATA and NONAME are typically not transient failures, so we don't expect success if
-        // the DNS query is retried.
-        // NOTE: this is also how the c-ares resolver treats NONAME and NODATA:
+        // Treat NONAME and NODATA as DNS records with no results and a failure.
+        // Experiments on Android have shown that treating NONAME and NODATA as success leads to
+        // many more net.dns and connection-level failures.
+        // NOTE: this differs from how the c-ares resolver treats NONAME and NODATA:
         // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
         ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
                   gai_strerror(rc.return_value_));
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
-        response = std::make_pair(treat_nodata_noname_as_success ? ResolutionStatus::Completed
-                                                                 : ResolutionStatus::Failure,
-                                  std::list<DnsResponse>());
+        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       } else {
         ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));

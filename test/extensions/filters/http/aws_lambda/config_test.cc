@@ -290,10 +290,10 @@ credentials:
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactoryWrapper factory;
 
-  auto provider =
+  auto chain =
       factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
   // hardwired credentials are set in provider configuration
-  auto credentials = provider->getCredentials();
+  auto credentials = chain->chainGetCredentials();
   EXPECT_EQ(credentials.accessKeyId().value(), "config_kid");
   EXPECT_EQ(credentials.secretAccessKey().value(), "config_Key");
   EXPECT_EQ(credentials.sessionToken().value(), "config_token");
@@ -313,7 +313,7 @@ credentials_profile: test_profile
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   AwsLambdaFilterFactoryWrapper factory;
 
-  auto provider = factory.getCredentialsProvider(proto_config, context_, "region");
+  auto chain = factory.getCredentialsProvider(proto_config, context_, "region");
 
   const char CREDENTIALS_FILE_CONTENTS[] =
       R"(
@@ -336,7 +336,7 @@ aws_session_token = profile4_token
       .WillRepeatedly(Return(CREDENTIALS_FILE_CONTENTS));
 
   // test_profile is set in provider configuration
-  const auto credentials = provider->getCredentials();
+  const auto credentials = chain->chainGetCredentials();
   EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("profile4_token", credentials.sessionToken().value());
@@ -355,7 +355,7 @@ invocation_mode: asynchronous
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   AwsLambdaFilterFactoryWrapper factory;
 
-  auto provider = factory.getCredentialsProvider(proto_config, context_, "region");
+  auto chain = factory.getCredentialsProvider(proto_config, context_, "region");
 
   const char CREDENTIALS_FILE_CONTENTS[] =
       R"(
@@ -378,7 +378,7 @@ aws_session_token = profile4_token
       .WillRepeatedly(Return(CREDENTIALS_FILE_CONTENTS));
 
   // Default Credentials Provider chain will always return credentials from default profile
-  const auto credentials = provider->getCredentials();
+  const auto credentials = chain->chainGetCredentials();
   EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
   EXPECT_EQ("default_token", credentials.sessionToken().value());

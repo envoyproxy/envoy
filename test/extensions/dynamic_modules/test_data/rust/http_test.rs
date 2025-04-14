@@ -68,6 +68,18 @@ fn test_header_callbacks_filter_on_request_headers() {
     })
     .once();
 
+  envoy_filter
+    .expect_get_attribute_int()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::SourcePort)
+    .return_const(1234)
+    .once();
+
+  envoy_filter
+    .expect_get_attribute_string()
+    .withf(|id| *id == abi::envoy_dynamic_module_type_attribute_id::SourceAddress)
+    .returning(|_| Some(EnvoyBuffer::new("1.1.1.1:1234")))
+    .once();
+
   assert_eq!(
     f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue

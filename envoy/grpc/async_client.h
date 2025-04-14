@@ -65,6 +65,14 @@ public:
    */
   virtual void resetStream() PURE;
 
+  /**
+   * Wait for the server to half-close its stream and then delete the RawAsyncStream object. No
+   * further methods may be invoked on the stream object and no further callbacks will be invoked.
+   * The server is expected to half-close within the interval specific in the StreamOptions,
+   * otherwise the stream is reset.
+   */
+  virtual void waitForRemoteCloseAndDelete() PURE;
+
   /***
    * @returns if the stream has enough buffered outbound data to be over the configured buffer
    * limits

@@ -27,7 +27,7 @@ private:
 class LinuxContainerCpuStatsReader : public CpuStatsReader {
 public:
   LinuxContainerCpuStatsReader(
-      TimeSource& time_source_,
+      TimeSource& time_source,
       const std::string& linux_cgroup_cpu_allocated_file = LINUX_CGROUP_CPU_ALLOCATED_FILE,
       const std::string& linux_cgroup_cpu_times_file = LINUX_CGROUP_CPU_TIMES_FILE);
   CpuTimes getCpuTimes() override;

@@ -543,8 +543,6 @@ TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dns_nodata_noname_is_success",
-                                    "false");
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -584,8 +582,6 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dns_nodata_noname_is_success",
-                                    "false");
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);

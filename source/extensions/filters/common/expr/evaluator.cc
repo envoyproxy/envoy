@@ -5,6 +5,7 @@
 
 #include "extensions/regex_functions.h"
 
+#include "cel/expr/syntax.pb.h"
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
@@ -139,6 +140,32 @@ BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext&
   return context.singletonManager().getTyped<BuilderInstance>(
       SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
       [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
+}
+
+// Converts from CEL canonical to CEL v1alpha1
+absl::optional<google::api::expr::v1alpha1::Expr>
+getExpr(const ::xds::type::v3::CelExpression& expression) {
+  ::cel::expr::Expr expr;
+  if (expression.has_cel_expr_checked()) {
+    expr = expression.cel_expr_checked().expr();
+  } else if (expression.has_cel_expr_parsed()) {
+    expr = expression.cel_expr_parsed().expr();
+  } else {
+    return {};
+  }
+
+  std::string data;
+  if (!expr.SerializeToString(&data)) {
+    return {};
+  }
+
+  // Parse the string into the target namespace message
+  google::api::expr::v1alpha1::Expr v1alpha1Expr;
+  if (!v1alpha1Expr.ParseFromString(data)) {
+    return {};
+  }
+
+  return v1alpha1Expr;
 }
 
 ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {

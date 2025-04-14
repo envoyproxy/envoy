@@ -51,7 +51,7 @@ void RdsRouteConfigUpdateRequester::requestSrdsUpdate(
               if (scope_exist) {
                 route_cache.refreshCachedRoute();
               }
-              (*cb)(scope_exist && route_cache.hasCachedRoute());
+              (*cb)(scope_exist&& route_cache.hasCachedRoute());
             }
           });
   scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,

@@ -36,7 +36,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
         continue;
       }
       providers.push_back(
-          factory_context.secretManager().createInlineTlsCertificateProvider(tls_certificate));
+          factory_context.serverFactoryContext().secretManager().createInlineTlsCertificateProvider(
+              tls_certificate));
     }
     return providers;
   }
@@ -44,13 +45,16 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
     for (const auto& sds_secret_config : config.tls_certificate_sds_secret_configs()) {
       if (sds_secret_config.has_sds_config()) {
         // Fetch dynamic secret.
-        providers.push_back(factory_context.secretManager().findOrCreateTlsCertificateProvider(
-            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-            factory_context.initManager()));
+        providers.push_back(factory_context.serverFactoryContext()
+                                .secretManager()
+                                .findOrCreateTlsCertificateProvider(
+                                    sds_secret_config.sds_config(), sds_secret_config.name(),
+                                    factory_context, factory_context.initManager()));
       } else {
         // Load static secret.
-        auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
-            sds_secret_config.name());
+        auto secret_provider =
+            factory_context.serverFactoryContext().secretManager().findStaticTlsCertificateProvider(
+                sds_secret_config.name());
         if (!secret_provider) {
           creation_status = absl::InvalidArgumentError(
               fmt::format("Unknown static secret: {}", sds_secret_config.name()));
@@ -70,14 +74,17 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
     absl::Status& creation_status) {
   if (sds_secret_config.has_sds_config()) {
     // Fetch dynamic secret.
-    return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
-        sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-        factory_context.initManager());
+    return factory_context.serverFactoryContext()
+        .secretManager()
+        .findOrCreateCertificateValidationContextProvider(sds_secret_config.sds_config(),
+                                                          sds_secret_config.name(), factory_context,
+                                                          factory_context.initManager());
   } else {
     // Load static secret.
     auto secret_provider =
-        factory_context.secretManager().findStaticCertificateValidationContextProvider(
-            sds_secret_config.name());
+        factory_context.serverFactoryContext()
+            .secretManager()
+            .findStaticCertificateValidationContextProvider(sds_secret_config.name());
     if (secret_provider) {
       return secret_provider;
     }
@@ -97,8 +104,9 @@ getCertificateValidationContextConfigProvider(
   switch (config.validation_context_type_case()) {
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContext:
-    return factory_context.secretManager().createInlineCertificateValidationContextProvider(
-        config.validation_context());
+    return factory_context.serverFactoryContext()
+        .secretManager()
+        .createInlineCertificateValidationContextProvider(config.validation_context());
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig:
     return getProviderFromSds(factory_context, config.validation_context_sds_secret_config(),

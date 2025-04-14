@@ -158,7 +158,7 @@ public:
       : regex_(THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(safe_regex, context.regexEngine()),
                                      Regex::CompiledMatcherPtr)) {}
 
-  RegexStringMatcher(RegexStringMatcher&& other) { regex_ = std::move(other.regex_); }
+  RegexStringMatcher(RegexStringMatcher&& other) noexcept { regex_ = std::move(other.regex_); }
 
   // StringMatcher
   bool match(const absl::string_view value) const { return regex_->match(value); }

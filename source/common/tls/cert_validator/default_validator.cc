@@ -27,6 +27,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/cert_validator/utility.h"
@@ -537,6 +538,7 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
       continue;
     }
+
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError(absl::StrCat(
@@ -560,13 +562,11 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
   // Set the verify_depth
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
-#if BORINGSSL_API_VERSION >= 29
     // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the
     // depth but include the trust anchor. Newer BoringSSLs match OpenSSL 1.1.x
     // and later in excluding both the leaf and trust anchor. `maxVerifyDepth`
     // documents the older behavior, so adjust the value to match.
     max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
-#endif
     SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
   }
   return absl::OkStatus();

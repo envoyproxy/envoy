@@ -197,6 +197,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
+        "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

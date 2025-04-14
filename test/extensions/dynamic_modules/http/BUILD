@@ -22,6 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_body",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_headers",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_trailers",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_stream_complete",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # factory_context_mocks needs this.
@@ -44,6 +45,7 @@ envoy_cc_test(
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",

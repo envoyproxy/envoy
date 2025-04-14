@@ -88,7 +88,7 @@ def envoy_cc_fuzz_test(
         tags = [],
         **kwargs):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
@@ -175,7 +175,7 @@ def envoy_cc_test(
         exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     native.cc_test(
@@ -222,7 +222,7 @@ def envoy_cc_test_library(
         alwayslink = 1,
         **kargs):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     disable_pch = kargs.pop("disable_pch", True)
@@ -292,7 +292,7 @@ def envoy_benchmark_test(
         repository = "",
         **kargs):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     native.sh_test(

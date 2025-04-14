@@ -246,32 +246,7 @@ private:
     }
     // Called after pushHost. Update subset by the hosts that pushed in the pushHost. If no any host
     // is pushed then subset_ will be set to empty.
-    void finalize(uint32_t priority, uint64_t seed) override {
-      while (host_sets_.size() <= priority) {
-        host_sets_.push_back({HostHashSet(), HostHashSet()});
-      }
-      auto& [old_hosts, new_hosts] = host_sets_[priority];
-
-      HostVector added;
-      HostVector removed;
-
-      for (const auto& host : old_hosts) {
-        if (new_hosts.count(host) == 0) {
-          removed.emplace_back(host);
-        }
-      }
-
-      for (const auto& host : new_hosts) {
-        if (old_hosts.count(host) == 0) {
-          added.emplace_back(host);
-        }
-      }
-
-      subset_.update(priority, new_hosts, added, removed, seed);
-
-      old_hosts.swap(new_hosts);
-      new_hosts.clear();
-    }
+    void finalize(uint32_t priority, uint64_t seed) override;
 
     bool active() const override { return !subset_.empty(); }
 

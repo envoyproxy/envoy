@@ -15,11 +15,10 @@
 #include "openssl/x509v3.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
+namespace Ssl {
 
-/** Interface to verify if there is a match in a list of subject alternative
+/**
+ * Interface to verify if there is a match in a list of subject alternative
  * names.
  */
 class SanMatcher {
@@ -29,6 +28,14 @@ public:
 };
 
 using SanMatcherPtr = std::unique_ptr<SanMatcher>;
+} // namespace Ssl
+
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
+using Ssl::SanMatcher;
+using Ssl::SanMatcherPtr;
 
 class StringSanMatcher : public SanMatcher {
 public:

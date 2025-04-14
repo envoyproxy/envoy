@@ -2990,6 +2990,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_platform_quiche_mem_slice",
     ],
 )
 
@@ -3014,6 +3015,7 @@ envoy_cc_library(
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_ip_address",
+        ":quiche_common_socket_address",
         ":quiche_common_wire_serialization",
         ":quiche_web_transport_web_transport_lib",
     ],
@@ -4693,6 +4695,20 @@ envoy_cc_library(
     deps = [":quiche_common_platform_default_quiche_platform_impl_googleurl_impl_lib"],
 )
 
+envoy_cc_library(
+    name = "quiche_common_platform_quiche_mem_slice",
+    srcs = ["quiche/common/platform/api/quiche_mem_slice.cc"],
+    hdrs = ["quiche/common/platform/api/quiche_mem_slice.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_callbacks",
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_platform_default_quiche_platform_impl_googleurl_impl_lib",
     hdrs = [
@@ -4936,7 +4952,6 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_command_line_flags.h",
         "quiche/common/platform/api/quiche_flag_utils.h",
         "quiche/common/platform/api/quiche_flags.h",
-        "quiche/common/platform/api/quiche_mem_slice.h",
         "quiche/common/platform/api/quiche_reference_counted.h",
         "quiche/common/platform/api/quiche_time_utils.h",
     ],
@@ -5038,6 +5053,7 @@ envoy_cc_test(
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_platform",
+        ":quiche_common_platform_quiche_mem_slice",
         ":quiche_common_platform_test",
     ],
 )
@@ -5176,6 +5192,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         "@com_google_absl//absl/algorithm:container",

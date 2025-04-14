@@ -128,9 +128,9 @@ private:
   };
 
   struct DecoderStatus {
-    DecoderStatus(ProtocolState next_state) : next_state_(next_state){};
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state) {};
     DecoderStatus(ProtocolState next_state, FilterStatus filter_status)
-        : next_state_(next_state), filter_status_(filter_status){};
+        : next_state_(next_state), filter_status_(filter_status) {};
 
     ProtocolState next_state_;
     absl::optional<FilterStatus> filter_status_;

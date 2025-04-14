@@ -120,7 +120,8 @@ public:
 
 private:
   // SocketInterfaceImpl
-  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
+                         absl::optional<int> domain,
                          const SocketCreationOptions& options) const override;
 
   const TestIoSocketHandle::ConnectOverrideProc connect_override_proc_;

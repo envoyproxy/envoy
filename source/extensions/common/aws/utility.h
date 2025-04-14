@@ -9,13 +9,16 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
+
+#include "curl/curl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class Utility {
+class Utility : public Logger::Loggable<Logger::Id::aws> {
 public:
   /**
    * Creates a canonicalized header map used in creating a AWS Signature V4 canonical request.

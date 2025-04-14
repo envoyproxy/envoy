@@ -20,6 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // sequences on a socket.
 
 // Event in a socket trace.
+// [#next-free-field: 6]
 message SocketEvent {
   option (udpa.annotations.versioning).previous_message_type = "envoy.data.tap.v2alpha.SocketEvent";
 
@@ -65,6 +66,9 @@ message SocketEvent {
 
     Closed closed = 4;
   }
+
+  // Connection information per event
+  Connection connection = 5;
 }
 
 // Sequence of read/write events that constitute a buffered trace on a socket.

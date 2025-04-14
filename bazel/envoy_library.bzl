@@ -104,7 +104,7 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
 

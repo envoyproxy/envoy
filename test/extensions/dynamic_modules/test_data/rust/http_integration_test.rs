@@ -10,18 +10,18 @@ fn init() -> bool {
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   name: &str,
-  config: &str,
+  config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
-      headers_to_add: config.to_string(),
+      headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
     })),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {
-      immediate_end_of_stream: config == "immediate_end_of_stream",
+      immediate_end_of_stream: config == b"immediate_end_of_stream",
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig {
-      on_request_headers: config == "on_request_headers",
+      on_request_headers: config == b"on_request_headers",
     })),
     _ => panic!("Unknown filter name: {}", name),
   }

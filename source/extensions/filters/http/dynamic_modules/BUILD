@@ -37,6 +37,7 @@ envoy_cc_library(
         ":abi_impl",
         ":filter_config_lib",
         ":filter_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
@@ -54,6 +55,8 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":filter_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],

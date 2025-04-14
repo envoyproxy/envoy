@@ -11,9 +11,8 @@
 #include "source/common/grpc/google_grpc_creds_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {

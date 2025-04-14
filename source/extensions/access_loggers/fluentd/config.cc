@@ -31,10 +31,10 @@ getAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& conte
       /* pin = */ true);
 }
 
-AccessLog::InstanceSharedPtr
-FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                                 AccessLog::FilterPtr&& filter,
-                                                 Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::FactoryContext& context,
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig&>(
       config, context.messageValidationVisitor());
@@ -60,9 +60,10 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
   // payload.
   // TODO(ohadvano): Improve the formatting operation by creating a dedicated formatter that
   //                 will directly serialize the record to msgpack payload.
-  auto commands = THROW_OR_RETURN_VALUE(
-      Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context),
-      std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>);
+  auto commands =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                proto_config.formatters(), context, std::move(command_parsers)),
+                            std::vector<Formatter::CommandParserPtr>);
 
   Formatter::FormatterPtr json_formatter =
       Formatter::SubstitutionFormatStringUtils::createJsonFormatter(proto_config.record(), true,

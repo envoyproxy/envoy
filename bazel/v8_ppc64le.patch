@@ -1,0 +1,13 @@
+diff --git a/bazel/config/BUILD.bazel b/bazel/config/BUILD.bazel
+index 448260d..fe50366 100644
+--- a/bazel/config/BUILD.bazel
++++ b/bazel/config/BUILD.bazel
+@@ -61,7 +61,7 @@ config_setting(
+ 
+ config_setting(
+     name = "platform_cpu_ppc64le",
+-    constraint_values = ["@platforms//cpu:ppc"],
++    constraint_values = ["@platforms//cpu:ppc64le"],
+ )
+ 
+ v8_target_cpu(

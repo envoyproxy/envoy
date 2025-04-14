@@ -19,3 +19,4 @@ Services
   ../config/tap/v3/*
   tap/v3/*
   redis_auth/v3/*
+  network_ext_proc/v3/*

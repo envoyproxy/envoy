@@ -30,4 +30,14 @@ message Tap {
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+
+  // Additional configurations for the transport socket tap
+  SocketTapConfig socket_tap_config = 3;
+}
+
+// Additional configurations for the transport socket tap
+message SocketTapConfig {
+  // Indicates to whether output the connection information per event
+  // This is only applicable if the streamed trace is enabled
+  bool set_connection_per_event = 1;
 }

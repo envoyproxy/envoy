@@ -18,6 +18,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:connection_interface",
         "//source/extensions/common/tap:tap_interface",
+        "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],
 )
 

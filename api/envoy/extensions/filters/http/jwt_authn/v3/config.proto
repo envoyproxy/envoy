@@ -380,6 +380,11 @@ message JwtProvider {
 message JwtCacheConfig {
   // The unit is number of JWTs, default to 100.
   uint32 jwt_cache_size = 1;
+
+  // The maximum size of a single cached token in bytes.
+  // If this field is not set or is set to 0, then the default value 4096 bytes is used.
+  // The maximum value for a token is inclusive.
+  uint32 jwt_max_token_size = 2;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
@@ -684,8 +689,7 @@ message FilterStateRule {
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the ``name`` field above.
-  map<string, JwtRequirement>
-  requires = 3;
+  map<string, JwtRequirement> requires = 3;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
@@ -730,7 +734,7 @@ message FilterStateRule {
 //              - provider_name: provider1
 //              - provider_name: provider2
 //
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message JwtAuthentication {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtAuthentication";
@@ -808,6 +812,9 @@ message JwtAuthentication {
   // in the body along with WWWAuthenticate header value set with "invalid token". If this value is set to true,
   // the response details will be stripped and only a 401 response code will be returned. Default value is false
   bool strip_failure_response = 6;
+
+  // Optional additional prefix to use when emitting statistics.
+  string stat_prefix = 7;
 }
 
 // Specify per-route config.

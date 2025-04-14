@@ -96,7 +96,9 @@ enum class HttpTcpBridgeStatus {
   HttpTcpBridgeEndStream,
 };
 
-class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
+class ProcessorState : public processState,
+                       public Logger::Loggable<Logger::Id::golang>,
+                       NonCopyable {
 public:
   explicit ProcessorState(httpRequest* r) {
     req = r;

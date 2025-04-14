@@ -106,7 +106,7 @@ public:
 struct TestCase {};
 
 OpenTelemetryTraceExporterIntegrationTest::OpenTelemetryTraceExporterIntegrationTest()
-    : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4){};
+    : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {};
 
 INSTANTIATE_TEST_SUITE_P(All, OpenTelemetryTraceExporterIntegrationTest,
                          // values are (min_flush_spans, num_requests)

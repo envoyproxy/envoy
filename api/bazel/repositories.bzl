@@ -27,14 +27,15 @@ def api_dependencies():
     external_http_archive(
         name = "com_google_googleapis",
     )
-
     external_http_archive(
         name = "com_github_cncf_xds",
     )
-
     external_http_archive(
         name = "prometheus_metrics_model",
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "rules_buf",
     )
     external_http_archive(
         name = "rules_proto",
@@ -48,13 +49,8 @@ def api_dependencies():
         build_file_content = OPENTELEMETRY_BUILD_CONTENT,
     )
     external_http_archive(
-        name = "com_github_bufbuild_buf",
-        build_file_content = BUF_BUILD_CONTENT,
-    )
-    external_http_archive(
         name = "dev_cel",
     )
-
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
@@ -385,19 +381,5 @@ go_grpc_library(
     embed = [
         ":trace_proto_go",
     ],
-)
-"""
-
-BUF_BUILD_CONTENT = """
-package(
-    default_visibility = ["//visibility:public"],
-)
-
-filegroup(
-    name = "buf",
-    srcs = [
-        "@com_github_bufbuild_buf//:bin/buf",
-    ],
-    tags = ["manual"], # buf is downloaded as a linux binary; tagged manual to prevent build for non-linux users
 )
 """

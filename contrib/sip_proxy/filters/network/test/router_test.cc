@@ -40,7 +40,7 @@ class SipRouterTest : public testing::Test {
 public:
   SipRouterTest()
       : router_filter_config_(std::make_shared<NiceMock<MockRouterFilterConfig>>()),
-        router_stats_(RouterFilterConfigImpl::generateStats("test", *store_.rootScope())){};
+        router_stats_(RouterFilterConfigImpl::generateStats("test", *store_.rootScope())) {};
   ~SipRouterTest() override { delete (filter_); }
 
   void initializeTrans(const std::string& sip_protocol_options_yaml = "",
