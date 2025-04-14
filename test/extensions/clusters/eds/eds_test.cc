@@ -469,7 +469,7 @@ TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
   }
 }
 
-// Verify that failured to initialize the base class results in an error not a crash.
+// Verify that failure to initialize the base class results in an error not a crash.
 // Note that this test is depending on the current implementation of how EDS inherits from
 // `BaseDynamicClusterImpl` and how `BaseDynamicClusterImpl` does error handling to have a
 // failure occur in the base class constructor.
