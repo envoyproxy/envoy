@@ -7,9 +7,13 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: release
   change: |
     Container (Ubuntu) updates to resolve glibc vulnerabilities.
+- area: eds
+  change: |
+    Fixed crash when creating an EDS cluster with invalid configuration.
 
 - area: http3
   change: |
