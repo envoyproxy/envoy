@@ -145,16 +145,14 @@ TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
   EXPECT_NE(id.value_or(0), 0);
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, MoveSocket) {
-  EXPECT_DEATH(impl_.moveSocket(), "not implemented");
-}
+TEST_F(QuicFilterManagerConnectionImplTest, MoveSocket) { EXPECT_EQ(impl_.moveSocket(), nullptr); }
 
 TEST_F(QuicFilterManagerConnectionImplTest, SetConnectionReused) {
-  EXPECT_DEATH(impl_.setConnectionReused(true), "not implemented");
+  impl_.setConnectionReused(true);
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, IsConnectionReused) {
-  EXPECT_DEATH(impl_.isConnectionReused(), "not implemented");
+  EXPECT_EQ(impl_.isConnectionReused(), false);
 }
 
 } // namespace Quic
