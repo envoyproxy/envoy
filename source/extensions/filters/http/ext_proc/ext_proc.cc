@@ -1540,7 +1540,7 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
     if (response.has_headers()) {
       const absl::Status mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, config().mutationChecker(),
-          stats_.rejected_header_mutations_);
+          stats_.rejected_header_mutations_, stats_.invalid_header_append_encoding_);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());

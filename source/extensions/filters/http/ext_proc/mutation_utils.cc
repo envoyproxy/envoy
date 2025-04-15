@@ -106,10 +106,34 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
   return absl::OkStatus();
 }
 
+bool MutationUtils::getAppendFromHeaderMutation(const envoy::config::core::v3::HeaderValueOption& set_header,
+                                                Stats::Counter& invalid_append_encoding) {
+  bool append;
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_proc_modified_append_default_value")) {
+    // This is legacy case. i.e, only "append" is supported, and default "append"" is false.
+    append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_header, append, false);
+
+    // As "append" is WKT, it needs to be explicitly encoded based on the
+    // API guide. Log an error and increment the counter in case it is not set.
+    if (!set_header.has_append()) {
+      ENVOY_LOG_EVERY_POW_2(error,
+                            "set_headers append value is not explicitly set, this is wrong");
+      invalid_append_encoding.inc();
+    }
+  } else {
+    // This is new behavior with default append as true. And "append_action" support
+    // can be added in this case.
+    append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_header, append, true);
+  }
+  return append;
+}
+
 absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
                                                  Http::HeaderMap& headers, bool replacing_message,
                                                  const Checker& checker,
                                                  Counter& rejected_mutations,
+                                                 Counter& invalid_append_encoding,
                                                  bool remove_content_length) {
   // Check whether the remove_headers or set_headers size exceed the HTTP connection manager limit.
   // Reject the mutation and return error status if either one does.
@@ -162,10 +186,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       return absl::InvalidArgumentError("Invalid character in set_headers mutation.");
     }
     const LowerCaseString header_name(sh.header().key());
-    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-        sh, append,
-        Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_proc_modified_append_default_value"));
+    const bool append = getAppendFromHeaderMutation(sh, invalid_append_encoding);
     const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
                                                                         : CheckOperation::SET;
     auto check_result = checker.check(check_op, header_name, header_value);

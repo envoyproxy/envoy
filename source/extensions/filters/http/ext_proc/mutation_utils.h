@@ -33,7 +33,8 @@ public:
   applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                        Http::HeaderMap& headers, bool replacing_message,
                        const Filters::Common::MutationRules::Checker& rule_checker,
-                       Stats::Counter& rejected_mutations, bool remove_content_length = false);
+                       Stats::Counter& rejected_mutations, Stats::Counter& invalid_append_encoding,
+                       bool remove_content_length = false);
 
   // Modify a buffer based on a set of mutations from a protobuf
   static void applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
@@ -59,6 +60,8 @@ private:
   // Check whether the header size after mutation is over the HCM size config.
   static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
                                                 Stats::Counter& rejected_mutations);
+  static bool getAppendFromHeaderMutation(const envoy::config::core::v3::HeaderValueOption& set_header,
+                                          Stats::Counter& invalid_append_encoding);
 };
 
 } // namespace ExternalProcessing

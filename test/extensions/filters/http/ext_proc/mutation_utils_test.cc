@@ -88,7 +88,7 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   s = mutation.add_set_headers();
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("418");
-  // Default of "append" is "true" and mutations
+  // Default of "append" is "false" and mutations
   // are applied in order.
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-replace-this");
@@ -107,7 +107,6 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   // Attempts to set method, host, authority, and x-envoy headers
   // should be ignored until we explicitly allow them.
   s = mutation.add_set_headers();
-  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("host");
   s->mutable_header()->set_raw_value("invalid:123");
   s = mutation.add_set_headers();
@@ -129,7 +128,6 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   // Attempts to set the status header out of range should
   // also be ignored.
   s = mutation.add_set_headers();
-  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("This is not even an integer");
   s = mutation.add_set_headers();
@@ -138,11 +136,12 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
 
   // Use the default mutation rules
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
-  Envoy::Stats::MockCounter rejections;
+  Envoy::Stats::MockCounter rejections, invalid_append;
   EXPECT_CALL(rejections, inc()).Times(10);
+  EXPECT_CALL(invalid_append, inc()).Times(10);
   // There were 10 attempts to change un-changeable headers above.
   EXPECT_TRUE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":scheme", "https"},
@@ -156,7 +155,6 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
       {"x-append-this", "2"},
       {"x-append-this", "3"},
       {"x-remove-and-append-this", "4"},
-      {"x-replace-this", "no"},
       {"x-replace-this", "nope"},
       {"x-envoy-strange-thing", "No"},
   };
@@ -188,10 +186,11 @@ TEST_F(MutationUtilsTest, TestNonAppendableHeaders) {
   // Use the default mutation rules
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
   // There were two invalid attempts above.
-  Envoy::Stats::MockCounter rejections;
+  Envoy::Stats::MockCounter rejections, invalid_append;
   EXPECT_CALL(rejections, inc()).Times(2);
+  EXPECT_CALL(invalid_append, inc()).Times(1);
   EXPECT_TRUE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append).ok());
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":path", "/foo"},
@@ -206,7 +205,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
       {"host", "localhost:1000"},
   };
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
-  Envoy::Stats::MockCounter rejections;
+  Envoy::Stats::MockCounter rejections, invalid_append;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   // Test header key contains invalid character.
@@ -214,7 +213,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   s->mutable_header()->set_raw_value("value");
   EXPECT_CALL(rejections, inc());
   EXPECT_FALSE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append).ok());
 
   mutation.Clear();
   s = mutation.add_set_headers();
@@ -223,7 +222,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   s->mutable_header()->set_raw_value("value\r");
   EXPECT_CALL(rejections, inc());
   EXPECT_FALSE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append).ok());
 }
 
 TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
@@ -235,20 +234,21 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
   };
   // Use the default mutation rules
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
-  Envoy::Stats::MockCounter rejections;
+  Envoy::Stats::MockCounter rejections, invalid_append;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   // Test header key contains content_length.
   s->mutable_header()->set_key("content-length");
   s->mutable_header()->set_raw_value("10");
 
-  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append,
                                                   /*remove_content_length=*/true)
                   .ok());
   // When `remove_content_length` is true, content_length headers is not added.
   EXPECT_EQ(headers.ContentLength(), nullptr);
 
-  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+  EXPECT_CALL(invalid_append, inc()).Times(1);
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append,
                                                   /*remove_content_length=*/false)
                   .ok());
   // When `remove_content_length` is false, content_length headers is added.
@@ -263,10 +263,10 @@ TEST_F(MutationUtilsTest, TestRemoveHeaderWithInvalidCharacter) {
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   mutation.add_remove_headers("host\n");
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
-  Envoy::Stats::MockCounter rejections;
+  Envoy::Stats::MockCounter rejections, invalid_append;
   EXPECT_CALL(rejections, inc());
   EXPECT_FALSE(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections, invalid_append).ok());
 }
 
 // Ensure that we actually replace the body
