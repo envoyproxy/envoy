@@ -1485,7 +1485,6 @@ envoy_cc_test(
     shard_count = 2,
     tags = [
         "cpu:3",
-        "nofips",
     ],
     deps = [
         ":http_protocol_integration_lib",
@@ -2556,7 +2555,6 @@ envoy_cc_test(
     shard_count = 16,
     tags = [
         "cpu:4",
-        "nofips",
     ],
     deps = select({
         "//bazel:disable_http3": [],
@@ -2631,7 +2629,6 @@ envoy_cc_test(
         "cpu:3",
         "fails_on_clang_cl",
         "fails_on_windows",
-        "nofips",
     ],
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",

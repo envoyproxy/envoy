@@ -15,7 +15,6 @@ envoy_extension_cc_test(
     name = "quic_stats_test",
     srcs = ["quic_stats_test.cc"],
     extension_names = ["envoy.quic.connection_debug_visitor.quic_stats"],
-    tags = ["nofips"],
     deps = [
         "//source/extensions/quic/connection_debug_visitor/quic_stats:quic_stats_lib",
         "//test/mocks/event:event_mocks",
@@ -28,7 +27,6 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.quic.connection_debug_visitor.quic_stats"],
     rbe_pool = "2core",
-    tags = ["nofips"],
     deps = [
         "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
         "//test/integration:http_integration_lib",
