@@ -124,13 +124,21 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
 
   absl::optional<absl::string_view> original_cluster_name = clusterName();
-  if (!original_cluster_name) {
-    sendNoRouteResponse();
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-  absl::string_view cluster_name = *original_cluster_name;
-  if (!config_->overrideUpstreamCluster().empty()) {
+  absl::string_view cluster_name;
+  if (config_->overrideUpstreamCluster().empty()) {
+    if (!original_cluster_name) {
+      sendNoRouteResponse();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    cluster_name = *original_cluster_name;
+  } else {
     cluster_name = config_->overrideUpstreamCluster();
+    if (!original_cluster_name) {
+      // It's possible the destination cluster will only be determined further upstream in
+      // the cache filter's side-channel, in which case we can't use it in the key;
+      // in this case use "unknown" instead.
+      original_cluster_name = "unknown";
+    }
   }
   OptRef<Http::AsyncClient> async_client = asyncClient(cluster_name);
   if (!async_client) {
