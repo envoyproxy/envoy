@@ -1,7 +1,8 @@
-#include <google/protobuf/extension_set.h>
+#include <fstream>
 
 #include "envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_json_reverse_transcoder/filter.h"
 #include "source/extensions/filters/http/grpc_json_reverse_transcoder/filter_config.h"
 
