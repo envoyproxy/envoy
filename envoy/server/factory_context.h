@@ -108,6 +108,11 @@ public:
   virtual Stats::Scope& serverScope() PURE;
 
   /**
+   * @return Stats::Scope& the stats scope.
+   */
+  virtual Stats::Scope& statsScope() PURE;
+
+  /**
    * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */

@@ -67,16 +67,6 @@ MockGenericFactoryContext::MockGenericFactoryContext() {
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }
 
-MockGenericFactoryContext::MockGenericFactoryContext() {
-  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_context_));
-  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(*store_.rootScope()));
-  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
-  ON_CALL(*this, messageValidationVisitor())
-      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
-}
-
-MockGenericFactoryContext::~MockGenericFactoryContext() = default;
-
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
