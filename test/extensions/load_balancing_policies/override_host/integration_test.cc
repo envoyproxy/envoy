@@ -49,6 +49,11 @@ policies:
     name: envoy.load_balancing_policies.override_host
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
+        primary_host_sources:
+        - metadata:
+            key: "envoy.lb"
+            path:
+            - key: "x-gateway-destination-endpoint"
         fallback_picking_policy:
           policies:
           - typed_extension_config:
@@ -64,7 +69,12 @@ policies:
     name: envoy.load_balancing_policies.override_host
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
-        use_http_headers_for_endpoints: true
+        primary_host_sources:
+        - header: "x-gateway-destination-endpoint"
+          metadata:
+            key: "envoy.lb"
+            path:
+            - key: "x-gateway-destination-endpoint"
         fallback_picking_policy:
           policies:
           - typed_extension_config:
@@ -79,7 +89,12 @@ policies:
     name: envoy.load_balancing_policies.override_host
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
-        use_http_headers_for_endpoints: true
+        primary_host_sources:
+        - header: "x-gateway-destination-endpoint"
+          metadata:
+            key: "envoy.lb"
+            path:
+            - key: "x-gateway-destination-endpoint"
         fallback_picking_policy:
           policies:
           - typed_extension_config:

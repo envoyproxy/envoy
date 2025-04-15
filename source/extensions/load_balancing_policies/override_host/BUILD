@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",

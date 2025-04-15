@@ -69,15 +69,8 @@ absl::StatusOr<std::vector<SelectedHosts::Endpoint>> extractEndpoints(absl::stri
 } // namespace
 
 absl::StatusOr<std::unique_ptr<SelectedHosts>>
-SelectedHosts::make(const Envoy::ProtobufWkt::Struct& selected_endpoints) {
-  if (!selected_endpoints.fields().contains(kPrimaryEndpointHeaderName)) {
-    return absl::InvalidArgumentError("Missing primary endpoint");
-  }
-  if (!selected_endpoints.fields().at(kPrimaryEndpointHeaderName).has_string_value()) {
-    return absl::InvalidArgumentError("Primary endpoint is not a string");
-  }
-  auto primary_endpoint_result =
-      extractEndpoints(selected_endpoints.fields().at(kPrimaryEndpointHeaderName).string_value());
+SelectedHosts::make(absl::string_view selected_endpoints) {
+  auto primary_endpoint_result = extractEndpoints(selected_endpoints);
   if (!primary_endpoint_result.ok()) {
     return primary_endpoint_result.status();
   }

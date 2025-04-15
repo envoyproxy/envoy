@@ -31,8 +31,7 @@ struct SelectedHosts {
   const Endpoint primary;
   const std::vector<Endpoint> failover;
 
-  static absl::StatusOr<std::unique_ptr<SelectedHosts>>
-  make(const Envoy::ProtobufWkt::Struct& selected_endpoints);
+  static absl::StatusOr<std::unique_ptr<SelectedHosts>> make(absl::string_view selected_endpoints);
 };
 
 } // namespace OverrideHost

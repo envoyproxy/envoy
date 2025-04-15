@@ -18,6 +18,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
 #include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
@@ -56,6 +57,12 @@ using ::Envoy::Upstream::TypedLoadBalancerFactory;
 // proto.
 class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
+  struct OverrideSource {
+    static OverrideSource make(const OverrideHost::OverrideHostSource& config);
+    absl::optional<Http::LowerCaseString> header_name;
+    absl::optional<Config::MetadataKey> metadata_key;
+  };
+
   static absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>> make(const OverrideHost& config,
                                                                     ServerFactoryContext& context);
 
@@ -63,14 +70,18 @@ public:
                                     const PrioritySet& priority_set, Loader& runtime,
                                     RandomGenerator& random, TimeSource& time_source) const;
 
-  const absl::optional<Http::LowerCaseString>& primaryEndpointHeaderName() const {
-    return primary_endpoint_header_name_;
+  const std::vector<OverrideSource>& primaryEndpointOverrideSources() const {
+    return primary_endpoint_source_;
   }
 
 private:
-  OverrideHostLbConfig(const OverrideHost& config,
+  OverrideHostLbConfig(std::vector<OverrideSource>&& primary_endpoint_source,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
+
+  static absl::StatusOr<std::vector<OverrideSource>> makeOverrideSources(
+      const Protobuf::RepeatedPtrField<OverrideHost::OverrideHostSource>& override_sources);
+
   // Group the factory and config together to make them const in the
   // configuration object.
   struct FallbackLbConfig {
@@ -78,8 +89,8 @@ private:
     const LoadBalancerConfigPtr load_balancer_config;
   };
   const FallbackLbConfig fallback_picker_lb_config_;
-  const absl::optional<Http::LowerCaseString> primary_endpoint_header_name_;
-  const absl::optional<Http::LowerCaseString> fallback_endpoint_list_header_name_;
+
+  const std::vector<OverrideSource> primary_endpoint_source_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -151,13 +162,15 @@ private:
     // nullptr if the metadata is not present.
     // Error if the metadata is present but cannot be parsed.
     absl::StatusOr<std::unique_ptr<SelectedHosts>>
-    getSelectedHostsFromMetadata(const ::envoy::config::core::v3::Metadata& metadata);
+    getSelectedHostsFromMetadata(const ::envoy::config::core::v3::Metadata& metadata,
+                                 const Config::MetadataKey& metadata_key);
 
     // Return a list of endpoints selected by the LbTrafficExtension, specified.
     // in the header. nullptr if the header is not present.
     // Error if the header is present but cannot be parsed.
     absl::StatusOr<std::unique_ptr<SelectedHosts>>
-    getSelectedHostsFromHeader(const Http::RequestHeaderMap* header_map);
+    getSelectedHostsFromHeader(const Http::RequestHeaderMap* header_map,
+                               const Http::LowerCaseString& header_name);
 
     const OverrideHostLbConfig& config_;
     const LoadBalancerPtr fallback_picker_lb_;

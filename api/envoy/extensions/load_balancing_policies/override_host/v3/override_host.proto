@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.override_host.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -27,12 +28,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // to integrate with this load balancing policy.
 //
 // This policy uses selected endpoints from either request headers or request metadata.
-// Use of request headers must be enabled in the configuration and is disabled by default. If enabled, Envoy
-// uses the ``x-gateway-destination-endpoint`` header for the primary endpoint. The value must contain a single ``IP:port`` token.
-// For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
 //
-// If the header is not present Envoy uses untyped request metadata under the ``envoy.lb`` key. The metadata ``protobuf.Struct``
-// contains a string value under the ``x-gateway-destination-endpoint`` key. The value has the same
+// The endpoint picker protocol for k8s gateway inference extensions uses the
+// ``x-gateway-destination-endpoint`` header for the primary endpoint. The value must contain a single ``IP:port`` token.
+// For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
+// Alternatively untyped request metadata under the ``envoy.lb`` key can be set to a ``protobuf.Struct``
+// containing a string value under the ``x-gateway-destination-endpoint`` key. The value has the same
 // format as the ``x-gateway-destination-endpoint`` header.
 //
 // If neither header nor metadata is present or there were errors parsing header or metadata values the
@@ -42,39 +43,31 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // See the :ref:`load balancing architecture
 // overview<arch_overview_load_balancing_types>` for more information.
 //
-// [#next-free-field: 6]
+// [#next-free-field: 4]
 message OverrideHost {
+
+  message OverrideHostSource {
+    // The header to get the override host addresses. One of the header or metadata field must be set.
+    string header = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // The metadata key to get the override host addresses from the request dynamic metadata. If
+    // set this field then it will take precedence over the header field.
+    // One of the header or metadata field must be set.
+    type.metadata.v3.MetadataKey metadata = 2;
+  }
+
+  // A list of host sources to get the override host addresses from. The first one who provides
+  // the addresses will be used, no matter if the addresses are valid or not. This ensure the first exist
+  // addresses source will be used.
+  repeated OverrideHostSource primary_host_sources = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // A list of host sources to get the fallback host addresses from. The first one who provides
+  // the addresses will be used, no matter if the addresses are valid or not.
+  // [#not-implemented-hide:]
+  repeated OverrideHostSource fallback_host_sources = 2;
+
   // The child LB policy to use in case neither header nor metadata with selected
   // hosts is present.
-  config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 1
+  config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 3
       [(validate.rules).message = {required: true}];
-
-  // When true primary endpoint is provided in the HTTP header.
-  // If header is present, the values in the request metadata are ignored.
-  // If header is not present, the values in the request metadata are used.
-  bool use_http_headers_for_endpoints = 2;
-
-  // The header name to use for the primary endpoint.
-  // Defaults to "x-gateway-destination-endpoint".
-  // The header value contains a single IP:port value. The IPv6 address must
-  // be enclosed in square brackets.
-  // Endpoint provided in this header takes precedence over value in the request
-  // metadata.
-  string primary_endpoint_http_header_name = 3;
-
-  // [#not-implemented-hide:]
-  // The header name to use for specifing multiple fallback endpoints.
-  // Defaults to "x-gateway-destination-endpoint-fallbacks".
-  // Header value is a comma separated list of IP:port tokens.
-  // Endpoints provided in this header take precedence over values in the
-  // request metadata.
-  string fallback_endpoint_list_http_header_name = 4;
-
-  // [#not-implemented-hide:]
-  // The header name to use for specifing single fallback endpoint.
-  // Defaults to "x-gateway-destination-endpoint-fallback".
-  // Value format is the same as the primary endpoint header.
-  // Endpoint provided in this header take precedence over values in the
-  // request metadata.
-  string fallback_endpoint_http_header_name = 5;
 }
