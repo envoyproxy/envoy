@@ -12,12 +12,12 @@ minor_behavior_changes:
     The field ``isp_db_path`` has been added to the ``MaxMindConfig`` to allow specifying the path to the ISP database.
 - area: http2
   change: |
-    Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
+    Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to ``true`` by default.
 - area: dfp
   change: |
     Setting :ref:`dns_query_timeout
     <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
-    to 0 will disable the the Envoy DNS query timeout and use the underlying DNS implementation timeout.
+    to 0 will disable the Envoy DNS query timeout and use the underlying DNS implementation timeout.
 - area: ext_proc
   change: |
     When :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
@@ -57,7 +57,7 @@ minor_behavior_changes:
     Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 - area: golang
   change: |
-    Align all loggers to use golang component Id. Improve sendLocalReply by using go memory pinning instead of string copy.
+    Align all loggers to use golang component Id. Improve ``sendLocalReply`` by using go memory pinning instead of string copy.
 - area: tls
   change: |
     FIPS build is updated to use the same version of boringssl as the regular build, per the revised FedRAMP policy.
@@ -78,7 +78,7 @@ bug_fixes:
     Fixed crash when creating an EDS cluster with invalid configuration.
 - area: http
   change: |
-    Fixed http parser responding to newlines between requests with 400 Bad Request; per
+    Fixed http parser responding to newlines between requests with ``400 Bad Request``; per
     RFC 9112: a server that is expecting to receive and parse a request-line SHOULD ignore
     at least one empty line (CRLF) received prior to the request-line.
     This fix can be reverted by setting runtime guard
@@ -129,16 +129,16 @@ bug_fixes:
     Fixed wrong metric calculation of ``downstream_rx_datagram_dropped``.
 - area: http
   change: |
-    Fixed the jwks fetcher to set the :scheme pseudo header according to the uri ('http' or 'https').
-    Before the :scheme header was always 'http'.
+    Fixed the JWKs fetcher to set the ``:scheme`` pseudo header according to the uri (``http`` or ``https``).
+    Before the ``:scheme`` header was always ``http``.
     This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
+    ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to ``false``.
 - area: ext_proc
   change: |
     Implemented graceful close of gRPC side streams, where the client half-closes its stream and waits
     (with timeout) for the server to half-close its stream.
     This behavioral change is disabled by default and can be enabled by setting runtime guard
-    ``envoy.reloadable_features.ext_proc_graceful_grpc_close`` to true.
+    ``envoy.reloadable_features.ext_proc_graceful_grpc_close`` to ``true``.
     The remote close timeout is 1 second by default and can be changed by setting the
     ``envoy.filters.http.ext_proc.remote_close_timeout_milliseconds`` runtime value.
 - area: listener
@@ -166,7 +166,7 @@ bug_fixes:
     ``envoy.reloadable_features.http3_remove_empty_cookie`` to ``false``.
 - area: wasm
   change: |
-    Fixed a bug where the wasm context deletion may result in a crash when the VM is paniced.
+    Fixed a bug where the WASM context deletion may result in a crash when the VM is panicked.
 - area: sds
   change: |
     Fixed a bug where a :ref:`GenericSecret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`
@@ -226,7 +226,7 @@ new_features:
   change: |
     The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
     can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.dfp_cluster_resolves_hosts``
-    to false.
+    to ``false``.
 - area: oauth2
   change: |
     Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.
@@ -259,8 +259,8 @@ new_features:
     Added an UDP extension for tap custom sink.
 - area: tansport tap
   change: |
-    Added support to control outputing the connection information per event and refer to set_connection_per_event in
-    the message SocketTapConfig of transport socket tap.
+    Added support to control outputing the connection information per event and refer to ``set_connection_per_event`` in
+    the message ``SocketTapConfig`` of transport socket tap.
 - area: udp_proxy
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
@@ -268,7 +268,7 @@ new_features:
 - area: admin
   change: |
     Add support for the ``inbound_only`` and graceful query params of ``/drain_listeners`` to be used together by
-    implementing directional draining in DrainManager.
+    implementing directional draining in ``DrainManager``.
 - area: http
   change: |
     Added alpha support for asynchronous load balancing. See
@@ -316,7 +316,7 @@ new_features:
 - area: redis_proxy
   change: |
     Added :ref:`custom_commands <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
-    configuring custom commands for redis proxy.
+    configuring custom commands for Redis proxy.
 - area: dfp
   change: |
     Added a feature to disable DNS refresh on failure by setting :ref:`disable_dns_refresh_on_failure
@@ -337,7 +337,7 @@ new_features:
     <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: local_rate_limit
   change: |
-    Added support for dynamic token buckets in local rate limit filter for http requests.
+    Added support for dynamic token buckets in local rate limit filter for HTTP requests.
 - area: attributes
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.locality`` to obtain upstream locality information.
@@ -397,13 +397,13 @@ new_features:
     Add SecretManager interface in the go envoy sdk.
 - area: dns
   change: |
-    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
+    Update C-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of C-ares channels,
     among several other new features, bug-fixes, etc.
 - area: golang
   change: |
     added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the
     Destroy function on the config instance. config should implement the new
-    github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config interface, implementing the Destroy function.
+    ``github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config`` interface, implementing the Destroy function.
 - area: http3
   change: |
     Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_qpack, an experimental support for
@@ -419,7 +419,7 @@ new_features:
 - area: matcher
   change: |
     Added the integration between :ref:`ExtensionWithMatcher
-    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` and network filters, and only SkipFilter is supported.
+    <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>` and network filters, and only ``SkipFilter`` is supported.
 - area: oauth2
   change: |
     Added field :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.stat_prefix>` to allow
@@ -431,9 +431,9 @@ new_features:
 - area: connection
   change: |
     Added the close through the network filter manager support that allows a network filter to disable the close of connection. This
-    behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is false.
+    behavior is controlled by runtime guard ``envoy.reloadable_features.connection_close_through_filter_manager``, and default is ``false``.
 - area: dns
   change: |
-    Update c-ares to version 1.34.5 to address **CVE-2025-31498**.
+    Update C-ares to version 1.34.5 to address **CVE-2025-31498**.
 
 deprecated:
