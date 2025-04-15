@@ -1,0 +1,39 @@
+name: Build and Publish
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  verify_input:
+    runs-on: self-hosted
+    steps:
+      - name: Setup jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: "https://artifactory.dev.redislabs.com:443"
+          JF_USER: ${{ vars.ARTIFACTORY_PUSH_USERNAME }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PUSH_TOKEN }}
+      #- name: Validate that the version does not already exist
+      #  if: ${{ inputs.publish == true }}
+      #  run: |
+      #    jf rt search core-generic-dev/redislabs-dev-private-deps/entraid-auth-${{ github.event.inputs.version }}.tar.gz | \
+      #    jq -e -r 'length == 0'
+
+  build:
+    needs: [verify_input]
+    runs-on: [self-hosted, ubuntu-2204-x64]
+    container:
+      image: redislabs/rs-builder:rhel8_v.0.0.18
+      credentials:
+        username: ${{ vars.DOCKERHUB_READ_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_READ_TOKEN }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Git Status
+      run: |
+        ls -la
+        git status
