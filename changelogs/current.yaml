@@ -1,10 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+date: April 15, 2025
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: geoip
   change: |
     The ``isp_db_path`` has been renamed to ``asn_db_path`` to keep the name consistent with the code behavior.
@@ -68,7 +64,6 @@ minor_behavior_changes:
     TLS parameter to enforce restrictions based on a given policy (e.g. FIPS).
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: dfp
   change: |
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
@@ -173,7 +168,6 @@ bug_fixes:
     stored in a file was not watched by SDS API.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.consistent_header_validation`` and legacy code paths.
@@ -435,5 +429,3 @@ new_features:
 - area: dns
   change: |
     Update C-ares to version 1.34.5 to address **CVE-2025-31498**.
-
-deprecated:
