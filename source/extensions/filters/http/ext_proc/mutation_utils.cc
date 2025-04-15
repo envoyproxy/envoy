@@ -106,8 +106,9 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
   return absl::OkStatus();
 }
 
-bool MutationUtils::getAppendFromHeaderMutation(const envoy::config::core::v3::HeaderValueOption& set_header,
-                                                Stats::Counter& invalid_append_encoding) {
+bool MutationUtils::getAppendFromHeaderMutation(
+    const envoy::config::core::v3::HeaderValueOption& set_header,
+    Stats::Counter& invalid_append_encoding) {
   bool append;
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_modified_append_default_value")) {
@@ -117,8 +118,7 @@ bool MutationUtils::getAppendFromHeaderMutation(const envoy::config::core::v3::H
     // As "append" is WKT, it needs to be explicitly encoded based on the
     // API guide. Log an error and increment the counter in case it is not set.
     if (!set_header.has_append()) {
-      ENVOY_LOG_EVERY_POW_2(error,
-                            "set_headers append value is not explicitly set, this is wrong");
+      ENVOY_LOG_EVERY_POW_2(error, "set_headers append value is not explicitly set, this is wrong");
       invalid_append_encoding.inc();
     }
   } else {

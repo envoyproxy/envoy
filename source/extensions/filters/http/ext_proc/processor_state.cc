@@ -511,7 +511,8 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     if (response.has_header_mutation() && trailers_ != nullptr) {
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
-          filter_.stats().rejected_header_mutations_, filter_.stats().invalid_header_append_encoding_);
+          filter_.stats().rejected_header_mutations_,
+          filter_.stats().invalid_header_append_encoding_);
       if (!mut_status.ok()) {
         filter_.onProcessTrailersResponse(response, mut_status, trafficDirection());
         return mut_status;

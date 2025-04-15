@@ -60,8 +60,9 @@ private:
   // Check whether the header size after mutation is over the HCM size config.
   static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
                                                 Stats::Counter& rejected_mutations);
-  static bool getAppendFromHeaderMutation(const envoy::config::core::v3::HeaderValueOption& set_header,
-                                          Stats::Counter& invalid_append_encoding);
+  static bool
+  getAppendFromHeaderMutation(const envoy::config::core::v3::HeaderValueOption& set_header,
+                              Stats::Counter& invalid_append_encoding);
 };
 
 } // namespace ExternalProcessing
