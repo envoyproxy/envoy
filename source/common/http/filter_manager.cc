@@ -243,7 +243,7 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
   return parent_.filter_manager_callbacks_.activeSpan();
 }
 
-const ScopeTrackedObject& ActiveStreamFilterBase::statsScope() {
+const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
 }
 
