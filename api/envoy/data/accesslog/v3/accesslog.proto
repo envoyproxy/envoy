@@ -109,14 +109,16 @@ message AccessLogCommon {
   double sample_rate = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
 
   // This field is the remote/origin address on which the request from the user was received.
-  // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
-  // example the x-forwarder-for header, proxy protocol, etc.
+  //
+  // .. note::
+  //   This may not be the actual peer address. For example, it might be derived from headers like ``x-forwarded-for``,
+  //   the proxy protocol, or similar sources.
   config.core.v3.Address downstream_remote_address = 2;
 
   // This field is the local/destination address on which the request from the user was received.
   config.core.v3.Address downstream_local_address = 3;
 
-  // If the connection is secure,S this field will contain TLS properties.
+  // If the connection is secure, this field will contain TLS properties.
   TLSProperties tls_properties = 4;
 
   // The time that Envoy started servicing this request. This is effectively the time that the first
@@ -128,7 +130,7 @@ message AccessLogCommon {
   google.protobuf.Duration time_to_last_rx_byte = 6;
 
   // Interval between the first downstream byte received and the first upstream byte sent. There may
-  // by considerable delta between ``time_to_last_rx_byte`` and this value due to filters.
+  // be considerable delta between ``time_to_last_rx_byte`` and this value due to filters.
   // Additionally, the same caveats apply as documented in ``time_to_last_downstream_tx_byte`` about
   // not accounting for kernel socket buffer time, etc.
   google.protobuf.Duration time_to_first_upstream_tx_byte = 7;
@@ -187,7 +189,7 @@ message AccessLogCommon {
   // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured
   // upstream transport socket. Common TLS failures are in
-  // :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  // :ref:`TLS troubleshooting <arch_overview_ssl_trouble_shooting>`.
   string upstream_transport_failure_reason = 18;
 
   // The name of the route
@@ -204,7 +206,7 @@ message AccessLogCommon {
   map<string, google.protobuf.Any> filter_state_objects = 21;
 
   // A list of custom tags, which annotate logs with additional information.
-  // To configure this value, users should configure
+  // To configure this value, see the documentation for
   // :ref:`custom_tags <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.custom_tags>`.
   map<string, string> custom_tags = 22;
 
@@ -225,40 +227,41 @@ message AccessLogCommon {
   // This could be any format string that could be used to identify one stream.
   string stream_id = 26;
 
-  // If this log entry is final log entry that flushed after the stream completed or
-  // intermediate log entry that flushed periodically during the stream.
-  // There may be multiple intermediate log entries and only one final log entry for each
-  // long-live stream (TCP connection, long-live HTTP2 stream).
-  // And if it is necessary, unique ID or identifier can be added to the log entry
-  // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
-  // correlate all these intermediate log entries and final log entry.
+  // Indicates whether this log entry is the final entry (flushed after the stream completed) or an intermediate entry
+  // (flushed periodically during the stream).
+  //
+  // For long-lived streams (e.g., TCP connections or long-lived HTTP/2 streams), there may be multiple intermediate
+  // entries and only one final entry.
+  //
+  // If needed, a unique identifier (see :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>`)
+  // can be used to correlate all intermediate and final log entries for the same stream.
   //
   // .. attention::
   //
-  //   This field is deprecated in favor of ``access_log_type`` for better indication of the
-  //   type of the access log record.
+  //   This field is deprecated in favor of ``access_log_type``, which provides a clearer indication of the log entry
+  //   type.
   bool intermediate_log_entry = 27
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured downstream
-  // transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  // transport socket. Common TLS failures are in :ref:`TLS troubleshooting <arch_overview_ssl_trouble_shooting>`.
   string downstream_transport_failure_reason = 28;
 
   // For HTTP: Total number of bytes sent to the downstream by the http stream.
-  // For TCP: Total number of bytes sent to the downstream by the tcp proxy.
+  // For TCP: Total number of bytes sent to the downstream by the :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
   uint64 downstream_wire_bytes_sent = 29;
 
   // For HTTP: Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
-  // For TCP: Total number of bytes received from the downstream by the tcp proxy.
+  // For TCP: Total number of bytes received from the downstream by the :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
   uint64 downstream_wire_bytes_received = 30;
 
   // For HTTP: Total number of bytes sent to the upstream by the http stream. This value accumulates during upstream retries.
-  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  // For TCP: Total number of bytes sent to the upstream by the :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
   uint64 upstream_wire_bytes_sent = 31;
 
   // For HTTP: Total number of bytes received from the upstream by the http stream.
-  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  // For TCP: Total number of bytes sent to the upstream by the :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
   uint64 upstream_wire_bytes_received = 32;
 
   // The type of the access log, which indicates when the log was recorded.
@@ -297,7 +300,7 @@ message ResponseFlags {
   // Indicates there was no healthy upstream.
   bool no_healthy_upstream = 2;
 
-  // Indicates an there was an upstream request timeout.
+  // Indicates there was an upstream request timeout.
   bool upstream_request_timeout = 3;
 
   // Indicates local codec level reset was sent on the stream.
@@ -358,7 +361,7 @@ message ResponseFlags {
   // Indicates that a filter configuration is not available.
   bool no_filter_config_found = 22;
 
-  // Indicates that request or connection exceeded the downstream connection duration.
+  // Indicates that the request or connection exceeded the downstream connection duration.
   bool duration_timeout = 23;
 
   // Indicates there was an HTTP protocol error in the upstream response.
@@ -480,7 +483,7 @@ message HTTPRequestProperties {
   // do not already have a request ID.
   string request_id = 9;
 
-  // Value of the ``X-Envoy-Original-Path`` request header.
+  // Value of the ``x-envoy-original-path`` request header.
   string original_path = 10;
 
   // Size of the HTTP request headers in bytes.
