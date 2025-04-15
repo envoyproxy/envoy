@@ -5571,8 +5571,11 @@ envoy_cc_test(
 
 envoy_cc_library(
     name = "quiche_web_transport_web_transport_lib",
-    srcs = [ "quiche/web_transport/web_transport_headers.cc"],
-    hdrs = ["quiche/web_transport/web_transport.h", "quiche/web_transport/web_transport_headers.h"],
+    srcs = ["quiche/web_transport/web_transport_headers.cc"],
+    hdrs = [
+        "quiche/web_transport/web_transport.h",
+        "quiche/web_transport/web_transport_headers.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
