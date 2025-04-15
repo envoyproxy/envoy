@@ -18,7 +18,7 @@
 
 * Reliability:
   - Fixed a bug in preconnecting logic that could lead to excessive connection establishment.
-  - Fixed port exhaustion issues in the original_src filter by setting the IP_BIND_ADDRESS_NO_PORT socket option.
+  - Fixed port exhaustion issues in the original_src filter by setting the `IP_BIND_ADDRESS_NO_PORT` socket option.
   - Fixed socket option application for additional listener addresses.
 
 * Features:
@@ -26,7 +26,11 @@
   - Added support for io_uring in the default socket interface.
   - Extended the compression filter with the ability to skip compression for specific response codes.
   - Added support for QUIC-LB draft standard for connection ID generation.
-  - Enhanced ext_proc with graceful gRPC side stream closing and added a new FULL_DUPLEX_STREAMED body mode.
+  - Enhanced ext_proc with graceful gRPC side stream closing and added a new `FULL_DUPLEX_STREAMED body mode.
+  - Introduced PKCE support for OAuth2 authorization code flow and SameSite cookie attribute configuration.
+  - Added support for monitoring container CPU utilization in Linux Kubernetes environments.
+  - Enhanced proxy protocol TLV support to enable more flexible and customizable usage between downstream and upstream connections.
+  - Added multiple formatter attributes improvements, e.g., `QUERY_PARAM`, `CUSTOM_FLAGS`, and `PATH`
 
 * Observability:
   - Enhanced Transport Tap with connection information output per event.
