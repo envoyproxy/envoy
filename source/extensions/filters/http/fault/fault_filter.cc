@@ -169,7 +169,7 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
         [this, &request_headers]() -> void { postDelayInjection(request_headers); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
-    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->statsScope());
+    delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected);
     auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
@@ -221,7 +221,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
       [](uint64_t, bool, std::chrono::milliseconds) {
         // write stats callback.
       },
-      config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->statsScope());
+      config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
 }
 
 bool FaultFilter::faultOverflow() {

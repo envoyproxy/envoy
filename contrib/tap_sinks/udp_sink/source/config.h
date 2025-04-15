@@ -18,12 +18,10 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink>();
   }
-  TapCommon::SinkPtr
-  createHttpSinkPtr(const Protobuf::Message& config,
-                    Server::Configuration::FactoryContext& http_context) override;
+
   TapCommon::SinkPtr
   createTransportSinkPtr(const Protobuf::Message& config,
-                         Server::Configuration::GenericFactoryContext& tsf_context) override;
+                         Server::Configuration::GenericFactoryContext& context) override;
 };
 
 } // namespace UDP

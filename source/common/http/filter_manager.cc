@@ -244,7 +244,7 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
 }
 
 const ScopeTrackedObject& ActiveStreamFilterBase::statsScope() {
-  return parent_.filter_manager_callbacks_.statsScope();
+  return parent_.filter_manager_callbacks_.scope();
 }
 
 void ActiveStreamFilterBase::restoreContextOnContinue(
@@ -1629,7 +1629,7 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
   if (connection_.has_value()) {
     tracked_object_stack.add(*connection_);
   }
-  tracked_object_stack.add(filter_manager_callbacks_.statsScope());
+  tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
 FilterManager::UpgradeResult

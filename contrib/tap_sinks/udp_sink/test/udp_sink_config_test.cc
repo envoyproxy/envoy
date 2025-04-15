@@ -30,14 +30,15 @@ namespace TapCommon = Extensions::Common::Tap;
 class TestConfigImpl : public TapCommon::TapConfigBaseImpl {
 public:
   TestConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                 Extensions::Common::Tap::Sink* admin_streamer, TapCommon::SinkContext context)
+                 Extensions::Common::Tap::Sink* admin_streamer,
+                 Server::Configuration::GenericFactoryContext& context)
       : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
 };
 
 class UdpTapSinkConfigTest : public testing::Test {
 protected:
-  UdpTapSinkConfigTest() {}
-  ~UdpTapSinkConfigTest() {}
+  UdpTapSinkConfigTest() = default;
+  ~UdpTapSinkConfigTest() override = default;
 };
 
 TEST_F(UdpTapSinkConfigTest, AddTestConfigHttpContextForUdpSink) {

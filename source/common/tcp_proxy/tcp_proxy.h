@@ -501,7 +501,7 @@ public:
       return parent_->read_callbacks_->connection();
     }
     StreamInfo::StreamInfo& streamInfo() override { return parent_->getStreamInfo(); }
-    const ScopeTrackedObject& statsScope() override { return *this; }
+    const ScopeTrackedObject& scope() override { return *this; }
     Event::Dispatcher& dispatcher() override {
       return parent_->read_callbacks_->connection().dispatcher();
     }
