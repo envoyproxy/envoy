@@ -11,9 +11,9 @@ namespace TapSinks {
 namespace UDP {
 
 TapCommon::SinkPtr
-UdpTapSinkFactory::createTransportSinkPtr(const Protobuf::Message& config,
-                                          Server::Configuration::GenericFactoryContext& context) {
-  ENVOY_LOG_MISC(trace, "{}: Create UDP sink in context", __func__);
+UdpTapSinkFactory::createSinkPtr(const Protobuf::Message& config,
+                                 Server::Configuration::GenericFactoryContext& context) {
+  ENVOY_LOG_MISC(trace, "{}: Create UDP sink", __func__);
   return std::make_unique<UdpTapSink>(
       MessageUtil::downcastAndValidate<
           const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink&>(
