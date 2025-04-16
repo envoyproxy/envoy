@@ -125,11 +125,11 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
       {{"authorized-by", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
-  auto check_response =
-      TestCommon::makeCheckResponse(grpc_status, envoy::type::v3::OK,
-                                    empty_body, expected_headers, expected_downstream_headers);
-  auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers, grpc_status);
+  auto check_response = TestCommon::makeCheckResponse(
+      grpc_status, envoy::type::v3::OK, empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers,
+                                    expected_downstream_headers, grpc_status);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -154,11 +154,11 @@ TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
       {{"invalid-key\n\n\n\n\n", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
-  auto check_response =
-      TestCommon::makeCheckResponse(grpc_status, envoy::type::v3::OK,
-                                    empty_body, expected_headers, expected_downstream_headers);
-  auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers, grpc_status);
+  auto check_response = TestCommon::makeCheckResponse(
+      grpc_status, envoy::type::v3::OK, empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers,
+                                    expected_downstream_headers, grpc_status);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -234,9 +234,9 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
-  auto check_response = TestCommon::makeCheckResponse(
-      grpc_status, envoy::type::v3::Unauthorized,
-      expected_body, expected_headers, expected_downstream_headers);
+  auto check_response =
+      TestCommon::makeCheckResponse(grpc_status, envoy::type::v3::Unauthorized, expected_body,
+                                    expected_headers, expected_downstream_headers);
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
                                     expected_headers, expected_downstream_headers, grpc_status);
@@ -266,9 +266,9 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus)
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
   const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
-  auto check_response = TestCommon::makeCheckResponse(
-      grpc_status, envoy::type::v3::Empty, expected_body,
-      expected_headers, expected_downstream_headers);
+  auto check_response =
+      TestCommon::makeCheckResponse(grpc_status, envoy::type::v3::Empty, expected_body,
+                                    expected_headers, expected_downstream_headers);
   // When the check response gives unknown denied response HTTP status code, the filter sets the
   // response HTTP status code with 403 Forbidden (default).
   auto authz_response =

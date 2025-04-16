@@ -76,9 +76,7 @@ public:
     upstream_host_ = std::move(upstream_host);
   }
   // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
-  void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) {
-    grpc_status_ = grpc_status;
-  }
+  void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
 
   bool hasFieldSupport() const override { return true; }
   Envoy::StreamInfo::FilterState::Object::FieldType

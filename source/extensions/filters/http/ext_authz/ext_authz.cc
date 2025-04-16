@@ -410,8 +410,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
 }
 
-void Filter::updateLoggingInfo(
-    const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
+void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   if (!config_->emitFilterStateStats()) {
     return;
   }

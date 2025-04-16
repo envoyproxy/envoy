@@ -85,11 +85,11 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
   return response;
 }
 
-Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code,
-                                       const std::string& body,
-                                       const HeaderValueOptionVector& headers,
-                                       const HeaderValueOptionVector& downstream_headers,
-                                       const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
+Response
+TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const std::string& body,
+                              const HeaderValueOptionVector& headers,
+                              const HeaderValueOptionVector& downstream_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   auto authz_response = Response{};
   authz_response.status = status;
   authz_response.status_code = status_code;
