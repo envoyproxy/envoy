@@ -15,9 +15,9 @@ removed_config_or_runtime:
 new_features:
 - area: stateful_session
   change: |
-    Supports packages mode in header based stateful session extension to keep the exist session header value
-    from upstream server. See :ref:`packages_mode_config
-    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.packages_mode_config>`
+    Supports envelope mode in header based stateful session extension to keep the exist session header value
+    from upstream server. See :ref:`mode
+    <envoy_v3_api_field_extensions.http.stateful_session.header.v3.HeaderBasedSessionState.mode>`
     for more details.
 
 deprecated:
