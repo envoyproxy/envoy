@@ -35,4 +35,4 @@ message ReverseConnPoolProto {
 
   // The typed configuration for the factory implementation.
   google.protobuf.Any typed_config = 5;
-} 
+}
