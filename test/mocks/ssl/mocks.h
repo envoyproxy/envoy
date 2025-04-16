@@ -123,6 +123,9 @@ public:
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
+  MOCK_METHOD(absl::optional<
+                  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
+              compliancePolicy, (), (const));
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
@@ -167,6 +170,9 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   MOCK_METHOD(bool, fullScanCertsOnSNIMismatch, (), (const));
+  MOCK_METHOD(absl::optional<
+                  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
+              compliancePolicy, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};

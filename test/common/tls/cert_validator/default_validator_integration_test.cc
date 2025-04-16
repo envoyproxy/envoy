@@ -147,5 +147,97 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
   ASSERT_TRUE(codec->waitForDisconnect());
 }
 
+class TestSanListenerFilter : public Network::ListenerFilter {
+public:
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
+    cb.filterState().setData("test_san_filter_state", nullptr,
+                             StreamInfo::FilterState::StateType::ReadOnly);
+    return Network::FilterStatus::Continue;
+  }
+  size_t maxReadBytes() const override { return 0; }
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  };
+};
+
+class TestSanListenerFilterFactory
+    : public Server::Configuration::NamedListenerFilterConfigFactory {
+public:
+  Network::ListenerFilterFactoryCb
+  createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                       const Network::ListenerFilterMatcherSharedPtr& matcher,
+                                       Server::Configuration::ListenerFactoryContext&) override {
+    return [matcher](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(matcher, std::make_unique<TestSanListenerFilter>());
+    };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+  std::string name() const override { return "test.tcp_listener.set_dns_filter_state"; }
+};
+
+REGISTER_FACTORY(TestSanListenerFilterFactory,
+                 Server::Configuration::NamedListenerFilterConfigFactory);
+
+class CustomSanStringMatcher : public Matchers::StringMatcher {
+public:
+  bool match(const absl::string_view) const override { return false; }
+  bool match(const absl::string_view, const StringMatcher::Context& context) const override {
+    return context.stream_info_ &&
+           context.stream_info_->filterState().hasDataWithName("test_san_filter_state");
+  }
+};
+
+class CustomSanStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {
+public:
+  Matchers::StringMatcherPtr
+  createStringMatcher(const Protobuf::Message&,
+                      Server::Configuration::CommonFactoryContext&) override {
+    return std::make_unique<CustomSanStringMatcher>();
+  }
+
+  std::string name() const override { return "envoy.string_matcher.test_custom_san_matcher"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+};
+
+REGISTER_FACTORY(CustomSanStringMatcherFactory, Matchers::StringMatcherExtensionFactory);
+
+TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithCustomMatcher) {
+  std::string matcher_config = R"EOF(
+    san_type: DNS
+    matcher:
+      custom:
+        name: envoy.string_matcher.test_custom_san_matcher
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
+  TestUtility::loadFromYaml(matcher_config, san_matcher);
+
+  config_helper_.addListenerFilter(R"EOF(
+    name: test.tcp_listener.set_dns_filter_state
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setSanMatchers({san_matcher}));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeHttpConnection(std::move(conn));
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
+}
+
 } // namespace Ssl
 } // namespace Envoy

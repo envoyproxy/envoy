@@ -8,7 +8,7 @@ configuration.
 
 There are a number of control planes compatible with Envoy's API, for example:
 
-- Within the Envoy project you an leverage `Envoy Gateway <https://gateway.envoyproxy.io/docs/>`_
+- Within the Envoy project you can leverage `Envoy Gateway <https://gateway.envoyproxy.io/docs/>`_
 - `Istio <https://istio.io>`_ provides a popular control plane for service meshes.
 
 You can find more control plane implementations, both CNCF Open Source control planes, and vendor provided control planes on the `Community page <https://www.envoyproxy.io/community>`_.
