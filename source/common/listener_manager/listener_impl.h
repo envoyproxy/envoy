@@ -180,8 +180,8 @@ public:
   Init::Manager& initManager() override;
   Stats::Scope& statsScope() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
   Configuration::GenericFactoryContext& getGenericFactoryContext() const override;
 
   Stats::Scope& listenerScope() override;
