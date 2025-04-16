@@ -6,6 +6,7 @@
 
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/common/http/http2/http2_frame.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -48,6 +49,29 @@ public:
   // Modify a given frame so that it has the HTTP/2 frame header for a valid
   // HEADERS frame.
   static void fixupHeaders(Frame& frame);
+};
+
+// A class for replaying HTTP/2 frames in tests
+class FrameReplay {
+public:
+  FrameReplay() = default;
+
+  // Add a frame to the replay queue
+  void addFrame(const Http2Frame& frame) { frames_.push_back(frame); }
+
+  // Get the number of frames in the replay queue
+  size_t frameCount() const { return frames_.size(); }
+
+  // Get the next frame from the replay queue
+  Http2Frame nextFrame() {
+    ASSERT(!frames_.empty());
+    Http2Frame frame = frames_.front();
+    frames_.pop_front();
+    return frame;
+  }
+
+private:
+  std::deque<Http2Frame> frames_;
 };
 
 class CodecFrameInjector {

@@ -103,6 +103,7 @@ envoy_cc_test_library(
     hdrs = ["frame_replay.h"],
     rbe_pool = "6gig",
     deps = [
+        ":http2_frame",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
         "//source/common/http:utility_lib",
