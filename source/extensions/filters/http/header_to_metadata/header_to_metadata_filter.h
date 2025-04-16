@@ -70,13 +70,15 @@ private:
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
+  static absl::StatusOr<Rule> create(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
   std::shared_ptr<const ValueSelector> selector_;
 
 private:
+  Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& creation_status);
+
   const ProtoRule rule_;
   Regex::CompiledMatcherPtr regex_rewrite_{};
   std::string regex_rewrite_substitution_{};
@@ -94,7 +96,8 @@ const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
+  static absl::StatusOr<std::shared_ptr<Config>>
+  create(const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
          Regex::Engine& regex_engine, bool per_route = false);
 
   const HeaderToMetadataRules& requestRules() const { return request_rules_; }
@@ -105,6 +108,9 @@ public:
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
 
+  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
+         Regex::Engine& regex_engine, bool per_route, absl::Status& creation_status);
+
   /**
    *  configToVector is a helper function for converting from configuration (protobuf types) into
    *  STL containers for usage elsewhere.
@@ -113,9 +119,11 @@ private:
    *         metadata
    *  @param vector A vector that will be populated with the configuration data from config
    *  @return true if any configuration data was added to the vector, false otherwise. Can be used
-   *          to validate whether the configuration was empty.
+   *          to validate whether the configuration was empty. If the configuration is invalid, an
+   *          error status will be returned.
    */
-  static bool configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&, Regex::Engine&);
+  static absl::StatusOr<bool> configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&,
+                                             Regex::Engine&);
 
   const std::string& decideNamespace(const std::string& nspace) const;
 

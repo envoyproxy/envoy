@@ -31,19 +31,20 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
       });
 }
 
-::Envoy::AccessLog::InstanceSharedPtr
-AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                          ::Envoy::AccessLog::FilterPtr&& filter,
-                                          Server::Configuration::FactoryContext& context) {
+::Envoy::AccessLog::InstanceSharedPtr AccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, ::Envoy::AccessLog::FilterPtr&& filter,
+    Server::Configuration::FactoryContext& context,
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  auto commands = THROW_OR_RETURN_VALUE(
-      Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context),
-      std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>);
+  auto commands =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                proto_config.formatters(), context, std::move(command_parsers)),
+                            std::vector<Formatter::CommandParserPtr>);
 
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

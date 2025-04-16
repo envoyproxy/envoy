@@ -73,6 +73,7 @@ prefix_routes:
   catch_all_route:
     cluster: fake_cluster
 stat_prefix: foo
+custom_commands: [example.parse]
 settings:
   op_timeout: 0.02s
   )EOF";

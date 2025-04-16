@@ -156,7 +156,7 @@ void CodecClient::completeRequest(ActiveRequest& request) {
 }
 
 void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
-  ENVOY_CONN_LOG(debug, "request reset", *connection_);
+  ENVOY_CONN_LOG(debug, "Request reset. Reason {}", *connection_, static_cast<int>(reason));
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamReset(reason);
   }

@@ -144,8 +144,13 @@ public:
   Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
-  bool drainClose() const override {
-    return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  bool drainClose(Network::DrainDirection scope) const override {
+    return drain_manager_->drainClose(scope) || server_.drainManager().drainClose(scope);
+  }
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected function call");
+    return nullptr;
   }
   Server::DrainManager& drainManager();
   friend class ListenerImpl;
@@ -266,8 +271,6 @@ public:
                                     const envoy::config::listener::v3::Listener& config,
                                     Network::Socket::Type socket_type);
 
-  // Compare whether two listeners have different socket options.
-  bool socketOptionsEqual(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.

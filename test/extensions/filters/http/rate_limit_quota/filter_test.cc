@@ -428,6 +428,35 @@ BucketId bucketIdFromMap(const absl::flat_hash_map<std::string, std::string>& bu
   return bucket_id;
 }
 
+TEST_F(FilterTest, DecodeHeaderWithValidOnNoMatchDenyWithSettings) {
+  addMatcherConfig(MatcherConfigType::ValidOnNoMatchConfig);
+  createFilter();
+  constructMismatchedRequestHeader();
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids({
+      {"on_no_match_name", "on_no_match_value"},
+      {"on_no_match_name_2", "on_no_match_value_2"},
+  });
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *no_assignment_action.mutable_bucket_id() = bucket_id;
+
+  // Default behavior is set to deny with custom settings in the bucket
+  // matcher's `no_assignment_behavior` & `deny_response_settings`.
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_, createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id),
+                                                bucket_id_hash, ProtoEq(no_assignment_action), _,
+                                                std::chrono::milliseconds::zero(), false))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
 TEST_F(FilterTest, DecodeHeadersWithoutCachedAssignment) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter();

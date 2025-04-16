@@ -2924,6 +2924,7 @@ TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
   FakeStreamPtr upstream_request;
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
   ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  cleanupUpstreamAndDownstream();
   tcp_client_->close();
 }
 

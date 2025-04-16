@@ -205,8 +205,9 @@ TEST(OnDemandConfigTest, Basic) {
   OnDemandFilterConfig config2(config, cm, visitor);
 
   config.mutable_odcds()->set_resources_locator("foo");
-  EXPECT_THROW_WITH_MESSAGE({ OnDemandFilterConfig config3(config, cm, visitor); }, EnvoyException,
-                            "foo does not have a xdstp:, http: or file: scheme");
+  EXPECT_THROW_WITH_MESSAGE(
+      { OnDemandFilterConfig config3(config, cm, visitor); }, EnvoyException,
+      "foo does not have a xdstp:, http: or file: scheme");
 }
 
 } // namespace OnDemand

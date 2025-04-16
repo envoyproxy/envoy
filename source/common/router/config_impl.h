@@ -179,8 +179,7 @@ public:
         max_age_(config.max_age()) {
     for (const auto& string_match : config.allow_origin_string_match()) {
       allow_origins_.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              string_match, factory_context));
+          std::make_unique<Matchers::StringMatcherImpl>(string_match, factory_context));
     }
     if (config.has_allow_credentials()) {
       allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
@@ -663,17 +662,7 @@ protected:
 public:
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
-  bool isRedirect() const {
-    if (!isDirectResponse()) {
-      return false;
-    }
-    if (redirect_config_ == nullptr) {
-      return false;
-    }
-    return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
-           !redirect_config_->prefix_rewrite_redirect_.empty() ||
-           redirect_config_->regex_rewrite_redirect_ != nullptr;
-  }
+  bool isRedirect() const;
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
@@ -1245,6 +1234,7 @@ private:
   HeaderParserPtr response_headers_parser_;
   RouteMetadataPackPtr metadata_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
+  const std::vector<Envoy::Matchers::FilterStateMatcherPtr> filter_state_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -1310,9 +1300,7 @@ private:
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
@@ -1345,9 +1333,7 @@ private:
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().exact() : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
@@ -1379,10 +1365,7 @@ private:
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().safe_regex().regex()
-                                    : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
@@ -1446,9 +1429,7 @@ private:
 class PathSeparatedPrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   // Router::PathMatchCriterion
-  const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
-  }
+  const std::string& matcher() const override { return path_matcher_->stringRepresentation(); }
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable

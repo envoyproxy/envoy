@@ -141,15 +141,37 @@ class LocalRateLimiterDescriptorImplTest : public LocalRateLimiterImplTest {
 public:
   void initializeWithAtomicTokenBucketDescriptor(const std::chrono::milliseconds fill_interval,
                                                  const uint32_t max_tokens,
-                                                 const uint32_t tokens_per_fill) {
-    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
+                                                 const uint32_t tokens_per_fill,
+                                                 uint32_t lru_size = 20) {
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, nullptr, lru_size);
   }
 
   static constexpr absl::string_view single_descriptor_config_yaml = R"(
   entries:
   - key: foo2
     value: bar2
+  token_bucket:
+    max_tokens: {}
+    tokens_per_fill: {}
+    fill_interval: {}
+  )";
+
+  static constexpr absl::string_view wildcard_descriptor_config_yaml = R"(
+  entries:
+  - key: user
+  token_bucket:
+    max_tokens: {}
+    tokens_per_fill: {}
+    fill_interval: {}
+  )";
+
+  static constexpr absl::string_view multiple_wildcard_descriptor_config_yaml = R"(
+  entries:
+  - key: user
+  - key: org
+    value: test
   token_bucket:
     max_tokens: {}
     tokens_per_fill: {}
@@ -173,6 +195,124 @@ public:
   std::vector<RateLimit::Descriptor> descriptor2_{{{{"hello", "world"}, {"foo", "bar"}}}};
   std::vector<RateLimit::Descriptor> no_match_descriptor_{{{{"no_match", "no_match"}}}};
 };
+
+// Make sure error raised in case duplicate/replicated descriptors are found.
+TEST_F(LocalRateLimiterImplTest, DuplicatedDynamicTokenBucketDescriptor) {
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(LocalRateLimiterImpl(std::chrono::milliseconds(60000), 2, 1,
+                                                 dispatcher_, descriptors_, true, nullptr, 1),
+
+                            EnvoyException,
+                            "duplicate descriptor in the local rate descriptor: user=");
+}
+
+// Verify dynamic token bucket functionality with a single entry descriptor.
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, 1);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
+
+  // this must not be rate-limited because it will be handled by default bucket which uses
+  // max_tokens i.e 20
+  std::vector<RateLimit::Descriptor> extra_entries_descriptor{{{{"user", "C"}, {"key", "value"}}}};
+  EXPECT_TRUE(rate_limiter_->requestAllowed(extra_entries_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(extra_entries_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(extra_entries_descriptor).allowed);
+
+  // this must not be rate-limited because it will be handled by default bucket which uses
+  // max_tokens i.e 20
+  std::vector<RateLimit::Descriptor> different_key_descriptor{{{{"notuser", "A"}}}};
+  EXPECT_TRUE(rate_limiter_->requestAllowed(different_key_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(different_key_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(different_key_descriptor).allowed);
+}
+
+// Verify dynamic token bucket functionality with multiple entries descriptor.
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketswildcardWithMultipleEntries) {
+  TestUtility::loadFromYaml(fmt::format(multiple_wildcard_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, 1);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 2 -> 2 tokens. This is to check if the tokens are not consumed
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  // same size entries but non-matching key for wildcard descriptor. Should not be rate-limited.
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "A"}, {"key", "value"}}}};
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 2 -> 2 tokens. This is to check if the tokens are not consumed
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+
+  // same size entries but non-wildcard key's values does not match. Should not be rate-limited.
+  std::vector<RateLimit::Descriptor> descriptors3{{{{"user", "A"}, {"org", "not-test"}}}};
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
+  // Descriptor from 2 -> 2 tokens. This is to check if the tokens are not consumed
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
+
+  // this must be rate-limited because non-wildcard key-value matches and wildcard key matches
+  std::vector<RateLimit::Descriptor> descriptors4{{{{"user", "A"}, {"org", "test"}}}};
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors4).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors4).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors4).allowed);
+}
+
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsMixedRequestOrder) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 4, 2, 2);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
+
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
+}
 
 // Verify descriptor rate limit time with small fill interval is rejected.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval) {
@@ -551,7 +691,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, NullDefaultTokenBucket) {
   // Not match any descriptor and default token bucket is null.
   auto no_match_result = rate_limiter_->requestAllowed(no_match_descriptor_);
   EXPECT_TRUE(no_match_result.allowed);
-  EXPECT_FALSE(no_match_result.token_bucket_context.has_value());
+  EXPECT_FALSE(no_match_result.token_bucket_context);
 }
 
 } // Namespace LocalRateLimit

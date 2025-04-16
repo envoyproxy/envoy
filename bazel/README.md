@@ -113,7 +113,7 @@ for how to update or override dependencies.
     Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
 
     #### Config Flag Choices
-    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:
+    Different [config](https://bazel.build/run/bazelrc/#config) flags specify the compiler libraries:
 
     - `--config=libc++` means using `clang` + `libc++`
     - `--config=clang` means using `clang` + `libstdc++`
@@ -186,7 +186,7 @@ for how to update or override dependencies.
     is set.
 
     Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
-    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
+    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#symlink).
     For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
@@ -399,7 +399,7 @@ bazel test //test/...
 ```
 
 An individual test target can be run with a more specific Bazel
-[label](https://bazel.build/versions/master/docs/build-ref.html#Labels), e.g. to build and run only
+[label](https://bazel.build/concepts/labels), e.g. to build and run only
 the units tests in
 [test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/main/test/common/http/async_client_impl_test.cc):
 
@@ -452,7 +452,7 @@ bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 
 Bazel will by default run all tests inside a sandbox, which disallows access to the
 local filesystem. If you need to break out of the sandbox (for example to run under a
-local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#flag--run_under)),
+local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#test-run-under)),
 you can run the test with `--strategy=TestRunner=local`, e.g.:
 
 ```
@@ -563,7 +563,7 @@ RUN_REMOTE=yes MOUNT_LOCAL=yes tools/bazel-test-docker.sh  //test/integration:in
 # Additional Envoy build and test options
 
 In general, there are 3 [compilation
-modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilation_mode)
+modes](https://docs.bazel.build/versions/master/user-manual.html#compilation-mode)
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).

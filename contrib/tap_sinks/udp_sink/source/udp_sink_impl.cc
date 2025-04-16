@@ -46,13 +46,12 @@ void UdpTapSink::UdpTapSinkHandle::submitTrace(TapCommon::TraceWrapperPtr&& trac
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
     FALLTHRU;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED:
-    FALLTHRU;
-  case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
     // will implement above format if it is needed.
-    ENVOY_LOG_MISC(debug,
-                   "{}: Not support PROTO_BINARY, PROTO_BINARY_LENGTH_DELIMITED,  PROTO_TEXT",
+    ENVOY_LOG_MISC(debug, "{}: Not support PROTO_BINARY and PROTO_BINARY_LENGTH_DELIMITEDT",
                    __func__);
     break;
+  case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
+    FALLTHRU;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     FALLTHRU;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING: {
@@ -60,7 +59,12 @@ void UdpTapSink::UdpTapSinkHandle::submitTrace(TapCommon::TraceWrapperPtr&& trac
       ENVOY_LOG_MISC(debug, "{}: udp writter isn't created yet", __func__);
       break;
     }
-    std::string json_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, false);
+    std::string json_string;
+    if (format == envoy::config::tap::v3::OutputSink::PROTO_TEXT) {
+      json_string = MessageUtil::toTextProto(*trace);
+    } else {
+      json_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, false);
+    }
     Buffer::OwnedImpl udp_data(std::move(json_string));
     Api::IoCallUint64Result write_result =
         parent_.udp_packet_writer_->writePacket(udp_data, nullptr, *parent_.udp_server_address_);

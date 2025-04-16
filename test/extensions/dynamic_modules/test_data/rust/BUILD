@@ -16,3 +16,5 @@ test_program(name = "program_init_fail")
 test_program(name = "abi_version_mismatch")
 
 test_program(name = "http")
+
+test_program(name = "http_integration_test")

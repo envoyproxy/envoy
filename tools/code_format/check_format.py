@@ -429,9 +429,7 @@ class FormatChecker:
         return False
 
     def is_external_build_file(self, file_path):
-        return self.is_build_file(file_path) and (
-            file_path.startswith("./bazel/external/")
-            or file_path.startswith("./tools/clang_tools"))
+        return self.is_build_file(file_path) and (file_path.startswith("./bazel/external/"))
 
     def is_starlark_file(self, file_path):
         return file_path.endswith(".bzl")

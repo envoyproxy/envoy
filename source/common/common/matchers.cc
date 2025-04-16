@@ -29,8 +29,7 @@ ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v,
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kDoubleMatch:
     return std::make_shared<const DoubleMatcher>(v.double_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kStringMatch:
-    return std::make_shared<const StringMatcherImpl<std::decay_t<decltype(v.string_match())>>>(
-        v.string_match(), context);
+    return std::make_shared<const StringMatcherImpl>(v.string_match(), context);
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kBoolMatch:
     return std::make_shared<const BoolMatcher>(v.bool_match());
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kPresentMatch:
@@ -132,8 +131,7 @@ filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMat
   switch (matcher.matcher_case()) {
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kStringMatch:
     return std::make_unique<FilterStateStringMatcher>(
-        std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher.string_match(), context));
+        std::make_unique<const StringMatcherImpl>(matcher.string_match(), context));
     break;
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
     auto ip_list = Network::Address::IpList::create(matcher.address_match().ranges());

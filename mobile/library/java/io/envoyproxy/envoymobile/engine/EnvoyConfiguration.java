@@ -26,6 +26,7 @@ public class EnvoyConfiguration {
 
   public final int connectTimeoutSeconds;
   public final boolean disableDnsRefreshOnFailure;
+  public final boolean disableDnsRefreshOnNetworkChange;
   public final int dnsRefreshSeconds;
   public final int dnsFailureRefreshSecondsBase;
   public final int dnsFailureRefreshSecondsMax;
@@ -72,6 +73,8 @@ public class EnvoyConfiguration {
    *     hosts in the cluster.
    * @param disableDnsRefreshOnFailure                    whether to disable the DNS refresh on
    *     failure
+   * @param disableDnsRefreshOnNetworkChange              whether to disable the DNS refresh on
+   *     network change
    * @param dnsRefreshSeconds                             default rate in seconds at which to
    *     refresh DNS.
    * @param dnsFailureRefreshSecondsBase                  base rate in seconds to refresh DNS on
@@ -133,7 +136,8 @@ public class EnvoyConfiguration {
    * HTTP/3.
    */
   public EnvoyConfiguration(
-      int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure, int dnsRefreshSeconds,
+      int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
+      boolean disableDnsRefreshOnNetworkChange, int dnsRefreshSeconds,
       int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
       int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
       int dnsCacheSaveIntervalSeconds, int dnsNumRetries, boolean enableDrainPostDnsRefresh,
@@ -155,6 +159,7 @@ public class EnvoyConfiguration {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
+    this.disableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
@@ -232,13 +237,13 @@ public class EnvoyConfiguration {
         JniBridgeUtility.listOfStringPairsToJniBytes(this.caresFallbackResolvers);
 
     return JniLibrary.createBootstrap(
-        connectTimeoutSeconds, disableDnsRefreshOnFailure, dnsRefreshSeconds,
-        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
-        dnsMinRefreshSeconds, dnsPreresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        dnsNumRetries, enableDrainPostDnsRefresh, enableHttp3, useCares, http3ConnectionOptions,
-        http3ClientConnectionOptions, quicHints, quicSuffixes, enableGzipDecompression,
-        enableBrotliDecompression, numTimeoutsToTriggerPortMigration, enableSocketTagging,
-        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        connectTimeoutSeconds, disableDnsRefreshOnFailure, disableDnsRefreshOnNetworkChange,
+        dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
+        dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve, enableDNSCache,
+        dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh, enableHttp3,
+        useCares, http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
+        enableGzipDecompression, enableBrotliDecompression, numTimeoutsToTriggerPortMigration,
+        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
         enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards, caresFallbackResolvers,

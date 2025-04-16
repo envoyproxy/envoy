@@ -1345,7 +1345,7 @@ message TrackClusterStats {
 
   // If request_response_sizes is true, then the :ref:`histograms
   // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
-  // of requests and responses will be published.
+  // of requests and responses will be published. Additionally, number of headers in the requests and responses will be tracked.
   bool request_response_sizes = 2;
 
   // If true, some stats will be emitted per-endpoint, similar to the stats in admin ``/clusters``

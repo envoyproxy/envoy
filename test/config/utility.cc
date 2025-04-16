@@ -1008,7 +1008,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 #endif
   }
 
-  // Make sure we we don't setAsyncLb() when we intend to use a non-default LB algorithm.
+  // Make sure we don't setAsyncLb() when we intend to use a non-default LB algorithm.
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = bootstrap_.mutable_static_resources()->mutable_clusters(i);
     if (cluster->has_load_balancing_policy() &&

@@ -1,3 +1,5 @@
+#include "source/common/http/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -77,6 +79,10 @@ bool setHeaderValueImpl(Http::HeaderMap* map, envoy_dynamic_module_type_buffer_m
     return false;
   }
   absl::string_view key_view(key, key_length);
+  if (value == nullptr) {
+    map->remove(Envoy::Http::LowerCaseString(key_view));
+    return true;
+  }
   absl::string_view value_view(value, value_length);
   // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
   map->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
@@ -369,13 +375,60 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   return true;
 }
 
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  stream_info->filterState()->setData(key_view,
+                                      std::make_unique<Router::StringAccessorImpl>(value_view),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  auto filter_state = stream_info->filterState()->getDataReadOnly<Router::StringAccessor>(key_view);
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        fmt::format("key not found in filter state", key_view));
+    return false;
+  }
+  absl::string_view str = filter_state->asString();
+  *result = const_cast<char*>(str.data());
+  *result_length = str.size();
+  return true;
+}
+
 bool envoy_dynamic_module_callback_http_get_request_body_vector(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_request_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_request_body_ for when we reach this.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -392,7 +445,11 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector_size(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_request_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_request_body_ for when we reach this line.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -403,6 +460,11 @@ bool envoy_dynamic_module_callback_http_append_request_body(
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
+    if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
+                                         // enter this block.
+      filter->current_request_body_->add(absl::string_view(static_cast<const char*>(data), length));
+      return true;
+    }
     return false;
   }
   filter->decoder_callbacks_->modifyDecodingBuffer([data, length](Buffer::Instance& buffer) {
@@ -415,11 +477,17 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
+    if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
+                                         // enter this block.
+      auto size = std::min<uint64_t>(filter->current_request_body_->length(), number_of_bytes);
+      filter->current_request_body_->drain(size);
+      return true;
+    }
     return false;
   }
 
   filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
@@ -431,7 +499,11 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_response_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_response_body_ for when we reach this line.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -448,7 +520,11 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector_size(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_response_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_response_body_ for when we reach this line.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -459,6 +535,12 @@ bool envoy_dynamic_module_callback_http_append_response_body(
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->encoder_callbacks_->encodingBuffer()) {
+    if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
+                                          // enter this block.
+      filter->current_response_body_->add(
+          absl::string_view(static_cast<const char*>(data), length));
+      return true;
+    }
     return false;
   }
   filter->encoder_callbacks_->modifyEncodingBuffer([data, length](Buffer::Instance& buffer) {
@@ -471,14 +553,150 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->encoder_callbacks_->encodingBuffer()) {
+    if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
+                                          // enter this block.
+      auto size = std::min<uint64_t>(filter->current_response_body_->length(), number_of_bytes);
+      filter->current_response_body_->drain(size);
+      return true;
+    }
     return false;
   }
 
   filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
+}
+
+void envoy_dynamic_module_callback_http_clear_route_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+}
+
+bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  bool ok = false;
+  switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_RequestProtocol: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto protocol = stream_info->protocol();
+      if (protocol.has_value()) {
+        const auto& protocol_string_ref = Http::Utility::getProtocolString(protocol.value());
+        *result = const_cast<char*>(protocol_string_ref.data());
+        *result_length = protocol_string_ref.size();
+        ok = true;
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamAddress: {
+    const auto upstream_info = filter->upstreamInfo();
+    if (upstream_info) {
+      auto upstream_host = upstream_info->upstreamHost();
+      if (upstream_host != nullptr && upstream_host->address() != nullptr) {
+        auto addr = upstream_host->address()->asStringView();
+        *result = const_cast<char*>(addr.data());
+        *result_length = addr.size();
+        ok = true;
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_SourceAddress: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto addressProvider =
+          stream_info->downstreamAddressProvider().remoteAddress()->asStringView();
+      *result = const_cast<char*>(addressProvider.data());
+      *result_length = addressProvider.size();
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_DestinationAddress: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto addressProvider =
+          stream_info->downstreamAddressProvider().localAddress()->asStringView();
+      *result = const_cast<char*>(addressProvider.data());
+      *result_length = addressProvider.size();
+      ok = true;
+    }
+    break;
+  }
+  default:
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Unsupported attribute ID {} as string",
+                        static_cast<int64_t>(attribute_id));
+    break;
+  }
+  return ok;
+}
+
+bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  bool ok = false;
+  switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_ResponseCode: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto code = stream_info->responseCode();
+      if (code.has_value()) {
+        *result = code.value();
+        ok = true;
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamPort: {
+    const auto upstream_info = filter->upstreamInfo();
+    if (upstream_info) {
+      auto upstream_host = upstream_info->upstreamHost();
+      if (upstream_host != nullptr && upstream_host->address() != nullptr) {
+        auto ip = upstream_host->address()->ip();
+        if (ip) {
+          *result = ip->port();
+          ok = true;
+        }
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_SourcePort: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto ip = stream_info->downstreamAddressProvider().remoteAddress()->ip();
+      if (ip) {
+        *result = ip->port();
+        ok = true;
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_DestinationPort: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto ip = stream_info->downstreamAddressProvider().localAddress()->ip();
+      if (ip) {
+        *result = ip->port();
+        ok = true;
+      }
+    }
+    break;
+  }
+  default:
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
+  }
+  return ok;
 }
 }
 } // namespace HttpFilters

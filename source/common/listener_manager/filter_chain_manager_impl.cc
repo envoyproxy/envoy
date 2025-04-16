@@ -80,8 +80,8 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
       init_manager_(init_manager) {}
 
-bool PerFilterChainFactoryContextImpl::drainClose() const {
-  return is_draining_.load() || parent_context_.drainDecision().drainClose();
+bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
+  return is_draining_.load() || parent_context_.drainDecision().drainClose(scope);
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }

@@ -328,8 +328,10 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   return default_match_;
 }
 
-InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                                              Server::Configuration::FactoryContext& context) {
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::FactoryContext& context,
+                            std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context);
@@ -339,7 +341,8 @@ InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       config, context.messageValidationVisitor(), factory);
 
-  return factory.createAccessLogInstance(*message, std::move(filter), context);
+  return factory.createAccessLogInstance(*message, std::move(filter), context,
+                                         std::move(command_parsers));
 }
 
 } // namespace AccessLog

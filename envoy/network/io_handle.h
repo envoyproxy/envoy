@@ -11,6 +11,8 @@
 #include "envoy/event/file_event.h"
 #include "envoy/network/address.h"
 
+#include "source/common/buffer/buffer_impl.h"
+
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
 
@@ -142,7 +144,7 @@ public:
     // The contents of the TOS byte in the IP header.
     uint8_t tos_{0};
     // UDP control message specified by save_cmsg_config in QUIC config.
-    Buffer::RawSlice saved_cmsg_;
+    Buffer::OwnedImpl saved_cmsg_;
   };
 
   /**

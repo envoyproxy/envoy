@@ -85,7 +85,7 @@ public:
               (const std::string& cluster, DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, drainConnections, (DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
-  MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
+  MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,
                const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,

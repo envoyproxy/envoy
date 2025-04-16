@@ -551,7 +551,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                             Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
-                            uint8_t tos, Buffer::RawSlice saved_cmsg) {
+                            uint8_t tos, Buffer::OwnedImpl saved_cmsg) {
   ENVOY_BUG(peer_addess != nullptr,
             fmt::format("Unable to get remote address on the socket bound to local address: {}.",
                         (local_address == nullptr ? "unknown" : local_address->asString())));
@@ -564,7 +564,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                         (local_address == nullptr ? "unknown" : local_address->asString()),
                         bytes_read));
   udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
-                                     std::move(buffer), receive_time, tos, saved_cmsg);
+                                     std::move(buffer), receive_time, tos, std::move(saved_cmsg));
 }
 
 Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
@@ -603,10 +603,10 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     if (num_packets_read != nullptr) {
       *num_packets_read += 1;
     }
-    passPayloadToProcessor(result.return_value_, std::move(buffer),
-                           std::move(output.msg_[0].peer_address_),
-                           std::move(output.msg_[0].local_address_), udp_packet_processor,
-                           receive_time, output.msg_[0].tos_, output.msg_[0].saved_cmsg_);
+    passPayloadToProcessor(
+        result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+        std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time,
+        output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
     return result;
   }
 
@@ -622,7 +622,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     }
     passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
                            output.msg_[0].local_address_, udp_packet_processor, receive_time,
-                           output.msg_[0].tos_, output.msg_[0].saved_cmsg_);
+                           output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
   }
 
   return result;
@@ -688,7 +688,7 @@ readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
     }
     passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                            output.msg_[i].local_address_, udp_packet_processor, receive_time,
-                           output.msg_[i].tos_, output.msg_[i].saved_cmsg_);
+                           output.msg_[i].tos_, std::move(output.msg_[i].saved_cmsg_));
   }
   return result;
 }
@@ -721,7 +721,7 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
   passPayloadToProcessor(result.return_value_, std::move(buffer),
                          std::move(output.msg_[0].peer_address_),
                          std::move(output.msg_[0].local_address_), udp_packet_processor,
-                         receive_time, output.msg_[0].tos_, output.msg_[0].saved_cmsg_);
+                         receive_time, output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
   return result;
 }
 

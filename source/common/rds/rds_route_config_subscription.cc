@@ -113,7 +113,7 @@ absl::Status RdsRouteConfigSubscription::onConfigUpdate(
       RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
 
-    afterProviderUpdate();
+    RETURN_IF_NOT_OK(afterProviderUpdate());
   }
 
   local_init_target_.ready();

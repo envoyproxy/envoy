@@ -9,6 +9,7 @@
 #include "envoy/stream_info/uint32_accessor.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
@@ -45,6 +46,15 @@ public:
     return nullptr;
   }
 };
+
+bool isProxying(StreamInfo::StreamInfo* stream_info) {
+  // Should not hit this call unless the flag is enabled.
+  ASSERT(Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
+  return stream_info && stream_info->filterState() &&
+         stream_info->filterState()->hasData<Network::Http11ProxyInfoFilterState>(
+             Network::Http11ProxyInfoFilterState::key());
+}
 
 } // namespace
 
@@ -394,21 +404,66 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   if (raw_host.empty()) {
     ENVOY_LOG(debug, "host empty");
-    return {nullptr};
+    return {nullptr, "empty_host_header"};
   }
-  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
+  std::string hostname =
+      Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (cluster_.enableSubCluster()) {
-    return cluster_.chooseHost(host, context);
+    return cluster_.chooseHost(hostname, context);
   }
-  return findHostByName(host);
+  Upstream::HostConstSharedPtr host = findHostByName(hostname);
+  bool force_refresh =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_if_no_connections") &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") &&
+      host && !host->used();
+  if ((host && !force_refresh) ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+    return {host};
+  }
+
+  // If the host is not found, the DFP cluster cluster can now do asynchronous lookup.
+  Upstream::ResourceAutoIncDecPtr handle = cluster_.dns_cache_->canCreateDnsRequest();
+
+  // Return an immediate failure if there's too many requests already.
+  if (!handle) {
+    return {nullptr, "dns_cache_pending_requests_overflow"};
+  }
+
+  // Attempt to load the host from cache. Generally this will result in async
+  // resolution so create a DFPHostSelectionHandle to handle this.
+  std::unique_ptr<DFPHostSelectionHandle> cancelable =
+      std::make_unique<DFPHostSelectionHandle>(context, cluster_, hostname);
+  bool is_proxying = isProxying(context->requestStreamInfo());
+  auto result = cluster_.dns_cache_->loadDnsCacheEntryWithForceRefresh(raw_host, port, is_proxying,
+                                                                       force_refresh, *cancelable);
+  switch (result.status_) {
+  case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache:
+    return {nullptr, result.host_info_.has_value() ? result.host_info_.value()->details() : ""};
+  case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
+    // Here the DFP kicks off an async lookup. The DFPHostSelectionHandle will
+    // call onLoadDnsCacheComplete and onAsyncHostSelection unless the
+    // resolution is canceled by the stream.
+    cancelable->setHandle(std::move(result.handle_));
+    cancelable->setAutoDec(std::move(handle));
+    return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
+  case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
+    // In the case of overflow, return immediate failure.
+    ENVOY_LOG(debug, "host {} lookup failed due to overflow", hostname);
+    break; // fall through
+  }
+  return {nullptr, "dns_cache_overflow"};
 }
 
 Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::string& host) const {
+  return cluster_.findHostByName(host);
+}
+
+Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
   {
-    absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
-    const auto host_it = cluster_.host_map_.find(host);
-    if (host_it == cluster_.host_map_.end()) {
+    absl::ReaderMutexLock lock{&host_map_lock_};
+    const auto host_it = host_map_.find(host);
+    if (host_it == host_map_.end()) {
       ENVOY_LOG(debug, "host {} not found", host);
       return nullptr;
     } else {

@@ -87,7 +87,7 @@ private:
                                             std::unique_ptr<Cleanup>&) {
     return absl::OkStatus();
   }
-  virtual void afterProviderUpdate() {}
+  virtual absl::Status afterProviderUpdate() { return absl::OkStatus(); }
 
 protected:
   const std::string route_config_name_;

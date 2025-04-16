@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -57,14 +58,14 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
 /**
  * Creates a new DynamicModule. This is mainly exposed for testing purposes. Use
  * newDynamicModuleByName in wiring up dynamic modules.
- * @param object_file_path the path to the object file to load.
+ * @param object_file_absolute_path the absolute path to the object file to load.
  * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated. For example, c-shared objects compiled by Go doesn't support dlclose
  * https://github.com/golang/go/issues/11100.
  */
-absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object_file_path,
-                                                  const bool do_not_close);
+absl::StatusOr<DynamicModulePtr>
+newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close);
 
 /**
  * Creates a new DynamicModule by name under the search path specified by the environment variable

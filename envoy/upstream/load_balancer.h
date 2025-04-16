@@ -59,7 +59,11 @@ struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host,
                         std::unique_ptr<AsyncHostSelectionHandle> cancelable = nullptr)
       : host(host), cancelable(std::move(cancelable)) {}
+  HostSelectionResponse(HostConstSharedPtr host, std::string details)
+      : host(host), details(details) {}
   HostConstSharedPtr host;
+  // Optional details if host selection fails.
+  std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
 };
 
@@ -141,6 +145,14 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
+  /**
+   * Upstream override host. The first element is the target host address and the second element is
+   * a boolean indicating whether the host should be selected strictly or not.
+   * If the host should be selected strictly and no valid host is found, the load balancer should
+   * return  nullptr.
+   * If the host should not be selected strictly, the load balancer will select another host is the
+   * target host is not valid.
+   */
   using OverrideHost = std::pair<absl::string_view, bool>;
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
@@ -151,8 +163,9 @@ public:
 
   /* Called by the load balancer when asynchronous host selection completes
    * @param host supplies the upstream host selected
+   * @param details gives optional details about the resolution success/failure.
    */
-  virtual void onAsyncHostSelection(HostConstSharedPtr&& host) PURE;
+  virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
 };
 
 /**

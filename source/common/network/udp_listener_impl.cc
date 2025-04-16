@@ -12,6 +12,7 @@
 #include "envoy/network/parent_drained_callback_registrar.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
@@ -124,7 +125,7 @@ void UdpListenerImpl::handleReadCallback() {
 void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_address,
                                     Address::InstanceConstSharedPtr peer_address,
                                     Buffer::InstancePtr buffer, MonotonicTime receive_time,
-                                    uint8_t tos, Buffer::RawSlice saved_cmsg) {
+                                    uint8_t tos, Buffer::OwnedImpl saved_cmsg) {
   // UDP listeners are always configured with the socket option that allows pulling the local
   // address. This should never be null.
   ASSERT(local_address != nullptr);
@@ -132,7 +133,7 @@ void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_addres
                        std::move(buffer),
                        receive_time,
                        tos,
-                       saved_cmsg};
+                       std::move(saved_cmsg)};
   cb_.onData(std::move(recvData));
 }
 

@@ -60,7 +60,7 @@ bespoke: beta:true,jwt_value:"eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk",trace=1234
 The header `name` may be `Authorization`.
 
 The `value_prefix` must match exactly, i.e., case-sensitively.
-If the `value_prefix` is not found, the header is skipped: not considered as a source for a JWT token.
+If the `value_prefix` is not found, the header is skipped: not considered as a source for a JWT.
 
 If there are no JWT-legal characters after the `value_prefix`, the entire string after it
-is taken to be the JWT token. This is unlikely to succeed; the error will reported by the JWT parser.
+is taken to be the JWT. This is unlikely to succeed; the error will reported by the JWT parser.

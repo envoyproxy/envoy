@@ -57,7 +57,7 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
-  void onDestroy() override{};
+  void onDestroy() override {};
   Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
 };
 
@@ -316,6 +316,53 @@ typed_config:
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
     initialize();
+  }
+
+  void initializeSecretsConfig(std::string config_secret_key = "",
+                               std::string config_secret_value = "", std::string path = "") {
+    const auto yaml_fmt = R"EOF(
+      name: golang
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+        library_id: %s
+        library_path: %s
+        plugin_name: %s
+        plugin_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          value:
+            path: %s
+            secret_key: %s
+            secret_value: %s
+        generic_secrets:
+          - name: static_secret
+          - name: dynamic_secret
+            sds_config:
+              path_config_source:
+                path: "{{ test_tmpdir }}/dynamic_secret.yaml"
+      )EOF";
+    // dynamic secret using SDS
+    TestEnvironment::writeStringToFileForTest("dynamic_secret.yaml", R"EOF(
+      resources:
+        - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+          name: dynamic_secret
+          generic_secret:
+            secret:
+              inline_string: "dynamic_secret_value")EOF",
+                                              false);
+    // static secret in bootstrap file
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("static_secret");
+      auto* generic = secret->mutable_generic_secret();
+      generic->mutable_secret()->set_inline_string("static_secret_value");
+    });
+    auto yaml_string = absl::StrFormat(yaml_fmt, SECRETS, genSoPath(), SECRETS, path,
+                                       config_secret_key, config_secret_value);
+    config_helper_.prependFilter(TestEnvironment::substitute(yaml_string));
+    config_helper_.skipPortUsageValidation();
+
+    initialize();
+    registerTestServerPorts({"http"});
   }
 
   void testBasic(std::string path) {
@@ -800,6 +847,23 @@ typed_config:
     cleanup();
   }
 
+  void testSecrets(const std::string secret_key, const std::string expected_secret_value,
+                   const std::string status_code, std::string path) {
+    initializeSecretsConfig(secret_key, expected_secret_value, path);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    auto response = std::move(encoder_decoder.second);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_EQ(status_code, response->headers().getStatusValue());
+    EXPECT_EQ(expected_secret_value, response->body());
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
@@ -810,6 +874,8 @@ typed_config:
   const std::string METRIC{"metric"};
   const std::string ACTION{"action"};
   const std::string ADDDATA{"add_data"};
+  const std::string BUFFERINJECTDATA{"bufferinjectdata"};
+  const std::string SECRETS{"secrets"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1350,6 +1416,158 @@ TEST_P(GolangIntegrationTest, AddDataBufferAllDataAndAsync) {
   cleanup();
 }
 
+TEST_P(GolangIntegrationTest, BufferInjectData_InBufferedDownstreamRequest) {
+  initializeBasicFilter(BUFFERINJECTDATA, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?bufferingly_decode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, false);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  codec_client_->sendData(request_encoder, "To ", false);
+  codec_client_->sendData(request_encoder, "be, ", true);
+
+  waitForNextUpstreamRequest();
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, upstream_request_->body().toString());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferInjectData_InNonBufferedDownstreamRequest) {
+  initializeBasicFilter(BUFFERINJECTDATA, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?nonbufferingly_decode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, false);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  codec_client_->sendData(request_encoder, "To be, ", false);
+  timeSystem().advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  codec_client_->sendData(request_encoder, "that is ", true);
+
+  waitForNextUpstreamRequest();
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, upstream_request_->body().toString());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferInjectData_InBufferedUpstreamResponse) {
+  initializeBasicFilter(BUFFERINJECTDATA, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?bufferingly_encode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data("To ");
+  upstream_request_->encodeData(response_data, false);
+  Buffer::OwnedImpl response_data2("be, ");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferInjectData_InNonBufferedUpstreamResponse) {
+  initializeBasicFilter(BUFFERINJECTDATA, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?nonbufferingly_encode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data("To be, ");
+  upstream_request_->encodeData(response_data, false);
+  timeSystem().advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  Buffer::OwnedImpl response_data2("that is ");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferInjectData_WithoutProcessingData) {
+  initializeBasicFilter(BUFFERINJECTDATA, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test?inject_data_when_processing_header"},
+      {":scheme", "http"},
+      {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferInjectData_ProcessingDataSynchronously) {
+  initializeBasicFilter(BUFFERINJECTDATA, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test?inject_data_when_processing_data_synchronously"},
+      {":scheme", "http"},
+      {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, false);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  codec_client_->sendData(request_encoder, "blahblah", true);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  cleanup();
+}
+
 // Buffer exceed limit in decode header phase.
 TEST_P(GolangIntegrationTest, BufferExceedLimit_DecodeHeader) {
   testBufferExceedLimit("/test?databuffer=decode-header");
@@ -1528,6 +1746,28 @@ TEST_P(GolangIntegrationTest, RefreshRouteCache) {
   EXPECT_EQ("second_matched", getHeader(response->headers(), "add-header-from"));
 
   cleanup();
+}
+
+TEST_P(GolangIntegrationTest, DynamicSecret) {
+  testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/");
+}
+
+TEST_P(GolangIntegrationTest, DynamicSecretGoRoutine) {
+  testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/async");
+}
+
+TEST_P(GolangIntegrationTest, StaticSecret) {
+  testSecrets("static_secret", "static_secret_value", "200", "/");
+}
+
+TEST_P(GolangIntegrationTest, StaticSecretGoRoutine) {
+  testSecrets("static_secret", "static_secret_value", "200", "/async");
+}
+
+TEST_P(GolangIntegrationTest, MissingSecret) { testSecrets("missing_secret", "", "404", "/"); }
+
+TEST_P(GolangIntegrationTest, MissingSecretGoRoutine) {
+  testSecrets("missing_secret", "", "404", "/async");
 }
 
 } // namespace Envoy

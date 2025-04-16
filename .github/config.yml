@@ -2,11 +2,11 @@ agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: 026fb6710a3e55716cc1aba129f613f9834212d2deb4ea875ac9d2c37ca19aa3
-  mobile-sha: d51387127bc3160b2c22b7b2d78f8182ad681a6d4feeeb5b55fda599dd7c4cbe
+  sha: d38457962937370aa867620a5cc7d01c568621fc0d1a57e044847599372a8571
+  mobile-sha: 5ff2c9ce8f3abdb89d305095a39fd0e7ee97422cc017d9578e738f9a56bc33d8
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 6e494ff9bcfa96868cb43f1200f2126cdab39d62db52a5dda80c8ec1694a93ee
-  tag: d2be0c198feda0c607fa33209da01bf737ef373f
+  gcr-sha: 56b66cc84065c88a141963cedbbe4198850ffae0dacad769f516d0e9081439da
+  tag: cb86d91cf406995012e330ab58830e6ee10240cb
 
 config:
   envoy:
@@ -182,6 +182,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
   mobile-android-all:
     paths:
@@ -192,6 +193,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
     push: never
   mobile-android-tests:
@@ -259,6 +261,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
   mobile-ios-all:
     paths:
@@ -269,6 +272,7 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
+    - source/common/**/*
     - tools/code_format/check_format.py
     push: never
   mobile-ios-tests:

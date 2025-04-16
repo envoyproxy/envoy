@@ -45,8 +45,8 @@ public final class FakeX509Util {
     }
 
     if (ContextUtils.getApplicationContext() == null) {
-      throw new NullPointerException(
-          "ContextUtils is not initialized with a proper context. Call initApplicationContext() during startup.");
+      throw new NullPointerException("ContextUtils is not initialized with a proper context. "
+                                     + "Call initApplicationContext() during startup.");
     }
 
     for (byte[] cert : certChain) {
