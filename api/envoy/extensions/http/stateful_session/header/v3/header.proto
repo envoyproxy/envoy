@@ -75,7 +75,7 @@ message HeaderBasedSessionState {
   // header. And the ``origin`` part should always be last part of the new header value.
   //
   // If this mode is used then Envoy will assume that the header in the request will also be in the
-  // same format and contains the ``origin`` part. This extension will parse the upstream host
+  // same format and will contain the ``origin`` part. This extension will parse the upstream host
   // address and update the ``name`` field specified header in the request to the ``origin`` part.
   //
   // This mode is used for the protocols or scenarios where the server will generate and set the
