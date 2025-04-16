@@ -47,7 +47,7 @@ message HeaderBasedSessionState {
   // The name that will be used to obtain header value from downstream HTTP request and generate
   // new response header for downstream. The Envoy assume the upstream server or the Envoy itself
   // will generate the ``name`` field specified header in the response. The header value will
-  // contains the necessary information to do the host selection. And Envoy assume the clients
+  // contain the necessary information to do the host selection. And Envoy assume the clients
   // will send the same header back in the subsequent requests if they receive the header and want
   // to use the same session.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -75,7 +75,7 @@ message HeaderBasedSessionState {
   // header. And the ``origin`` part should always be last part of the new header value.
   //
   // If this mode is used then Envoy will assume that the header in the request will also be in the
-  // same format and contains the ``origin`` part. This extension will parse the upstream host
+  // same format and will contain the ``origin`` part. This extension will parse the upstream host
   // address and update the ``name`` field specified header in the request to the ``origin`` part.
   //
   // This mode is used for the protocols or scenarios where the server will generate and set the
