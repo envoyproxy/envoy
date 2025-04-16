@@ -320,5 +320,10 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: resource_monitors
+  change: |
+    added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
+    memory pressure, with configurable max_memory_bytes limit
+    :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`.
 
 deprecated:

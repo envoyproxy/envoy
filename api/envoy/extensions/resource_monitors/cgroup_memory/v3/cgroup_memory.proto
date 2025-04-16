@@ -15,7 +15,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.resource_monitors.cgroup_memory]
 
 message CgroupMemoryConfig {
-  // The maximum memory limit in bytes. When the current memory usage exceeds this limit,
-  // the overload action(s) will be triggered. Must be greater than 0.
-  uint64 max_memory_bytes = 1 [(validate.rules).uint64 = {gt: 0}];
+  // The maximum memory available to the monitored cgroup in bytes.
+  // If not specified, will use only the cgroup's memory limit.
+  // If specified, must be greater than 0.
+  optional uint64 max_memory_bytes = 1 [(validate.rules).uint64 = {gt: 0}];
 }

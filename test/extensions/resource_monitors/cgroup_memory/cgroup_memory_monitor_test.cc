@@ -32,19 +32,20 @@ public:
   bool hasError() const { return error_.has_value(); }
 
   double pressure() const { return *pressure_; }
+  const EnvoyException& error() const { return *error_; }
 
 private:
   absl::optional<double> pressure_;
   absl::optional<EnvoyException> error_;
 };
 
-TEST(CgroupMemoryMonitorTest, ComputesCorrectUsage) {
+TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingConfigLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   config.set_max_memory_bytes(1000);
 
   auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
   EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
-  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(1000));
+  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(500));
 
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
 
@@ -55,29 +56,13 @@ TEST(CgroupMemoryMonitorTest, ComputesCorrectUsage) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.5);
 }
 
-TEST(CgroupMemoryMonitorTest, ReportsErrorOnZeroLimit) {
+
+TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingCgroupLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(0);
 
   auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
   EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
-  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(0));
-
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
-
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasError());
-  ASSERT_FALSE(resource.hasPressure());
-}
-
-TEST(CgroupMemoryMonitorTest, UsesConfiguredLimitWhenLowerThanCgroup) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(1000); // Lower than cgroup limit
-
-  auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
-  EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
-  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(2000)); // Higher cgroup limit
+  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(2000));
 
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
 
@@ -85,31 +70,11 @@ TEST(CgroupMemoryMonitorTest, UsesConfiguredLimitWhenLowerThanCgroup) {
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  // Should use configured limit (1000) for calculation: 500/1000 = 0.5
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.5);
-}
-
-TEST(CgroupMemoryMonitorTest, UsesCgroupLimitWhenLowerThanConfigured) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(2000); // Higher than cgroup limit
-
-  auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
-  EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
-  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(1000)); // Lower cgroup limit
-
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
-
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasPressure());
-  ASSERT_FALSE(resource.hasError());
-  // Should use cgroup limit (1000) for calculation: 500/1000 = 0.5
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.5);
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.25);
 }
 
 TEST(CgroupMemoryMonitorTest, UsageExceedsLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(1000);
 
   auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
   EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(2000)); // Usage higher than limit
@@ -125,15 +90,12 @@ TEST(CgroupMemoryMonitorTest, UsageExceedsLimit) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 2.0);
 }
 
-TEST(CgroupMemoryMonitorTest, HandlesVeryLargeValues) {
+TEST(CgroupMemoryMonitorTest, HandlesUnlimitedCgroupMemory) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(std::numeric_limits<uint64_t>::max());
 
   auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
-  EXPECT_CALL(*stats_reader, getMemoryUsage())
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max() / 2));
-  EXPECT_CALL(*stats_reader, getMemoryLimit())
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+  EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
+  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(CgroupMemoryStatsReader::UNLIMITED_MEMORY));
 
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
 
@@ -141,8 +103,59 @@ TEST(CgroupMemoryMonitorTest, HandlesVeryLargeValues) {
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  // Should handle large values correctly: max/2 / max = 0.5
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.5);
+  // Unlimited cgroup memory means no pressure
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);
+}
+
+TEST(CgroupMemoryMonitorTest, HandlesUnlimitedConfigMemory) {
+  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+  config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
+
+  auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
+  EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
+  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(500));
+
+  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  EXPECT_TRUE(resource.hasPressure());
+  EXPECT_FALSE(resource.hasError());
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);  // Should report no pressure when cgroup limit is unlimited
+}
+
+TEST(CgroupMemoryMonitorTest, HandlesErrorFromStatsReader) {
+  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+
+  auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
+  EXPECT_CALL(*stats_reader, getMemoryUsage())
+      .WillOnce(testing::Throw(EnvoyException("Failed to read memory usage")));
+
+  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  EXPECT_FALSE(resource.hasPressure());
+  EXPECT_TRUE(resource.hasError());
+  EXPECT_THAT(resource.error().what(), testing::HasSubstr("Failed to read memory usage"));
+}
+
+TEST(CgroupMemoryMonitorTest, HandlesBothLimitsUnlimited) {
+  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+  config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
+
+  auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
+  EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
+  EXPECT_CALL(*stats_reader, getMemoryLimit())
+      .WillOnce(Return(CgroupMemoryStatsReader::UNLIMITED_MEMORY));
+
+  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  EXPECT_TRUE(resource.hasPressure());
+  EXPECT_FALSE(resource.hasError());
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);
 }
 
 } // namespace

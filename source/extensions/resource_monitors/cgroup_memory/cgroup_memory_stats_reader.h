@@ -2,10 +2,11 @@
 
 #include <memory>
 #include <string>
+#include <limits>
 
 #include "envoy/common/pure.h"
 
-#include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_paths.h"
+#include "cgroup_memory_paths.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,14 +21,19 @@ class CgroupMemoryStatsReader {
 public:
   virtual ~CgroupMemoryStatsReader() = default;
 
+  // Use a large value that's unlikely to be an actual limit
+  static constexpr uint64_t UNLIMITED_MEMORY = std::numeric_limits<uint64_t>::max();
+
   /**
-   * @return Current memory usage in bytes.
+   * Returns current memory usage in bytes.
    * @throw EnvoyException if stats cannot be read.
    */
   virtual uint64_t getMemoryUsage() PURE;
 
   /**
-   * @return Memory limit in bytes.
+   * Returns memory limit in bytes.
+   * @return UNLIMITED_MEMORY if no limit is set (cgroup v1 returns -1, v2 returns "max").
+   * @return actual limit value, which may be 0 to indicate an invalid/error state.
    * @throw EnvoyException if stats cannot be read.
    */
   virtual uint64_t getMemoryLimit() PURE;
@@ -40,35 +46,34 @@ public:
   static std::unique_ptr<CgroupMemoryStatsReader> create();
 
 protected:
+  // Helper method to read and parse memory stats from cgroup files
   static uint64_t readMemoryStats(const std::string& path);
 
-  // Make path getters virtual so they can be overridden in tests
-  virtual std::string getMemoryUsagePath() const = 0;
-  virtual std::string getMemoryLimitPath() const = 0;
+  // Virtual path getters to support test overrides
+  virtual std::string getMemoryUsagePath() const PURE;
+  virtual std::string getMemoryLimitPath() const PURE;
 };
 
+/**
+ * Implementation for cgroup v1 memory subsystem.
+ */
 class CgroupV1StatsReader : public CgroupMemoryStatsReader {
 public:
   uint64_t getMemoryUsage() override;
   uint64_t getMemoryLimit() override;
-  std::string getMemoryUsagePath() const override { return usage_path_; }
-  std::string getMemoryLimitPath() const override { return limit_path_; }
-
-private:
-  const std::string usage_path_{CgroupPaths::V1::USAGE};
-  const std::string limit_path_{CgroupPaths::V1::LIMIT};
+  std::string getMemoryUsagePath() const override { return CgroupPaths::V1::getUsagePath(); }
+  std::string getMemoryLimitPath() const override { return CgroupPaths::V1::getLimitPath(); }
 };
 
+/**
+ * Implementation for cgroup v2 memory subsystem.
+ */
 class CgroupV2StatsReader : public CgroupMemoryStatsReader {
 public:
   uint64_t getMemoryUsage() override;
   uint64_t getMemoryLimit() override;
-  std::string getMemoryUsagePath() const override { return usage_path_; }
-  std::string getMemoryLimitPath() const override { return limit_path_; }
-
-private:
-  const std::string usage_path_{CgroupPaths::V2::USAGE};
-  const std::string limit_path_{CgroupPaths::V2::LIMIT};
+  std::string getMemoryUsagePath() const override { return CgroupPaths::V2::getUsagePath(); }
+  std::string getMemoryLimitPath() const override { return CgroupPaths::V2::getLimitPath(); }
 };
 
 } // namespace CgroupMemory

@@ -3,13 +3,17 @@
 #include "envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.pb.h"
 #include "envoy/server/resource_monitor.h"
 
-#include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_stats_reader.h"
+#include "cgroup_memory_stats_reader.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace CgroupMemory {
 
+/**
+ * Resource monitor implementation that reads cgroup memory metrics.
+ * Calculates memory pressure based on current usage vs configured/cgroup limits.
+ */
 class CgroupMemoryMonitor : public Server::ResourceMonitor {
 public:
   CgroupMemoryMonitor(
