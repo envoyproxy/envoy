@@ -36,6 +36,30 @@ struct CircuitBreakerLimits {
   uint32_t max_pending_requests = 1024;
   uint32_t max_retries = 3;
   uint32_t max_connection_pools = std::numeric_limits<uint32_t>::max();
+
+  CircuitBreakerLimits withMaxConnections(uint32_t max_connections) const {
+    CircuitBreakerLimits limits = *this;
+    limits.max_connections = max_connections;
+    return limits;
+  }
+
+  CircuitBreakerLimits withMaxRequests(uint32_t max_requests) const {
+    CircuitBreakerLimits limits = *this;
+    limits.max_requests = max_requests;
+    return limits;
+  }
+
+  CircuitBreakerLimits withMaxPendingRequests(uint32_t max_pending_requests) const {
+    CircuitBreakerLimits limits = *this;
+    limits.max_pending_requests = max_pending_requests;
+    return limits;
+  }
+
+  CircuitBreakerLimits withMaxRetries(uint32_t max_retries) const {
+    CircuitBreakerLimits limits = *this;
+    limits.max_retries = max_retries;
+    return limits;
+  }
 };
 
 const std::string& config() {
@@ -369,13 +393,13 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxConnections) {
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
 
     reduceAggregateClustersListToOneCluster(*aggregate_cluster);
-    setCircuitBreakerLimits(*aggregate_cluster, CircuitBreakerLimits{.max_connections = 1});
+    setCircuitBreakerLimits(*aggregate_cluster, CircuitBreakerLimits{}.withMaxConnections(1));
     setMaxConcurrentStreams(*aggregate_cluster, 1);
   });
 
   initialize();
 
-  setCircuitBreakerLimits(cluster1_, CircuitBreakerLimits{.max_connections = 1});
+  setCircuitBreakerLimits(cluster1_, CircuitBreakerLimits{}.withMaxConnections(1));
   setMaxConcurrentStreams(cluster1_, 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -491,12 +515,12 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxRequests) {
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
 
     reduceAggregateClustersListToOneCluster(*aggregate_cluster);
-    setCircuitBreakerLimits(*aggregate_cluster, CircuitBreakerLimits{.max_requests = 1});
+    setCircuitBreakerLimits(*aggregate_cluster, CircuitBreakerLimits{}.withMaxRequests(1));
   });
 
   initialize();
 
-  setCircuitBreakerLimits(cluster1_, CircuitBreakerLimits{.max_requests = 1});
+  setCircuitBreakerLimits(cluster1_, CircuitBreakerLimits{}.withMaxRequests(1));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
@@ -612,14 +636,14 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxPendingRequests) {
 
     reduceAggregateClustersListToOneCluster(*aggregate_cluster);
     setCircuitBreakerLimits(*aggregate_cluster,
-                            CircuitBreakerLimits{.max_connections = 1, .max_pending_requests = 1});
+                            CircuitBreakerLimits{}.withMaxConnections(1).withMaxPendingRequests(1));
     setMaxConcurrentStreams(*aggregate_cluster, 1);
   });
 
   initialize();
 
   setCircuitBreakerLimits(cluster1_,
-                          CircuitBreakerLimits{.max_connections = 1, .max_pending_requests = 1});
+                          CircuitBreakerLimits{}.withMaxConnections(1).withMaxPendingRequests(1));
   setMaxConcurrentStreams(cluster1_, 1);
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -767,12 +791,12 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
 
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
     reduceAggregateClustersListToOneCluster(*aggregate_cluster);
-    setCircuitBreakerLimits(*aggregate_cluster, CircuitBreakerLimits{.max_retries = 1});
+    setCircuitBreakerLimits(*aggregate_cluster, CircuitBreakerLimits{}.withMaxRetries(1));
   });
 
   initialize();
 
-  setCircuitBreakerLimits(cluster1_, CircuitBreakerLimits{.max_retries = 1});
+  setCircuitBreakerLimits(cluster1_, CircuitBreakerLimits{}.withMaxRetries(1));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
