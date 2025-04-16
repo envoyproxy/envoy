@@ -34,6 +34,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "cert_validator/cert_validator.h"
+#include "openssl/crypto.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/pkcs12.h"
@@ -185,6 +186,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
     }
   }
+
+  const bool fips_mode = FIPS_mode();
 
 #ifdef BORINGSSL_FIPS
   if (!capabilities_.is_fips_compliant) {
@@ -349,6 +352,31 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       SSL_CTX* ctx = context.ssl_ctx_.get();
       ASSERT(ctx != nullptr);
       SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+    }
+  }
+
+  // Compliance policy must be applied last to have a defined behavior.
+  if (const auto policy = config.compliancePolicy(); policy.has_value()) {
+    switch (policy.value()) {
+      using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    case ProtoPolicy::FIPS_202205:
+      if (!fips_mode) {
+        ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
+      }
+      for (auto& tls_context : tls_contexts_) {
+        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
+                                               ssl_compliance_policy_fips_202205);
+        if (rc != 1) {
+          creation_status = absl::InvalidArgumentError(
+              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
+                           Utility::getLastCryptoError().value_or("")));
+          return;
+        }
+      }
+      break;
+    default:
+      creation_status = absl::InvalidArgumentError("Unknown compliance policy");
+      return;
     }
   }
 }
