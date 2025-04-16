@@ -1131,7 +1131,8 @@ public:
   /**
    * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
+  virtual const UpstreamLocalAddressSelectorConstSharedPtr
+  getUpstreamLocalAddressSelector() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
