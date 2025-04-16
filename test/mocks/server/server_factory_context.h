@@ -140,8 +140,8 @@ public:
   MockGenericFactoryContext();
   ~MockGenericFactoryContext() override;
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), ());
   MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 

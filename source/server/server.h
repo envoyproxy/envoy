@@ -217,7 +217,6 @@ public:
 
   // Configuration::GenericFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
-  Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and

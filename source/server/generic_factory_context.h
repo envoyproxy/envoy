@@ -19,9 +19,9 @@ public:
         validation_visitor_(validation_visitor), init_manager_(init_manager) {}
 
   // Server::Configuration::GenericFactoryContext
-  Server::Configuration::ServerFactoryContext& serverFactoryContext() const override;
+  Server::Configuration::ServerFactoryContext& serverFactoryContext() override;
   Stats::Scope& statsScope() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Init::Manager& initManager() override;
 
   void setInitManager(Init::Manager& init_manager) { init_manager_ = &init_manager; }

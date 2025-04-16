@@ -262,12 +262,12 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server and provides
    *         access to the server's resources.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
