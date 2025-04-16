@@ -318,16 +318,16 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   PANIC("corrupt enum");
 }
 
-bool createWasm(
-    const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
-    Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-    Event::Dispatcher& dispatcher, Api::Api& api,
-    Server::ServerLifecycleNotifier& lifecycle_notifier,
-    Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-    ThreadLocal::SlotAllocator& slot_alloc, RemoteAsyncDataProviderPtr& remote_data_provider,
-    Oci::ManifestProviderPtr& oci_manifest_provider, Oci::BlobProviderPtr& oci_blob_provider,
-    std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
-    CreateWasmCallback&& cb, CreateContextFn create_root_context_for_testing) {
+bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
+                Server::ServerLifecycleNotifier& lifecycle_notifier,
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                ThreadLocal::SlotAllocator& slot_alloc,
+                RemoteAsyncDataProviderPtr& remote_data_provider,
+                Oci::ManifestProviderPtr& oci_manifest_provider,
+                Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
+                CreateContextFn create_root_context_for_testing) {
   auto& stats_handler = getCreateStatsHandler();
   std::string source, code;
   auto config = plugin->wasmConfig();
@@ -487,6 +487,7 @@ bool createWasm(
         manifest_uri.mutable_timeout()->set_seconds(
             vm_config.code().remote().http_uri().timeout().seconds());
 
+        std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider;
         if (vm_config.has_image_pull_secret()) {
           auto secrets_provider = THROW_OR_RETURN_VALUE(
               secretsProvider(vm_config.image_pull_secret(),
@@ -707,12 +708,11 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
     plugin_handle_ = std::move(thread_local_handle);
   };
 
-  if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
-                                init_manager, context.mainThreadDispatcher(), context.api(),
-                                context.lifecycleNotifier(),
-                                context.getTransportSocketFactoryContext(), context.threadLocal(),
-                                remote_data_provider_, oci_manifest_provider_, oci_blob_provider_,
-                                std::move(image_pull_secret_provider_), std::move(callback))) {
+  if (!Common::Wasm::createWasm(
+          plugin_, scope.createScope(""), context.clusterManager(), init_manager,
+          context.mainThreadDispatcher(), context.api(), context.lifecycleNotifier(),
+          context.getTransportSocketFactoryContext(), context.threadLocal(), remote_data_provider_,
+          oci_manifest_provider_, oci_blob_provider_, std::move(callback))) {
     // TODO(wbpcode): use absl::Status to return error rather than throw.
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm plugin {}", plugin_->name_));
