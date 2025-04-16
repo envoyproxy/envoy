@@ -502,6 +502,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Check for NonForwardingActionEntry.
+  const auto* non_forwarding_action = route_->nonForwardingActionEntry();
+  if (non_forwarding_action != nullptr) {
+    stats_.rq_non_forwarding_action_.inc();
+    callbacks_->streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().NonForwardingAction);
+    // Stop iteration, do not forward. Response generation is expected
+    // to be handled by a subsequent filter.
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
   // If there's a route specific limit and it's smaller than general downstream
