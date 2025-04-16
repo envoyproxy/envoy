@@ -218,7 +218,7 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed()
 Status::GrpcStatus
 GrpcJsonReverseTranscoderFilter::GrpcStatusFromHeaders(ResponseHeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
-  if (http_response_status == 200) {
+  if (http_response_status >= 200 && http_response_status <= 299) {
     return Status::WellKnownGrpcStatus::Ok;
   } else {
     is_non_ok_response_ = true;
