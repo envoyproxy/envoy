@@ -13,5 +13,8 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: ext_authz
+  change: |
+    Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
 
 deprecated:
