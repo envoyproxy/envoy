@@ -92,8 +92,9 @@ private:
   Network::DownstreamTransportSocketFactoryPtr createQuicUpstreamTlsContext(
       testing::NiceMock<Server::Configuration::MockGenericFactoryContext>&);
 
-  Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockGenericFactoryContext>&, bool);
+  Network::DownstreamTransportSocketFactoryPtr
+  createUpstreamTlsContext(testing::NiceMock<Server::Configuration::MockGenericFactoryContext>&,
+                           bool);
 };
 
 } // namespace Envoy

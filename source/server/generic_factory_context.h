@@ -24,6 +24,8 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
   Init::Manager& initManager() override;
 
+  void setInitManager(Init::Manager& init_manager) { init_manager_ = &init_manager; }
+
 private:
   Server::Configuration::ServerFactoryContext& server_context_;
   Stats::Scope& stats_scope_;

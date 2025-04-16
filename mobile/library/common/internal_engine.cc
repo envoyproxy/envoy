@@ -236,9 +236,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           auto api_listener = server_->listenerManager().apiListener()->get().createHttpApiListener(
               server_->dispatcher());
           ASSERT(api_listener != nullptr);
-          http_client_ = std::make_unique<Http::Client>(std::move(api_listener), *dispatcher_,
-                                                        server_->serverFactoryContext().statsScope(),
-                                                        server_->api().randomGenerator());
+          http_client_ = std::make_unique<Http::Client>(
+              std::move(api_listener), *dispatcher_, server_->serverFactoryContext().statsScope(),
+              server_->api().randomGenerator());
           dispatcher_->drain(server_->dispatcher());
           engine_running_.Notify();
           callbacks_->on_engine_running_();
