@@ -1853,7 +1853,7 @@ TEST_P(ExtProcIntegrationTest, RetainResponseContentLength) {
       });
 
   verifyDownstreamResponse(*response, 200);
-  EXPECT_EQ(response->headers().ContentLength(), "13");
+  EXPECT_EQ(response->headers().getContentLengthValue(), "13");
   EXPECT_EQ(response->body(), "Hello, World!");
 }
 
@@ -1922,7 +1922,7 @@ TEST_P(ExtProcIntegrationTest, RetainResponseContentLengthAfterBodyProcessing) {
       });
 
   verifyDownstreamResponse(*response, 200);
-  EXPECT_EQ(response->headers().ContentLength(), "13");
+  EXPECT_EQ(response->headers().getContentLengthValue(), "13");
   EXPECT_EQ(response->body(), "Hello, World!");
 }
 
