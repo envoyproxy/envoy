@@ -1,3 +1,8 @@
+#include <chrono>
+#include <memory>
+
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
@@ -697,6 +702,53 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
   }
   return ok;
+}
+bool envoy_dynamic_module_callback_http_filter_http_callout(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
+    uint64_t timeout_milliseconds) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  // Try to get the cluster from the cluster manager for the given cluster name.
+  absl::string_view cluster_name_view(cluster_name, cluster_name_length);
+  Upstream::ThreadLocalCluster* cluster =
+      filter->clusterManager().getThreadLocalCluster(cluster_name_view);
+  if (!cluster) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Cluster {} not found", cluster_name_view);
+    return false;
+  }
+
+  // Construct the request message, starting with the headers, checking for required headers, and
+  // adding the body if present.
+  std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = &headers[i];
+    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+    const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                  header->value_length);
+    hdrs->addCopy(Http::LowerCaseString(key), value);
+  }
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Missing required headers. :path, :method, and host are required");
+    return false;
+  }
+  if (body_size > 0) {
+    message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
+    message->headers().setContentLength(body_size);
+  }
+
+  // Create the callout and add it to the filter.
+  Http::AsyncClient::RequestOptions options;
+  Http::AsyncClient::Callbacks* callback = filter->newHttpCalloutCallback(callout_id);
+  options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
+  cluster->httpAsyncClient().send(std::move(message), *callback, options);
+  return true;
 }
 }
 } // namespace HttpFilters

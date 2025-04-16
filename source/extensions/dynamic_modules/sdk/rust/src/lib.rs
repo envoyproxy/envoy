@@ -1341,3 +1341,16 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
   let filter = &mut **filter;
   filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
+  _envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  _callout_id: u32,
+  _result: abi::envoy_dynamic_module_type_http_callout_result,
+  _headers: *const abi::envoy_dynamic_module_type_http_header,
+  _headers_size: usize,
+  _body_vector: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  _body_vector_size: usize,
+) {
+}

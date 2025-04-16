@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
+#include <vector>
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -103,6 +105,64 @@ void DynamicModuleHttpFilter::sendLocalReply(
 }
 
 void DynamicModuleHttpFilter::encodeComplete() {};
+
+void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::Request&,
+                                                             ResponseMessagePtr&& response) {
+
+  // Check if the filter is destroyed before the callout completed. Note that this HTTP filter
+  // initiated callout is "thread-local", so checking the filter pointer is safe here.
+  if (!filter_->in_module_filter_) {
+    return;
+  }
+
+  std::vector<envoy_dynamic_module_type_http_header> headers_vector;
+  headers_vector.reserve(response->headers().size());
+  response->headers().iterate([&headers_vector](
+                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    headers_vector.emplace_back(envoy_dynamic_module_type_http_header{
+        const_cast<char*>(header.key().getStringView().data()), header.key().getStringView().size(),
+        const_cast<char*>(header.value().getStringView().data()),
+        header.value().getStringView().size()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  Envoy::Buffer::RawSliceVector body = response->body().getRawSlices(std::nullopt);
+  filter_->config_->on_http_filter_http_callout_done_(
+      filter_->thisAsVoidPtr(), filter_->in_module_filter_, callout_id_,
+      envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
+      headers_vector.size(), reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(body.data()),
+      body.size());
+
+  // This callback is allocated on the heap and not held by a shared pointer, so we need to
+  // delete it here.
+  delete this;
+}
+
+void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
+    const AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
+  // Check if the filter is destroyed before the callout completed. Note that this HTTP filter
+  // initiated callout is "thread-local", so checking the filter pointer is safe here.
+  if (!filter_->in_module_filter_) {
+    return;
+  }
+
+  envoy_dynamic_module_type_http_callout_result result;
+  switch (reason) {
+  case Http::AsyncClient::FailureReason::Reset:
+    result = envoy_dynamic_module_type_http_callout_result_Reset;
+    break;
+  case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
+    result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
+    break;
+  }
+  filter_->config_->on_http_filter_http_callout_done_(filter_->thisAsVoidPtr(),
+                                                      filter_->in_module_filter_, callout_id_,
+                                                      result, nullptr, 0, nullptr, 0);
+
+  // This callback is allocated on the heap and not held by a shared pointer, so we need to
+  // delete it here.
+  delete this;
+}
 
 } // namespace HttpFilters
 } // namespace DynamicModules

@@ -3,6 +3,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -21,9 +22,10 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -65,9 +67,10 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -112,9 +115,10 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -170,9 +174,10 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -243,9 +248,10 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
