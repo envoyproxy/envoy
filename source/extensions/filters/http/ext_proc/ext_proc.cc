@@ -210,8 +210,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       grpc_service_(getFilterGrpcService(config)),
       send_body_without_waiting_for_header_response_(
           config.send_body_without_waiting_for_header_response()),
-      keep_content_length_header_in_header_mutation_(
-          config.keep_content_length_header_in_header_mutation()),
+      retain_content_length_header_(config.retain_content_length_header()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -566,8 +565,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
     ENVOY_STREAM_LOG(trace, "decodeHeaders: Skipped header processing", *decoder_callbacks_);
   }
 
-  if (!processing_complete_ && decoding_state_.shouldRemoveContentLength(
-                                   config_->keepContentLengthHeaderInHeaderMutation())) {
+  if (!processing_complete_ &&
+      decoding_state_.shouldRemoveContentLength(config_->retainContentLengthHeader())) {
     headers.removeContentLength();
   }
   return status;
@@ -1008,8 +1007,8 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // (2) side stream processing has been completed. For example, it could be caused by stream error
   // that triggers the local reply or due to spurious message that skips the side stream
   // mutation.
-  if (!processing_complete_ && encoding_state_.shouldRemoveContentLength(
-                                   config_->keepContentLengthHeaderInHeaderMutation())) {
+  if (!processing_complete_ &&
+      encoding_state_.shouldRemoveContentLength(config_->retainContentLengthHeader())) {
     headers.removeContentLength();
   }
   return status;

@@ -114,7 +114,7 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
       common_response.header_mutation(), *headers_,
       common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
       filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
-      shouldRemoveContentLength(filter_.config().keepContentLengthHeaderInHeaderMutation()));
+      shouldRemoveContentLength(filter_.config().retainContentLengthHeader()));
   return mut_status;
 }
 

@@ -187,8 +187,8 @@ public:
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
   bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
-  bool shouldRemoveContentLength(const bool keep_content_length_header_in_header_mutation) const {
-    // Always remove the content length in 3 cases below:
+  bool shouldRemoveContentLength(const bool retain_content_length_header) const {
+    // Always remove the content length in 4 cases below:
     // 1) STREAMED BodySendMode
     // 2) BUFFERED_PARTIAL BodySendMode
     // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
@@ -197,17 +197,17 @@ public:
     // body is mutated by external processor later.
     // An exception to the rules outlined above is whenever an external processor server is
     // consuming headers and bodies in STREAMED or FULL_DUPLEX_STREAMED modes and configuring
-    // the ext_proc filter to keep the content length header in header mutations. In such cases
-    // the side stream server is responsible to correctly set the content length. If no content
-    // length is provided as part of a header mutation ext_proc falls back to the default cases
-    // for STREAMED or FULL_DUPLEX_STREAMED modes.
+    // the ext_proc filter to retain the content length header. In such cases the side stream
+    // server is responsible to correctly set the content length. If no content length is
+    // provided as part of a header mutation ext_proc falls back to the default cases for
+    // STREAMED or FULL_DUPLEX_STREAMED modes.
     // In http1 codec, removing content length will enable chunked encoding whenever feasible.
     return (
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED &&
-         !(send_headers_ && keep_content_length_header_in_header_mutation)) ||
+         !(send_headers_ && retain_content_length_header)) ||
         (body_mode_ ==
              envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED &&
-         !(send_headers_ && keep_content_length_header_in_header_mutation)) ||
+         !(send_headers_ && retain_content_length_header)) ||
         body_mode_ ==
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&

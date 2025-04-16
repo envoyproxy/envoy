@@ -340,12 +340,12 @@ message ExternalProcessor {
   config.core.v3.TypedExtensionConfig on_processing_response = 23
       [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // Keep content length header defined in a header mutation for STREAMED and FULL_DUPLEX_STREAMED body processing modes.
+  // Retain content length header for STREAMED and FULL_DUPLEX_STREAMED body processing modes.
   // It only works in combination with SEND header send mode. For any other combination of modes, it is ignored.
   //
-  // If enabled and a content length header is present in a header mutation Envoy will not switch to chunked transfer encoding
-  // for http1 codec. It is the responsibility of the side stream server to provide a correct content length.
-  bool keep_content_length_header_in_header_mutation = 24;
+  // If enabled and a content length header is present Envoy will not switch to chunked transfer encoding
+  // for http1 codec. It is the responsibility of the side stream server to ensure a correct content length header is present.
+  bool retain_content_length_header = 24;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
