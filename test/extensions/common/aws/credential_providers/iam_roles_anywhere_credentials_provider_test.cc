@@ -5,26 +5,28 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/mocks/filesystem/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
+using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -291,14 +293,14 @@ public:
        "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
        "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
        "Signature="
-       "0b296dd7b4cdaede1ce25a305884e1630955a08f665eab2f011d1456d7cca57abfc2d537fe81c731fef0fbcee97"
-       "5ad8891d342c28046779328530810f929edfe9eb3769c7d44b741a381ff15a50983e60d761f23b979ca36c33b50"
-       "a61a1c3cb29a30e19c0a14f5660a3d3cab7ceb58b0dc97e0d256fac15f1b7635ca12e9b598b4f5bed7863015a49"
-       "c0a1e2f72e847075a7515f538508293af64c5d30ecbb13d4a051efa728ae0d35c4e1920d90f6e4376c7477d8d01"
-       "f3e71c5288dc1eb69e9ecb61767cceb92942f677437bad4eb4ffff6dfac1aac2d6b76318f47fe66e9d34931b2d3"
-       "3c90b340ca97a0a3f5b9896f9834109f83b6c21f5c3a281dcb73263b0"},
+       "94cee97ea560e0c66774332af8d637728d4ec92fe95f1f0489e37e001cc96d59204ceece0727bee28270f117a16"
+       "97e004b68523817e66a2be724be43f5d4daa7701c2d3a253888ff955f804628a4b7857e1d82233d9623a5472988"
+       "f8dbedd4dc0013bde4706117bedfe36ea03464949de9fd8cd6ec7105aa41f3b28723c61ffa6b6d9bcb448368df9"
+       "04e8bb470066072308a1b773b6a07adc0deb2d941ecfdfef3fb4707900ffe582561424eacdd9c8e1e8c2beed612"
+       "33522c339c6efad913797ff5ee39c4e3d43dfe0d8d09afbfbc5a6aefa3ea2264e77315d74861cc01451c3f11f48"
+       "adbf9c25ac451841c9770ed6e08a862537bb30d8d04fd6da46c426195"},
       {"x-amz-date", "20180102T030405Z"},
-      {"x-amz-content-sha256", "ba4c787c2a8f206d06d204e6046e05f4805ed9d401c3161a2a463703014a03a1"},
+      {"x-amz-content-sha256", "9459c733184fbb190c1e0be65b079c66e4bf96b6edddcb6c39a1a939460e6d55"},
       {"x-amz-x509",
        "MIIDczCCAlugAwIBAgIQYy0lLc2af47/"
        "u52i06RCqDANBgkqhkiG9w0BAQsFADATMREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTg"
@@ -358,7 +360,7 @@ public:
        "GN98K+"
        "IREpCWSbf9DMkaeHx6Sw85UjovZU2KgedQHkQ0bhsXqY1PDlP3WgTQAfHx04TA8rljw5lyGxOZJQ3WIvsc4qCn2Q1Dv"
        "+AjpLNZq411"},
-      {"x-amz-content-sha256", "ba4c787c2a8f206d06d204e6046e05f4805ed9d401c3161a2a463703014a03a1"},
+      {"x-amz-content-sha256", "9459c733184fbb190c1e0be65b079c66e4bf96b6edddcb6c39a1a939460e6d55"},
       {"authorization",
        "AWS4-X509-RSA-SHA256 "
        "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
@@ -366,12 +368,12 @@ public:
        "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509;x-amz-x509-"
        "chain, "
        "Signature="
-       "273f78e504db3ef6326a5b912e9990c2acb2e6a7aaee9c201ac6bac75798daaf253b8da955bf1124f528f116fd1"
-       "3f240387563d8e9d1661cdcff6b830b877e1e5e3bbd3256afdf1ccfc6f090ee60af3bb5f0bfd515023506d42bdd"
-       "5e9aa401651b6e1a50d879c54e9101966c097b6a9583ac9a175da14e4fe2a7af310402e658ed993228c47170c49"
-       "e1c860632f51ea79def4cafb66cc22ae4d27078673b1f3bd6854b80f3b04499faab731cec06477640687f6b196a"
-       "0954521caeba9bd6edc56b28bf91af9bcab86f47026b35d905f0b8dc8af40d79c27163aa9331f1c99e47f1f8b75"
-       "754701992be356cca96f9925b374fd2f300f40b4eece35719d2d4d8fe"}};
+       "8c5b5daa03ab9ac9513e2241eeb31a78215f4b2c8336122ad0c6c3962b625a64f0133da911ecf2e1868d402ce9b"
+       "dfc5015cc9446b8be4d3dc2fdc3bcda826bb1f333a77e53632ec0d4dfe18b88b31207c8a9547fc5f22d77707196"
+       "326d3cc7568d40d8c1ab929559f4d8300925312efc51bad5739254140307ee071379e2c159c015df501f5941829"
+       "575ad0a3b41d8e04d02beec8bea615e21bef1a91f5e4a97d0b2f55b737fca32b790ecb7c87d9519e947c80f4279"
+       "f6c57965c04fa040959c9449fa64da1ac0c193c601b6a312d3b8eb0c0f26417a6c9b63c6d8e9665ba00cbb5ea0d"
+       "116956516cb8da33bddc5a665a9b4f590a00df9c611cb15cfc4ed1471"}};
 
   Http::TestRequestHeaderMapImpl rsa_headers_chain_fast_forward_{
       {":path", "/sessions"},
@@ -413,7 +415,7 @@ public:
        "GN98K+"
        "IREpCWSbf9DMkaeHx6Sw85UjovZU2KgedQHkQ0bhsXqY1PDlP3WgTQAfHx04TA8rljw5lyGxOZJQ3WIvsc4qCn2Q1Dv"
        "+AjpLNZq411"},
-      {"x-amz-content-sha256", "ba4c787c2a8f206d06d204e6046e05f4805ed9d401c3161a2a463703014a03a1"},
+      {"x-amz-content-sha256", "9459c733184fbb190c1e0be65b079c66e4bf96b6edddcb6c39a1a939460e6d55"},
       {"authorization",
        "AWS4-X509-RSA-SHA256 "
        "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
@@ -421,12 +423,12 @@ public:
        "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509;x-amz-x509-"
        "chain, "
        "Signature="
-       "77e20f5d7d48f966adb3f3bd640bd9656edb6a4823f9217f8f7e699544b14367096ecad7d9f99580047de151750"
-       "1b9895b152e5ff735c1ac7a9057a576fd54d63cf07ad9a0638486ef1289c87a43a5b84c522b9dbb44fba43eda97"
-       "e593a8d145640e1b071877449b67545c57d8652e37c00bd0ef122ade548c28650592831410372dd8bc5d70db482"
-       "b5d79818d148e71f031ea2588b519f6eb83f0320b39e0ebb26e56e8b0cc60a338d2291c1296b5c6423c3af2fed8"
-       "7998ec1da571646afdb83dc0e8a9baa456ad0794d49e21e79011397d3d8418b470d5055c6dc27588cb16041a3ad"
-       "025633ed3b88a5ec5fcc4a5ef1bf7fceb6da83ab27a94b584cea9e1ae"}};
+       "0a546bb10a5169c30f53788b38fade69e9af8eb20debc8f3fc33ec2123c0406fcf831728109920e2a34f094c353"
+       "7b82f10c97a6159c53190b7b4cb65899bbe8db20bd1f5eac3412d40c25b4d08b891707efe7d82d1ac529957cf02"
+       "eaebee6f2ba0b7937b18922995d2fd24d7a58a83a07fb6d1f8233ee853d0b11c0ae7ef7b4ae6374ba232da93f8e"
+       "62027378af712e4a9f5035df5b6d0d1b596d84d955caf1a50ec8c276abf163c3b00df92f9722aea041e2437f369"
+       "56b05aa487941592921cf4327623afb5679e83b94b03c7b0e2511624193f5b621148516e316ef54714aa8dbaa8b"
+       "ababdc5e88c82c20eee3cdf0be48ff0eaf8217fb16d90f35793d0f1b0"}};
 
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
@@ -449,6 +451,8 @@ public:
 
 // Test cases created from python implementation of iam roles anywhere session
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   // This is what we expect to see requested by the signer
   auto headers =
       Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
@@ -510,18 +514,18 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomSessionN
       "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
       "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
       "Signature="
-      "1b578c0283f15a0ef61dbf967877cbbad1bbbae056921e336bafafa38c466f38d0ad5c39a45f70728064fb1bae21"
-      "0db085d35c2a8f810dcd94adc6e78cccd79e012bfc675cbfc7149e07ecf9464dd985663bab91350ce8b120204ce3"
-      "99858f6c30696e3f8e409bc6b23a4c377f1c11f409d31fb7732028bb73985ed030e3ae4670b4c5877fd00d17b6e3"
-      "424fb1f7070ea078bf598082e0810c9b9fa0b7b54e248f8bd51494fc9ad8c8a6d86e253bb0d7b7a17d17cf22b0c9"
-      "ca25df7112bf90c31d6c47e2ecf1bd43e9137dadcbd1c6c65ac59c84ab723b10679a58faba0fac996f638950e1e9"
-      "b722215c37d42d2e364e0be234bd46704e44938fb904804f0ca7");
+      "949b52d936e142f1f2b62fedb05cb7733b5ef3a3ae070f6b342d2a6173e2a712e7586fc00688974f0562fa09d917"
+      "07615aec1e6e3174513d421b1b9093820bbd65a5e2bd99621118a8a9cf01fb5a0cc7921e69d7f9e41117e43f60b8"
+      "36d17f5d7b7197e3039069a73cfa26021c3a8ee2fa10d30582cdfda1f371a88ff951bf99c9057bc45bcd850d579a"
+      "d1053f9d6aebe190d198177fae03ef06be32b6ea1c57ef28c17ea0aa16ced09ebb6529e53fe6ec8ca68089da1374"
+      "9c2d076ff2a5a499672fccba4ef3d6ad606c217c553708542f89b9e6f4991fcb2ca5d1cd966d0c1377f4dfe4fadf"
+      "2c883b43fa1b2f78a25a890dfc2c3f5699e3c1290b7514de390b");
   message.headers().setCopy(Http::LowerCaseString("x-amz-content-sha256"),
-                            "229d2f52a6b6d64706c163c3abc8f19b5e661d9a8d6d4ec684b1e71f14edf7e5");
+                            "26ba3087303676735d4b0a63543d5ef4e74be47839e11b5c283d707ddbec6deb");
 
-  message.body().add("{\"durationSeconds\": 3600, \"profileArn\": \"arn:profile-arn\", "
-                     "\"roleArn\": \"arn:role-arn\", \"trustAnchorArn\": \"arn:trust-anchor-arn\", "
-                     "\"roleSessionName\": \"mysession\"}");
+  message.body().add(
+      "{\"durationSeconds\":3600.0,\"profileArn\":\"arn:profile-arn\",\"roleArn\":\"arn:role-arn\","
+      "\"roleSessionName\":\"mysession\",\"trustAnchorArn\":\"arn:trust-anchor-arn\"}");
 
   expectDocument(201, "", message);
 
@@ -555,18 +559,17 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningBlankSessionNa
       "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
       "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
       "Signature="
-      "09bee21035a040e96194dc42d7e48bacc0c6be47d226be00501b3ce6389227b6b2ad67321d0b87c673bd51554e2c"
-      "86571b7ba6aae628bcba8d2b587d5108474f969ee168b1fb4d8d0dfac8b8cbabfeb3ad0a2d80f87eaae3afbbfeea"
-      "d69d6f9a53fab98a8bdc72613fb4cea898c9d5d0e0a6c5806a46c7833e0acb8992d8f0ef0d0498acacb6cc81c90b"
-      "0bfa50aed7814f24b3b6509fdbe6181e1218650784829cc331270c19982c8924434fc52f92c19037ba0aa790ad4d"
-      "6dbb5e66cd017a066fc0fb058b04a711fa5f91e25e748ce44be98d9ce4b0665726b8ca93ccad1f87f8f3e4079472"
-      "b321306c2320038828ff21703e08b1a77a696d3e5e326cdcf50a");
+      "a5c4ab3c911805ce0dc74f90855fc958cab2b0c1104a85e04140d878dd7982a0cf6dcbf2ba92a8530f64c5821a9c"
+      "40b3e131cd4da3c26b14535345119e874e79dad118a0eeb0161b92c96ad48cd5b252046c742164c31c87ac249b9f"
+      "9673887d3f60cfbf9e1499d461fc7a6d8bd0b182e70ed44e56e5a29362f93ed3e3b6ebc2f7df72e9e16957e4117f"
+      "f3dff8f44674bfabf0c39f338ffa7e45ada6de33722a3c1021832e6f04847297d350c8eed700ee4efeacd6ac91fc"
+      "4df2edb198304a1f1e87eca3946b23d4d3e319c39c368f958766b1101596a36024ce15fc2aa2200e50f65cfbed64"
+      "77597591a9afb444876c62cdede451632097b5e370db7a1e05e1");
   message.headers().setCopy(Http::LowerCaseString("x-amz-content-sha256"),
-                            "3351f0119309ca7d266e49d34647662de4053d521f17227958be5f4d44f014a8");
+                            "265fe6c14e7b03446a0b273bbdfaef3a0a9e83810298706c0e2bd4b30d899338");
 
-  message.body().add(
-      "{\"durationSeconds\": 3600, \"profileArn\": \"arn:profile-arn\", \"roleArn\": "
-      "\"arn:role-arn\", \"trustAnchorArn\": \"arn:trust-anchor-arn\"}");
+  message.body().add("{\"durationSeconds\":3600.0,\"profileArn\":\"arn:profile-arn\",\"roleArn\":"
+                     "\"arn:role-arn\",\"trustAnchorArn\":\"arn:trust-anchor-arn\"}");
 
   expectDocument(201, "", message);
 
@@ -600,18 +603,19 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomDuration
       "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
       "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
       "Signature="
-      "369ec50ce45ec2586dc9adc394c46bc2bb06fc31141047a094eaad6c97619e9217f1b19d2941dbd1a4396edfeed0"
-      "fbf35b93faf414275de8d798d86557a3bb09ce6d0ce62e642e551076def486ce338c31d9b5e4e5f8d4d6396c2afb"
-      "e523df533fa5f1c3f2056bd06950b06edd4f9abd18057df395cb17eaec4a6a5571848dc380d598f26e4051b0bc82"
-      "197da01d760e29dd13c960425a823887c6b3fb16d416fca59b5b1bc2cbeca7275977a665c8bca101b8de81c38993"
-      "e57bc8949afbbcd5ff88df52e796f45cd254b6441cc62f76acf4a7c632e2963ad9d8f8c4329a03c97be56109faf0"
-      "a5ea4e7619c052330a83da8fbf6c475c353adf621a307eab1271");
+      "8a1bdc11741fbd2ea3da7626d1cebb78b104813f842adfa18d099631f6354758d4863a04dfb55487b71df1d4fc74"
+      "dea3d3232f9f3f582880da8296666e22272a808f57d71b39866271622c0e65c1e27ac6cc8222f6cdbbdc6f0071b0"
+      "1dd610ffab95f99f9d41fbbac347536d6113df900ce795d783c3486e53d9f8b01c8bc71ea49095aafa5d3fbd47c6"
+      "d6c0e5c4cfe93826f09fbce8e54a0e095dc018ba96f9c12e073e54b87d26457a953a5276e554f9e3285494891aee"
+      "54a4ce7e5d76dbe57bcf228b3a22fc7e697403abccce863cc948ab643de15ff97154430f362570ce3afaa77a8d87"
+      "17210f88b2965d2acf8098321434367e5c285ed5766bbec9120e");
   message.headers().setCopy(Http::LowerCaseString("x-amz-content-sha256"),
-                            "7458c6feacdabcbde5c0a5b3058497c47e7f48530efde3d1fab51329081b2fdd");
+                            "d423ab05be9a4ea24346dd8c9beccd7ce30b10322d9b2bab54a75303b4201889");
 
-  message.body().add("{\"durationSeconds\": 123, \"profileArn\": \"arn:profile-arn\", \"roleArn\": "
-                     "\"arn:role-arn\", \"trustAnchorArn\": \"arn:trust-anchor-arn\", "
-                     "\"roleSessionName\": \"mysession\"}");
+  message.body().add("{\"durationSeconds\":123.0,\"profileArn\":\"arn:profile-arn\",\"roleArn\":"
+                     "\"arn:role-arn\",\"roleSessionName\":\"mysession\",\"trustAnchorArn\":\"arn:"
+                     "trust-anchor-arn\""
+                     "}");
 
   expectDocument(201, "", message);
 
@@ -1004,7 +1008,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, Coverage) {
 
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {
 public:
-  IamRolesAnywhereCredentialsProviderBadCredentialsTest() : api_(Api::createApiForTest()){};
+  IamRolesAnywhereCredentialsProviderBadCredentialsTest() : api_(Api::createApiForTest()) {};
 
   envoy::config::core::v3::DataSource certificate_data_source_, private_key_data_source_,
       cert_chain_data_source_;
