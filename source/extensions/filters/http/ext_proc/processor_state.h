@@ -204,10 +204,10 @@ public:
     // In http1 codec, removing content length will enable chunked encoding whenever feasible.
     return (
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED &&
-         !(send_headers_ && retain_content_length_header)) ||
+         !retain_content_length_header) ||
         (body_mode_ ==
              envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED &&
-         !(send_headers_ && retain_content_length_header)) ||
+         !retain_content_length_header) ||
         body_mode_ ==
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&
