@@ -123,6 +123,8 @@ public:
     ENVOY_LOG(debug, "Creating CreateConnectionData");
     if (connection_fn == nullptr) {
       ENVOY_LOG(debug, "Using default CreateConnectionData");
+      // The static cast makes sure we call the base class host() and not
+      // HttpConnPoolImplBase::host which is of a different type.
       connection_fn = [](HttpConnPoolImplBase& parent) {
         return static_cast<Envoy::ConnectionPool::ConnPoolImplBase*>(&parent)
             ->host()

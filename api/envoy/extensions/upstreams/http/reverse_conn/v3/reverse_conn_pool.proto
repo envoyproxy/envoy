@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package envoy.extensions.upstreams.http.reverse_conn.v3;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/any.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.reverse_conn.v3";
+option java_outer_classname = "ReverseConnPoolProtoOuterClass";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/reverse_conn/v3;reverseconnv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse Connection Pool]
+
+// A connection pool which manages reverse connections from upstream to downstream.
+// [#extension: envoy.upstreams.http.reverse_conn]
+message ReverseConnPoolProto {
+  // Maximum number of connections that can be established per host.
+  // Default is 1.
+  uint32 max_connections_per_host = 1;
+
+  // Connection idle timeout. If a connection is idle for this duration, it will be closed.
+  // Default is 1 hour.
+  google.protobuf.Duration idle_timeout = 2;
+
+  // Maximum number of requests that can be in flight for a connection.
+  // Default is 100.
+  uint32 max_requests_per_connection = 3;
+
+  // The name of the factory implementation to use.
+  string name = 4;
+
+  // The typed configuration for the factory implementation.
+  google.protobuf.Any typed_config = 5;
+} 

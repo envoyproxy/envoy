@@ -128,6 +128,10 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
+    // For non-reused connections, remove them from the active connections list immediately.
+    // For reused connections, we keep them in the list until the socket transfer is complete
+    // via moveSocket(). This prevents race conditions where a connection might be removed
+    // before its socket is transferred to a new connection.
     if (!connection_->isConnectionReused()) {
       active_connections_.listener_.removeConnection(*this);
     }
