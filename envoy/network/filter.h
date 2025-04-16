@@ -59,7 +59,7 @@ public:
   /**
    * @return Socket the socket the filter is operating on.
    */
-  virtual const Socket& socket() PURE;
+  virtual const ConnectionSocket& socket() PURE;
 };
 
 /**

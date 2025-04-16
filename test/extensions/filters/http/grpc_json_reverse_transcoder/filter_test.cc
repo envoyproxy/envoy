@@ -532,6 +532,41 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponse) {
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0"); // OK
 }
 
+// Test transcoding of a create request.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseForResourceCreation) {
+  Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
+                                             {":path", "/bookstore.Bookstore/CreateBook"},
+                                             {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(req_headers, false));
+
+  Buffer::OwnedImpl buffer{"{\"id\":123,\"author\":\"John Doe\",\"title\":\"A Book\"}"};
+
+  Http::TestResponseTrailerMapImpl trailers;
+  EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
+  Http::TestResponseHeaderMapImpl res_headers{{":status", "201"},
+                                              {"content-type", "application/json"},
+                                              {"content-length", std::to_string(buffer.length())}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(res_headers, false));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(buffer, true));
+
+  bookstore::Book expected_book;
+  expected_book.set_id(123);
+  expected_book.set_author("John Doe");
+  expected_book.set_title("A Book");
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(buffer, frames);
+
+  bookstore::Book book;
+  book.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
+  EXPECT_EQ(trailers.getGrpcStatusValue(), "0"); // OK
+}
+
 // Test transcoding of a JSON response with trailers.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseWithTrailer) {
   Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},

@@ -1,31 +1,38 @@
 **Summary of changes**:
 
-* c-ares:
-  - [CVE-2024-25629](https://github.com/c-ares/c-ares/security/advisories/GHSA-mg26-v6qh-x48q) Out of bounds read in c-ares (DNS)
+* Security:
+  - [CVE-2025-30157](https://github.com/envoyproxy/envoy/security/advisories/GHSA-cf3q-gqg7-3fm9): Fixed a bug where local replies were incorrectly sent to the ext_proc server.
+  - [CVE-2025-31498](https://github.com/c-ares/c-ares/security/advisories/GHSA-6hxc-62jh-p29v): Updated c-ares to version 1.34.5 to address a security vulnerability.
+
 * HTTP:
-  - RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security issue for Envoys in multi-tenant mesh environments.
-  - Shadow requests are now streamed in parallel with the original request.
-  - Local replies now traverse the filter chain if 1xx headers have been sent to the client.
-* Tracing:
-  - Removed support for (long deprecated) Opencensus tracing extension.
-* Wasm:
-  - The route cache will *not* be cleared by default if a Wasm extension modifies the request headers and the ABI version of wasm extension is larger than 0.2.1.
-  - Remove previously deprecated xDS attributes from `get_property`, use `xds` attributes instead.
-  - Added Wasm VM reload support and support for plugins writtin in Go.
-* Access log:
-  - New implementation of the JSON formatter is enabled by default.
-* CSRF:
-  - Increase the statistics counter `missing_source_origin` only for requests with a missing source origin.
-* DNS:
-  - Added nameserver rotation and query timeouts/retries to the c-ares resolver.
-* Formatter:
-  - `NaN` and `Infinity` values of float will be serialized to `null` and `inf` respectively in the metadata (`DYNAMIC_METADATA`, `CLUSTER_METADATA`, etc.) formatters.
-* OAuth2:
-  - `use_refresh_token` is now enabled by default.
-  - Implement the Signed Double-Submit Cookie pattern.
-* QUIC:
-  - Enable UDP GRO in QUIC client connections by default.
-* SDS:
-  - Relaxed the backing cluster validation for Secret Discovery Service (SDS).
-* TLS:
-  - Added support for P-384 and P-521 curves for server certificates, improved upstream SNI and SAN validation support.
+  - Added support for async load balancing, allowing endpoints to respond with their ability to handle requests.
+  - Improved HTTP/1 parser to handle newlines between requests correctly per RFC 9112.
+  - Added option to ignore specific HTTP/1.1 upgrade values using configurable matchers.
+  - Implemented TCP proxy option to read from downstream connections before establishing upstream connections.
+
+* Performance:
+  - Improved performance for HTTP/1 ignored upgrades.
+  - Enhanced TCP proxy retries to run in a different event loop iteration to avoid connection issues.
+  - Added fixed value option for minimum RTT in adaptive concurrency filter.
+  - Enhanced dynamic forward proxy with async lookups for null hosts.
+
+* Reliability:
+  - Fixed a bug in preconnecting logic that could lead to excessive connection establishment.
+  - Fixed port exhaustion issues in the original_src filter by setting the `IP_BIND_ADDRESS_NO_PORT` socket option.
+  - Fixed socket option application for additional listener addresses.
+  - Fixed crash when creating an EDS cluster with invalid configuration.
+
+* Features:
+  - Added support for loading shared libraries at runtime through dynamic modules.
+  - Added support for io_uring in the default socket interface.
+  - Extended the compression filter with the ability to skip compression for specific response codes.
+  - Added support for QUIC-LB draft standard for connection ID generation.
+  - Enhanced ext_proc with graceful gRPC side stream closing and added a new `FULL_DUPLEX_STREAMED` body mode.
+  - Introduced PKCE support for OAuth2 authorization code flow and SameSite cookie attribute configuration.
+  - Added support for monitoring container CPU utilization in Linux Kubernetes environments.
+  - Enhanced proxy protocol TLV support to enable more flexible and customizable usage between downstream and upstream connections.
+  - Added multiple formatter attributes improvements, e.g., `QUERY_PARAM`, `CUSTOM_FLAGS`, and `PATH`
+
+* Observability:
+  - Enhanced Transport Tap with connection information output per event.
+  - Added support for directing LRS to report loads when requests are issued.

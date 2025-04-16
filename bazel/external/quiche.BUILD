@@ -3221,6 +3221,7 @@ envoy_quic_cc_library(
         ":quiche_common_capsule_lib",
         ":quiche_common_mem_slice_storage",
         ":quiche_common_structured_headers_lib",
+        ":quiche_web_transport_web_transport_lib",
     ],
 )
 
@@ -5570,7 +5571,11 @@ envoy_cc_test(
 
 envoy_cc_library(
     name = "quiche_web_transport_web_transport_lib",
-    hdrs = ["quiche/web_transport/web_transport.h"],
+    srcs = ["quiche/web_transport/web_transport_headers.cc"],
+    hdrs = [
+        "quiche/web_transport/web_transport.h",
+        "quiche/web_transport/web_transport_headers.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -5580,6 +5585,8 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_quiche_stream_lib",
         ":quiche_common_quiche_vectorized_io_utils_lib",
+        ":quiche_common_status_utils",
+        ":quiche_common_structured_headers_lib",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",

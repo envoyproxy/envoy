@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common TLS configuration]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message TlsParameters {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsParameters";
 
@@ -43,6 +43,23 @@ message TlsParameters {
 
     // TLS 1.3
     TLSv1_3 = 4;
+  }
+
+  enum CompliancePolicy {
+    // FIPS_202205 configures a TLS connection to use:
+    //
+    //   * TLS 1.2 or 1.3
+    //   * For TLS 1.2, only ECDHE_[RSA|ECDSA]_WITH_AES_*_GCM_SHA*.
+    //   * For TLS 1.3, only AES-GCM
+    //   * P-256 or P-384 for key agreement.
+    //   * For server signatures, only ``PKCS#1/PSS`` with ``SHA256/384/512``, or ECDSA
+    //     with P-256 or P-384.
+    //
+    // .. attention::
+    //
+    //   Please refer to `BoringSSL policies <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20240913.0/include/openssl/ssl.h#5608>`_
+    //   for details.
+    FIPS_202205 = 0;
   }
 
   // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
@@ -157,6 +174,11 @@ message TlsParameters {
   //   rsa_pkcs1_sha1
   //   ecdsa_sha1
   repeated string signature_algorithms = 5;
+
+  // Compliance policies configure various aspects of the TLS based on the given policy.
+  // The policies are applied last during configuration and may override the other TLS
+  // parameters, or any previous policy.
+  repeated CompliancePolicy compliance_policies = 6 [(validate.rules).repeated = {max_items: 1}];
 }
 
 // BoringSSL private key method configuration. The private key methods are used for external

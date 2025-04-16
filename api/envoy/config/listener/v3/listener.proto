@@ -352,6 +352,11 @@ message Listener {
   // accepted in later event loop iterations.
   // If no value is provided Envoy will accept all connections pending accept
   // from the kernel.
+  //
+  // .. note::
+  //
+  //  It is recommended to lower this value for better overload management and reduced per-event cost.
+  //  Setting it to 1 is a viable option with no noticeable impact on performance.
   google.protobuf.UInt32Value max_connections_to_accept_per_socket_event = 34
       [(validate.rules).uint32 = {gt: 0}];
 

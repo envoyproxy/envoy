@@ -4742,7 +4742,7 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
 
   auto to_create = new Tcp::ConnectionPool::MockInstance();
 
-  EXPECT_CALL(context, overrideHostToSelect()).Times(2).WillRepeatedly(Return(absl::nullopt));
+  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
   EXPECT_CALL(*to_create, addIdleCallback(_));

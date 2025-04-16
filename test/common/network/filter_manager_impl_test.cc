@@ -46,7 +46,7 @@ public:
   }
 
   NiceMock<MockFilterManagerConnection> connection_;
-  NiceMock<MockListenSocket> socket_;
+  NiceMock<MockConnectionSocket> socket_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
