@@ -159,7 +159,8 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
       name: session-header
-      packages_mode_config: {}
+      mode:
+        envelope_mode: {}
 )EOF";
 
 static const std::string STATEFUL_SESSION_STRICT_MODE =
