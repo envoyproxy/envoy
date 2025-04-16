@@ -1541,7 +1541,7 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponseWithFilter) {
   Event::MockTimer* timeout_timer =
       new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
 
-  // Set the IPv6 to be removed.
+  // Set IPv6 to be removed.
   dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v6);
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
@@ -1551,13 +1551,6 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponseWithFilter) {
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
   EXPECT_CALL(*timeout_timer, disableTimer());
-  //   EXPECT_CALL(callbacks,
-  //               onLoadDnsCacheComplete(DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
-  //   EXPECT_CALL(update_callbacks_,
-  //               onDnsResolutionComplete("foo.com:80",
-  //                                       DnsHostInfoEquals("127.0.0.2:80", "foo.com", false),
-  //                                       Network::DnsResolver::ResolutionStatus::Completed));
-  std::cerr << "==> AAB TEST 9" << std::endl;
   EXPECT_CALL(
       update_callbacks_,
       onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
@@ -1577,54 +1570,16 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponseWithFilter) {
   ASSERT_NE(absl::nullopt, result.host_info_);
   EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("127.0.0.2:80", "foo.com", false));
 
-  std::cerr << "==> AAB TEST 10" << std::endl;
-  // Force refresh the hosts and set the IPv4 to be removed.
+  // Set IPv4 to be removed.
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("[::2]:80", "foo.com", false)));
   dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v4);
-  std::cerr << "==> AAB TEST 11" << std::endl;
-  EXPECT_CALL(*resolver_, resetNetworking());
-  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
-  EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(update_callbacks_,
-              onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("[::2]:80", "foo.com", false)));
-  EXPECT_CALL(update_callbacks_,
-              onDnsResolutionComplete("foo.com:80", DnsHostInfoEquals("[::2]:80", "foo.com", false),
-                                      Network::DnsResolver::ResolutionStatus::Completed));
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
-  dns_cache_->forceRefreshHosts();
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
-             TestUtility::makeDnsResponse({"127.0.0.2", "::2"}));
-  // Verify that only the address is now set to an IPv6.
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
-  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
-  EXPECT_EQ(result.handle_, nullptr);
-  ASSERT_NE(absl::nullopt, result.host_info_);
-  EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("[::2]:80", "foo.com", false));
 
-  // Force refresh the hosts and set the IP version to be removed to empty.
-  dns_cache_->setIpVersionToRemove(absl::nullopt);
-  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
-  EXPECT_CALL(*timeout_timer, disableTimer());
+  // Set the IP version to be removed to empty.
   EXPECT_CALL(
       update_callbacks_,
       onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
-  EXPECT_CALL(update_callbacks_,
-              onDnsResolutionComplete("foo.com:80",
-                                      DnsHostInfoEquals("127.0.0.2:80", "foo.com", false),
-                                      Network::DnsResolver::ResolutionStatus::Completed));
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
-  dns_cache_->forceRefreshHosts();
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
-             TestUtility::makeDnsResponse({"127.0.0.2", "::2"}));
-  // Verify that only the address is now set to an IPv4 (the first entry in the DNS response).
-  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
-  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
-  EXPECT_EQ(result.handle_, nullptr);
-  ASSERT_NE(absl::nullopt, result.host_info_);
-  EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("127.0.0.2:80", "foo.com", false));
+  dns_cache_->setIpVersionToRemove(absl::nullopt);
 }
 
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponse) {

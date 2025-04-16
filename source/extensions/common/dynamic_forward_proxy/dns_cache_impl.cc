@@ -345,7 +345,6 @@ void DnsCacheImpl::forceRefreshHosts() {
 }
 
 void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) {
-        std::cerr << "==> AAB setIpVersionToRemove" << std::endl;
   bool has_changed = false;
   {
     absl::MutexLock lock{&ip_version_to_remove_lock_};
@@ -360,7 +359,6 @@ void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersi
     absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
     for (auto& primary_host : primary_hosts_) {
       for (auto* callbacks : update_callbacks_) {
-        std::cerr << "==> AAB onDnsHostAddOrUpdate: 1" << std::endl;
         auto status = callbacks->callbacks_.onDnsHostAddOrUpdate(primary_host.first,
                                                                  primary_host.second->host_info_);
         if (!status.ok()) {
@@ -370,8 +368,11 @@ void DnsCacheImpl::setIpVersionToRemove(absl::optional<Network::Address::IpVersi
         }
       }
     }
-    ENVOY_LOG(debug, "refresh all logical hosts in host map, unsupported IP version {}",
-              ip_version.has_value() ? absl::StrCat("'", *ip_version, "'") : "none");
+    ENVOY_LOG(debug, "refresh all {} logical hosts in host map, unsupported IP version {}",
+              primary_hosts_.size(),
+              ip_version.has_value()
+                  ? (*ip_version == Network::Address::IpVersion::v4 ? "v4" : "v6")
+                  : "none");
   }
 }
 
@@ -588,7 +589,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 absl::Status DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
                                                  const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
-    std::cerr << "==> AAB onDnsHostAddOrUpdate: 2" << std::endl;
     RETURN_IF_NOT_OK(callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info));
   }
   return absl::OkStatus();
@@ -762,18 +762,21 @@ DnsCacheImpl::DnsHostInfoImpl::DnsHostInfoImpl(DnsCacheImpl& parent,
 }
 
 Network::Address::InstanceConstSharedPtr DnsCacheImpl::DnsHostInfoImpl::address() const {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
-    auto ip_version_to_remove = parent_.getIpVersionToRemove();
-    absl::ReaderMutexLock lock{&resolve_lock_};
-    for (const auto& address : address_list_) {
-      if (!ip_version_to_remove || address->ip()->version() != *ip_version_to_remove) {
-        return address;
-      }
-    }
-    return nullptr;
-  }
+  const bool filter_unusable_ips = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.dns_cache_filter_unusable_ip_version");
+  absl::optional<Network::Address::IpVersion> ip_version_to_remove = parent_.getIpVersionToRemove();
   absl::ReaderMutexLock lock{&resolve_lock_};
+  for (const auto& address : address_list_) {
+    // If not filtering unusable IPs, OR if there is no IP version to remove, OR if the address is
+    // not of the IP family to remove, use the address. This means if the
+    // `dns_cache_filter_unusable_ip_version` feature is off OR there is no set IP family to remove,
+    // the first address in the list will automatically be returned.
+    if (!filter_unusable_ips || !ip_version_to_remove ||
+        address->ip()->version() != *ip_version_to_remove) {
+      return address;
+    }
+  }
+  // If no address was returned yet, return the first address in the list, if any.
   return !address_list_.empty() ? address_list_.front() : nullptr;
 }
 

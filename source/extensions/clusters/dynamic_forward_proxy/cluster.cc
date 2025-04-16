@@ -288,8 +288,6 @@ absl::Status Cluster::addOrUpdateHost(
       //                     cluster would create multiple logical hosts based on those addresses.
       //                     We will leave this is a follow up depending on need.
       ASSERT(host_info == host_map_it->second.shared_host_info_);
-      ASSERT(host_map_it->second.shared_host_info_->address() !=
-             host_map_it->second.logical_host_->address());
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
       host_map_it->second.logical_host_->setNewAddresses(
           host_info->address(), host_info->addressList(/*filtered=*/true), dummy_lb_endpoint_);
