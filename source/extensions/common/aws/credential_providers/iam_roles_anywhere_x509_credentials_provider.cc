@@ -177,8 +177,8 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
 
   if (certificate_data_source_provider_ == nullptr ||
       private_key_data_source_provider_ == nullptr) {
-        cached_credentials_ = X509Credentials();
-        return;
+    cached_credentials_ = X509Credentials();
+    return;
   }
 
   auto cert_pem = certificate_data_source_provider_->data();
