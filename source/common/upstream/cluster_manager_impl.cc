@@ -1993,7 +1993,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long
     // time and halt other useful work. Consider breaking up this work. Note that this behavior is
     // noted in the configuration documentation in cluster setting
-    // "close_connections_on_host_health_failure". Update the docs if this if this changes.
+    // "close_connections_on_host_health_failure". Update the docs if this changes.
     while (true) {
       const auto& it = host_tcp_conn_map_.find(host);
       if (it == host_tcp_conn_map_.end()) {
@@ -2401,17 +2401,17 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
     if (host->cluster().clusterType().has_value() &&
         host->cluster().clusterType()->name() == "envoy.clusters.reverse_connection") {
-      ENVOY_LOG_MISC(debug, "allocating reverse connection pool");
-      auto* factory = Config::Utility::getFactoryByName<Http::Http2::ReverseConnPoolFactory>(
-          "envoy.http.reverse_conn.default");
-      if (factory) {
-        return factory->allocateConnPool(
-            dispatcher, context_.api().randomGenerator(), server_.singletonManager(), host,
-            priority, options, transport_socket_options, state, origin, alternate_protocols_cache);
-      } else
-        ENVOY_LOG_MISC(error,
-                       "failed to create reverse connection pool. Cannot find a factory "
-                       "implementation for reverse connection pool. Will use forward connecions");
+      ENVOY_LOG(debug, "allocating reverse connection pool");
+      auto* factory = Config::Utility::getFactory<Http::Http2::ReverseConnPoolFactory>(
+          envoy::extensions::upstreams::http::reverse_conn::v3::ReverseConnPoolProto::
+              default_instance());
+      if (factory == nullptr) {
+        ENVOY_LOG_MISC(error, "factory not found for reverse connection pool");
+        return nullptr;
+      }
+      return factory->allocateConnPool(
+          dispatcher, context_.api().randomGenerator(), server_.singletonManager(), host, priority,
+          options, transport_socket_options, state, origin, alternate_protocols_cache);
     }
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state, origin,
@@ -2444,7 +2444,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     ClusterConnectivityState& state,
     absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
-  ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
+  ENVOY_LOG(debug, "Allocating TCP conn pool");
   return std::make_unique<Tcp::ConnPoolImpl>(
       dispatcher, host, priority, options, transport_socket_options, state, tcp_pool_idle_timeout);
 }

@@ -343,7 +343,11 @@ public:
   virtual bool aboveHighWatermark() const PURE;
 
   /**
-   * @return ConnectionSocketPtr& To get socket from current connection.
+   * Transfers ownership of the connection socket to the caller. This should only be called when
+   * the connection is marked as reused. The connection will be cleaned up but the socket will
+   * not be closed.
+   *
+   * @return ConnectionSocketPtr The connection socket.
    */
   virtual ConnectionSocketPtr moveSocket() PURE;
 

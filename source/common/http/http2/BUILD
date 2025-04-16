@@ -80,14 +80,26 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "conn_pool_lib",
-    srcs = ["conn_pool.cc"],
-    hdrs = ["conn_pool.h"],
+    srcs = [
+        "conn_pool.cc",
+        "reverse_conn_pool_factory.cc",
+    ],
+    hdrs = [
+        "conn_pool.h",
+        "reverse_conn_pool_factory.h",
+    ],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/http:conn_pool_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
         "//source/common/http:conn_pool_base_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/reverse_conn/v3:pkg_cc_proto",
     ],
 )
 

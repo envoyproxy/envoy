@@ -62,9 +62,6 @@ public:
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
-  // Transfers ownership of the connection socket to the caller. This should only be called when
-  // the connection is marked as reused. The connection will be cleaned up but the socket will
-  // not be closed.
   ConnectionSocketPtr moveSocket() override;
   void setConnectionReused(bool value) override { reuse_connection_ = value; }
   bool isConnectionReused() override { return reuse_connection_; }
