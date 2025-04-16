@@ -17,11 +17,10 @@ GenericFactoryContextImpl::GenericFactoryContextImpl(
       init_manager_(&generic_context.initManager()) {}
 
 // Server::Configuration::GenericFactoryContext
-Server::Configuration::ServerFactoryContext&
-GenericFactoryContextImpl::serverFactoryContext() const {
+Server::Configuration::ServerFactoryContext& GenericFactoryContextImpl::serverFactoryContext() {
   return server_context_;
 }
-ProtobufMessage::ValidationVisitor& GenericFactoryContextImpl::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& GenericFactoryContextImpl::messageValidationVisitor() {
   return validation_visitor_;
 }
 
