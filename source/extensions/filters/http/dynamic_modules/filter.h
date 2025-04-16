@@ -101,8 +101,34 @@ public:
    */
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
 
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+    public:
+      HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
+          : filter_(filter), callout_id_(id) {}
+      ~HttpCalloutCallback() override = default;
+
+      void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
+      void onFailure(const AsyncClient::Request& request,
+                     Http::AsyncClient::FailureReason reason) override;
+      void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                        const Http::ResponseHeaderMap*) override {};
+
+      /**
+       * sent is called when the request is actually sent.
+       *
+       * If the request failed to send, the failure callback will be called inline according
+       * to the AsyncClient interface. Thefore, this can be used to prevent the recursive call to
+       * the module to on_http_filter_http_callout_done_ in the immediate failure case.
+       */
+      void sent() { sent_ = true; }
+    private:
+      std::shared_ptr<DynamicModuleHttpFilter> filter_;
+      uint32_t callout_id_;
+      bool sent_ = false;
+  };
+
   /**
-   * This allocates a new Http::AsyncClient::Callbacks object for the HTTP callout. The
+   * This allocates a new Http::AsyncClient::Callbacks implementation for the HTTP callout. The
    * HttpCalloutCallback object is used to handle the response from the HTTP callout.
    *
    * The returned object holds a shared pointer to this filter itself, so it ensures
@@ -112,10 +138,9 @@ public:
    * Deallocation of the object happens when AsyncClient::Callbacks::onSuccess() or
    * AsyncClient::Callbacks::onFailure() is called.
    */
-  Http::AsyncClient::Callbacks* newHttpCalloutCallback(uint32_t id) {
+   HttpCalloutCallback* newHttpCalloutCallback(uint32_t id) {
     return new HttpCalloutCallback(this->shared_from_this(), id);
-  }
-
+   }
 private:
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the
@@ -132,23 +157,6 @@ private:
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
-
-  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
-  public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
-        : filter_(filter), callout_id_(id) {}
-    ~HttpCalloutCallback() override = default;
-
-    void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
-    void onFailure(const AsyncClient::Request& request,
-                   Http::AsyncClient::FailureReason reason) override;
-    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
-                                      const Http::ResponseHeaderMap*) override {};
-
-  private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
-    uint32_t callout_id_;
-  };
 };
 
 } // namespace HttpFilters

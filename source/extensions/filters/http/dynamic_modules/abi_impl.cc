@@ -745,9 +745,15 @@ bool envoy_dynamic_module_callback_http_filter_http_callout(
 
   // Create the callout and add it to the filter.
   Http::AsyncClient::RequestOptions options;
-  Http::AsyncClient::Callbacks* callback = filter->newHttpCalloutCallback(callout_id);
+  DynamicModuleHttpFilter::HttpCalloutCallback* callback = filter->newHttpCalloutCallback(callout_id);
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
-  cluster->httpAsyncClient().send(std::move(message), *callback, options);
+  auto result = cluster->httpAsyncClient().send(std::move(message), *callback, options);
+  if (!result) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Failed to send HTTP callout");
+    return false;
+  }
+  callback->sent();
   return true;
 }
 }

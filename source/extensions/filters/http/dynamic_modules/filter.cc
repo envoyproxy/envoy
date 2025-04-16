@@ -145,6 +145,10 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
   if (!filter_->in_module_filter_) {
     return;
   }
+  if (!sent_) {
+    // Immediate failure case. See the comment on fired() method.
+    return;
+  }
 
   envoy_dynamic_module_type_http_callout_result result;
   switch (reason) {
