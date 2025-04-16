@@ -22,10 +22,9 @@ envoy_cc_test(
     srcs = ["iam_roles_anywhere_credentials_provider_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
-        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
-        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
         "//source/extensions/common/aws:credentials_provider_base_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
@@ -35,7 +34,8 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_handle_mocks",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/test_common:test_runtime_lib",
-
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 

@@ -63,7 +63,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   fields["profileArn"].set_string_value(profile_arn_);
   fields["roleArn"].set_string_value(role_arn_);
   fields["trustAnchorArn"].set_string_value(trust_anchor_arn_);
-  
+
   if (session_duration_.has_value()) {
     fields["durationSeconds"].set_number_value(session_duration_.value());
   }
@@ -72,7 +72,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   }
 
   auto body_data = Json::Factory::loadFromProtobufStruct(*json_message);
-  
+
   message.body().add(body_data->asJsonString());
   ENVOY_LOG(debug, "IAM Roles Anywhere /sessions payload: {}", body_data->asJsonString());
 
