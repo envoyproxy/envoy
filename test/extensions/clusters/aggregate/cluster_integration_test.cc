@@ -831,7 +831,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
 
   // wait for the first request retry to arrive at cluster1
   waitForNextUpstreamRequest(FirstUpstreamIndex);
-  auto& first_request_retry = *upstream_request_;
+  auto first_request_retry = std::move(upstream_request_);
 
   // the aggregate_cluster the circuit breaker opens
   test_server_->waitForGaugeEq("cluster.aggregate_cluster.circuit_breakers.default.rq_retry_open",
@@ -878,7 +878,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
 
   // wait for the third request retry to arrive at cluster1
   waitForNextUpstreamRequest(FirstUpstreamIndex);
-  auto& third_request_retry = *upstream_request_;
+  auto third_request_retry = std::move(upstream_request_);
 
   // the aggregate_cluster the circuit breaker remains open
   test_server_->waitForGaugeEq("cluster.aggregate_cluster.circuit_breakers.default.rq_retry_open",
@@ -912,14 +912,14 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
   test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_retry_overflow", 1);
 
   // respond to the third request to cluster1
-  third_request_retry.encodeHeaders(default_response_headers_, true);
+  third_request_retry->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(cluster1_response1->waitForEndStream());
   EXPECT_EQ("200", cluster1_response1->headers().getStatusValue());
   // handle the response to the fourth request to cluster1
   ASSERT_TRUE(cluster1_response2->waitForEndStream());
   EXPECT_EQ("503", cluster1_response2->headers().getStatusValue());
   // respond to the first request to the aggregate cluster
-  first_request_retry.encodeHeaders(default_response_headers_, true);
+  first_request_retry->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(aggregate_cluster_response1->waitForEndStream());
   EXPECT_EQ("200", aggregate_cluster_response1->headers().getStatusValue());
   // handle the response to the second request to the aggregate cluster
