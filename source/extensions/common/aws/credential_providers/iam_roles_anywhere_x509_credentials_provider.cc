@@ -31,7 +31,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
   if (provider_or_error_.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
-    ENVOY_LOG(info, "Invalid certificate data source");
+    ENVOY_LOG(error, "Invalid certificate data source");
     certificate_data_source_provider_ = nullptr;
     return;
   }
@@ -43,7 +43,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
-      ENVOY_LOG(info, "Invalid certificate chain data source");
+      ENVOY_LOG(error, "Invalid certificate chain data source");
     }
   } else {
     certificate_chain_data_source_provider_ = absl::nullopt;
@@ -55,7 +55,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
-    ENVOY_LOG(info, "Invalid private key data source");
+    ENVOY_LOG(error, "Invalid private key data source");
     private_key_data_source_provider_ = nullptr;
     return;
   }
@@ -177,7 +177,8 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
 
   if (certificate_data_source_provider_ == nullptr ||
       private_key_data_source_provider_ == nullptr) {
-    return;
+        cached_credentials_ = X509Credentials();
+        return;
   }
 
   auto cert_pem = certificate_data_source_provider_->data();
