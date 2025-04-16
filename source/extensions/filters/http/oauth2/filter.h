@@ -376,7 +376,7 @@ private:
                                                  const absl::string_view path_str);
   bool validateCsrfToken(const Http::RequestHeaderMap& headers,
                          const std::string& csrf_token) const;
-  void decryptAndUpdateOAuthTokens(Http::RequestHeaderMap& headers);
+  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers);
   std::string decryptToken(const std::string& encrypted_token, const std::string& secret);
 };
 

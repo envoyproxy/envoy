@@ -620,7 +620,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
   // the request upstream.
-  decryptAndUpdateOAuthTokens(headers);
+  decryptAndUpdateOAuthTokenCookies(headers);
 
   if (canSkipOAuth(headers)) {
     // Update the path header with the query string parameters after a successful OAuth login.
@@ -763,12 +763,15 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   return false;
 }
 
-// Decrypts the OAuth tokens and updates the OAuth tokens in the request headers before forwarding
+// Decrypts the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
-void OAuth2Filter::decryptAndUpdateOAuthTokens(Http::RequestHeaderMap& headers) {
-  const CookieNames& cookie_names = config_->cookieNames();
-
+void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
+  if(cookies.empty()){
+    return;
+  }
+
+  const CookieNames& cookie_names = config_->cookieNames();
 
   const std::string encrypted_access_token = findValue(cookies, cookie_names.bearer_token_);
   const std::string encrypted_id_token = findValue(cookies, cookie_names.id_token_);
@@ -789,8 +792,10 @@ void OAuth2Filter::decryptAndUpdateOAuthTokens(Http::RequestHeaderMap& headers) 
                              decryptToken(encrypted_refresh_token, config_->hmacSecret()));
   }
 
-  std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
-  headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  if (!encrypted_access_token.empty()||!encrypted_id_token.empty()||!encrypted_refresh_token.empty()){
+    std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+    headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  }
 }
 
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token,
