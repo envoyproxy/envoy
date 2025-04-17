@@ -106,6 +106,39 @@ void DynamicModuleHttpFilter::sendLocalReply(
 
 void DynamicModuleHttpFilter::encodeComplete() {};
 
+bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+                                              Http::RequestMessagePtr&& message,
+                                              uint64_t timeout_milliseconds) {
+  Upstream::ThreadLocalCluster* cluster =
+      config_->cluster_manager_.getThreadLocalCluster(cluster_name);
+  if (!cluster) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Cluster {} not found", cluster_name);
+    return false;
+  }
+  Http::AsyncClient::RequestOptions options;
+  options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
+  // This allocates a new Http::AsyncClient::Callbacks implementation for the HTTP callout. The
+  // HttpCalloutCallback object is used to handle the response from the HTTP callout.
+  //
+  // The returned object holds a shared pointer to this filter itself, so it ensures
+  // that the filter is not destroyed while the HTTP callout is in progress regardless of whether
+  // the filter is destroyed or not by the time the callout is completed.
+  //
+  // Deallocation of the object happens when AsyncClient::Callbacks::onSuccess() or
+  // AsyncClient::Callbacks::onFailure() is called.
+  auto* callback = new HttpCalloutCallback(this->shared_from_this(), callout_id);
+  auto result = cluster->httpAsyncClient().send(std::move(message), *callback, options);
+  if (!result) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Failed to send HTTP callout");
+    delete callback;
+    return false;
+  }
+  callback->sent_ = true;
+  return true;
+}
+
 void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::Request&,
                                                              ResponseMessagePtr&& response) {
 

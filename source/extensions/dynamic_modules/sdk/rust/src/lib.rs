@@ -1060,8 +1060,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
   ) -> bool {
-    let cluster_name_ptr = cluster_name.as_ptr();
-    let cluster_name_size = cluster_name.len();
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
     let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
@@ -1069,8 +1067,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_filter_http_callout(
         self.raw_ptr,
         callout_id,
-        cluster_name_ptr as *const _ as *mut _,
-        cluster_name_size,
+        cluster_name.as_ptr() as *const _ as *mut _,
+        cluster_name.len(),
         headers_ptr as *const _ as *mut _,
         headers.len(),
         body_ptr as *const _ as *mut _,

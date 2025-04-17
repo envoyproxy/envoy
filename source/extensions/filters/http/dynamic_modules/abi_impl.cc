@@ -1,6 +1,3 @@
-#include <chrono>
-#include <memory>
-
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -703,6 +700,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
   }
   return ok;
 }
+
 bool envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
@@ -713,13 +711,6 @@ bool envoy_dynamic_module_callback_http_filter_http_callout(
 
   // Try to get the cluster from the cluster manager for the given cluster name.
   absl::string_view cluster_name_view(cluster_name, cluster_name_length);
-  Upstream::ThreadLocalCluster* cluster =
-      filter->clusterManager().getThreadLocalCluster(cluster_name_view);
-  if (!cluster) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Cluster {} not found", cluster_name_view);
-    return false;
-  }
 
   // Construct the request message, starting with the headers, checking for required headers, and
   // adding the body if present.
@@ -742,19 +733,8 @@ bool envoy_dynamic_module_callback_http_filter_http_callout(
     message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
     message->headers().setContentLength(body_size);
   }
-
-  // Create the callout and add it to the filter.
-  Http::AsyncClient::RequestOptions options;
-  DynamicModuleHttpFilter::HttpCalloutCallback* callback = filter->newHttpCalloutCallback(callout_id);
-  options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
-  auto result = cluster->httpAsyncClient().send(std::move(message), *callback, options);
-  if (!result) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Failed to send HTTP callout");
-    return false;
-  }
-  callback->sent();
-  return true;
+  return filter->sendHttpCallout(callout_id, cluster_name_view, std::move(message),
+                                 timeout_milliseconds);
 }
 }
 } // namespace HttpFilters

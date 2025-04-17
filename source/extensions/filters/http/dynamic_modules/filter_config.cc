@@ -92,6 +92,7 @@ newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
   config->on_http_filter_response_trailers_ = on_response_trailers.value();
   config->on_http_filter_stream_complete_ = on_filter_stream_complete.value();
   config->on_http_filter_destroy_ = on_filter_destroy.value();
+  config->on_http_filter_http_callout_done_ = on_http_callout_done.value();
   return config;
 }
 
