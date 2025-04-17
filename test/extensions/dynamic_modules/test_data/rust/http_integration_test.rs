@@ -392,7 +392,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
     for chunk in response_body {
       body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
     }
-    assert_eq!(body, "local_response_body");
+    assert_eq!(body, "response_body_from_callout");
 
     envoy_filter.send_response(
       200,

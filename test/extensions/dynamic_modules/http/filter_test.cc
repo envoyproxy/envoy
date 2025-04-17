@@ -452,7 +452,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
       {"some_header", "some_value"},
   }));
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
-  response->body().add("local_response_body");
+  response->body().add("response_body_from_callout");
 
   EXPECT_TRUE(callbacks_captured);
   callbacks_captured->onSuccess(req, std::move(response));
