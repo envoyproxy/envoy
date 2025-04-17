@@ -370,7 +370,16 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
       .WillOnce(testing::Return(cluster.get()));
 
-  EXPECT_CALL(cluster->async_client_, send_(_, _, _)).WillOnce(testing::Return(nullptr));
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            testing::NiceMock<Http::MockAsyncClientRequest> req{
+                &cluster->async_client_}; // This is not used, just for making compiler happy.
+            // Simulate immediate failure where onFailure is called inline.
+            callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
 
   Http::MockStreamDecoderFilterCallbacks callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());

@@ -116,11 +116,11 @@ private:
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
-   * callout.
+   * callout from the parent HTTP filter.
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
+    HttpCalloutCallback(DynamicModuleHttpFilter& filter, uint32_t id)
         : filter_(filter), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
@@ -130,14 +130,20 @@ private:
     void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                       const Http::ResponseHeaderMap*) override {};
 
-    // This remains true until the callout is actually sent. This allows us to avoid inline
-    // failures in the onFailure() method.
+    // This remains false until the callout is actually sent. This allows us to avoid inline
+    // calls to onFailure() method when the async client immediately fails the callout.
     bool sent_ = false;
+    // This is the request object that is used to send the HTTP callout. It is used to cancel the
+    // callout if the filter is destroyed before the callout is completed.
+    Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    DynamicModuleHttpFilter& filter_;
     uint32_t callout_id_;
   };
+
+  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
+      http_callouts_;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;

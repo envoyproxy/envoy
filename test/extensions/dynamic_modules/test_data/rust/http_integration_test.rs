@@ -341,6 +341,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
     );
     if !result {
       envoy_filter.send_response(500, vec![("foo", b"bar")], None);
+    } else {
+      // Try sending the same callout id, which should fail.
+      assert!(!envoy_filter.send_http_callout(
+        1234,
+        &self.cluster_name,
+        vec![
+          (":path", b"/"),
+          (":method", b"GET"),
+          ("host", b"example.com"),
+        ],
+        None,
+        1000,
+      ));
     }
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
@@ -380,8 +393,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
     }
     assert_eq!(body, "local_response_body");
-
-    println!("Received response from callout: {}", body);
 
     envoy_filter.send_response(
       200,

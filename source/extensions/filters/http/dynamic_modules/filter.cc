@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -23,6 +25,12 @@ void DynamicModuleHttpFilter::destroy() {
   }
   config_->on_http_filter_destroy_(in_module_filter_);
   in_module_filter_ = nullptr;
+  for (auto& callout : http_callouts_) {
+    if (callout.second->request_) {
+      callout.second->request_->cancel();
+    }
+  }
+  http_callouts_.clear();
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& headers,
@@ -107,6 +115,13 @@ void DynamicModuleHttpFilter::encodeComplete() {};
 bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
                                               Http::RequestMessagePtr&& message,
                                               uint64_t timeout_milliseconds) {
+
+  // Check if the callout id is not duplicated.
+  if (http_callouts_.find(callout_id) != http_callouts_.end()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+                        "Duplicate callout id {}", callout_id);
+    return false;
+  }
   Upstream::ThreadLocalCluster* cluster =
       config_->cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
@@ -116,37 +131,27 @@ bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_
   }
   Http::AsyncClient::RequestOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
-  // This allocates a new Http::AsyncClient::Callbacks implementation for the HTTP callout. The
-  // HttpCalloutCallback object is used to handle the response from the HTTP callout.
-  //
-  // The returned object holds a shared pointer to this filter itself, so it ensures
-  // that the filter is not destroyed while the HTTP callout is in progress regardless of whether
-  // the filter is destroyed or not by the time the callout is completed.
-  //
-  // Deallocation of the object happens when AsyncClient::Callbacks::onSuccess() or
-  // AsyncClient::Callbacks::onFailure() is called.
-  auto* callback = new HttpCalloutCallback(this->shared_from_this(), callout_id);
+  auto callback = std::make_unique<HttpCalloutCallback>(*this, callout_id);
   auto result = cluster->httpAsyncClient().send(std::move(message), *callback, options);
   if (!result) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Failed to send HTTP callout");
-    delete callback;
     return false;
   }
   callback->sent_ = true;
+  callback->request_ = result;
+  http_callouts_.emplace(callout_id, std::move(callback));
   return true;
 }
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::Request&,
                                                              ResponseMessagePtr&& response) {
-
-  // Check if the filter is destroyed before the callout completed. Note that this HTTP filter
-  // initiated callout is "thread-local", so checking the filter pointer is safe here.
-  if (!filter_->in_module_filter_) {
+  // Check if the filter is destroyed before the callout completed.
+  if (!filter_.in_module_filter_) {
     return;
   }
 
-  std::vector<envoy_dynamic_module_type_http_header> headers_vector;
+  absl::InlinedVector<envoy_dynamic_module_type_http_header, 16> headers_vector;
   headers_vector.reserve(response->headers().size());
   response->headers().iterate([&headers_vector](
                                   const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
@@ -158,26 +163,20 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
   });
 
   Envoy::Buffer::RawSliceVector body = response->body().getRawSlices(std::nullopt);
-  filter_->config_->on_http_filter_http_callout_done_(
-      filter_->thisAsVoidPtr(), filter_->in_module_filter_, callout_id_,
+  filter_.config_->on_http_filter_http_callout_done_(
+      filter_.thisAsVoidPtr(), filter_.in_module_filter_, callout_id_,
       envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
       headers_vector.size(), reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(body.data()),
       body.size());
 
-  // This callback is allocated on the heap and not held by a shared pointer, so we need to
-  // delete it here.
-  delete this;
+  // Clean up the callout.
+  filter_.http_callouts_.erase(callout_id_);
 }
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
     const AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
-  // Check if the filter is destroyed before the callout completed. Note that this HTTP filter
-  // initiated callout is "thread-local", so checking the filter pointer is safe here.
-  if (!filter_->in_module_filter_) {
-    return;
-  }
-  if (!sent_) {
-    // Immediate failure case. See the comment on fired() method.
+  // Check if the filter is destroyed before the callout completed.
+  if (!filter_.in_module_filter_ || !sent_) { // See the comment on sent_ for more details.
     return;
   }
 
@@ -190,13 +189,11 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
     result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
     break;
   }
-  filter_->config_->on_http_filter_http_callout_done_(filter_->thisAsVoidPtr(),
-                                                      filter_->in_module_filter_, callout_id_,
-                                                      result, nullptr, 0, nullptr, 0);
-
-  // This callback is allocated on the heap and not held by a shared pointer, so we need to
-  // delete it here.
-  delete this;
+  filter_.config_->on_http_filter_http_callout_done_(filter_.thisAsVoidPtr(),
+                                                     filter_.in_module_filter_, callout_id_, result,
+                                                     nullptr, 0, nullptr, 0);
+  // Clean up the callout.
+  filter_.http_callouts_.erase(callout_id_);
 }
 
 } // namespace HttpFilters
