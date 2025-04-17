@@ -1102,20 +1102,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.sanitize_sni_in_access_log", "false"},
-    });
-
-    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
-    std::string requested_server_name = "stub_server\n";
-    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
-    EXPECT_EQ("stub_server\n", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::stringValue("stub_server\n")));
-  }
-
-  {
     StreamInfoFormatter listener_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
     std::string downstream_transport_failure_reason = "TLS error";
     stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
