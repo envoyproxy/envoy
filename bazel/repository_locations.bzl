@@ -134,13 +134,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 1. Open https://chromiumdash.appspot.com/releases?platform=Linux and find the latest Stable release.
         # 2. In the info for that release, open the "Branch Base Commit" link, then open DEPS, and use the <boringssl_revision>.
         #
-        # chromium-130.0.6723.69 (linux/stable)
-        version = "58f3bc83230d2958bb9710bc910972c4f5d382dc",
-        sha256 = "50db81f25e3ee0f90b95182fc244ceb58aefbac59456bf3f55f1c519c5584d71",
+        # chromium-135.0.7049.84 (linux/stable)
+        version = "673e61fc215b178a90c0e67858bbf162c8158993",
+        sha256 = "5f84f1d01a278a5cadf51acc11a0c4519f2f57277cff33d154917083c68463b4",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-09-13",
+        release_date = "2025-02-28",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",

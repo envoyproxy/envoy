@@ -10,12 +10,18 @@ minor_behavior_changes:
     The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>` first.
     And if not found, it will search by the canonical name of the filter ``envoy.filters.http.lua``.
+- area: grpc-json
+  change: |
+    Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: access_log
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.sanitize_sni_in_access_log`` and legacy code paths.
 
 new_features:
 
