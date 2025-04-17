@@ -106,6 +106,7 @@ absl::Status MutationUtils::headerMutationResultCheck(const Http::HeaderMap& hea
   return absl::OkStatus();
 }
 
+// TODO(yanjunxiang-google): Remove the invalid_header_append_encoding counter when removing the runtime.
 bool MutationUtils::getAppendFromHeaderMutation(
     const envoy::config::core::v3::HeaderValueOption& set_header,
     Stats::Counter& invalid_append_encoding) {
