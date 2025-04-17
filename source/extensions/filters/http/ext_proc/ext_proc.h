@@ -44,6 +44,7 @@ namespace ExternalProcessing {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(message_timeouts)                                                                        \
   COUNTER(rejected_header_mutations)                                                               \
+  COUNTER(invalid_header_append_encoding)                                                          \
   COUNTER(override_message_timeout_received)                                                       \
   COUNTER(override_message_timeout_ignored)                                                        \
   COUNTER(clear_route_cache_ignored)                                                               \
