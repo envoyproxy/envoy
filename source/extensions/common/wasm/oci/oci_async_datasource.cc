@@ -14,13 +14,13 @@ ManifestProvider::ManifestProvider(
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
     Random::RandomGenerator& random, const envoy::config::core::v3::HttpUri& uri,
     std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
-    const std::string registry, bool allow_empty, AsyncDataSourceCb&& callback)
+    const std::string registry, AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
           [this, &cm, &uri, &image_pull_secret_provider, &registry]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageManifestFetcher>(
                 cm, uri, *this, image_pull_secret_provider, registry);
           },
-          "ManifestProvider", manager, source, dispatcher, random, allow_empty,
+          "ManifestProvider", manager, source, dispatcher, random, /*allow_empty*/ true,
           std::move(callback)) {};
 
 BlobProvider::BlobProvider(

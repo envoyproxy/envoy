@@ -518,8 +518,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
 
         oci_manifest_provider = std::make_unique<Oci::ManifestProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
-            api.randomGenerator(), manifest_uri, image_pull_secret_provider, registry, true,
-            get_blob_cb);
+            api.randomGenerator(), manifest_uri, image_pull_secret_provider, registry, get_blob_cb);
       } else {
         remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,

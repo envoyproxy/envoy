@@ -126,7 +126,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceNoCluster) {
   std::string async_data = "non-empty";
   oci_manifest_provider_ = std::make_unique<ManifestProvider>(
       cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", true, [&](const std::string& data) {
+      "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -157,7 +157,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceReturnFailure) {
   std::string async_data = "non-empty";
   oci_manifest_provider_ = std::make_unique<ManifestProvider>(
       cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", true, [&](const std::string& data) {
+      "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -190,7 +190,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccessWith503) {
   std::string async_data = "non-empty";
   oci_manifest_provider_ = std::make_unique<ManifestProvider>(
       cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", true, [&](const std::string& data) {
+      "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -206,7 +206,6 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccessWith503) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-// TODO: Never allow empty manifest
 TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   AsyncDataSourcePb config;
   TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
@@ -224,7 +223,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   std::string async_data = "non-empty";
   oci_manifest_provider_ = std::make_unique<ManifestProvider>(
       cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", true, [&](const std::string& data) {
+      "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -260,7 +259,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccess) {
   std::string async_data = "non-empty";
   oci_manifest_provider_ = std::make_unique<ManifestProvider>(
       cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", true, [&](const std::string& data) {
+      "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, layer_digest_);
         async_data = data;
@@ -271,35 +270,6 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccess) {
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, layer_digest_);
-}
-
-TEST_F(OciManifestProviderTest, LoadRemoteDataSourceDoNotAllowEmpty) {
-  AsyncDataSourcePb config;
-  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(
-        request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", false,
-      [&](const std::string& data) { async_data = data; });
-
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, "non-empty");
 }
 
 TEST_F(OciManifestProviderTest, DatasourceReleasedBeforeFetchingData) {
@@ -323,7 +293,7 @@ TEST_F(OciManifestProviderTest, DatasourceReleasedBeforeFetchingData) {
 
     oci_manifest_provider_ = std::make_unique<ManifestProvider>(
         cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-        "123.dkr.ecr.us-east-1.amazonaws.com", false, [&](const std::string& data) {
+        "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
           EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
           EXPECT_EQ(data, layer_digest_);
           async_data = data;
@@ -371,7 +341,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceWithRetry) {
   std::string async_data = "non-empty";
   oci_manifest_provider_ = std::make_unique<ManifestProvider>(
       cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
-      "123.dkr.ecr.us-east-1.amazonaws.com", false, [&](const std::string& data) {
+      "123.dkr.ecr.us-east-1.amazonaws.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, layer_digest_);
         async_data = data;

@@ -18,7 +18,7 @@ public:
       const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
       Random::RandomGenerator& random, const envoy::config::core::v3::HttpUri& uri,
       std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
-      const std::string registry, bool allow_empty, AsyncDataSourceCb&& callback);
+      const std::string registry, AsyncDataSourceCb&& callback);
 };
 
 using ManifestProviderPtr = std::unique_ptr<ManifestProvider>;
