@@ -124,8 +124,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(DynamicModuleHttpFilter& filter, uint32_t id)
-        : filter_(filter), callout_id_(id) {}
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
+        : filter_(std::move(filter)), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
@@ -138,11 +138,12 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    DynamicModuleHttpFilter& filter_;
+    std::shared_ptr<DynamicModuleHttpFilter> filter_;
     uint32_t callout_id_;
   };
 
-  absl::flat_hash_map<uint32_t, DynamicModuleHttpFilter::HttpCalloutCallback> http_callouts_;
+  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
+      http_callouts_;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;

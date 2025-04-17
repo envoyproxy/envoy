@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
+#include <memory>
+
 #include "absl/container/inlined_vector.h"
 
 namespace Envoy {
@@ -26,8 +28,8 @@ void DynamicModuleHttpFilter::destroy() {
   config_->on_http_filter_destroy_(in_module_filter_);
   in_module_filter_ = nullptr;
   for (auto& callout : http_callouts_) {
-    if (callout.second.request_) {
-      callout.second.request_->cancel();
+    if (callout.second->request_) {
+      callout.second->request_->cancel();
     }
   }
   http_callouts_.clear();
@@ -123,12 +125,14 @@ bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_
   }
   Http::AsyncClient::RequestOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
-  auto [iterator, inserted] = http_callouts_.try_emplace(callout_id, *this, callout_id);
+  auto [iterator, inserted] = http_callouts_.try_emplace(
+      callout_id, std::make_unique<DynamicModuleHttpFilter::HttpCalloutCallback>(shared_from_this(),
+                                                                                 callout_id));
   if (!inserted) {
     ENVOY_LOG(error, "Duplicate callout id {}", callout_id);
     return false;
   }
-  auto& callback = iterator->second;
+  DynamicModuleHttpFilter::HttpCalloutCallback& callback = *iterator->second;
   auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
   if (!request) {
     ENVOY_LOG(error, "Failed to send HTTP callout");
@@ -140,8 +144,12 @@ bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::Request&,
                                                              ResponseMessagePtr&& response) {
+  // Move the filter and callout id to the local scope as on_http_filter_http_callout_done_ might
+  // call the local reply which destroy the filter. That ends up destorying this callback itself.
+  DynamicModuleHttpFilterSharedPtr filter = std::move(filter_);
+  uint32_t callout_id = callout_id_;
   // Check if the filter is destroyed before the callout completed.
-  if (!filter_.in_module_filter_) {
+  if (!filter->in_module_filter_) {
     return;
   }
 
@@ -157,20 +165,23 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
   });
 
   Envoy::Buffer::RawSliceVector body = response->body().getRawSlices(std::nullopt);
-  filter_.config_->on_http_filter_http_callout_done_(
-      filter_.thisAsVoidPtr(), filter_.in_module_filter_, callout_id_,
+  filter->config_->on_http_filter_http_callout_done_(
+      filter->thisAsVoidPtr(), filter->in_module_filter_, callout_id,
       envoy_dynamic_module_type_http_callout_result_Success, headers_vector.data(),
       headers_vector.size(), reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(body.data()),
       body.size());
-
   // Clean up the callout.
-  filter_.http_callouts_.erase(callout_id_);
+  filter->http_callouts_.erase(callout_id);
 }
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
     const AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
+  // Move the filter and callout id to the local scope as on_http_filter_http_callout_done_ might
+  // call the local reply which destroy the filter. That ends up destorying this callback itself.
+  DynamicModuleHttpFilterSharedPtr filter = std::move(filter_);
+  uint32_t callout_id = callout_id_;
   // Check if the filter is destroyed before the callout completed.
-  if (!filter_.in_module_filter_) {
+  if (!filter->in_module_filter_) {
     return;
   }
   // request_ is not null if the callout is actually sent to the upstream cluster.
@@ -186,13 +197,13 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
       result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
       break;
     }
-    filter_.config_->on_http_filter_http_callout_done_(filter_.thisAsVoidPtr(),
-                                                       filter_.in_module_filter_, callout_id_,
+    filter->config_->on_http_filter_http_callout_done_(filter->thisAsVoidPtr(),
+                                                       filter->in_module_filter_, callout_id,
                                                        result, nullptr, 0, nullptr, 0);
   }
 
   // Clean up the callout.
-  filter_.http_callouts_.erase(callout_id_);
+  filter->http_callouts_.erase(callout_id);
 }
 
 } // namespace HttpFilters
