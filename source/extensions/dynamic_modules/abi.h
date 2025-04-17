@@ -585,7 +585,7 @@ void envoy_dynamic_module_on_http_filter_destroy(
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
  * @param callout_id is the ID of the callout. This is used to differentiate between multiple
- * callouts.
+ * calls.
  * @param result is the result of the callout.
  * @param headers is the headers of the response.
  * @param headers_size is the size of the headers.

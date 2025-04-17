@@ -251,7 +251,6 @@ TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
 
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendData(encoder_decoder.first, 10, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
