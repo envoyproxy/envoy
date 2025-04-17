@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
-#include <vector>
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
