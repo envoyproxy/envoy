@@ -334,11 +334,11 @@ public:
     // Initialize the transport socket factory using a customized ssl option.
     ssl_client_option_.setSan(san_to_match_).setSni("lyft.com");
     NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-    ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(context.server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(stats_scope_));
-    ON_CALL(context.server_context_, sslContextManager())
+    ON_CALL(context.server_factory_context_, sslContextManager())
         .WillByDefault(testing::ReturnRef(context_manager_));
-    ON_CALL(context.server_context_, threadLocal())
+    ON_CALL(context.server_factory_context_, threadLocal())
         .WillByDefault(testing::ReturnRef(thread_local_));
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;

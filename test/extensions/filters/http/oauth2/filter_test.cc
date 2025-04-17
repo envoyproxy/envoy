@@ -302,9 +302,10 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   NiceMock<Init::MockManager> init_manager;
   Init::TargetHandlePtr init_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+  EXPECT_CALL(secret_context.server_factory_context_, localInfo())
+      .WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_factory_context_, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context.server_factory_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
@@ -315,11 +316,11 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "client", secret_context, init_manager);
   auto client_callback =
-      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
+      secret_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "token", secret_context, init_manager);
   auto token_callback =
-      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
+      secret_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),

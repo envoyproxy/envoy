@@ -60,8 +60,9 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         libqat_(std::make_shared<FakeLibQatCryptoImpl>()), fsm_(libqat_) {
     handle_.setLibqat(libqat_);
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(factory_context_.server_context_, singletonManager())
+    ON_CALL(factory_context_.server_factory_context_, api())
+        .WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(factory_context_.server_factory_context_, singletonManager())
         .WillByDefault(testing::ReturnRef(fsm_));
   }
 

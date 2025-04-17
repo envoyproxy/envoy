@@ -316,7 +316,8 @@ public:
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), downstream_tls_context);
 
     NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
-    ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(mock_factory_ctx.server_factory_context_, api())
+        .WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         downstream_tls_context, mock_factory_ctx, false);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
@@ -535,7 +536,8 @@ public:
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context;
 
     NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
-    ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(mock_factory_ctx.server_factory_context_, api())
+        .WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         upstream_tls_context, mock_factory_ctx);
     static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
