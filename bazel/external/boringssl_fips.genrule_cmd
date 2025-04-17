@@ -60,6 +60,9 @@ fi
 for pem in $(ls ssl/test/runner/*.pem);
   do cp --dereference ${pem} tmp.pem; cp --remove-destination tmp.pem ${pem}; rm tmp.pem;
 done
+for data in $(ls ssl/test/runner/hpke/testdata/*);
+  do cp --dereference ${data} tmp; cp --remove-destination tmp ${data}; rm tmp;
+done
 
 # Ninja
 VERSION=1.10.2
