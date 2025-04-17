@@ -30,7 +30,7 @@ public:
                Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                const envoy::config::core::v3::HttpUri& uri,
                std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider,
-               const std::string& registry, const std::string& sha256, bool allow_empty,
+               const std::string& registry, const std::string& sha256,
                AsyncDataSourceCb&& callback);
 };
 
