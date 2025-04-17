@@ -11,20 +11,29 @@ namespace ResourceMonitors {
 namespace CgroupMemory {
 
 /**
- * Resource monitor implementation that reads cgroup memory metrics.
- * Calculates memory pressure based on current usage vs configured/cgroup limits.
+ * Resource monitor implementation using cgroup memory statistics.
  */
 class CgroupMemoryMonitor : public Server::ResourceMonitor {
 public:
+  /**
+   * Creates a new monitor with the given configuration.
+   * @param config Configuration for the monitor.
+   * @param stats_reader Reader for cgroup memory statistics.
+   */
   CgroupMemoryMonitor(
       const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
       std::unique_ptr<CgroupMemoryStatsReader> stats_reader = nullptr);
 
-  // Server::ResourceMonitor
+  /**
+   * Updates resource pressure based on current memory usage.
+   * @param callbacks Callbacks to report resource pressure or errors.
+   */
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
-  const uint64_t max_memory_;
+  // Maximum memory limit in bytes.
+  const uint64_t max_memory_bytes_;
+  // Reader for cgroup memory statistics.
   std::unique_ptr<CgroupMemoryStatsReader> stats_reader_;
 };
 

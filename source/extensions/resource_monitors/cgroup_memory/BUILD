@@ -10,13 +10,21 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "cgroup_memory_paths",
+    srcs = ["cgroup_memory_paths.cc"],
+    hdrs = ["cgroup_memory_paths.h"],
+    deps = [
+        "//envoy/common:pure_lib",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "cgroup_memory_stats_reader",
     srcs = ["cgroup_memory_stats_reader.cc"],
-    hdrs = [
-        "cgroup_memory_paths.h",
-        "cgroup_memory_stats_reader.h",
-    ],
+    hdrs = ["cgroup_memory_stats_reader.h"],
     deps = [
+        ":cgroup_memory_paths",
         "//envoy/common:exception_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",

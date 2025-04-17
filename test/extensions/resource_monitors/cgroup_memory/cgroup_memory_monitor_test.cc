@@ -39,6 +39,7 @@ private:
   absl::optional<EnvoyException> error_;
 };
 
+// Test that the monitor computes correct usage using the configured limit
 TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingConfigLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   config.set_max_memory_bytes(1000);
@@ -56,7 +57,7 @@ TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingConfigLimit) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.5);
 }
 
-
+// Test that the monitor computes correct usage using the cgroup limit
 TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingCgroupLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
 
@@ -73,6 +74,7 @@ TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingCgroupLimit) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.25);
 }
 
+// Test that the monitor reports correct pressure when usage exceeds the limit
 TEST(CgroupMemoryMonitorTest, UsageExceedsLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
 
@@ -90,12 +92,14 @@ TEST(CgroupMemoryMonitorTest, UsageExceedsLimit) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 2.0);
 }
 
+// Test that the monitor handles unlimited cgroup memory
 TEST(CgroupMemoryMonitorTest, HandlesUnlimitedCgroupMemory) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
 
   auto stats_reader = std::make_unique<MockCgroupMemoryStatsReader>();
   EXPECT_CALL(*stats_reader, getMemoryUsage()).WillOnce(Return(500));
-  EXPECT_CALL(*stats_reader, getMemoryLimit()).WillOnce(Return(CgroupMemoryStatsReader::UNLIMITED_MEMORY));
+  EXPECT_CALL(*stats_reader, getMemoryLimit())
+      .WillOnce(Return(CgroupMemoryStatsReader::UNLIMITED_MEMORY));
 
   auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(stats_reader));
 
@@ -107,6 +111,7 @@ TEST(CgroupMemoryMonitorTest, HandlesUnlimitedCgroupMemory) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);
 }
 
+// Test that the monitor handles unlimited configured memory
 TEST(CgroupMemoryMonitorTest, HandlesUnlimitedConfigMemory) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
@@ -121,9 +126,11 @@ TEST(CgroupMemoryMonitorTest, HandlesUnlimitedConfigMemory) {
   monitor->updateResourceUsage(resource);
   EXPECT_TRUE(resource.hasPressure());
   EXPECT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);  // Should report no pressure when cgroup limit is unlimited
+  EXPECT_DOUBLE_EQ(resource.pressure(),
+                   0.0); // Should report no pressure when cgroup limit is unlimited
 }
 
+// Test that the monitor handles errors from the stats reader
 TEST(CgroupMemoryMonitorTest, HandlesErrorFromStatsReader) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
 
@@ -140,6 +147,7 @@ TEST(CgroupMemoryMonitorTest, HandlesErrorFromStatsReader) {
   EXPECT_THAT(resource.error().what(), testing::HasSubstr("Failed to read memory usage"));
 }
 
+// Test that the monitor handles both limits being unlimited
 TEST(CgroupMemoryMonitorTest, HandlesBothLimitsUnlimited) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);

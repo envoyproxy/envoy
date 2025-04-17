@@ -13,7 +13,7 @@ namespace CgroupMemory {
 CgroupMemoryMonitor::CgroupMemoryMonitor(
     const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
     std::unique_ptr<CgroupMemoryStatsReader> stats_reader)
-    : max_memory_(config.has_max_memory_bytes() ? config.max_memory_bytes() : 0),
+    : max_memory_bytes_(config.has_max_memory_bytes() ? config.max_memory_bytes() : 0),
       stats_reader_(stats_reader ? std::move(stats_reader) : CgroupMemoryStatsReader::create()) {}
 
 void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
@@ -33,7 +33,7 @@ void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& c
   Server::ResourceUsage usage_stats;
 
   // Use config limit if set, otherwise use cgroup limit
-  const uint64_t limit = max_memory_ > 0 ? max_memory_ : raw_limit;
+  const uint64_t limit = max_memory_bytes_ > 0 ? max_memory_bytes_ : raw_limit;
 
   if (limit == CgroupMemoryStatsReader::UNLIMITED_MEMORY) {
     // When memory is unlimited, there is no memory pressure

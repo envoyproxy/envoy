@@ -1,9 +1,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/resource_monitor_config.h"
 
-#include "source/extensions/resource_monitors/cgroup_memory/config.h"
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_monitor.h"
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_stats_reader.h"
+#include "source/extensions/resource_monitors/cgroup_memory/config.h"
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -27,19 +27,22 @@ public:
   MOCK_METHOD(std::string, getMemoryLimitPath, (), (const, override));
 };
 
+// Basic test to verify factory registration
 TEST(CgroupMemoryMonitorFactoryTest, BasicTest) {
-  auto* factory = Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-      "envoy.resource_monitors.cgroup_memory");
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(factory->name(), "envoy.resource_monitors.cgroup_memory");
 }
 
+// Test creating a monitor with default values
 TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorDefault) {
-  auto* factory = Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-      "envoy.resource_monitors.cgroup_memory");
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
-  // Set up mock stats reader factory
   auto mock_reader = std::make_unique<MockCgroupMemoryStatsReader>();
   EXPECT_CALL(*mock_reader, getMemoryUsage()).WillRepeatedly(Return(100));
   EXPECT_CALL(*mock_reader, getMemoryLimit()).WillRepeatedly(Return(1000));
@@ -54,18 +57,19 @@ TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorDefault) {
   EXPECT_NE(monitor, nullptr);
 }
 
+// Test creating a monitor with a specific configured memory limit
 TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorWithLimit) {
-  auto* factory = Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-      "envoy.resource_monitors.cgroup_memory");
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
-  // Set up mock stats reader
   auto mock_reader = std::make_unique<MockCgroupMemoryStatsReader>();
   EXPECT_CALL(*mock_reader, getMemoryUsage()).WillRepeatedly(Return(500));
   EXPECT_CALL(*mock_reader, getMemoryLimit()).WillRepeatedly(Return(2000));
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(1234);  // Set explicit memory limit
+  config.set_max_memory_bytes(1234); // Set explicit memory limit
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
@@ -76,13 +80,15 @@ TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorWithLimit) {
   EXPECT_NE(monitor, nullptr);
 }
 
+// Test creating a monitor with an invalid memory limit
 TEST(CgroupMemoryMonitorFactoryTest, InvalidConfig) {
-  auto* factory = Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-      "envoy.resource_monitors.cgroup_memory");
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(0);  // Invalid value
+  config.set_max_memory_bytes(0);
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
@@ -91,8 +97,7 @@ TEST(CgroupMemoryMonitorFactoryTest, InvalidConfig) {
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
   EXPECT_THROW_WITH_MESSAGE(
-      factory->createResourceMonitor(config, context),
-      ProtoValidationException,
+      factory->createResourceMonitor(config, context), ProtoValidationException,
       "max_memory_bytes: 0\n: Proto constraint validation failed "
       "(CgroupMemoryConfigValidationError.MaxMemoryBytes: value must be greater than 0)");
 }

@@ -58,10 +58,10 @@ Cgroup Memory
 The cgroup memory resource monitor tracks memory pressure by reading memory usage and limits from the cgroup memory subsystem.
 This monitor supports both cgroup v1 and v2.
 
-The monitor reports memory pressure as a ratio of current memory usage to the memory limit. The limit is determined as the minimum of:
+The monitor reports memory pressure as a ratio of current memory usage to the memory limit. The limit is determined by:
 
-1. The cgroup memory limit (from memory.limit_bytes for v1 or memory.max for v2)
-2. The configured max_memory_bytes value (if specified)
+1. The configured max_memory_bytes value if specified, or
+2. The cgroup memory limit (from memory.limit_bytes for v1 or memory.max for v2) if max_memory_bytes is not configured
 
 When no memory limit is set in cgroup (indicated by -1 in v1 or "max" in v2), the pressure is reported as 0.
 

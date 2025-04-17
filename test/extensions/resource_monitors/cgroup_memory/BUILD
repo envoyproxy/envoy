@@ -17,12 +17,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.resource_monitors.cgroup_memory"],
     deps = [
         "//envoy/registry",
-        "//source/extensions/resource_monitors/cgroup_memory:config",
         "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
+        "//source/extensions/resource_monitors/cgroup_memory:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/resource_monitors/cgroup_memory/v3:pkg_cc_proto",
         "//test/test_common:utility_lib",
     ],
 )
@@ -35,6 +34,15 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "cgroup_memory_paths_test",
+    srcs = ["cgroup_memory_paths_test.cc"],
+    extension_names = ["envoy.resource_monitors.cgroup_memory"],
+    deps = [
+        "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_paths",
     ],
 )
 
