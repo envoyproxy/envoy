@@ -503,6 +503,11 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, &dispatcher, &api,
                             image_pull_secret_provider, vm_config, fetch_callback, registry,
                             image_name](const std::string& digest) {
+          if (digest.empty()) {
+            fetch_callback(EMPTY_STRING);
+            return;
+          }
+
           envoy::config::core::v3::HttpUri blob_uri;
           blob_uri.set_cluster(vm_config.code().remote().http_uri().cluster());
           blob_uri.set_uri(
