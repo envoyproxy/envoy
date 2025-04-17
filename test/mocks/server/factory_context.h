@@ -48,7 +48,7 @@ public:
 
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
-  MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, statsScope, ());
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
