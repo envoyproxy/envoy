@@ -520,10 +520,10 @@ config_setting(
 )
 
 selects.config_setting_group(
-    name = "boringssl_fips_not_ppc",
+    name = "boringssl_fips_x86",
     match_all = [
         ":boringssl_fips",
-        ":not_ppc",
+        "@platforms//cpu:x86_64",
     ],
 )
 
@@ -532,6 +532,14 @@ selects.config_setting_group(
     match_all = [
         ":boringssl_fips",
         ":linux_ppc64le",
+    ],
+)
+
+selects.config_setting_group(
+    name = "boringssl_fips_not_ppc",
+    match_all = [
+        ":boringssl_fips",
+        ":not_ppc",
     ],
 )
 
