@@ -40,9 +40,8 @@ public:
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   Http3ConnPoolImplTest() {
-    ON_CALL(context_.server_factory_context_, threadLocal())
-        .WillByDefault(ReturnRef(thread_local_));
-    EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(

@@ -43,9 +43,9 @@ absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSsl
   }
 
   auto factory = Envoy::Config::Utility::getFactoryByName<ServerContextFactory>(
-      "envoy.ssl.server_factory_context_factory.default");
+      "envoy.ssl.server_context_factory.default");
   if (!factory) {
-    IS_ENVOY_BUG("No envoy.ssl.server_factory_context_factory registered");
+    IS_ENVOY_BUG("No envoy.ssl.server_context_factory registered");
     return nullptr;
   }
   absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> context_or_error =

@@ -16,8 +16,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
       params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
 
   Envoy::Server::GenericFactoryContextImpl factory_context(
-      params.server_factory_context_, *scope,
-      params.server_factory_context_.messageValidationVisitor());
+      params.server_context_, *scope, params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(
@@ -29,9 +28,9 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
       std::unique_ptr<TransportSocketMatcherImpl>);
 
   return THROW_OR_RETURN_VALUE(
-      ClusterInfoImpl::create(params.server_factory_context_.initManager(),
-                              params.server_factory_context_, params.cluster_, params.bind_config_,
-                              params.server_factory_context_.runtime(), std::move(socket_matcher),
+      ClusterInfoImpl::create(params.server_context_.initManager(), params.server_context_,
+                              params.cluster_, params.bind_config_,
+                              params.server_context_.runtime(), std::move(socket_matcher),
                               std::move(scope), params.added_via_api_, factory_context),
       std::unique_ptr<ClusterInfoImpl>);
 }

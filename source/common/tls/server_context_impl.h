@@ -93,7 +93,7 @@ private:
 
 class ServerContextFactoryImpl : public ServerContextFactory {
 public:
-  std::string name() const override { return "envoy.ssl.server_factory_context_factory.default"; }
+  std::string name() const override { return "envoy.ssl.server_context_factory.default"; }
   absl::StatusOr<Ssl::ServerContextSharedPtr>
   createServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
                       const std::vector<std::string>& server_names,

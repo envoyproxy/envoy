@@ -72,12 +72,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
-  ON_CALL(factory_context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_.server_factory_context_, sslContextManager())
+  ON_CALL(factory_context_.server_context_, sslContextManager())
       .WillByDefault(ReturnRef(context_manager_));
-  ON_CALL(factory_context_.server_factory_context_, threadLocal())
-      .WillByDefault(ReturnRef(thread_local_));
+  ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
 
 #ifndef ENVOY_ADMIN_FUNCTIONALITY
   config_helper_.addConfigModifier(

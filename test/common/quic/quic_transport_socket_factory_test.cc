@@ -18,9 +18,8 @@ class QuicServerTransportSocketFactoryConfigTest : public Event::TestUsingSimula
 public:
   QuicServerTransportSocketFactoryConfigTest()
       : server_api_(Api::createApiForTest(server_stats_store_, simTime())) {
-    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*server_api_));
-    ON_CALL(context_.server_factory_context_, threadLocal())
-        .WillByDefault(ReturnRef(thread_local_));
+    ON_CALL(context_.server_context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
@@ -117,9 +116,8 @@ downstream_tls_context:
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {
-    ON_CALL(context_.server_factory_context_, threadLocal())
-        .WillByDefault(ReturnRef(thread_local_));
-    EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
+    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillOnce(Return(nullptr));
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
@@ -148,14 +146,14 @@ TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
   Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};
-  EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context1));
   update_callback_();
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config1 = factory_->getCryptoConfig();
   EXPECT_NE(nullptr, crypto_config1);
 
   Ssl::ClientContextSharedPtr ssl_context2{new Ssl::MockClientContext()};
-  EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context2));
   update_callback_();
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config2 = factory_->getCryptoConfig();

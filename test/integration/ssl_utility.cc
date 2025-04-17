@@ -114,7 +114,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   initializeUpstreamTlsContextConfig(options, tls_context);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx.server_factory_context_, api()).WillByDefault(ReturnRef(api));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context,
                                                                                  mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
@@ -130,7 +130,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context(), use_http3);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx.server_factory_context_, api()).WillByDefault(ReturnRef(api));
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(ReturnRef(api));
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context, mock_factory_ctx, false);
 
@@ -144,7 +144,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
   ON_CALL(mock_factory_ctx, statsScope())
       .WillByDefault(ReturnRef(*upstream_stats_store->rootScope()));
-  ON_CALL(mock_factory_ctx.server_factory_context_, sslContextManager())
+  ON_CALL(mock_factory_ctx.server_context_, sslContextManager())
       .WillByDefault(ReturnRef(context_manager));
 
   std::vector<std::string> server_names;

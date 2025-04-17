@@ -249,7 +249,7 @@ public:
     // Override the bootstrap used by the mock Server::Instance object.
     server_.bootstrap_.CopyFrom(bootstrap);
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
-        bootstrap, factory_, factory_.server_factory_context_, factory_.stats_, factory_.tls_,
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
         xds_manager_);
@@ -317,7 +317,7 @@ public:
     const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
     absl::Status creation_status = absl::OkStatus();
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
-        bootstrap, factory_, factory_.server_factory_context_, factory_.stats_, factory_.tls_,
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, local_cluster_update_, local_hosts_removed_,
         http_context_, grpc_context_, router_context_, server_, xds_manager_, creation_status);
@@ -328,7 +328,7 @@ public:
   void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
     absl::Status creation_status = absl::OkStatus();
     cluster_manager_ = std::make_unique<UpdateOverrideClusterManagerImpl>(
-        bootstrap, factory_, factory_.server_factory_context_, factory_.stats_, factory_.tls_,
+        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
         xds_manager_, creation_status);

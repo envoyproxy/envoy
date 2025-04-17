@@ -1029,12 +1029,11 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsNotReady) {
   NiceMock<Random::MockRandomGenerator> random;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(factory_context_.server_factory_context_, localInfo())
-      .WillOnce(ReturnRef(local_info));
-  EXPECT_CALL(factory_context_.server_factory_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   // EXPECT_CALL(factory_context_, random()).WillOnce(ReturnRef(random));
-  EXPECT_CALL(factory_context_.server_factory_context_, clusterManager())
+  EXPECT_CALL(factory_context_.server_context_, clusterManager())
       .WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
   auto* sds_secret_configs = tls_context.mutable_session_ticket_keys_sds_secret_config();
@@ -1065,8 +1064,7 @@ session_ticket_keys:
 )EOF";
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
@@ -1558,10 +1556,9 @@ TEST_F(ClientContextConfigImplTest, SecretNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(factory_context_.server_factory_context_, localInfo())
-      .WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context_.server_factory_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
@@ -1590,10 +1587,9 @@ TEST_F(ClientContextConfigImplTest, ValidationContextNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(factory_context_.server_factory_context_, localInfo())
-      .WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context_.server_factory_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
@@ -1630,8 +1626,7 @@ tls_certificate:
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
@@ -1665,8 +1660,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_pem = "{{ test_rundir "
@@ -1703,8 +1697,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_p12 = "{{ test_rundir "
@@ -1736,8 +1729,7 @@ TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1766,8 +1758,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1799,8 +1790,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1825,7 +1815,7 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  EXPECT_TRUE(factory_context_.server_factory_context_.secretManager()
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
                   .addStaticSecret(tls_certificate_secret_config)
                   .ok());
   envoy::extensions::transport_sockets::tls::v3::Secret
@@ -1838,7 +1828,7 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  EXPECT_TRUE(factory_context_.server_factory_context_.secretManager()
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
                   .addStaticSecret(certificate_validation_context_secret_config)
                   .ok());
 
@@ -1873,8 +1863,7 @@ tls_certificate:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  EXPECT_TRUE(
-      factory_context_.server_factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -1900,7 +1889,7 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  EXPECT_TRUE(factory_context_.server_factory_context_.secretManager()
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
                   .addStaticSecret(tls_certificate_secret_config)
                   .ok());
   envoy::extensions::transport_sockets::tls::v3::Secret
@@ -1913,7 +1902,7 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  EXPECT_TRUE(factory_context_.server_factory_context_.secretManager()
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
                   .addStaticSecret(certificate_validation_context_secret_config)
                   .ok());
 
@@ -2010,10 +1999,9 @@ TEST_F(ServerContextConfigImplTest, SecretNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(factory_context_.server_factory_context_, localInfo())
-      .WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context_.server_factory_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
@@ -2043,10 +2031,9 @@ TEST_F(ServerContextConfigImplTest, ValidationContextNotReady) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(factory_context_.server_factory_context_, localInfo())
-      .WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context_.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context_.server_factory_context_, mainThreadDispatcher())
+  EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
@@ -2123,7 +2110,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_.server_factory_context_, sslContextManager())
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
@@ -2149,7 +2136,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_.server_factory_context_, sslContextManager())
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
@@ -2181,7 +2168,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
   ContextManagerImpl manager(server_factory_context_);
-  EXPECT_CALL(factory_context_.server_factory_context_, sslContextManager())
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
@@ -2217,7 +2204,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_.server_factory_context_, sslContextManager())
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
@@ -2247,7 +2234,7 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallback) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_.server_factory_context_, sslContextManager())
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
       .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));

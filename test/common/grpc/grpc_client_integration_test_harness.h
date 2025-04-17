@@ -668,7 +668,7 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
