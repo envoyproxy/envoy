@@ -25,6 +25,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/ext_proc:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
+        "//envoy/http:codec_interface",
         "//test/integration:base_integration_test_lib",
         "//test/integration:fake_upstream_lib",
         "//test/integration:integration_lib",

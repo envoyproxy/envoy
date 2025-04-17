@@ -1,9 +1,13 @@
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
+#include "source/extensions/filters/network/ext_proc/client_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
+
+using envoy::service::network_ext_proc::v3::ProcessingRequest;
+using envoy::service::network_ext_proc::v3::ProcessingResponse;
 
 NetworkExtProcFilter::~NetworkExtProcFilter() {
   ENVOY_CONN_LOG(debug, "boteng NetworkExtProcFilter::~NetworkExtProcFilter",
@@ -83,7 +87,7 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
     ExternalProcessorStreamPtr stream_object =
-    client_->start(*this, config_with_hash_key_, options, nullptr);
+    client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     ENVOY_CONN_LOG(info, "After start gRPC stream to external processor",
                    read_callbacks_->connection());

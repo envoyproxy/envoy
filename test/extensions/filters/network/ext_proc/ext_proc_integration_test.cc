@@ -3,7 +3,7 @@
 #include "source/extensions/filters/network/ext_proc/config.h"
 #include "envoy/service/network_ext_proc/v3/network_external_processor.pb.h"
 
-// #include "src/envoy/http/codec.h"
+#include "envoy/http/codec.h"
 #include "test/config/utility.h"
 #include "test/integration/base_integration_test.h"
 #include "test/integration/fake_upstream.h"
@@ -14,6 +14,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
+
+using envoy::service::network_ext_proc::v3::ProcessingRequest;
+using envoy::service::network_ext_proc::v3::ProcessingResponse;
 
 class NetworkExtProcFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -40,7 +43,7 @@ public:
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    grpc_upstream_ = &addFakeUpstream(Envoy::HTTP::CodecType::HTTP2);
+    grpc_upstream_ = &addFakeUpstream(Http::CodecType::HTTP2);
   } 
 
   void initialize() override {
@@ -73,7 +76,7 @@ public:
     ProcessingResponse response;
     auto* read_data = response.mutable_read_data();
     read_data->set_data(data);
-    read_data->set_end_stream(end_stream);
+    read_data->set_end_of_stream(end_stream);
     ENVOY_LOG_MISC(debug, "boteng sendReadGrpcMessage {}",
                    response.DebugString());
     if (first_message) {
@@ -88,7 +91,7 @@ public:
     ProcessingResponse response;
     auto* read_data = response.mutable_read_data();
     read_data->set_data(data);
-    read_data->set_end_stream(end_stream);
+    read_data->set_end_of_stream(end_stream);
     ENVOY_LOG_MISC(debug, "boteng sendReadGrpcMessage {}",
                    response.DebugString());
     if (first_message) {
@@ -102,7 +105,7 @@ public:
     ProcessingResponse response;
     auto* write_data = response.mutable_write_data();
     write_data->set_data(data);
-    write_data->set_end_stream(end_stream);
+    write_data->set_end_of_stream(end_stream);
     ENVOY_LOG_MISC(debug, "boteng sendWriteGrpcMessage {}",
                    response.DebugString());
     if (first_message) {

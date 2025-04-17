@@ -83,6 +83,9 @@ private:
   void onGrpcClose() override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void logStreamInfo() override;
+  
+  void onComplete(ProcessingResponse&) override {};
+  void onError() override {};
 
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{};
