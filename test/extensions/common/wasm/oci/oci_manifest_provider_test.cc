@@ -85,7 +85,7 @@ protected:
         cluster: cluster_1
         timeout: 1s
       sha256:
-        xxxxxx
+        image_blob_sha
   )EOF";
 
   const std::string response_body_ = R"EOF({
@@ -345,7 +345,7 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceWithRetry) {
         cluster: cluster_1
         timeout: 1s
       sha256:
-        xxxxxx
+        image_blob_sha
       retry_policy:
         retry_back_off:
           base_interval: 1s

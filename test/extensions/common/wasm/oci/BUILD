@@ -9,8 +9,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "oci_async_datasource_test",
-    srcs = ["oci_async_datasource_test.cc"],
+    name = "oci_manifest_provider_test",
+    srcs = ["oci_manifest_provider_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:empty_string",
