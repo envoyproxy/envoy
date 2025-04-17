@@ -414,9 +414,14 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions& option) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(message->headers().Path()->value().getStringView(), "/");
+            EXPECT_EQ(message->headers().Method()->value().getStringView(), "GET");
+            EXPECT_EQ(message->headers().Host()->value().getStringView(), "example.com");
+            EXPECT_EQ(message->body().toString(), "http_callout_body");
+            EXPECT_EQ(option.timeout.value(), std::chrono::milliseconds(1000));
             callbacks_captured = &callbacks;
             return &request;
           }));

@@ -336,7 +336,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
         (":method", b"GET"),
         ("host", b"example.com"),
       ],
-      Some(b"local_response_body_from_on_request_headers"),
+      Some(b"http_callout_body"),
       1000,
     );
     if !result {

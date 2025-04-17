@@ -1416,7 +1416,6 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
 ) {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  // let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
   let headers = if headers_size > 0 {
     Some(unsafe {
       std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)

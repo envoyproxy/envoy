@@ -130,6 +130,8 @@ private:
     void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                       const Http::ResponseHeaderMap*) override {};
 
+    // This remains true until the callout is actually sent. This allows us to avoid inline
+    // failures in the onFailure() method.
     bool sent_ = false;
 
   private:
