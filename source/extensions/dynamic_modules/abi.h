@@ -1127,7 +1127,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param callout_id is the ID of the callout. This can be arbitrary and is used to
- * differentiate between multiple callouts on the same filter.
+ * differentiate between multiple calls from the same filter.
  * @param cluster_name is the name of the cluster to which the callout is sent.
  * @param cluster_name_length is the length of the cluster name.
  * @param headers is the headers of the request.
