@@ -26,8 +26,8 @@ void DynamicModuleHttpFilter::destroy() {
   config_->on_http_filter_destroy_(in_module_filter_);
   in_module_filter_ = nullptr;
   for (auto& callout : http_callouts_) {
-    if (callout.second->request_) {
-      callout.second->request_->cancel();
+    if (callout.second.request_) {
+      callout.second.request_->cancel();
     }
   }
   http_callouts_.clear();
@@ -115,32 +115,27 @@ void DynamicModuleHttpFilter::encodeComplete() {};
 bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
                                               Http::RequestMessagePtr&& message,
                                               uint64_t timeout_milliseconds) {
-
-  // Check if the callout id is not duplicated.
-  if (http_callouts_.find(callout_id) != http_callouts_.end()) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Duplicate callout id {}", callout_id);
-    return false;
-  }
   Upstream::ThreadLocalCluster* cluster =
       config_->cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Cluster {} not found", cluster_name);
+    ENVOY_LOG(error, "Cluster {} not found", cluster_name);
     return false;
   }
   Http::AsyncClient::RequestOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
-  auto callback = std::make_unique<HttpCalloutCallback>(*this, callout_id);
-  auto result = cluster->httpAsyncClient().send(std::move(message), *callback, options);
-  if (!result) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Failed to send HTTP callout");
+  auto [iterator, inserted] = http_callouts_.try_emplace(callout_id, *this, callout_id);
+  if (!inserted) {
+    ENVOY_LOG(error, "Duplicate callout id {}", callout_id);
     return false;
   }
-  callback->sent_ = true;
-  callback->request_ = result;
-  http_callouts_.emplace(callout_id, std::move(callback));
+  auto& callback = iterator->second;
+  auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
+  if (!request) {
+    ENVOY_LOG(error, "Failed to send HTTP callout");
+    return false;
+  }
+  callback.sent_ = true;
+  callback.request_ = request;
   return true;
 }
 

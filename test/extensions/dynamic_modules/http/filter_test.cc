@@ -418,7 +418,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
-      .WillOnce(testing::Return(cluster.get()));
+      .WillRepeatedly(testing::Return(cluster.get()));
 
   NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
@@ -484,7 +484,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
-      .WillOnce(testing::Return(cluster.get()));
+      .WillRepeatedly(testing::Return(cluster.get()));
 
   NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;

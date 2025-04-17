@@ -15,7 +15,8 @@ using namespace Envoy::Http;
  * A filter that uses a dynamic module and corresponds to a single HTTP stream.
  */
 class DynamicModuleHttpFilter : public Http::StreamFilter,
-                                public std::enable_shared_from_this<DynamicModuleHttpFilter> {
+                                public std::enable_shared_from_this<DynamicModuleHttpFilter>,
+                                public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
   ~DynamicModuleHttpFilter() override;
@@ -142,8 +143,7 @@ private:
     uint32_t callout_id_;
   };
 
-  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
-      http_callouts_;
+  absl::flat_hash_map<uint32_t, DynamicModuleHttpFilter::HttpCalloutCallback> http_callouts_;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;
