@@ -134,7 +134,6 @@ bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_
     ENVOY_LOG(error, "Failed to send HTTP callout");
     return false;
   }
-  callback.sent_ = true;
   callback.request_ = request;
   return true;
 }
@@ -171,22 +170,27 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
 void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
     const AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
   // Check if the filter is destroyed before the callout completed.
-  if (!filter_.in_module_filter_ || !sent_) { // See the comment on sent_ for more details.
+  if (!filter_.in_module_filter_) {
     return;
   }
-
-  envoy_dynamic_module_type_http_callout_result result;
-  switch (reason) {
-  case Http::AsyncClient::FailureReason::Reset:
-    result = envoy_dynamic_module_type_http_callout_result_Reset;
-    break;
-  case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
-    result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
-    break;
+  // request_ is not null if the callout is actually sent to the upstream cluster.
+  // This allows us to avoid inlined calls to onFailure() method (which results in a reentrant to
+  // the modules) when the async client immediately fails the callout.
+  if (request_) {
+    envoy_dynamic_module_type_http_callout_result result;
+    switch (reason) {
+    case Http::AsyncClient::FailureReason::Reset:
+      result = envoy_dynamic_module_type_http_callout_result_Reset;
+      break;
+    case Http::AsyncClient::FailureReason::ExceedResponseBufferLimit:
+      result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
+      break;
+    }
+    filter_.config_->on_http_filter_http_callout_done_(filter_.thisAsVoidPtr(),
+                                                       filter_.in_module_filter_, callout_id_,
+                                                       result, nullptr, 0, nullptr, 0);
   }
-  filter_.config_->on_http_filter_http_callout_done_(filter_.thisAsVoidPtr(),
-                                                     filter_.in_module_filter_, callout_id_, result,
-                                                     nullptr, 0, nullptr, 0);
+
   // Clean up the callout.
   filter_.http_callouts_.erase(callout_id_);
 }

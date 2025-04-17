@@ -95,6 +95,9 @@ public:
     return nullptr;
   }
 
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   */
   bool sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
                        Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
@@ -130,10 +133,6 @@ private:
                    Http::AsyncClient::FailureReason reason) override;
     void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                       const Http::ResponseHeaderMap*) override {};
-
-    // This remains false until the callout is actually sent. This allows us to avoid inline
-    // calls to onFailure() method when the async client immediately fails the callout.
-    bool sent_ = false;
     // This is the request object that is used to send the HTTP callout. It is used to cancel the
     // callout if the filter is destroyed before the callout is completed.
     Http::AsyncClient::Request* request_ = nullptr;
