@@ -40,7 +40,7 @@ void Base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
     headers.addCopy(key_string, value);
   }
 }
-}  // namespace
+} // namespace
 
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
 AsyncClientImpl::create(Upstream::ClusterManager& cm,
