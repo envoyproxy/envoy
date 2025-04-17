@@ -106,9 +106,11 @@ public:
     ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
-    ON_CALL(context_.server_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
-    ON_CALL(context_.server_context_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
-    ON_CALL(context_.server_context_, runtime()).WillByDefault(ReturnRef(runtime_));
+    ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.server_factory_context_.api_, randomGenerator())
+        .WillByDefault(ReturnRef(random_));
+    ON_CALL(context_.server_factory_context_, runtime()).WillByDefault(ReturnRef(runtime_));
   }
   std::shared_ptr<MockClusterMockPrioritySet> cluster_{
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>()};

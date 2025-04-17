@@ -622,7 +622,8 @@ TEST_F(HdsTest, TestSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::GenericFactoryContextImpl factory_context(
-            params.server_context_, *scope, params.server_context_.messageValidationVisitor());
+            params.server_factory_context_, *scope,
+            params.server_factory_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
@@ -1111,7 +1112,8 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::GenericFactoryContextImpl factory_context(
-            params.server_context_, *scope, params.server_context_.messageValidationVisitor());
+            params.server_factory_context_, *scope,
+            params.server_factory_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =

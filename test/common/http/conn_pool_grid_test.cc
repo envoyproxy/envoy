@@ -170,7 +170,7 @@ public:
         alternate_protocols_(std::make_shared<HttpServerPropertiesCacheImpl>(
             dispatcher_, std::vector<std::string>(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {
-    ON_CALL(factory_context_.server_context_, threadLocal())
+    ON_CALL(factory_context_.server_factory_context_, threadLocal())
         .WillByDefault(ReturnRef(thread_local_));
     // Make sure we test happy eyeballs code.
     address_list_ = {*Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
@@ -1677,7 +1677,8 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(factory_context_.server_factory_context_.ssl_context_manager_,
+              createSslClientContext(_, _))
       .WillOnce(Return(ssl_context));
   auto factory =
       *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);

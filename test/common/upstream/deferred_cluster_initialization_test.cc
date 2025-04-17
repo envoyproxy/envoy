@@ -64,7 +64,7 @@ protected:
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
-        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
+        bootstrap, factory_, factory_.server_factory_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
         xds_manager_);

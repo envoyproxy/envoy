@@ -378,7 +378,8 @@ public:
       std::vector<Singleton::InstanceSharedPtr> pinned_singletons_;
     };
     FakeSingletonManager fsm;
-    ON_CALL(mock_factory_ctx.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm));
+    ON_CALL(mock_factory_ctx.server_factory_context_, singletonManager())
+        .WillByDefault(ReturnRef(fsm));
     UpstreamAltsTransportSocketConfigFactory factory;
 
     envoy::extensions::transport_sockets::alts::v3::Alts alts_config;
