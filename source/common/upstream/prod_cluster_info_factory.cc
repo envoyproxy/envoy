@@ -16,8 +16,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
       params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      params.server_context_, params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.server_context_.messageValidationVisitor());
+      params.server_context_, *scope, params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(

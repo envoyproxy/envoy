@@ -1696,7 +1696,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     }
   }
 
-  setRoute(route);
+  setRoute(std::move(route));
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {

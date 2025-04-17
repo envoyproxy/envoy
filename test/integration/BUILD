@@ -1240,7 +1240,7 @@ envoy_cc_test_library(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -1325,8 +1325,8 @@ envoy_cc_test_library(
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -2193,7 +2193,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/transport_sockets/tls:config",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2626,6 +2626,7 @@ envoy_cc_test(
     #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
+    shard_count = 5,
     tags = [
         "cpu:3",
         "fails_on_clang_cl",

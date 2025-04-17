@@ -41,7 +41,7 @@ public:
 
   // May be overridden to, for example, also drain other threads into the dispatcher
   // before draining the dispatcher.
-  virtual void beforePumpingDispatcher(){};
+  virtual void beforePumpingDispatcher() {};
   void pumpDispatcher();
 
   Event::Dispatcher& dispatcher() { return *dispatcher_; }

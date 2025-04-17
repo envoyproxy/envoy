@@ -715,7 +715,7 @@ class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
   RouterTestStrictCheckOneHeader()
-      : RouterTestBase(false, false, false, false, protobufStrList({GetParam()})){};
+      : RouterTestBase(false, false, false, false, protobufStrList({GetParam()})) {};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -765,7 +765,7 @@ class RouterTestStrictCheckSomeHeaders
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
   RouterTestStrictCheckSomeHeaders()
-      : RouterTestBase(false, false, false, false, protobufStrList(GetParam())){};
+      : RouterTestBase(false, false, false, false, protobufStrList(GetParam())) {};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -799,7 +799,7 @@ class RouterTestStrictCheckAllHeaders
 public:
   RouterTestStrictCheckAllHeaders()
       : RouterTestBase(false, false, false, false,
-                       protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+                       protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)) {};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,

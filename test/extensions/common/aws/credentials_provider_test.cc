@@ -59,7 +59,7 @@ TEST(Credentials, AllNonEmpty) {
 class AsyncCredentialHandlingTest : public testing::Test {
 public:
   AsyncCredentialHandlingTest()
-      : raw_metadata_fetcher_(new MockMetadataFetcher), message_(new Http::RequestMessageImpl()){};
+      : raw_metadata_fetcher_(new MockMetadataFetcher), message_(new Http::RequestMessageImpl()) {};
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
 

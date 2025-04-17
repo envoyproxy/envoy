@@ -656,7 +656,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -683,6 +683,14 @@ message Http3ProtocolOptions {
   // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
+
+  // [#not-implemented-hide:] Hiding until Envoy has full HTTP/3 upstream support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Disables QPACK compression related features for HTTP/3 including:
+  // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
+  // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
+  bool disable_qpack = 7;
 }
 
 // A message to control transformations to the :scheme header

@@ -36,6 +36,9 @@ setup_clang_toolchain() {
     if [[ -n "${ENVOY_RBE}" ]]; then
         CONFIG_PARTS+=("remote")
     fi
+    if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
+        CONFIG_PARTS+=("arm64")
+    fi
     CONFIG_PARTS+=("clang")
     ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
     if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then

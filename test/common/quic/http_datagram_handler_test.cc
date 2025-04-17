@@ -20,7 +20,7 @@ constexpr quic::QuicStreamId kStreamId = UINT64_C(0x01020304);
 class MockSession : public quic::test::MockQuicSpdySession {
 public:
   explicit MockSession(quic::QuicConnection* connection)
-      : quic::test::MockQuicSpdySession(connection){};
+      : quic::test::MockQuicSpdySession(connection) {};
 
   MOCK_METHOD(void, OnStreamClosed, (quic::QuicStreamId stream_id), (override));
 };

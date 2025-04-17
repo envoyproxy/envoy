@@ -135,7 +135,7 @@ private:
   struct CredentialsProviderCluster {
     CredentialsProviderCluster(envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
                                std::string uri)
-        : uri_(uri), cluster_type_(cluster_type){};
+        : uri_(uri), cluster_type_(cluster_type) {};
 
     std::string uri_;
     envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;

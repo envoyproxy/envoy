@@ -19,7 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Filter]
-// [#not-implemented-hide:]
 // External Processing Filter: Process network traffic using an external service.
 // [#extension: envoy.filters.network.ext_proc]
 

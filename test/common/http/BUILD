@@ -533,7 +533,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:test_runtime_lib",
         "//source/common/quic:quic_client_factory_lib",

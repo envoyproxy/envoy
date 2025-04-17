@@ -390,6 +390,16 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
 
+  /// Get the bytes-typed filter state value with the given key.
+  /// If the filter state is not found or is the wrong type, this returns `None`.
+  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the bytes-typed filter state value with the given key.
+  /// If the filter state is not found, this will create a new filter state.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
+
   /// Get the currently buffered request body. The body is represented as a list of [`EnvoyBuffer`].
   /// Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be modified in place.
   /// However, the vector itself is a "copied view". For example, adding or removing
@@ -784,6 +794,43 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         self.raw_ptr,
         namespace_ptr as *const _ as *mut _,
         namespace_size,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_bytes(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+    } else {
+      None
+    }
+  }
+
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_bytes(
+        self.raw_ptr,
         key_ptr as *const _ as *mut _,
         key_size,
         value_ptr as *const _ as *mut _,

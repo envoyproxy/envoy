@@ -45,7 +45,7 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
       single_slice_buffer->move(data, slice.len_);
       quic_slices.emplace_back(
           reinterpret_cast<char*>(slice.mem_), slice.len_,
-          [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
+          [single_slice_buffer = std::move(single_slice_buffer)](absl::string_view) mutable {
             // Free this memory explicitly when the callback is invoked.
             single_slice_buffer = nullptr;
           });

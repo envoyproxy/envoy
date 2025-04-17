@@ -179,7 +179,7 @@ public:
     return absl::OkStatus();
   };
   MOCK_METHOD(bool, addCallbackIfCredentialsPending,
-              (Extensions::Common::Aws::CredentialsPendingCallback &&));
+              (Extensions::Common::Aws::CredentialsPendingCallback&&));
 };
 
 class MockAuthContext : public ::grpc::AuthContext {

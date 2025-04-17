@@ -1168,18 +1168,12 @@ public:
 
   void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallbacks>& callback,
                                        const std::vector<std::string>& upstream_ips) {
-    auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
-
-    for (const auto& ip : upstream_ips) {
-      Network::Address::InstanceConstSharedPtr address =
-          Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(ip, false);
-
-      address_obj->address_ = address;
-    }
-
     // Set the filter state data.
     callback.streamInfo().filterState()->setData(
-        StreamInfo::UpstreamAddress::key(), std::move(address_obj),
+        StreamInfo::UpstreamAddress::key(),
+        std::make_unique<StreamInfo::UpstreamAddress>(
+            Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ips.back(),
+                                                                        false)),
         StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
   }
 };

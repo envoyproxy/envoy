@@ -94,7 +94,7 @@ const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
  */
 class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(std::shared_ptr<FilterConfig> config) : config_(config){};
+  Filter(std::shared_ptr<FilterConfig> config) : config_(config) {};
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

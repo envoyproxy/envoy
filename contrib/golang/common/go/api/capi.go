@@ -59,6 +59,7 @@ type HttpCAPI interface {
 	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
 	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32

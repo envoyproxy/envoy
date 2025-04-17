@@ -52,7 +52,7 @@ public:
   MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
   MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
   MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback&&));
 };
 
 class MockFetchMetadata {
@@ -91,7 +91,7 @@ public:
 class MockCredentialsProviderChain : public CredentialsProviderChain {
 public:
   MOCK_METHOD(Credentials, chainGetCredentials, ());
-  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback&&));
   MOCK_METHOD(void, onCredentialUpdate, ());
 };
 

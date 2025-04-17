@@ -240,7 +240,7 @@ TEST(TestConfig, SetDnsQueryTimeout) {
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   // The default value.
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 120 }"));
 
   engine_builder.addDnsQueryTimeoutSeconds(30);
   bootstrap = engine_builder.generateBootstrap();

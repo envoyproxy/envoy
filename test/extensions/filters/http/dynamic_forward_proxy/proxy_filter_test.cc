@@ -621,9 +621,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
   const auto pre_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 80);
-  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
-  address_obj->address_ = pre_address;
-  filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
+  filter_state->setData(StreamInfo::UpstreamAddress::key(),
+                        std::make_unique<StreamInfo::UpstreamAddress>(pre_address),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
 
@@ -664,8 +663,8 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
           StreamInfo::UpstreamAddress::key());
 
   // Verify the data
-  EXPECT_TRUE(updated_address_obj->address_);
-  EXPECT_EQ(updated_address_obj->address_->asStringView(), host_info->address_->asStringView());
+  EXPECT_TRUE(updated_address_obj->getIp());
+  EXPECT_EQ(updated_address_obj->getIp()->asStringView(), host_info->address_->asStringView());
 
   filter_->onDestroy();
 }

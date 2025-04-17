@@ -733,22 +733,22 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
-  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
+  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
   auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setExpectedPeerAddress(fmt::format(
           "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
-  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
   // validation is pending.
   quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(500 * TIMEOUT_FACTOR);
+      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -775,19 +775,19 @@ typed_config:
   )EOF"),
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
-  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
+  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
   auto cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
   // validation is pending.
   quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(500 * TIMEOUT_FACTOR);
+      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1227,6 +1227,22 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
             codec_client_->connection()->requestedServerName());
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, DisableQpack) {
+  initialize();
+
+  codec_client_ = makeRawHttp3Connection(makeClientConnection(lookupPort("http")), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ true, /*disable_qpack*/ true);
+  auto headers = default_request_headers_;
+  headers.addCopy("cookie", "x;y");
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  waitForNextUpstreamRequest(0);
+  // Cookie crumbling is disabled along with QPACK.
+  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("cookie", "x;y"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();

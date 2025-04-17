@@ -153,12 +153,12 @@ private:
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
-  int dns_query_timeout_seconds_ = 5;
+  int dns_query_timeout_seconds_ = 120;
   bool disable_dns_refresh_on_failure_{false};
   bool disable_dns_refresh_on_network_change_{false};
   absl::optional<uint32_t> dns_num_retries_ = 3;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
-  int h2_connection_keepalive_timeout_seconds_ = 10;
+  int h2_connection_keepalive_timeout_seconds_ = 15;
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";

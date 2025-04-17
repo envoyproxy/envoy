@@ -102,7 +102,7 @@ void DynamicModuleHttpFilter::sendLocalReply(
   decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-void DynamicModuleHttpFilter::encodeComplete(){};
+void DynamicModuleHttpFilter::encodeComplete() {};
 
 } // namespace HttpFilters
 } // namespace DynamicModules

@@ -49,9 +49,8 @@ InstanceImpl::InstanceImpl(
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
-      stats_scope_(std::move(stats_scope)),
-      redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                     POOL_COUNTER(*stats_scope_))},
+      stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
+      redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
       refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache) {}
 
 void InstanceImpl::init() {
@@ -288,7 +287,9 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
   }
 
   Common::Redis::RespValue request;
-  for (uint16_t size = 0;; size++) {
+  absl::flat_hash_set<Upstream::HostConstSharedPtr> unique_hosts;
+  unique_hosts.reserve(Envoy::Extensions::Clusters::Redis::MaxSlot);
+  for (uint16_t size = 0; size < Envoy::Extensions::Clusters::Redis::MaxSlot; size++) {
     Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
         size, request, Common::Redis::Client::ReadPolicy::Primary);
     Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
@@ -296,8 +297,9 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
     if (!host) {
       return size;
     }
+    unique_hosts.insert(std::move(host));
   }
-  return 0;
+  return static_cast<uint16_t>(unique_hosts.size());
 }
 
 Common::Redis::Client::PoolRequest*

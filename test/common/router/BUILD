@@ -18,7 +18,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
-    rbe_pool = "6gig",
+    size = "large",
     deps = [":config_impl_test_lib"],
 )
 
@@ -36,6 +36,7 @@ envoy_cc_test_library(
         "//source/common/router:config_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/stream_info:upstream_address_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/router:router_mocks",
@@ -266,7 +267,7 @@ envoy_directory_genrule(
         "$(location //test/common/router:config_impl_test_static)",
     ]),
     exec_properties = select({
-        "//bazel:engflow_rbe": {"Pool": "6gig"},
+        "//bazel:engflow_rbe_x86_64": {"Pool": "6gig"},
         "//conditions:default": {},
     }),
     tools = [":corpus_from_config_impl_sh"],
