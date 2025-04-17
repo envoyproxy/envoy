@@ -1,39 +1,34 @@
+From 58e2bf9b0da7d79bbe2fe090c1710ab5c59214ef Mon Sep 17 00:00:00 2001
+From: Rohit Agrawal <rohit.agrawal@databricks.com>
+Date: Wed, 16 Apr 2025 18:36:38 -0700
+Subject: [PATCH] Bazel Fixes
+
+---
+ BUILD          | 1 -
+ src/core/BUILD | 1 -
+ 2 files changed, 2 deletions(-)
+
 diff --git a/BUILD b/BUILD
-index 06b69411a8..05cd878ae8 100644
+index 9ade4e9bc321c..bb3b6743e860c 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -29,7 +29,7 @@ licenses(["reciprocal"])
+@@ -33,7 +33,6 @@ package(
      default_visibility = ["//visibility:public"],
      features = [
          "-parse_headers",
 -        "layering_check",
-+        "-layering_check",
      ],
  )
  
 diff --git a/src/core/BUILD b/src/core/BUILD
-index 1bb970e049..81265483e9 100644
+index f6cb041711d38..974ab189f5d2d 100644
 --- a/src/core/BUILD
 +++ b/src/core/BUILD
-@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+@@ -27,7 +27,6 @@ licenses(["reciprocal"])
  package(
      default_visibility = ["//:__subpackages__"],
      features = [
 -        "layering_check",
-+        "-layering_check",
      ],
  )
  
-diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
-index a2c7f3a1bb..cd023ebb06 100644
---- a/bazel/generate_cc.bzl
-+++ b/bazel/generate_cc.bzl
-@@ -134,7 +134,7 @@ def generate_cc_impl(ctx):
- 
-     # Include the output directory so that protoc puts the generated code in the
-     # right directory.
--    arguments.append("--proto_path={0}{1}".format(dir_out, proto_root))
-+    arguments.append("--proto_path={0}".format(dir_out))
-     arguments += [_get_srcs_file_path(proto) for proto in protos]
- 
-     # create a list of well known proto files if the argument is non-None
