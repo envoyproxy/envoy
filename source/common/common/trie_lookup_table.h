@@ -144,6 +144,23 @@ public:
   }
 
   /**
+   * Returns the length of the longest matching prefix. See findMatchingPrefix for details.
+   */
+  size_t findLongestPrefixLength(absl::string_view key) const {
+    int32_t current = 0;
+    size_t result = 0;
+    for (auto it = key.begin(); it < key.end(); it++) {
+      current = getChildIndex(current, *it);
+      if (current == NoNode) {
+        return result;
+      } else if (nodes_[current].value_) {
+        result = it - key.begin() + 1;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Finds the entry with the longest key that is a prefix of the specified key.
    * Complexity is O(min(longest key prefix, key length)).
    * @param key the key used to find.

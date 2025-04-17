@@ -29,6 +29,8 @@ def api_dependencies():
     )
     external_http_archive(
         name = "com_github_cncf_xds",
+        patch_args = ["-p1"],
+        patches = ["@envoy_api//bazel:xds_matcher.patch"],
     )
     external_http_archive(
         name = "prometheus_metrics_model",
