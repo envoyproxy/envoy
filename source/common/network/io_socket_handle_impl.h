@@ -118,10 +118,9 @@ private:
 
   // Caches the address instances of the most recently received packets on this socket.
   // Should only be used by QUIC client sockets to avoid creating multiple address instances for
-  // the same address in each read operation. Since the QUIC client sockets are typically connected
-  // via a connect() call (when envoy.reloadable_features.quic_connect_client_udp_sockets is set),
-  // the total number of expected addresses are 2 (source and destination address), and the cache
-  // size defaults to 4.
+  // the same address in each read operation. Since the QUIC client sockets are connected via a
+  // connect() call, the total number of expected addresses are 2 (source and destination address),
+  // and the cache size defaults to 4.
   size_t address_cache_max_capacity_;
   // Only non-null if address_cache_max_capacity_ is greater than 0.
   absl::optional<std::vector<QuicEnvoyAddressPair>> recent_received_addresses_ = absl::nullopt;
