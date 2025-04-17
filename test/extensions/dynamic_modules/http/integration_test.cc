@@ -85,7 +85,6 @@ typed_config:
         "cat",
         response->trailers().get()->get(Http::LowerCaseString("dog"))[0]->value().getStringView());
   }
-  const std::string fake_cluster_name_ = "fake_cluster";
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesIntegrationTest,

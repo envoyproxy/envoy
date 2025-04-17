@@ -210,11 +210,11 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 
   /// This is called when the HTTP callout is done.
   ///
-  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
-  /// The `callout_id` is the ID of the callout that was done.
-  /// The `result` indicates the result of the callout.
-  /// The `response_headers` is a list of key-value pairs of the response headers. This is optional.
-  /// The `response_body` is the response body. This is optional.
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `callout_id` is the ID of the callout that was done.
+  /// * `result` indicates the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
   fn on_http_callout_done(
     &mut self,
     _envoy_filter: &mut EHF,
@@ -557,7 +557,8 @@ pub trait EnvoyHttpFilter {
   ///
   /// Headers must contain the `:method`, ":path", and `host` headers.
   ///
-  /// This returns true if the callout is sent successfully.
+  /// This returns true if the callout is sent successfully. For example, if callout_id is
+  /// duplicated, this returns false.
   ///
   /// The callout result will be delivered to the [`HttpFilter::on_http_callout_done`] method.
   fn send_http_callout<'a>(
