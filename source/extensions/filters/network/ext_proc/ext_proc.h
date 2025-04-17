@@ -40,6 +40,7 @@ private:
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 class NetworkExtProcFilter : public Envoy::Network::Filter,
+                             ExternalProcessorCallbacks,
                              Envoy::Logger::Loggable<Envoy::Logger::Id::ext_proc> {
 public:
   // The result of an attempt to open the stream
@@ -75,10 +76,13 @@ public:
 
 private:
   StreamOpenState openStream();
-  void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response);
-  void onGrpcClose();
   void closeStream();
+  void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
+
+  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override;
+  void onGrpcClose() override;
+  void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
+  void logStreamInfo() override;
 
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{};
@@ -87,6 +91,7 @@ private:
   ExternalProcessorStreamPtr stream_;
   ::envoy::config::core::v3::GrpcService grpc_service_;
   Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
   bool processing_complete_;
 };
 

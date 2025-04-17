@@ -17,7 +17,7 @@ namespace ExtProc {
 
 namespace CommonExtProc = Envoy::Extensions::Common::ExternalProcessing;
 
-using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingResponse;
+using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
 
 using ExternalProcessorCallbacks = CommonExtProc::ProcessorCallbacks<ProcessingResponse>;

@@ -107,13 +107,13 @@ void NetworkExtProcFilter::sendRequest(Envoy::Buffer::Instance& data, bool end_s
     read_callbacks_->connection().readDisable(true);
     auto read_data = request.mutable_read_data();
     read_data->set_data(data.toString());
-    read_data->set_end_stream(end_stream);
+    read_data->set_end_of_stream(end_stream);
     ENVOY_CONN_LOG(info, "boteng sendRequest {}", read_callbacks_->connection(), request.DebugString());
     stream_->send(std::move(request), false);
   } else {
     auto write_data = request.mutable_write_data();
     write_data->set_data(data.toString());
-    write_data->set_end_stream(end_stream);
+    write_data->set_end_of_stream(end_stream);
     ENVOY_CONN_LOG(info, "boteng sendRequest {}", read_callbacks_->connection(),
     request.DebugString());
     stream_->send(std::move(request), false);
@@ -124,45 +124,42 @@ void NetworkExtProcFilter::sendRequest(Envoy::Buffer::Instance& data, bool end_s
 void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) {
   auto response_internal = std::move(response);
   ENVOY_CONN_LOG(debug, "boteng received message from external processor",
-                read_callbacks_->connection());
-  switch (response_internal->data_case()) {
-    case ProcessingResponse::kReadData: {
-      auto data = response_internal->read_data();
-      ENVOY_CONN_LOG(info,
-                    "boteng received read data from external processor {}",
-                    read_callbacks_->connection(), data.DebugString());
-      auto buffer = Envoy::Buffer::OwnedImpl(data.data());
-      read_callbacks_->injectReadDataToFilterChain(buffer, /*end_stream=*/data.end_stream());
-      read_callbacks_->connection().readDisable(false);
-      break;
+                 read_callbacks_->connection());
+  
+  // Check for read_data field
+  if (response_internal->has_read_data()) {
+    auto data = response_internal->read_data();
+    ENVOY_CONN_LOG(info,
+                  "boteng received read data from external processor {}",
+                  read_callbacks_->connection(), data.DebugString());
+    auto buffer = Envoy::Buffer::OwnedImpl(data.data());
+    read_callbacks_->injectReadDataToFilterChain(buffer, /*end_stream=*/data.end_of_stream());
+    read_callbacks_->connection().readDisable(false);
+  } 
+  // Check for write_data field
+  else if (response_internal->has_write_data()) {
+    auto data = response_internal->write_data();
+    ENVOY_CONN_LOG(info,
+                  "boteng received write data from external processor {}",
+                  read_callbacks_->connection(), data.DebugString());
+    auto buffer = Envoy::Buffer::OwnedImpl(data.data());
+    write_callbacks_->injectWriteDataToFilterChain(buffer, data.end_of_stream());
+    if (read_callbacks_->connection().state() ==
+        Envoy::Network::Connection::State::Closing) {
+      read_callbacks_->connection().close(
+          Envoy::Network::ConnectionCloseType::FlushWrite);
     }
-    case ProcessingResponse::kWriteData: {
-      auto data = response_internal->write_data();
-      ENVOY_CONN_LOG(info,
-                    "boteng received write data from external processor {}",
-                    read_callbacks_->connection(), data.DebugString());
-      auto buffer = Envoy::Buffer::OwnedImpl(data.data());
-      write_callbacks_->injectWriteDataToFilterChain(buffer, data.end_stream());
-      if (read_callbacks_->connection().state() ==
-          Envoy::Network::Connection::State::Closing) {
-        read_callbacks_->connection().close(
-            Envoy::Network::ConnectionCloseType::FlushWrite);
-      }
-      break;
-    }
-    default:
-      ENVOY_LOG(debug, "Received message from external processor with no data");
-      break;
-}
-
-ENVOY_CONN_LOG(debug, "Received message from external processor",
-               read_callbacks_->connection());
+  }
+  // No data case
+  else {
+    ENVOY_LOG(debug, "Received message from external processor with no data");
+  }
 }
 
 void NetworkExtProcFilter::onGrpcError(
-  Envoy::Grpc::Status::GrpcStatus grpc_status) {
-    ENVOY_CONN_LOG(debug, "Received gRPC error on stream: {}",
-                  read_callbacks_->connection(), grpc_status);
+  Envoy::Grpc::Status::GrpcStatus grpc_status, const std::string& message) {
+    ENVOY_CONN_LOG(debug, "Received gRPC error on stream: {}, with message {}",
+                  read_callbacks_->connection(), grpc_status, message);
 
     if (processing_complete_) {
       return;
