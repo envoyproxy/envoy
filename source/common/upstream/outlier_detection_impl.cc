@@ -211,6 +211,13 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
       [result](const ExtMonitorPtr& monitor) { monitor->putResult(LocalOriginEvent(result)); });
 }
 
+void DetectorHostMonitorImpl::reportResult(absl::string_view monitor_name, bool error) {
+  auto monitor = monitors_set_.monitors_.find(monitor_name);
+  if (monitor != monitors_set_.monitors_.end()) {
+    monitor->second->reportResult(error);
+  }
+}
+
 void DetectorHostMonitorImpl::localOriginFailure() {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
   if (!detector) {

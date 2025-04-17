@@ -87,6 +87,7 @@ public:
 
   // Method to report a result to extensions.
   virtual void putResult(const ExtResult) PURE;
+  virtual void reportResult(bool) PURE;
   virtual void setExtMonitorCallback(ExtMonitorCallback) PURE;
   virtual void reset() PURE;
 
@@ -99,16 +100,18 @@ using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
 
 class ExtMonitorsSet {
 public:
-  void addMonitor(ExtMonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
+  void addMonitor(ExtMonitorPtr&& monitor) {
+    monitors_.emplace(monitor->name(), std::move(monitor));
+  }
   template <class CALLABLE> void forEach(const CALLABLE& f) const {
     for (auto& monitor : monitors_) {
-      f(monitor);
+      f(monitor.second);
     }
   }
   bool empty() const { return monitors_.empty(); }
 
-private:
-  absl::InlinedVector<ExtMonitorPtr, 3> monitors_;
+  // private:
+  absl::flat_hash_map<std::string, ExtMonitorPtr> monitors_;
 };
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
@@ -136,6 +139,8 @@ public:
    * and such code may be passed as optional parameter.
    */
   virtual void putResult(Result result, absl::optional<uint64_t> code) PURE;
+
+  virtual void reportResult(absl::string_view monitor_name, bool error) PURE;
 
   /**
    * Wrapper around putResult with 2 params when mapping to HTTP code is not

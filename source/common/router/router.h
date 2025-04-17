@@ -45,6 +45,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Router {
@@ -284,6 +285,11 @@ public:
   Stats::StatName empty_stat_name_;
   std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
+
+  std::vector<
+      std::pair<std::vector<Extensions::Common::Matcher::MatcherPtr>, std::vector<std::string>>>
+      outlier_detection_http_events_;
+  std::vector<std::pair<std::string, bool>> outlier_detection_locally_originated_events_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -554,6 +560,9 @@ private:
                                                 const Http::HeaderEntry& internal_redirect,
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
+                              absl::optional<uint64_t> code);
+  void updateOutlierDetection(Upstream::Outlier::Result result,
+                              Upstream::HostDescriptionConstSharedPtr host,
                               absl::optional<uint64_t> code);
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);

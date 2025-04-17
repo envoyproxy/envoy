@@ -86,6 +86,7 @@ public:
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() = default;
   void putResult(const ExtResult) override;
+  void reportResult(bool) override;
 
   void setExtMonitorCallback(ExtMonitorCallback callback) override { callback_ = callback; }
 

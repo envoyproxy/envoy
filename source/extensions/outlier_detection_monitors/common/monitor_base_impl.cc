@@ -21,6 +21,7 @@ bool LocalOriginEventsBucket::match(const ExtResult& event) const {
 }
 
 void ExtMonitorBase::putResult(const ExtResult result) {
+  return;
   if (config_->buckets().empty()) {
     return;
   }
@@ -50,6 +51,22 @@ void ExtMonitorBase::putResult(const ExtResult result) {
   }
 
   if (matched_value) {
+    // Count as error.
+    if (onMatch()) {
+      callback_(this);
+      // Reaching error was reported via callback.
+      // but the host may or may not be ejected based on enforce_ parameter.
+      // Reset the monitor's state, so a single new error does not
+      // immediately trigger error condition again.
+      onReset();
+    }
+  } else {
+    onSuccess();
+  }
+}
+
+void ExtMonitorBase::reportResult(bool error) {
+  if (error) {
     // Count as error.
     if (onMatch()) {
       callback_(this);
