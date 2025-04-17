@@ -80,11 +80,11 @@ envoy_extension_cc_test(
     tags = ["fails_on_clang_cl"],
     deps = [
         ":test_resolver_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/key_value/file_based:config_lib",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
-        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

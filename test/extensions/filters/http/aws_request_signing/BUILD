@@ -41,9 +41,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.aws_request_signing"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//source/extensions/filters/http/aws_request_signing:config",
-        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
