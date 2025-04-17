@@ -1,11 +1,8 @@
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
 
-#include <openssl/sha.h>
-
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/base64.h"
-#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
@@ -16,18 +13,6 @@ namespace BasicAuth {
 
 namespace {
 constexpr uint32_t MaximumUriLength = 256;
-
-// Function to compute SHA1 hash
-std::string computeSHA1(absl::string_view password) {
-  unsigned char hash[SHA_DIGEST_LENGTH];
-
-  // Calculate the SHA-1 hash
-  SHA1(reinterpret_cast<const unsigned char*>(password.data()), password.length(), hash);
-
-  // Encode the binary hash in Base64
-  return Base64::encode(reinterpret_cast<const char*>(hash), SHA_DIGEST_LENGTH);
-}
-
 } // namespace
 
 FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_header,
@@ -101,7 +86,10 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
     return false;
   }
 
-  return computeSHA1(password) == user->second.hash;
+  auto algorithm_provider = user->second.algorithm_provider;
+  auto password_hash = algorithm_provider->computeHash(password);
+  auto encoded_hash = Base64::encode(password_hash.c_str(), algorithm_provider->digestLength());
+  return encoded_hash == user->second.hash;
 }
 
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
