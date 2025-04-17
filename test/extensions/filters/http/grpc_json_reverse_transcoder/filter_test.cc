@@ -47,25 +47,21 @@ protected:
 
   static envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
       GrpcJsonReverseTranscoder
-      bookstoreProtoConfig(bool include_version_header = false, bool set_body_size = false) {
-    std::string json_string = "{\"descriptor_path\": \"" + bookstoreDescriptorPath() + "\"";
-    if (set_body_size) {
-      json_string += ",\"max_request_body_size\":2222,"
-                     "\"max_response_body_size\":2222";
-    }
-    if (include_version_header) {
-      json_string += ",\"api_version_header\": \"Api-Version\"";
-    }
-    json_string += "}";
-    return makeProtoConfig(json_string);
-  }
+      bookstoreProtoConfig(bool include_version_header = false, bool set_body_size = false,
+                           bool preserve_proto_field = false) {
 
-  static envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-      GrpcJsonReverseTranscoder
-      makeProtoConfig(const std::string json_string) {
     envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder
         proto_config;
-    TestUtility::loadFromJson(json_string, proto_config);
+    proto_config.set_descriptor_path(bookstoreDescriptorPath());
+    if (set_body_size) {
+      proto_config.mutable_max_request_body_size()->set_value(2222);
+      proto_config.mutable_max_response_body_size()->set_value(2222);
+    }
+    if (include_version_header) {
+      proto_config.set_api_version_header("Api-Version");
+    }
+    proto_config.mutable_request_json_print_options()->set_use_canonical_field_names(
+        !preserve_proto_field);
     return proto_config;
   }
 
@@ -281,6 +277,84 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeHttpBody) {
   EXPECT_EQ(headers.getContentLengthValue(), std::to_string(http_body.data().size()));
 }
 
+// Test request transcoding where body field is in snake case and
+// converted to camelCase in transcoding.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeToCamelCase) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/bookstore.Bookstore/UpdateShelf"},
+                                         {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  bookstore::UpdateShelfRequest update_shelf_request;
+  update_shelf_request.mutable_new_shelf()->set_id(12345);
+  update_shelf_request.mutable_new_shelf()->set_theme("Kids book");
+
+  auto request_data = Grpc::Common::serializeToGrpcFrame(update_shelf_request);
+  std::string expected_request = "{\"id\":\"12345\",\"theme\":\"Kids book\"}";
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(*request_data, true));
+  EXPECT_EQ(headers.getPathValue(), "/shelves/12345");
+  EXPECT_EQ(request_data->toString(), expected_request);
+  EXPECT_EQ(headers.getContentLengthValue(), std::to_string(expected_request.size()));
+}
+
+// Test request transcoding where body field is in snake case and is
+// preserved.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodePreservingBodyField) {
+  auto config = std::make_shared<GrpcJsonReverseTranscoderConfig>(
+      bookstoreProtoConfig(false, false, true), *api_);
+  auto filter = GrpcJsonReverseTranscoderFilter(config);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/bookstore.Bookstore/UpdateAuthor"},
+                                         {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter.decodeHeaders(headers, false));
+
+  bookstore::UpdateAuthorRequest update_author_request;
+  update_author_request.mutable_author()->set_id(12345);
+  update_author_request.mutable_author()->set_first_name("John");
+  update_author_request.mutable_author()->set_last_name("Doe");
+
+  auto request_data = Grpc::Common::serializeToGrpcFrame(update_author_request);
+  std::string expected_request = "{\"first_name\":\"John\",\"id\":\"12345\",\"last_name\":\"Doe\"}";
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter.decodeData(*request_data, true));
+  EXPECT_EQ(headers.getPathValue(), "/authors/12345");
+  EXPECT_EQ(request_data->toString(), expected_request);
+  EXPECT_EQ(headers.getContentLengthValue(), std::to_string(expected_request.size()));
+}
+
+// Test request transcoding where body field is in snake case and is
+// converted to its json_name annotation.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeToJsonNameAnnotation) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {":path", "/bookstore.Bookstore/UpdateAuthor"},
+                                         {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  bookstore::UpdateAuthorRequest update_author_request;
+  update_author_request.mutable_author()->set_id(12345);
+  update_author_request.mutable_author()->set_first_name("John");
+  update_author_request.mutable_author()->set_last_name("Doe");
+
+  auto request_data = Grpc::Common::serializeToGrpcFrame(update_author_request);
+  std::string expected_request = "{\"firstName\":\"John\",\"id\":\"12345\",\"lname\":\"Doe\"}";
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(*request_data, true));
+  EXPECT_EQ(headers.getPathValue(), "/authors/12345");
+  EXPECT_EQ(request_data->toString(), expected_request);
+  EXPECT_EQ(headers.getContentLengthValue(), std::to_string(expected_request.size()));
+}
+
+// Test request transcoding where body field is invalid.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeWithInvalidBodyName) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {":path", "/bookstore.ServiceWithInvalidRequestBody/UpdateAuthor"},
+      {"content-type", "application/grpc"}};
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+}
+
 // Test request transcoding where request type is `google.api.HttpBody` and
 // the path contains placeholders.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, MissingPlaceholderValue) {
@@ -301,8 +375,8 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, MissingPlaceholderValue) {
 
 // Test request transcoding for the payload is a nested filed of type `google.api.HttpBody`.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeNestedHttpBody) {
-  auto config =
-      std::make_shared<GrpcJsonReverseTranscoderConfig>(bookstoreProtoConfig(true), *api_);
+  auto config = std::make_shared<GrpcJsonReverseTranscoderConfig>(
+      bookstoreProtoConfig(true, false, true), *api_);
   auto filter = GrpcJsonReverseTranscoderFilter(config);
   filter.setDecoderFilterCallbacks(decoder_callbacks_);
   filter.setEncoderFilterCallbacks(encoder_callbacks_);

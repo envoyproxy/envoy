@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: grpc-json
+  change: |
+    Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
