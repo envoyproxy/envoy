@@ -43,12 +43,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // See the :ref:`load balancing architecture
 // overview<arch_overview_load_balancing_types>` for more information.
 //
-// [#next-free-field: 4]
 message OverrideHost {
-
   message OverrideHostSource {
     // The header to get the override host addresses. One of the header or metadata field must be set.
-    string header = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    string header = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // The metadata key to get the override host addresses from the request dynamic metadata. If
     // set this field then it will take precedence over the header field.
