@@ -176,9 +176,7 @@ void CodecClient::onData(Buffer::Instance& data) {
         !isPrematureResponseError(status) ||
         (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout);
     const bool is_goaway = isGoAwayGracefulCloseError(status);
-    if (not_408 &&
-        (!is_goaway || !Runtime::runtimeFeatureEnabled(
-                           "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close"))) {
+    if (not_408 && !is_goaway) {
       host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
     }
