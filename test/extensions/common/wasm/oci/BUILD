@@ -26,3 +26,12 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        "//source/extensions/common/wasm/oci:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
