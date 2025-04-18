@@ -2402,11 +2402,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     if (host->cluster().clusterType().has_value() &&
         host->cluster().clusterType()->name() == "envoy.clusters.reverse_connection") {
       ENVOY_LOG(debug, "allocating reverse connection pool");
-      auto* factory = Config::Utility::getFactory<Http::Http2::ReverseConnPoolFactory>(
-          envoy::extensions::upstreams::http::reverse_conn::v3::ReverseConnPoolProto::
-              default_instance());
+      auto* factory = Config::Utility::getFactoryByType<Http::Http2::ReverseConnPoolFactory>(
+          host->cluster().clusterType()->typed_config());
       if (factory == nullptr) {
-        ENVOY_LOG_MISC(error, "factory not found for reverse connection pool");
+        ENVOY_LOG(error, "factory not found for reverse connection pool");
         return nullptr;
       }
       return factory->allocateConnPool(
