@@ -78,12 +78,13 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   // check_response's http_response value (either OkHttpResponse or DeniedHttpResponse) the dynamic
   // metadata is set to be equal to the check response's dynamic metadata.
   check_response->mutable_dynamic_metadata()->MergeFrom(expected_dynamic_metadata);
-
-  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+  status->set_code(grpc_status);
 
   // This is the expected authz response.
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
+  authz_response.grpc_status = grpc_status;
 
   authz_response.dynamic_metadata = expected_dynamic_metadata;
 
@@ -123,11 +124,12 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
       {{"authorized-by", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body, expected_headers, expected_downstream_headers);
-  auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+  auto check_response = TestCommon::makeCheckResponse(
+      grpc_status, envoy::type::v3::OK, empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers,
+                                    expected_downstream_headers, grpc_status);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -151,11 +153,12 @@ TEST_F(ExtAuthzGrpcClientTest, IndifferentToInvalidHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
       {{"invalid-key\n\n\n\n\n", "TestAuthService", false}, {"cookie", "authtoken=1234", true}});
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
-                                    empty_body, expected_headers, expected_downstream_headers);
-  auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+  auto check_response = TestCommon::makeCheckResponse(
+      grpc_status, envoy::type::v3::OK, empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers,
+                                    expected_downstream_headers, grpc_status);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -176,9 +179,11 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
+  status->set_code(grpc_status);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
+  authz_response.grpc_status = grpc_status;
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -200,9 +205,11 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
 
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
-  status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Unknown;
+  status->set_code(grpc_status);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
+  authz_response.grpc_status = grpc_status;
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -226,12 +233,13 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::Unauthorized,
-      expected_body, expected_headers, expected_downstream_headers);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
+  auto check_response =
+      TestCommon::makeCheckResponse(grpc_status, envoy::type::v3::Unauthorized, expected_body,
+                                    expected_headers, expected_downstream_headers);
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
-                                    expected_headers, expected_downstream_headers);
+                                    expected_headers, expected_downstream_headers, grpc_status);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -257,14 +265,15 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus)
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::Empty, expected_body,
-      expected_headers, expected_downstream_headers);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
+  auto check_response =
+      TestCommon::makeCheckResponse(grpc_status, envoy::type::v3::Empty, expected_body,
+                                    expected_headers, expected_downstream_headers);
   // When the check response gives unknown denied response HTTP status code, the filter sets the
   // response HTTP status code with 403 Forbidden (default).
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden, expected_body,
-                                    expected_headers, expected_downstream_headers);
+                                    expected_headers, expected_downstream_headers, grpc_status);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -284,13 +293,18 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus)
 TEST_F(ExtAuthzGrpcClientTest, UnknownError) {
   initialize();
 
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Unknown;
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+  authz_response.grpc_status = grpc_status;
+
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
 
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
-  client_->onFailure(Grpc::Status::Unknown, "", span_);
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
+  client_->onFailure(grpc_status, "", span_);
 }
 
 // Test the client when the request is canceled.
@@ -309,13 +323,18 @@ TEST_F(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
   initialize();
 
+  const auto grpc_status = Grpc::Status::DeadlineExceeded;
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+  authz_response.grpc_status = grpc_status;
+
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
 
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
-  client_->onFailure(Grpc::Status::DeadlineExceeded, "", span_);
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
+  client_->onFailure(grpc_status, "", span_);
 }
 
 // Test the client when an OK response is received with dynamic metadata in that OK response.
@@ -337,12 +356,14 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   check_response->mutable_ok_response()->mutable_dynamic_metadata()->MergeFrom(
       overridden_dynamic_metadata);
 
-  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+  status->set_code(grpc_status);
 
   // This is the expected authz response.
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
   authz_response.dynamic_metadata = overridden_dynamic_metadata;
+  authz_response.grpc_status = grpc_status;
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -364,7 +385,8 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
 
-  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+  status->set_code(grpc_status);
 
   const Http::Utility::QueryParamsVector query_parameters_to_set{{"add-me", "yes"}};
   for (const auto& [key, value] : query_parameters_to_set) {
@@ -383,6 +405,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
   authz_response.status = CheckStatus::OK;
   authz_response.query_parameters_to_set = {{"add-me", "yes"}};
   authz_response.query_parameters_to_remove = {"remove-me"};
+  authz_response.grpc_status = grpc_status;
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -436,6 +459,7 @@ ok_response:
       .response_headers_to_overwrite_if_exists =
           UnsafeHeaderVector{{"overwrite-if-exists", "overwrite-if-exists-value"}},
       .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
   };
 
   envoy::service::auth::v3::CheckRequest request;
