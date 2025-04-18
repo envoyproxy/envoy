@@ -94,7 +94,7 @@ TEST(CgroupMemoryConfigTest, InvalidConfig) {
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.mutable_max_memory_bytes();  // Creates an empty wrapper which will fail validation
+  config.mutable_max_memory_bytes(); // Creates an empty wrapper which will fail validation
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
