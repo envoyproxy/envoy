@@ -145,5 +145,15 @@ TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
   EXPECT_NE(id.value_or(0), 0);
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, MoveSocket) { EXPECT_EQ(impl_.moveSocket(), nullptr); }
+
+TEST_F(QuicFilterManagerConnectionImplTest, SetConnectionReused) {
+  impl_.setConnectionReused(true);
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, IsConnectionReused) {
+  EXPECT_EQ(impl_.isConnectionReused(), false);
+}
+
 } // namespace Quic
 } // namespace Envoy

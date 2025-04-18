@@ -47,7 +47,8 @@ namespace Upstream {
 /**
  * Production implementation of ClusterManagerFactory.
  */
-class ProdClusterManagerFactory : public ClusterManagerFactory {
+class ProdClusterManagerFactory : public ClusterManagerFactory,
+                                  public Logger::Loggable<Logger::Id::pool> {
 public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 

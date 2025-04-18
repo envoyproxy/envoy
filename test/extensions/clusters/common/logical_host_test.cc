@@ -59,6 +59,13 @@ TEST_F(RealHostDescription, UnitTest) {
 
   Upstream::Outlier::DetectorHostMonitorPtr detector_host;
   description_.setOutlierDetector(std::move(detector_host));
+
+  // Test getHostId
+  EXPECT_CALL(*mock_host_, getHostId()).WillOnce(Return("mock-host-id"));
+  EXPECT_EQ(description_.getHostId(), "mock-host-id");
+
+  // Test setHostId (no-op implementation).
+  description_.setHostId("new-host-id");
 }
 
 } // namespace Clusters
