@@ -86,7 +86,7 @@ ExprDescriptorFactory::createDescriptorProducerFromProto(
     return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed());
   default:
     return absl::InvalidArgumentError(
-        "Rate limit descriptor extension failed: expression is not set");
+        "Rate limit descriptor extension failed: expression specifier is not set");
   }
 }
 
