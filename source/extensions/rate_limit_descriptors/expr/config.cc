@@ -85,7 +85,8 @@ ExprDescriptorFactory::createDescriptorProducerFromProto(
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
     return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed());
   default:
-    return nullptr;
+    return absl::InvalidArgumentError(
+        "Rate limit descriptor extension failed: expression is not set");
   }
 }
 
