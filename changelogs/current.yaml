@@ -5,6 +5,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: lua
+  change: |
+    The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>` first.
+    And if not found, it will search by the canonical name of the filter ``envoy.filters.http.lua``.
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
