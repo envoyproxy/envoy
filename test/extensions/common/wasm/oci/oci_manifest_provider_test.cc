@@ -300,9 +300,8 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceWithAuthenticationSuccess) {
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(&secret));
 
   NiceMock<ThreadLocal::MockInstance> slot_alloc;
-  Api::ApiPtr api;
   auto provider =
-      Secret::ThreadLocalGenericSecretProvider::create(secret_provider, slot_alloc, *api);
+      Secret::ThreadLocalGenericSecretProvider::create(secret_provider, slot_alloc, *api_);
   std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider =
       std::move(provider.value());
 
