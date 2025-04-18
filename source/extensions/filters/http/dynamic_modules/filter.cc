@@ -144,8 +144,9 @@ bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::Request&,
                                                              ResponseMessagePtr&& response) {
-  // Move the filter and callout id to the local scope as on_http_filter_http_callout_done_ might
-  // call the local reply which destroy the filter. That ends up destorying this callback itself.
+  // Move the filter and callout id to the local scope since on_http_filter_http_callout_done_ might
+  // results in the local reply which destroys the filter. That eventually ends up deallocating this
+  // callback itself.
   DynamicModuleHttpFilterSharedPtr filter = std::move(filter_);
   uint32_t callout_id = callout_id_;
   // Check if the filter is destroyed before the callout completed.
@@ -176,8 +177,9 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
     const AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
-  // Move the filter and callout id to the local scope as on_http_filter_http_callout_done_ might
-  // call the local reply which destroy the filter. That ends up destorying this callback itself.
+  // Move the filter and callout id to the local scope since on_http_filter_http_callout_done_ might
+  // results in the local reply which destroys the filter. That eventually ends up deallocating this
+  // callback itself.
   DynamicModuleHttpFilterSharedPtr filter = std::move(filter_);
   uint32_t callout_id = callout_id_;
   // Check if the filter is destroyed before the callout completed.
