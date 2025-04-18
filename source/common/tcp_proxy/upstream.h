@@ -255,8 +255,12 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
-      Buffer::OwnedImpl data;
-      parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers")) {
+        Buffer::OwnedImpl data;
+        parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      }
+
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
@@ -376,8 +380,11 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
-      Buffer::OwnedImpl data;
-      parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers")) {
+        Buffer::OwnedImpl data;
+        parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      }
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
