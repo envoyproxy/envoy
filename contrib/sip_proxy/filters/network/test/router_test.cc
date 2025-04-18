@@ -105,7 +105,7 @@ public:
 
     EXPECT_CALL(context_, getGenericFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
-    EXPECT_CALL(factory_context_.server_context_, localInfo())
+    EXPECT_CALL(factory_context_.server_factory_context_, localInfo())
         .WillRepeatedly(testing::ReturnRef(local_info_));
 
     transaction_infos_ = std::make_shared<TransactionInfos>();
