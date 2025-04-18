@@ -94,23 +94,12 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_support_certificate_compression", "true");
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
       Envoy::ExpectedLogMessages(
           {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
       { testRouterHeaderOnlyRequestAndResponse(); });
-}
-
-TEST_P(QuicHttpIntegrationTest, CertCompressionDisabled) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_support_certificate_compression", "false");
-  initialize();
-
-  EXPECT_LOG_NOT_CONTAINS("trace", "Cert compression successful",
-                          { testRouterHeaderOnlyRequestAndResponse(); });
 }
 
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {

@@ -82,7 +82,6 @@ RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
-RUNTIME_GUARD(envoy_reloadable_features_quic_support_certificate_compression);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
