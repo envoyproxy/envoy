@@ -59,7 +59,7 @@ TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
   thread->join();
 }
 
-// Validate that the host header is the cluster name in grpc config.
+// Validates that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -84,7 +84,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that the host header is the authority field in grpc config.
+// Validates that the host header is the authority field in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
@@ -116,8 +116,170 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that the metadata header is the initial metadata in gRPC service config and the value is
-// interpolated.
+// Validates that "*-bin" client init metadata are based64 encoded.
+TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Escaped) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+
+  auto initial_metadata_entry = config.mutable_initial_metadata()->Add();
+  initial_metadata_entry->set_key("static-binary-metadata-bin");
+  initial_metadata_entry->set_value("你好，世界。");
+
+  initial_metadata_entry = config.mutable_initial_metadata()->Add();
+  initial_metadata_entry->set_key("hello-world-in-japanese-bin");
+  initial_metadata_entry->set_value("こんにちは 世界");
+
+  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  // Encoding is done after all initial-metadata insertion.
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                headers.addCopy(Http::LowerCaseString("somemore-bin"), "更多bin");
+                return true;
+              })));
+  EXPECT_CALL(
+      http_stream,
+      sendHeaders(
+          testing::Truly([](Http::HeaderMap& headers) {
+            EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
+                          ->value()
+                          .getStringView(),
+                      "5L2g5aW977yM5LiW55WM44CC");
+            EXPECT_EQ(headers.get(Http::LowerCaseString("hello-world-in-japanese-bin"))[0]
+                          ->value()
+                          .getStringView(),
+                      "44GT44KT44Gr44Gh44GvIOS4lueVjA==");
+            EXPECT_EQ(
+                headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
+                "5pu05aSaYmlu");
+            return true;
+          }),
+          _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that "*-bin" server init metadata are NOT based64 decoded.
+// See https://github.com/envoyproxy/envoy/issues/39054, we don't want arbitrary binary header
+// values gets into Envoy before that's well understood by folks.
+TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescaped) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(grpc_callbacks, onReceiveInitialMetadata_(_))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers) {
+        EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
+                      ->value()
+                      .getStringView(),
+                  "5L2g5aW977yM5LiW55WM44CC");
+        EXPECT_EQ(headers.get(Http::LowerCaseString("hello-world-in-japanese-bin"))[0]
+                      ->value()
+                      .getStringView(),
+                  "44GT44KT44Gr44Gh44GvIOS4lueVjA==");
+        EXPECT_EQ(headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
+                  "5pu05aSaYmlu");
+        return true;
+      }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
+        http_callbacks->onHeaders(
+            std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
+                {"static-binary-metadata-bin", "5L2g5aW977yM5LiW55WM44CC"},
+                {":status", "200"},
+                {"hello-world-in-japanese-bin", "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
+                {"somemore-bin", "5pu05aSaYmlu"}}),
+            // This tells clients it's server initial metadata.
+            /*end_stream=*/false);
+        http_callbacks->onReset();
+      }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that "*-bin" trailing metadata are based64 decoded.
+// See https://github.com/envoyproxy/envoy/issues/39054, we don't want arbitrary binary header
+// values gets into Envoy before that's well understood by folks.
+TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnescaped) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+  EXPECT_CALL(http_stream, reset()); // onTrailers will trigger reset.
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_))
+      .WillOnce(Invoke([&](const Http::ResponseTrailerMap& headers) {
+        EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
+                      ->value()
+                      .getStringView(),
+                  "5L2g5aW977yM5LiW55WM44CC");
+        EXPECT_EQ(headers.get(Http::LowerCaseString("hello-world-in-japanese-bin"))[0]
+                      ->value()
+                      .getStringView(),
+                  /*こんにちは 世界*/ "44GT44KT44Gr44Gh44GvIOS4lueVjA==");
+        EXPECT_EQ(headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
+                  /*更多bin*/ "5pu05aSaYmlu");
+        return true;
+      }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
+        http_callbacks->onHeaders(
+            std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
+                {"static-binary-metadata-bin", "5L2g5aW977yM5LiW55WM44CC"},
+                {":status", "200"},
+                {"hello-world-in-japanese-bin", "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
+                {"somemore-bin", "5pu05aSaYmlu"}}),
+            true);
+        http_callbacks->onReset();
+      }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that the metadata header is the initial metadata in gRPC service config and the value
+// is interpolated.
 TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -155,7 +317,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that metadata is initialized without async client parent context.
+// Validates that metadata is initialized without async client parent context.
 TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
@@ -194,7 +356,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that a failure in the HTTP client returns immediately with status
+// Validates that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
@@ -205,7 +367,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that a failure in the HTTP client returns immediately with status
+// Validates that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
@@ -231,7 +393,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_EQ(grpc_request, nullptr);
 }
 
-// Validate that a failure to sendHeaders() in the HTTP client returns
+// Validates that a failure to sendHeaders() in the HTTP client returns
 // immediately with status INTERNAL.
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
@@ -258,7 +420,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validate that a failure to sendHeaders() in the HTTP client returns
+// Validates that a failure to sendHeaders() in the HTTP client returns
 // immediately with status INTERNAL.
 TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
@@ -299,7 +461,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   EXPECT_EQ(grpc_request, nullptr);
 }
 
-// Validate that when the cluster is not present the grpc_client returns immediately with
+// Validates that when the cluster is not present the grpc_client returns immediately with
 // status UNAVAILABLE and error message "Cluster not available"
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;

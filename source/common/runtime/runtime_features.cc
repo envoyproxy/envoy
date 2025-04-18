@@ -81,7 +81,6 @@ RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_ssl_port);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
-RUNTIME_GUARD(envoy_reloadable_features_quic_connect_client_udp_sockets);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -91,7 +90,6 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_f
 RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
 RUNTIME_GUARD(envoy_reloadable_features_report_stream_reset_error_code);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
-RUNTIME_GUARD(envoy_reloadable_features_sanitize_sni_in_access_log);
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_trace_sampling);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_ext_proc_on_local_reply);
