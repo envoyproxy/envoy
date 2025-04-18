@@ -1,15 +1,19 @@
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/common/wasm/oci/oci_async_datasource.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -25,6 +29,7 @@ namespace {
 using ::testing::AtLeast;
 using ::testing::NiceMock;
 using ::testing::Return;
+using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string>;
 
 class OciManifestProviderTest : public testing::Test {
 protected:
@@ -115,6 +120,10 @@ protected:
     return manifest_uri;
   }
 };
+
+MATCHER_P(ContainsPairAsHeader, pair, "") {
+  return arg->headers().get(pair.first)[0]->value().getStringView() == pair.second;
+}
 
 TEST_F(OciManifestProviderTest, LoadRemoteDataSourceNoCluster) {
   AsyncDataSourcePb config;
@@ -267,6 +276,82 @@ TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccess) {
 
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+
+  EXPECT_EQ(async_data, layer_digest_);
+}
+
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceWithAuthenticationSuccess) {
+  AsyncDataSourcePb config;
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
+  EXPECT_TRUE(config.has_remote());
+
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret secret;
+  secret.mutable_secret()->set_inline_string(R"EOF({
+  "auths": {
+    "123.dkr.ecr.us-east-1.amazonaws.com":{
+      "auth": "credential"
+    }
+  }
+})EOF");
+
+  auto secret_provider = std::make_shared<Secret::MockGenericSecretConfigProvider>();
+  EXPECT_CALL(*secret_provider, addUpdateCallback(_))
+      .WillOnce(testing::Invoke([&](std::function<absl::Status()>) { return nullptr; }));
+  EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(&secret));
+
+  NiceMock<ThreadLocal::MockInstance> slot_alloc;
+  Api::ApiPtr api;
+  auto provider =
+      Secret::ThreadLocalGenericSecretProvider::create(secret_provider, slot_alloc, *api);
+  std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider =
+      std::move(provider.value());
+
+  EXPECT_TRUE(provider.ok());
+
+  cm_.initializeThreadLocalClusters({"cluster_1"});
+
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+    response->body().add(response_body_);
+
+    callbacks.onSuccess(request_, std::move(response));
+    return nullptr;
+  });
+
+  std::string async_data = "non-empty";
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(),
+      image_pull_secret_provider, "123.dkr.ecr.us-east-1.amazonaws.com",
+      [&](const std::string& data) {
+        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+        EXPECT_EQ(data, layer_digest_);
+        async_data = data;
+      });
+
+  const HeaderValuePair authz_header{"authorization", "Basic credential"};
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
+      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
+        EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+                    send_(ContainsPairAsHeader(authz_header), _, _))
+            .WillOnce(Invoke(
+                [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+                  Http::ResponseMessagePtr response(
+                      new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                          new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+                  response->body().add(response_body_);
+
+                  callbacks.onSuccess(request_, std::move(response));
+                  return nullptr;
+                }));
+
+        retry_timer_cb_();
+      }));
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, layer_digest_);
