@@ -216,19 +216,6 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersPropagateFinDownstream) {
   upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-TEST_P(HttpUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
-        "false"}});
-  setupUpstream();
-  EXPECT_CALL(encoder_.stream_, resetStream(_)).Times(0);
-  upstream_->doneWriting();
-  EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
-  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
-  upstream_->responseDecoder().decodeTrailers(std::move(trailers));
-}
-
 class HttpUpstreamRequestEncoderTest : public testing::TestWithParam<Http::CodecType> {
 public:
   HttpUpstreamRequestEncoderTest() {
@@ -670,17 +657,6 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-TEST_F(CombinedUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
-        "false"}});
-  this->setup();
-  upstream_->doneWriting();
-  EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
-  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
-  upstream_->responseDecoder().decodeTrailers(std::move(trailers));
-}
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy
