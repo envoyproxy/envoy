@@ -13,18 +13,9 @@ envoy_cc_test(
     srcs = ["oci_manifest_provider_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/common:empty_string",
-        "//source/common/crypto:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/common/wasm/oci:oci_async_datasource_lib",
-        "//test/mocks/event:event_mocks",
-        "//test/mocks/init:init_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//test/extensions/common/wasm:remote_async_datasource_base_test",
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
 

@@ -1,81 +1,17 @@
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/base.pb.validate.h"
-
-#include "source/common/common/cleanup.h"
-#include "source/common/common/empty_string.h"
-#include "source/common/config/datasource.h"
-#include "source/common/http/message_impl.h"
-#include "source/common/protobuf/protobuf.h"
-#include "source/extensions/common/wasm/remote_async_datasource.h"
-
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
+#include "test/extensions/common/wasm/remote_async_datasource_base_test.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Common {
+namespace Wasm {
 namespace {
-using ::testing::AtLeast;
-using ::testing::NiceMock;
-using ::testing::Return;
 
-class AsyncDataSourceTest : public testing::Test {
+class RemoteAsyncDataSourceTest : public AsyncDataSourceTest {
 protected:
-  using AsyncDataSourcePb = envoy::config::core::v3::AsyncDataSource;
-
-  NiceMock<Upstream::MockClusterManager> cm_;
-  Init::MockManager init_manager_;
-  Init::ExpectableWatcherImpl init_watcher_;
-  Init::TargetHandlePtr init_target_handle_;
-  Api::ApiPtr api_{Api::createApiForTest()};
-  NiceMock<Random::MockRandomGenerator> random_;
-  Event::MockDispatcher dispatcher_;
-  Event::MockTimer* retry_timer_;
-  Event::TimerCb retry_timer_cb_;
-  NiceMock<Http::MockAsyncClientRequest> request_{&cm_.thread_local_cluster_.async_client_};
-
   RemoteAsyncDataProviderPtr remote_data_provider_;
-
-  using AsyncClientSendFunc = std::function<Http::AsyncClient::Request*(
-      Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
-      const Http::AsyncClient::RequestOptions)>;
-
-  void initialize(AsyncClientSendFunc func, int num_retries = 1) {
-    retry_timer_ = new Event::MockTimer();
-    EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-      init_target_handle_ = target.createHandle("test");
-    }));
-
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      retry_timer_cb_ = timer_cb;
-      return retry_timer_;
-    }));
-
-    EXPECT_CALL(*retry_timer_, disableTimer());
-    if (!func) {
-      return;
-    }
-
-    EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
-        .Times(AtLeast(1))
-        .WillRepeatedly(ReturnRef(cm_.thread_local_cluster_.async_client_));
-
-    if (num_retries == 1) {
-      EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-          .Times(AtLeast(1))
-          .WillRepeatedly(Invoke(func));
-    } else {
-      EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-          .Times(num_retries)
-          .WillRepeatedly(Invoke(func));
-    }
-  }
 };
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -111,7 +47,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -152,7 +88,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -195,7 +131,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -238,7 +174,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -285,7 +221,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -328,7 +264,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
   EXPECT_EQ(async_data, body);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -366,7 +302,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
   EXPECT_EQ(async_data, "non-empty");
 }
 
-TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
+TEST_F(RemoteAsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
   const std::string body = "hello world";
   std::string async_data = "non-empty";
 
@@ -411,7 +347,7 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
   EXPECT_EQ(async_data, body);
 }
 
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
+TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -480,7 +416,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   EXPECT_EQ(async_data, body);
 }
 
-TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
+TEST_F(RemoteAsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -506,7 +442,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
       EnvoyException, "max_interval must be greater than or equal to the base_interval");
 }
 
-TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
+TEST_F(RemoteAsyncDataSourceTest, BaseIntervalTest) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -526,4 +462,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
 }
 
 } // namespace
+} // namespace Wasm
+} // namespace Common
+} // namespace Extensions
 } // namespace Envoy
