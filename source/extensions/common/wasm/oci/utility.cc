@@ -62,20 +62,15 @@ absl::StatusOr<std::string> prepareAuthorizationHeader(const std::string& image_
   auto registry_result = auths->getObject(registry);
   if (!registry_result.ok()) {
     return absl::InvalidArgumentError(
-        absl::StrCat("Did not find 'auths.", registry,
-                     "' key in the image pull secret: ", registry_result.status().message()));
+        absl::StrCat("Did not find registry '", registry,
+                     "' in the image pull secret: ", registry_result.status().message()));
   }
   Json::ObjectSharedPtr registry_object = registry_result.value();
 
   auto auth = registry_object->getString("auth");
   if (!auth.ok()) {
     return absl::InvalidArgumentError(
-        absl::StrCat("Did not find 'auths.", registry, ".auth' key in the image pull secret"));
-  }
-
-  // TODO(jewertow): handle other registries
-  if (!absl::StrContains(registry, ".dkr.ecr.") || !absl::EndsWith(registry, ".amazonaws.com")) {
-    return absl::InvalidArgumentError("Unsupported registry - currently, only ECR is supported");
+        absl::StrCat("Did not find 'auth' key for registry '", registry, "' in the image pull secret"));
   }
 
   // ECR uses basic auth and the "auth" key in the image pull secret should contain base64-encoded
