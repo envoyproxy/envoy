@@ -193,12 +193,11 @@ INSTANTIATE_TEST_SUITE_P(
     ParsePathPatternSyntaxFailureTestSuite, ParsePathPatternSyntaxFailure,
     testing::Values("/api/v{versionNum=*}/1234", "/api/{version=*beta}/1234",
                     "/media/eff456/ll-sd-out.{ext}", "/media/eff456/ll-sd-out.{ext=*}",
-                    "/media/{country=**}/{lang=*}/**", "/media/**/*/**",
-                    "/media/{id=/*}/*", "/media/{contentId=/**}", "/api/{version}/{version}",
-                    "/api/{version.major}/{version.minor}",
-                    "/media/*{*}*", "/media/{*}/", "/media/*/index?a=2", "media",
-                    "/\001\002\003\004\005\006\007", "/*(/**", "/**/{var}",
-                    "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
+                    "/media/{country=**}/{lang=*}/**", "/media/**/*/**", "/media/{id=/*}/*",
+                    "/media/{contentId=/**}", "/api/{version}/{version}",
+                    "/api/{version.major}/{version.minor}", "/media/*{*}*", "/media/{*}/",
+                    "/media/*/index?a=2", "media", "/\001\002\003\004\005\006\007", "/*(/**",
+                    "/**/{var}", "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
                     "/{var12345678901234=*}"));
 
 TEST_P(ParsePathPatternSyntaxFailure, ParsePathPatternSyntaxFailureTest) {
