@@ -34,7 +34,7 @@ public:
 };
 
 // Basic test to verify factory registration
-TEST(CgroupMemoryMonitorFactoryTest, BasicTest) {
+TEST(CgroupMemoryConfigTest, BasicTest) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cgroup_memory");
@@ -43,7 +43,7 @@ TEST(CgroupMemoryMonitorFactoryTest, BasicTest) {
 }
 
 // Test creating a monitor with default values
-TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorDefault) {
+TEST(CgroupMemoryConfigTest, CreateMonitorDefault) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cgroup_memory");
@@ -64,7 +64,7 @@ TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorDefault) {
 }
 
 // Test creating a monitor with a specific configured memory limit
-TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorWithLimit) {
+TEST(CgroupMemoryConfigTest, CreateMonitorWithLimit) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cgroup_memory");
@@ -75,7 +75,7 @@ TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorWithLimit) {
   EXPECT_CALL(*mock_reader, getMemoryLimit()).WillRepeatedly(Return(2000));
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(1234); // Set explicit memory limit
+  config.mutable_max_memory_bytes()->set_value(1234); // Set explicit memory limit
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
@@ -87,14 +87,14 @@ TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorWithLimit) {
 }
 
 // Test creating a monitor with an invalid memory limit
-TEST(CgroupMemoryMonitorFactoryTest, InvalidConfig) {
+TEST(CgroupMemoryConfigTest, InvalidConfig) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(0);
+  config.mutable_max_memory_bytes();  // Creates an empty wrapper which will fail validation
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
@@ -104,12 +104,12 @@ TEST(CgroupMemoryMonitorFactoryTest, InvalidConfig) {
 
   EXPECT_THROW_WITH_MESSAGE(
       factory->createResourceMonitor(config, context), ProtoValidationException,
-      "max_memory_bytes: 0\n: Proto constraint validation failed "
+      "max_memory_bytes {\n}\n: Proto constraint validation failed "
       "(CgroupMemoryConfigValidationError.MaxMemoryBytes: value must be greater than 0)");
 }
 
 // Test that factory creates a monitor successfully with ignored context
-TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorIgnoresContext) {
+TEST(CgroupMemoryConfigTest, CreateMonitorIgnoresContext) {
   auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
   const auto* mock_ptr = mock_file_system.get();
   const FileSystem* original = &FileSystem::instance();
@@ -129,7 +129,7 @@ TEST(CgroupMemoryMonitorFactoryTest, CreateMonitorIgnoresContext) {
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(1234);
+  config.mutable_max_memory_bytes()->set_value(1234);
 
   Event::MockDispatcher dispatcher1;
   Api::ApiPtr api1 = Api::createApiForTest();

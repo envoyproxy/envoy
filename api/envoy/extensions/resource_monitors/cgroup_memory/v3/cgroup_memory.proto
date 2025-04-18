@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.resource_monitors.cgroup_memory.v3;
 
+import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -18,5 +19,5 @@ message CgroupMemoryConfig {
   // The maximum memory available to the monitored cgroup in bytes.
   // If not specified, will use only the cgroup's memory limit.
   // If specified, must be greater than 0.
-  optional uint64 max_memory_bytes = 1 [(validate.rules).uint64 = {gt: 0}];
+  google.protobuf.UInt64Value max_memory_bytes = 1 [(validate.rules).uint64.gt = 0];
 }

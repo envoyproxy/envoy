@@ -13,8 +13,8 @@ namespace CgroupMemory {
 CgroupMemoryMonitor::CgroupMemoryMonitor(
     const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
     std::unique_ptr<CgroupMemoryStatsReader> stats_reader)
-    : max_memory_bytes_(config.has_max_memory_bytes() ? config.max_memory_bytes() : 0),
-      stats_reader_(stats_reader ? std::move(stats_reader) : CgroupMemoryStatsReader::create()) {}
+    : max_memory_bytes_(config.has_max_memory_bytes() ? config.max_memory_bytes().value() : 0),
+    stats_reader_(stats_reader ? std::move(stats_reader) : CgroupMemoryStatsReader::create()) {}
 
 void CgroupMemoryMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   uint64_t usage;
