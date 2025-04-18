@@ -32,7 +32,6 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/common/platform/api/quiche_flags.h"
 #endif
-ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_boolean_to_string_fix);
 
 using testing::_;
 using testing::Invoke;
@@ -1261,10 +1260,8 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
                             "bad config");
 }
 
-TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
+TEST_F(RtdsLoaderImplTest, BooleanToStringConversion) {
   setup();
-
-  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, true);
 
   auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_resource
@@ -1276,23 +1273,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
   doOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
-}
-
-TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
-  setup();
-
-  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, false);
-
-  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: some_resource
-    layer:
-      toggle: true
-  )EOF");
-
-  EXPECT_CALL(rtds_init_callback_, Call());
-  doOnConfigUpdateVerifyNoThrow(runtime);
-
-  EXPECT_EQ("1", loader_->snapshot().get("toggle").value().get()); // Assuming previous behavior
 }
 
 } // namespace
