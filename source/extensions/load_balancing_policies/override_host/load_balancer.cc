@@ -232,6 +232,9 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
 
 absl::StatusOr<std::unique_ptr<SelectedHosts>>
 OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext* context) {
+  // This is ensured by config validation.
+  ASSERT(!config_.primaryEndpointOverrideSources().empty());
+  // TODO(yanavlasov): add support for multiple override sources.
   const OverrideHostLbConfig::OverrideSource& override_source =
       config_.primaryEndpointOverrideSources().front();
   // First check if header based host selection is enabled and if header is
