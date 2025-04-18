@@ -86,7 +86,7 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   ProtobufMessage::NullValidationVisitorImpl any_validation_visitor_;
-  absl::Status creation_status_{};
+  absl::Status creation_status_;
   std::unique_ptr<Envoy::Extensions::Filters::Common::RateLimit::RateLimitConfig> config_;
   Http::TestRequestHeaderMapImpl headers_;
   std::shared_ptr<Router::MockRoute> route_{new NiceMock<Router::MockRoute>()};
@@ -440,7 +440,7 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicy> rate_limit_entry_;
-  absl::Status creation_status_{};
+  absl::Status creation_status_;
   Http::TestRequestHeaderMapImpl headers_;
   std::shared_ptr<Router::MockRoute> route_{new NiceMock<Router::MockRoute>()};
 
@@ -1272,10 +1272,13 @@ public:
   }
   std::string name() const override { return "test.descriptor_producer"; }
 
-  Envoy::RateLimit::DescriptorProducerPtr
+  absl::StatusOr<Envoy::RateLimit::DescriptorProducerPtr>
   createDescriptorProducerFromProto(const Protobuf::Message&,
                                     Server::Configuration::CommonFactoryContext&) override {
-    return return_valid_producer_ ? std::make_unique<Router::SourceClusterAction>() : nullptr;
+    if (!return_valid_producer_) {
+      return absl::InvalidArgumentError("Rate limit descriptor extension failed: invalid producer");
+    }
+    return std::make_unique<Router::SourceClusterAction>();
   }
   bool return_valid_producer_{true};
 };

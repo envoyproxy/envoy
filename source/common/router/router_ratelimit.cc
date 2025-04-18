@@ -344,15 +344,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
-      RateLimit::DescriptorProducerPtr producer =
+      absl::StatusOr<RateLimit::DescriptorProducerPtr> producer_or =
           factory->createDescriptorProducerFromProto(*message, context);
-      if (producer) {
-        actions_.emplace_back(std::move(producer));
-      } else {
-        creation_status = absl::InvalidArgumentError(
-            absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
-        return;
-      }
+      SET_AND_RETURN_IF_NOT_OK(producer_or.status(), creation_status);
+      actions_.emplace_back(std::move(producer_or.value()));
       break;
     }
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:

@@ -151,7 +151,7 @@ public:
    * @return DescriptorProducerPtr the rate limit descriptor producer which will be used to
    * populate rate limit descriptors.
    */
-  virtual DescriptorProducerPtr
+  virtual absl::StatusOr<DescriptorProducerPtr>
   createDescriptorProducerFromProto(const Protobuf::Message& config,
                                     Server::Configuration::CommonFactoryContext& context) PURE;
 

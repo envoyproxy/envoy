@@ -64,7 +64,8 @@ ProtobufTypes::MessagePtr ExprDescriptorFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor>();
 }
 
-RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducerFromProto(
+absl::StatusOr<RateLimit::DescriptorProducerPtr>
+ExprDescriptorFactory::createDescriptorProducerFromProto(
     const Protobuf::Message& message, Server::Configuration::CommonFactoryContext& context) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor&>(
@@ -75,8 +76,8 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kText: {
     auto parse_status = google::api::expr::parser::Parse(config.text());
     if (!parse_status.ok()) {
-      throw EnvoyException("Unable to parse descriptor expression: " +
-                           parse_status.status().ToString());
+      return absl::InvalidArgumentError(absl::StrCat("Unable to parse descriptor expression: ",
+                                                     parse_status.status().ToString()));
     }
     return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr());
   }
@@ -84,7 +85,8 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
     return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed());
   default:
-    return nullptr;
+    return absl::InvalidArgumentError(
+        "Rate limit descriptor extension failed: expression specifier is not set");
   }
 }
 
