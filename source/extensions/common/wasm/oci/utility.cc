@@ -69,8 +69,8 @@ absl::StatusOr<std::string> prepareAuthorizationHeader(const std::string& image_
 
   auto auth = registry_object->getString("auth");
   if (!auth.ok()) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Did not find 'auth' key for registry '", registry, "' in the image pull secret"));
+    return absl::InvalidArgumentError(absl::StrCat("Did not find 'auth' key for registry '",
+                                                   registry, "' in the image pull secret"));
   }
 
   // ECR uses basic auth and the "auth" key in the image pull secret should contain base64-encoded

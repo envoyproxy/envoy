@@ -1,7 +1,6 @@
 #include "source/extensions/common/wasm/oci/utility.h"
 
 #include "absl/strings/match.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -66,7 +65,8 @@ TEST_F(UtilityTest, PrepareAuthorizationHeaderMissingAuthsKeyFailure) {
   auto status = Oci::prepareAuthorizationHeader("{}", "example.com");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_TRUE(absl::StartsWith(status.status().message(), "Did not find 'auths' key in the image pull secret: "));
+  EXPECT_TRUE(absl::StartsWith(status.status().message(),
+                               "Did not find 'auths' key in the image pull secret: "));
 }
 
 TEST_F(UtilityTest, PrepareAuthorizationHeaderMissingRegistryKeyFailure) {
@@ -78,7 +78,8 @@ TEST_F(UtilityTest, PrepareAuthorizationHeaderMissingRegistryKeyFailure) {
   auto status = Oci::prepareAuthorizationHeader(image_pull_secret, "example.com");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_TRUE(absl::StartsWith(status.status().message(), "Did not find registry 'example.com' in the image pull secret: "));
+  EXPECT_TRUE(absl::StartsWith(status.status().message(),
+                               "Did not find registry 'example.com' in the image pull secret: "));
 }
 
 TEST_F(UtilityTest, PrepareAuthorizationHeaderMissingAuthKeyFailure) {
@@ -91,7 +92,8 @@ TEST_F(UtilityTest, PrepareAuthorizationHeaderMissingAuthKeyFailure) {
   auto status = Oci::prepareAuthorizationHeader(image_pull_secret, "example.com");
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(status.status().message(), "Did not find 'auth' key for registry 'example.com' in the image pull secret");
+  EXPECT_EQ(status.status().message(),
+            "Did not find 'auth' key for registry 'example.com' in the image pull secret");
 }
 
 TEST_F(UtilityTest, PrepareAuthorizationHeaderSuccess) {
