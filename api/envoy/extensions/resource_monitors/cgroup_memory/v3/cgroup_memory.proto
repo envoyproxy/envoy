@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.cgroup_memory.v3;
+
+import "google/protobuf/wrappers.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.cgroup_memory.v3";
+option java_outer_classname = "CgroupMemoryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/cgroup_memory/v3;cgroup_memoryv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Cgroup Memory]
+// [#extension: envoy.resource_monitors.cgroup_memory]
+
+message CgroupMemoryConfig {
+  // The maximum memory available to the monitored cgroup in bytes.
+  // If not specified, will use only the cgroup's memory limit.
+  // If specified, must be greater than 0.
+  google.protobuf.UInt64Value max_memory_bytes = 1 [(validate.rules).uint64.gt = 0];
+}
