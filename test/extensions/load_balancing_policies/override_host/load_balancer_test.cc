@@ -526,7 +526,31 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadata) {
 
   createLoadBalancer(makeDefaultConfig());
 
-  // Use wrong value type.
+  // Use invalid host address.
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "bad-host@address" }
+    }
+  )pb");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  // Even though metadata is invalid, the fallback LB will be used to select a host.
+  EXPECT_NE(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
+}
+
+TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadataType) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
+      0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfig());
+
+  // Use invalid type for address value.
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
       key: "x-gateway-destination-endpoint"
@@ -567,6 +591,25 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderOnlySourceWithNoHeader) {
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   // Since LB is only configured to use hosts, the metadata is ignored and fallback LB is used.
   EXPECT_EQ(host->address()->asString(), "1.2.3.4:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
+      0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithHeadersOnlyEnabled("x-foo-primary-endpoint",
+                                                             "x-foo-failover-endpoints"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  EXPECT_CALL(load_balancer_context_, downstreamHeaders()).WillOnce(Return(nullptr));
+  // Even though metadata is invalid, the fallback LB will be used to select a host.
+  EXPECT_NE(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
 
 } // namespace

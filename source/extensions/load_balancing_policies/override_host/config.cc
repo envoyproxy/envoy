@@ -27,9 +27,8 @@ OverrideHostLoadBalancerFactory::loadConfig(Server::Configuration::ServerFactory
                                             const Protobuf::Message& config) {
   const OverrideHost& override_host_config = MessageUtil::downcastAndValidate<const OverrideHost&>(
       config, context.messageValidationVisitor());
-  if (!override_host_config.has_fallback_picking_policy()) {
-    return absl::InvalidArgumentError("The fallback picking policy must be set.");
-  }
+  // Enforced in config validation.
+  ASSERT(override_host_config.has_fallback_picking_policy());
   return OverrideHostLbConfig::make(override_host_config, context);
 }
 
