@@ -49,6 +49,20 @@ private:
   const std::string limit_path_;
 };
 
+// Test class to expose protected methods for V1 reader
+class TestableV1StatsReader : public CgroupV1StatsReader {
+public:
+  using CgroupV1StatsReader::getMemoryLimitPath;
+  using CgroupV1StatsReader::getMemoryUsagePath;
+};
+
+// Test class to expose protected methods for V2 reader
+class TestableV2StatsReader : public CgroupV2StatsReader {
+public:
+  using CgroupV2StatsReader::getMemoryLimitPath;
+  using CgroupV2StatsReader::getMemoryUsagePath;
+};
+
 // Tests reading memory stats from cgroup v1 files.
 TEST(CgroupMemoryStatsReaderTest, ReadsV1MemoryStats) {
   const std::string usage_path = TestEnvironment::temporaryPath("memory.usage_in_bytes");
@@ -245,6 +259,20 @@ TEST(CgroupMemoryStatsReaderTest, CreateThrowsWhenNoImplementationAvailable) {
                             "No supported cgroup memory implementation found");
 
   FileSystem::setInstance(original);
+}
+
+// Tests that V1 reader returns correct paths
+TEST(CgroupMemoryStatsReaderTest, V1ReaderReturnsPaths) {
+  TestableV1StatsReader stats_reader;
+  EXPECT_EQ(stats_reader.getMemoryUsagePath(), CgroupPaths::V1::getUsagePath());
+  EXPECT_EQ(stats_reader.getMemoryLimitPath(), CgroupPaths::V1::getLimitPath());
+}
+
+// Tests that V2 reader returns correct paths
+TEST(CgroupMemoryStatsReaderTest, V2ReaderReturnsPaths) {
+  TestableV2StatsReader stats_reader;
+  EXPECT_EQ(stats_reader.getMemoryUsagePath(), CgroupPaths::V2::getUsagePath());
+  EXPECT_EQ(stats_reader.getMemoryLimitPath(), CgroupPaths::V2::getLimitPath());
 }
 
 } // namespace
