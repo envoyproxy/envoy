@@ -1158,27 +1158,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE",
     ),
-    # Curl usage is under deprecation and will be removed by Q3 2024 before v1.31 release in July-2024.
-    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
-    com_github_curl = dict(
-        project_name = "curl",
-        project_desc = "Library for transferring data with URLs",
-        project_url = "https://curl.haxx.se",
-        version = "8.9.1",
-        sha256 = "291124a007ee5111997825940b3876b3048f7d31e73e9caa681b80fe48b2dcd5",
-        strip_prefix = "curl-{version}",
-        urls = ["https://github.com/curl/curl/releases/download/curl-{underscore_version}/curl-{version}.tar.gz"],
-        use_category = ["dataplane_ext", "observability_ext"],
-        extensions = [
-            "envoy.filters.http.aws_lambda",
-            "envoy.filters.http.aws_request_signing",
-            "envoy.grpc_credentials.aws_iam",
-        ],
-        release_date = "2024-07-31",
-        cpe = "cpe:2.3:a:haxx:libcurl:*",
-        license = "curl",
-        license_url = "https://github.com/curl/curl/blob/curl-{underscore_version}/COPYING",
-    ),
     v8 = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",

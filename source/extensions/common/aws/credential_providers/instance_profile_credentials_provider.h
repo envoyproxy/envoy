@@ -24,9 +24,9 @@ class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBas
                                            public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
-  InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+  InstanceProfileCredentialsProvider(Api::Api& api,
+                                     Server::Configuration::ServerFactoryContext& context,
                                      AwsClusterManagerOptRef aws_cluster_manager,
-                                     const CurlMetadataFetcher& fetch_metadata_using_curl,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
@@ -40,20 +40,10 @@ public:
 private:
   bool needsRefresh() override;
   void refresh() override;
-  void fetchInstanceRole(const std::string&& token, bool async = false);
-  void fetchInstanceRoleAsync(const std::string&& token) {
-    fetchInstanceRole(std::move(token), true);
-  }
-  void fetchCredentialFromInstanceRole(const std::string&& instance_role, const std::string&& token,
-                                       bool async = false);
+  void fetchInstanceRoleAsync(const std::string&& token);
   void fetchCredentialFromInstanceRoleAsync(const std::string&& instance_role,
-                                            const std::string&& token) {
-    fetchCredentialFromInstanceRole(std::move(instance_role), std::move(token), true);
-  }
-  void extractCredentials(const std::string&& credential_document_value, bool async = false);
-  void extractCredentialsAsync(const std::string&& credential_document_value) {
-    extractCredentials(std::move(credential_document_value), true);
-  }
+                                            const std::string&& token);
+  void extractCredentialsAsync(const std::string&& credential_document_value);
 };
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;

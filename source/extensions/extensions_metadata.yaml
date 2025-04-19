@@ -874,11 +874,6 @@ envoy.geoip_providers.maxmind:
   status: wip
   type_urls:
   - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
-envoy.grpc_credentials.aws_iam:
-  categories:
-  - envoy.grpc_credentials
-  security_posture: data_plane_agnostic
-  status: alpha
 envoy.grpc_credentials.file_based_metadata:
   categories:
   - envoy.grpc_credentials

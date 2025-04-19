@@ -122,7 +122,7 @@ public:
     auto credential_uri = "169.254.170.2:80/path/to/doc";
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, manager_optref_, nullptr,
+        *api_, context_, manager_optref_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -366,171 +366,6 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
 
 // End unit test for new option via Http Async client.
 
-// Begin unit test for deprecated option using Libcurl client.
-// TODO(suniltheta): Remove this test class once libcurl is removed from Envoy.
-class ContainerCredentialsProviderUsingLibcurlTest : public testing::Test {
-public:
-  ContainerCredentialsProviderUsingLibcurlTest() : api_(Api::createApiForTest(time_system_)) {
-    // Tue Jan  2 03:04:05 UTC 2018
-    time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
-  }
-
-  void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
-                         MetadataFetcher::MetadataReceiver::RefreshState::Ready,
-                     std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.use_http_client_to_fetch_aws_credentials", "false"}});
-
-    provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, absl::nullopt, absl::nullopt,
-        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
-          return this->fetch_metadata_.fetch(message);
-        },
-        nullptr, "169.254.170.2:80/path/to/doc", refresh_state, initialization_timer, "auth_token",
-        "credentials_provider_cluster");
-  }
-
-  void expectDocument(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
-                                           {":authority", "169.254.170.2:80"},
-                                           {":scheme", "http"},
-                                           {":method", "GET"},
-                                           {"authorization", "auth_token"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
-  }
-
-  TestScopedRuntime scoped_runtime_;
-  Event::SimulatedTimeSystem time_system_;
-  Api::ApiPtr api_;
-  NiceMock<MockFetchMetadata> fetch_metadata_;
-  ContainerCredentialsProviderPtr provider_;
-};
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FailedFetchingDocument) {
-  setupProvider();
-  expectDocument(absl::optional<std::string>());
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyDocument) {
-  setupProvider();
-  expectDocument("");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, MalformedDocument) {
-  setupProvider();
-  expectDocument(R"EOF(
-not json
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyValues) {
-  setupProvider();
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "",
-  "SecretAccessKey": "",
-  "Token": "",
-  "Expiration": ""
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FullCachedCredentials) {
-  setupProvider();
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token",
-  "Expiration": "2018-01-02T03:05:00Z"
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
-}
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, NormalCredentialExpiration) {
-  setupProvider();
-  InSequence sequence;
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token",
-  "Expiration": "2019-01-02T03:04:05Z"
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  time_system_.advanceTimeWait(std::chrono::hours(2));
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "new_akid",
-  "SecretAccessKey": "new_secret",
-  "Token": "new_token",
-  "Expiration": "2019-01-02T03:04:05Z"
-}
-)EOF");
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
-}
-
-TEST_F(ContainerCredentialsProviderUsingLibcurlTest, TimestampCredentialExpiration) {
-  setupProvider();
-  InSequence sequence;
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token",
-  "Expiration": "2018-01-02T03:04:05Z"
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "new_akid",
-  "SecretAccessKey": "new_secret",
-  "Token": "new_token",
-  "Expiration": "2019-01-02T03:04:05Z"
-}
-)EOF");
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
-}
-// End unit test for deprecated option using Libcurl client.
-
 // Specific test case for EKS Pod Identity, as Pod Identity auth token is only loaded at credential
 // refresh time
 class ContainerEKSPodIdentityCredentialsProviderTest : public testing::Test {
@@ -558,7 +393,7 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, manager_optref_, nullptr,
+        *api_, context_, manager_optref_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);

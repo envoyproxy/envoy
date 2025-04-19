@@ -23,6 +23,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/extensions/common/aws:96.3"
+"source/extensions/common/aws/credential_providers:94.4"
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.6"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting

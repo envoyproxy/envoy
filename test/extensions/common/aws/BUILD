@@ -115,24 +115,3 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
     ],
 )
-
-envoy_cc_test(
-    name = "aws_metadata_fetcher_integration_test",
-    size = "large",
-    srcs = [
-        "aws_metadata_fetcher_integration_test.cc",
-    ],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/common/common:fmt_lib",
-        "//source/extensions/common/aws:utility_lib",
-        "//source/extensions/filters/http/fault:config",
-        "//source/extensions/filters/http/fault:fault_filter_lib",
-        "//source/extensions/filters/http/router:config",
-        "//source/extensions/filters/network/echo:config",
-        "//source/extensions/filters/network/http_connection_manager:config",
-        "//test/integration:integration_lib",
-        "//test/server:utility_lib",
-        "//test/test_common:utility_lib",
-    ],
-)

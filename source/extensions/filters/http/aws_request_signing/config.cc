@@ -122,15 +122,13 @@ AwsRequestSigningFilterFactory::createSigner(
       }
       credentials_provider =
           std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-              server_context.api(), makeOptRef(server_context), region, nullptr,
-              credential_provider_config);
+              server_context.api(), server_context, region, credential_provider_config);
     }
   } else {
     // No credential provider settings provided, so make the default credentials provider chain
     credentials_provider =
         std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-            server_context.api(), makeOptRef(server_context), region, nullptr,
-            credential_provider_config);
+            server_context.api(), server_context, region, credential_provider_config);
   }
 
   if (!credentials_provider.ok()) {

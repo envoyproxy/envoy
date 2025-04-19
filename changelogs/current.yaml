@@ -2,6 +2,11 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: aws_iam
+  change: |
+    As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
+    grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
+    will fail to load.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
