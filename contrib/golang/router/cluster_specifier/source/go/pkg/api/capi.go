@@ -19,5 +19,6 @@ package api
 
 type HttpCAPI interface {
 	HttpGetHeader(headerPtr uint64, key *string, value *string) bool
+	HttpGetAllHeaders(headerPtr uint64) map[string][]string
 	HttpLogError(pluginPtr uint64, msg *string)
 }
