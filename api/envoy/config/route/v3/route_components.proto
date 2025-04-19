@@ -276,7 +276,6 @@ message Route {
     // implemented]
     FilterAction filter_action = 17;
 
-    // [#not-implemented-hide:]
     // An action used when the route will generate a response directly,
     // without forwarding to an upstream host. This will be used in non-proxy
     // xDS clients like the gRPC server. It could also be used in the future
@@ -1783,7 +1782,6 @@ message DirectResponseAction {
   core.v3.DataSource body = 2;
 }
 
-// [#not-implemented-hide:]
 message NonForwardingAction {
 }
 

@@ -11651,6 +11651,56 @@ virtual_hosts:
   }
 }
 
+// Test that nonForwardingActionEntry() returns the correct value based on action type.
+TEST_F(RouteMatcherTest, NonForwardingActionEntryTest) {
+  // Test case 1: Route with NonForwardingAction
+  {
+    const std::string yaml_non_forwarding = R"EOF(
+virtual_hosts:
+  - name: host
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/test" }
+        non_forwarding_action: {}
+)EOF";
+    absl::Status creation_status = absl::OkStatus();
+    TestConfigImpl config_non_forwarding(parseRouteConfigurationFromYaml(yaml_non_forwarding),
+                                         factory_context_, true, creation_status_);
+    EXPECT_TRUE(creation_status.ok());
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("host.com", "/test", "GET");
+    const Route* route = config_non_forwarding.route(headers, 0).get();
+    ASSERT_NE(route, nullptr);
+    const NonForwardingActionEntry* non_forwarding_entry = route->nonForwardingActionEntry();
+    // For NonForwardingAction, it should return a pointer to the route entry itself.
+    EXPECT_NE(non_forwarding_entry, nullptr);
+    EXPECT_EQ(dynamic_cast<const RouteEntry*>(non_forwarding_entry), route->routeEntry());
+  }
+
+  // Test case 2: Standard route with a cluster destination
+  {
+    const std::string yaml_standard_route = R"EOF(
+virtual_hosts:
+  - name: host
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/standard" }
+        route: { cluster: my_cluster }
+)EOF";
+    factory_context_.cluster_manager_.initializeClusters({"my_cluster"}, {});
+    absl::Status creation_status = absl::OkStatus();
+    TestConfigImpl config_standard(parseRouteConfigurationFromYaml(yaml_standard_route),
+                                   factory_context_, true, creation_status_);
+    EXPECT_TRUE(creation_status.ok());
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("host.com", "/standard", "GET");
+    const Route* route = config_standard.route(headers, 0).get();
+    ASSERT_NE(route, nullptr);
+    // For a standard route action, nonForwardingActionEntry() should return nullptr.
+    EXPECT_EQ(route->nonForwardingActionEntry(), nullptr);
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

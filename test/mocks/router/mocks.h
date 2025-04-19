@@ -522,6 +522,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
+  MOCK_METHOD(const NonForwardingActionEntry*, nonForwardingActionEntry, (), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;

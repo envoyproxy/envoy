@@ -101,6 +101,13 @@ public:
     }
     RETURN_IF_NOT_OK(creation_status);
 
+    // If this is a non-forwarding route with non_forwarding_action, use
+    // NonForwardingRouteEntryImpl.
+    if (route_config.has_non_forwarding_action()) {
+      route = std::make_shared<NonForwardingRouteEntryImpl>(vhost, route_config, factory_context,
+                                                            validator, creation_status);
+    }
+
     if (validation_clusters.has_value()) {
       RETURN_IF_NOT_OK(route->validateClusters(*validation_clusters));
       for (const auto& shadow_policy : route->shadowPolicies()) {
@@ -1383,6 +1390,16 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
+const NonForwardingActionEntry* RouteEntryImplBase::nonForwardingActionEntry() const {
+  // By default, routes are forwarding routes, so return nullptr unless this route is
+  // non-forwarding.
+  if (isNonForwarding()) {
+    return this;
+  } else {
+    return nullptr;
+  }
+}
+
 RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
     const Http::LowerCaseString& cluster_header_name, const Http::HeaderMap& headers,
     const RouteEntryAndRoute* route_selector_override) const {
@@ -1405,7 +1422,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
   if (weighted_clusters_config_ == nullptr) {
-    if (!cluster_name_.empty() || isDirectResponse()) {
+    if (!cluster_name_.empty() || isDirectResponse() || isNonForwarding()) {
       return shared_from_this();
     } else if (!cluster_header_name_.get().empty()) {
       return pickClusterViaClusterHeader(cluster_header_name_, headers,
@@ -1863,6 +1880,81 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return clusterEntry(headers, random_value);
   }
+  return nullptr;
+}
+
+NonForwardingRouteEntryImpl::NonForwardingRouteEntryImpl(
+    const CommonVirtualHostSharedPtr& vhost, const envoy::config::route::v3::Route& route,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
+      route_name_(route.name()) {
+  // Store the match information from the route match.
+  if (route.match().has_prefix()) {
+    matcher_ = route.match().prefix();
+    path_match_type_ = PathMatchType::Prefix;
+  } else if (route.match().has_path()) {
+    matcher_ = route.match().path();
+    path_match_type_ = PathMatchType::Exact;
+  } else if (route.match().has_safe_regex()) {
+    matcher_ = route.match().safe_regex().regex();
+    path_match_type_ = PathMatchType::Regex;
+    auto regex_status =
+        Regex::Utility::parseRegex(route.match().safe_regex(), factory_context.regexEngine());
+    SET_AND_RETURN_IF_NOT_OK(regex_status.status(), creation_status);
+    regex_matcher_ = std::move(regex_status.value());
+  } else if (route.match().has_connect_matcher()) {
+    matcher_ = "CONNECT";
+    path_match_type_ = PathMatchType::Prefix; // Use Prefix as a fallback
+  } else if (route.match().has_path_separated_prefix()) {
+    matcher_ = route.match().path_separated_prefix();
+    path_match_type_ = PathMatchType::PathSeparatedPrefix;
+  } else {
+    // Default to prefix matching on '/' if no path matching criteria are defined.
+    matcher_ = "/";
+    path_match_type_ = PathMatchType::Prefix;
+  }
+}
+
+RouteConstSharedPtr NonForwardingRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                         const StreamInfo::StreamInfo& stream_info,
+                                                         uint64_t random_value) const {
+  if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
+    return nullptr;
+  }
+
+  // Match based on the stored match type
+  bool is_match = false;
+  absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+  absl::string_view sanitized_path = sanitizePathBeforePathMatching(path);
+
+  switch (path_match_type_) {
+  case PathMatchType::Prefix:
+    is_match =
+        sanitized_path.empty() ? matcher_.empty() : absl::StartsWith(sanitized_path, matcher_);
+    break;
+  case PathMatchType::Exact:
+    is_match = sanitized_path == matcher_;
+    break;
+  case PathMatchType::Regex:
+    is_match = regex_matcher_ && regex_matcher_->match(sanitized_path);
+    break;
+  case PathMatchType::PathSeparatedPrefix: {
+    const size_t sanitized_size = sanitized_path.size();
+    const size_t matcher_size = matcher_.size();
+    is_match = sanitized_size >= matcher_size &&
+               sanitized_path.substr(0, matcher_size) == matcher_ &&
+               (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/');
+    break;
+  }
+  default:
+    is_match = false;
+  }
+
+  if (is_match) {
+    return shared_from_this();
+  }
+
   return nullptr;
 }
 
