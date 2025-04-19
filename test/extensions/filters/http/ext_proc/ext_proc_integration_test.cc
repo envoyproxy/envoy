@@ -656,7 +656,7 @@ protected:
 
   // Verify existing content-length header (i.e., no external processor mutation) is removed and
   // chunked encoding is enabled.
-  void testWithoutHeaderMutation(ConfigOptions config_option) {
+  void testWithoutHeaderMutation(ConfigOptions config_option, bool verify_content_length = false) {
     initializeConfig(config_option);
     HttpIntegrationTest::initialize();
 
@@ -672,7 +672,12 @@ protected:
         });
 
     handleUpstreamRequest();
-    verifyChunkedEncoding(upstream_request_->headers());
+
+    if (verify_content_length) {
+      EXPECT_EQ(upstream_request_->headers().getContentLengthValue(), "13");
+    } else {
+      verifyChunkedEncoding(upstream_request_->headers());
+    }
 
     EXPECT_EQ(upstream_request_->body().toString(), "Hello, World!");
     verifyDownstreamResponse(*response, 200);
@@ -1743,6 +1748,16 @@ TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthInStreamedMode) {
   testWithoutHeaderMutation(config_option);
 }
 
+TEST_P(ExtProcIntegrationTest, RetainRequestContentLengthInStreamedMode) {
+  proto_config_.set_retain_content_length_header(true);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  testWithoutHeaderMutation(config_option, /*verify_content_length*/ true);
+}
+
 // Test the request content length is removed in BUFFERED BodySendMode + SKIP HeaderSendMode..
 TEST_P(ExtProcIntegrationTest, RemoveRequestContentLengthInBufferedMode) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
@@ -1817,6 +1832,35 @@ TEST_P(ExtProcIntegrationTest, RemoveResponseContentLength) {
 
   verifyDownstreamResponse(*response, 200);
   verifyChunkedEncoding(response->headers());
+  EXPECT_EQ(response->body(), "Hello, World!");
+}
+
+TEST_P(ExtProcIntegrationTest, RetainResponseContentLength) {
+  proto_config_.set_retain_content_length_header(true);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequestWithBody("test!", absl::nullopt, /*add_content_length=*/true);
+
+  handleUpstreamRequest(/*add_content_length=*/true);
+  processResponseHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->headers().getContentLengthValue(), "13");
   EXPECT_EQ(response->body(), "Hello, World!");
 }
 
@@ -5743,5 +5787,4 @@ TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison)
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
-
 } // namespace Envoy
