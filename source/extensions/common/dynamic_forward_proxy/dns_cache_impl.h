@@ -70,6 +70,7 @@ public:
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
   void forceRefreshHosts() override;
   void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) override;
+  absl::optional<Network::Address::IpVersion> getIpVersionToRemove() override;
   void stop() override;
 
 private:
@@ -110,81 +111,32 @@ private:
 
   class DnsHostInfoImpl : public DnsHostInfo {
   public:
-    DnsHostInfoImpl(TimeSource& time_source, absl::string_view resolved_host, bool is_ip_address)
-        : time_source_(time_source), resolved_host_(resolved_host), is_ip_address_(is_ip_address),
-          stale_at_time_(time_source.monotonicTime()) {
-      touch();
-    }
-
+    DnsHostInfoImpl(DnsCacheImpl& parent, absl::string_view resolved_host, bool is_ip_address);
     // DnsHostInfo
-    Network::Address::InstanceConstSharedPtr address() const override {
-      absl::ReaderMutexLock lock{&resolve_lock_};
-      return address_;
-    }
-
-    std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override {
-      std::vector<Network::Address::InstanceConstSharedPtr> ret;
-      absl::ReaderMutexLock lock{&resolve_lock_};
-      ret = address_list_;
-      return ret;
-    }
-
-    const std::string& resolvedHost() const override { return resolved_host_; }
-    bool isIpAddress() const override { return is_ip_address_; }
-    void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
-    void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl) {
-      stale_at_time_ = resolution_time + ttl;
-    }
-    bool isStale() {
-      return time_source_.monotonicTime() > static_cast<MonotonicTime>(stale_at_time_);
-    }
-
-    void setAddresses(Network::Address::InstanceConstSharedPtr address,
-                      std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
-      absl::WriterMutexLock lock{&resolve_lock_};
-      address_ = address;
-      address_list_ = std::move(list);
-    }
-
-    void setDetails(absl::string_view details) {
-      absl::WriterMutexLock lock{&resolve_lock_};
-      details_ = details;
-    }
-
-    std::string details() override {
-      absl::ReaderMutexLock lock{&resolve_lock_};
-      return details_;
-    }
-
-    std::chrono::steady_clock::duration lastUsedTime() const { return last_used_time_.load(); }
-
-    bool firstResolveComplete() const override {
-      absl::ReaderMutexLock lock{&resolve_lock_};
-      return first_resolve_complete_;
-    }
-
-    void setFirstResolveComplete() {
-      absl::WriterMutexLock lock{&resolve_lock_};
-      first_resolve_complete_ = true;
-    }
-
-    void setResolutionStatus(Network::DnsResolver::ResolutionStatus resolution_status) {
-      absl::WriterMutexLock lock{&resolve_lock_};
-      resolution_status_ = resolution_status;
-    }
-
-    Network::DnsResolver::ResolutionStatus resolutionStatus() const override {
-      absl::WriterMutexLock lock{&resolve_lock_};
-      return resolution_status_;
-    }
+    Network::Address::InstanceConstSharedPtr address() const override;
+    std::vector<Network::Address::InstanceConstSharedPtr> addressList(bool filtered) const override;
+    const std::string& resolvedHost() const override;
+    bool isIpAddress() const override;
+    void touch() final;
+    void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl);
+    bool isStale();
+    void setAddresses(std::vector<Network::Address::InstanceConstSharedPtr>&& list,
+                      absl::string_view details,
+                      Network::DnsResolver::ResolutionStatus resolution_status);
+    void setDetails(absl::string_view details);
+    std::string details() override;
+    std::chrono::steady_clock::duration lastUsedTime() const;
+    bool firstResolveComplete() const override;
+    void setFirstResolveComplete();
+    void setResolutionStatus(Network::DnsResolver::ResolutionStatus resolution_status);
+    Network::DnsResolver::ResolutionStatus resolutionStatus() const override;
 
   private:
     friend class DnsCacheImplTest;
-    TimeSource& time_source_;
+    DnsCacheImpl& parent_;
     const std::string resolved_host_;
     const bool is_ip_address_;
     mutable absl::Mutex resolve_lock_;
-    Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(resolve_lock_);
     std::vector<Network::Address::InstanceConstSharedPtr>
         address_list_ ABSL_GUARDED_BY(resolve_lock_);
     std::string details_ ABSL_GUARDED_BY(resolve_lock_){"not_resolved"};
@@ -249,7 +201,6 @@ private:
   PrimaryHostInfo& getPrimaryHost(const std::string& host);
 
   void addCacheEntry(const std::string& host,
-                     const Network::Address::InstanceConstSharedPtr& address,
                      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                      const std::chrono::seconds ttl);
   void removeCacheEntry(const std::string& host);

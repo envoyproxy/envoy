@@ -1527,6 +1527,61 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionUnSet) {
   EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
 }
 
+TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponseWithFilter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.dns_cache_filter_unusable_ip_version", "true"}});
+
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  Event::MockTimer* timeout_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+
+  // Set IPv6 to be removed.
+  dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v6);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com:80",
+                                      DnsHostInfoEquals("127.0.0.2:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Completed));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({"127.0.0.2", "::2"}));
+  // Verify that only the address is now set to an IPv4.
+  result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+  EXPECT_EQ(result.handle_, nullptr);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  EXPECT_THAT(*result.host_info_, DnsHostInfoEquals("127.0.0.2:80", "foo.com", false));
+
+  // Set IPv4 to be removed.
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("[::2]:80", "foo.com", false)));
+  dns_cache_->setIpVersionToRemove(Network::Address::IpVersion::v4);
+
+  // Set the IP version to be removed to empty.
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("127.0.0.2:80", "foo.com", false)));
+  dns_cache_->setIpVersionToRemove(absl::nullopt);
+}
+
 TEST_F(DnsCacheImplTest, SetIpVersionToRemoveYieldsNonEmptyResponse) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.dns_cache_set_ip_version_to_remove", "true"}});
@@ -2167,7 +2222,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     EXPECT_NE(absl::nullopt, result.host_info_);
-    EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+    EXPECT_EQ(1, result.host_info_.value()->addressList(/*filtered=*/false).size());
   }
 
   {
@@ -2176,7 +2231,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
     EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
     EXPECT_EQ(result.handle_, nullptr);
     ASSERT_NE(absl::nullopt, result.host_info_);
-    EXPECT_EQ(2, result.host_info_.value()->addressList().size());
+    EXPECT_EQ(2, result.host_info_.value()->addressList(/*filtered=*/false).size());
   }
 }
 
@@ -2246,7 +2301,7 @@ TEST_F(DnsCacheImplTest, SingleAddressCache) {
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   ASSERT_NE(absl::nullopt, result.host_info_);
-  EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+  EXPECT_EQ(1, result.host_info_.value()->addressList(/*filtered=*/false).size());
 }
 
 TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
