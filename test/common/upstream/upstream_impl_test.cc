@@ -27,8 +27,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
-#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -82,7 +82,7 @@ protected:
     return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
   }
 
-  absl::StatusOr<std::shared_ptr<StrictDnsClusterImpl>>
+  absl::StatusOr<std::shared_ptr<DnsClusterImpl>>
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
@@ -97,7 +97,7 @@ protected:
     if (!status_or_cluster.ok()) {
       return status_or_cluster.status();
     }
-    return (std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first));
+    return (std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -1413,9 +1413,11 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
-      EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+  auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+  EXPECT_FALSE(cluster_or_error.ok());
+  EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(cluster_or_error.status().message(),
+            "DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
@@ -4226,17 +4228,17 @@ class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {
 public:
   ClusterInfoImplTest() { ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_)); }
 
-  std::shared_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+  std::shared_ptr<DnsClusterImpl> makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV3Yaml(yaml);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, [&]() { return dns_resolver_; },
         ssl_context_manager_, nullptr, false);
 
-    StrictDnsClusterFactory factory{};
+    DnsClusterFactory factory{};
     auto status_or_cluster = factory.create(cluster_config_, factory_context);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
-    return std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first);
+    return std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
@@ -5139,7 +5141,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
-  std::vector<std::shared_ptr<StrictDnsClusterImpl>> clusters;
+  std::vector<std::shared_ptr<DnsClusterImpl>> clusters;
 
   {
     // Get the cluster with extension_protocol_options for a network filter factory.
