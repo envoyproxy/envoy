@@ -130,6 +130,7 @@ public:
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(config_option.cluster);
         logging_filter_config.set_check_received_bytes(true);
+        logging_filter_config.set_http_rcd("via_upstream");
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
