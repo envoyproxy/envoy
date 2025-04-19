@@ -24,9 +24,9 @@ public:
     return std::make_unique<
         envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport>();
   }
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override {
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override {
     const auto& outer_config =
         MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::
                                              internal_upstream::v3::InternalUpstreamTransport&>(
@@ -101,7 +101,7 @@ Config::extractMetadata(const Upstream::HostDescriptionConstSharedPtr& host) con
 }
 
 InternalSocketFactory::InternalSocketFactory(
-    Server::Configuration::TransportSocketFactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
         config_proto,
     Network::UpstreamTransportSocketFactoryPtr&& inner_factory)

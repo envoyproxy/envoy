@@ -28,7 +28,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   auto client_or_error = server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      grpc_service, server.scope(), false);
+      grpc_service, server.statsScope(), false);
   RETURN_IF_NOT_OK_REF(client_or_error.status());
   std::shared_ptr<GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                       envoy::service::metrics::v3::StreamMetricsResponse>>

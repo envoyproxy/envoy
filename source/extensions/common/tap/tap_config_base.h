@@ -103,7 +103,8 @@ public:
 
 protected:
   TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                    Common::Tap::Sink* admin_streamer, SinkContext context);
+                    Common::Tap::Sink* admin_streamer,
+                    Server::Configuration::GenericFactoryContext& context);
 
 private:
   // This is the default setting for both RX/TX max buffered bytes. (This means that per tap, the

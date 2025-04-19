@@ -10,7 +10,7 @@ namespace GenericProxy {
 constexpr uint32_t MaxCodeValue = 999;
 
 CodeOrFlags::CodeOrFlags(Server::Configuration::ServerFactoryContext& context)
-    : pool_(context.scope().symbolTable()) {
+    : pool_(context.statsScope().symbolTable()) {
 
   // Only 0-999 are valid status codes for now. This should be enough for all practical purposes.
   // And because this should be global singleton, it's fine to preallocate all of them.

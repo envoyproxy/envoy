@@ -14,7 +14,7 @@ namespace Tls {
 
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 DownstreamSslSocketFactory::createTransportSocketFactory(
-    const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& context,
     const std::vector<std::string>& server_names) {
   absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> server_config_or_error =
       ServerContextConfigImpl::create(

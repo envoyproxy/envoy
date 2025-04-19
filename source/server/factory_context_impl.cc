@@ -12,18 +12,17 @@ FactoryContextImplBase::FactoryContextImplBase(
   ASSERT(listener_info_ != nullptr);
 }
 
-Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() const {
+Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() {
   return server_.serverFactoryContext();
 }
 
-ProtobufMessage::ValidationVisitor& FactoryContextImplBase::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& FactoryContextImplBase::messageValidationVisitor() {
   return validation_visitor_;
 }
 
-Stats::Scope& FactoryContextImplBase::scope() { return *scope_; }
+Stats::Scope& FactoryContextImplBase::statsScope() { return *scope_; }
 
-Configuration::TransportSocketFactoryContext&
-FactoryContextImplBase::getTransportSocketFactoryContext() const {
+Configuration::GenericFactoryContext& FactoryContextImplBase::getGenericFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 

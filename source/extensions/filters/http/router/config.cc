@@ -14,7 +14,7 @@ namespace RouterFilter {
 absl::StatusOr<Http::FilterFactoryCb> RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  Stats::StatNameManagedStorage prefix(stat_prefix, context.scope().symbolTable());
+  Stats::StatNameManagedStorage prefix(stat_prefix, context.statsScope().symbolTable());
   auto config_or_error = Router::FilterConfig::create(
       prefix.statName(), context,
       std::make_unique<Router::ShadowWriterImpl>(context.serverFactoryContext().clusterManager()),

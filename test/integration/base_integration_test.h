@@ -534,7 +534,7 @@ protected:
   Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 

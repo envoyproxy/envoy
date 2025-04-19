@@ -12,11 +12,11 @@ namespace Envoy {
 class SslCertsTest : public testing::Test {
 protected:
   SslCertsTest() : api_(Api::createApiForTest(store_, time_system_)) {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   Event::SimulatedTimeSystem time_system_;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
   Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;
 };

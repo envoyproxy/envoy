@@ -95,7 +95,7 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
                        Server::Configuration::FactoryContext& context,
                        Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("dubbo.{}.", config.stat_prefix())),
-      stats_(DubboFilterStats::generateStats(stats_prefix_, context_.scope())),
+      stats_(DubboFilterStats::generateStats(stats_prefix_, context_.statsScope())),
       serialization_type_(
           SerializationTypeMapper::lookupSerializationType(config.serialization_type())),
       protocol_type_(ProtocolTypeMapper::lookupProtocolType(config.protocol_type())) {

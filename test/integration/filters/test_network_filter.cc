@@ -61,7 +61,7 @@ private:
       const test::integration::filters::TestNetworkFilterConfig& config,
       Server::Configuration::FactoryContext& context) override {
     return [config, &context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestNetworkFilter>(context.scope()));
+      filter_manager.addReadFilter(std::make_shared<TestNetworkFilter>(context.statsScope()));
     };
   }
 };

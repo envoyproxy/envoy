@@ -40,7 +40,7 @@ public:
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   void initialize() override;
@@ -65,7 +65,7 @@ private:
   Network::UpstreamTransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::UpstreamTransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::UpstreamTransportSocketFactoryPtr upstream_ssl_ctx_;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
 };
 } // namespace Xfcc
 } // namespace Envoy

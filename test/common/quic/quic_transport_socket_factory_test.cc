@@ -18,8 +18,9 @@ class QuicServerTransportSocketFactoryConfigTest : public Event::TestUsingSimula
 public:
   QuicServerTransportSocketFactoryConfigTest()
       : server_api_(Api::createApiForTest(server_stats_store_, simTime())) {
-    ON_CALL(context_.server_context_, api()).WillByDefault(ReturnRef(*server_api_));
-    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+    ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*server_api_));
+    ON_CALL(context_.server_factory_context_, threadLocal())
+        .WillByDefault(ReturnRef(thread_local_));
   }
 
   void verifyQuicServerTransportSocketFactory(std::string yaml, bool expect_early_data) {
@@ -37,7 +38,7 @@ public:
   QuicServerTransportSocketConfigFactory config_factory_;
   Stats::TestUtil::TestStore server_stats_store_;
   Api::ApiPtr server_api_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
 };
 
 TEST_F(QuicServerTransportSocketFactoryConfigTest, EarlyDataEnabledByDefault) {
@@ -116,8 +117,9 @@ downstream_tls_context:
 class QuicClientTransportSocketFactoryTest : public testing::Test {
 public:
   QuicClientTransportSocketFactoryTest() {
-    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+    ON_CALL(context_.server_factory_context_, threadLocal())
+        .WillByDefault(ReturnRef(thread_local_));
+    EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillOnce(Return(nullptr));
     EXPECT_CALL(*context_config_, setSecretUpdateCallback(_))
         .WillOnce(testing::SaveArg<0>(&update_callback_));
@@ -126,7 +128,7 @@ public:
   }
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   // Will be owned by factory_.
   NiceMock<Ssl::MockClientContextConfig>* context_config_{
@@ -146,14 +148,14 @@ TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   EXPECT_EQ(nullptr, factory_->getCryptoConfig());
 
   Ssl::ClientContextSharedPtr ssl_context1{new Ssl::MockClientContext()};
-  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context1));
   update_callback_();
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config1 = factory_->getCryptoConfig();
   EXPECT_NE(nullptr, crypto_config1);
 
   Ssl::ClientContextSharedPtr ssl_context2{new Ssl::MockClientContext()};
-  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+  EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
       .WillOnce(Return(ssl_context2));
   update_callback_();
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config2 = factory_->getCryptoConfig();

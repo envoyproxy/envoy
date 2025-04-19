@@ -65,7 +65,7 @@
 #include "source/common/upstream/upstream_factory_context_impl.h"
 #include "source/extensions/upstreams/http/config.h"
 #include "source/extensions/upstreams/tcp/config.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
@@ -837,7 +837,7 @@ public:
          const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
          Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
          Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
-         Server::Configuration::TransportSocketFactoryContext&);
+         Server::Configuration::GenericFactoryContext&);
 
   static DeferredCreationCompatibleClusterTrafficStats
   generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
@@ -1064,7 +1064,7 @@ protected:
                   const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
                   Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
-                  Server::Configuration::TransportSocketFactoryContext& context,
+                  Server::Configuration::GenericFactoryContext& context,
                   absl::Status& creation_status);
 
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -1177,7 +1177,7 @@ private:
  */
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 createTransportSocketFactory(const envoy::config::cluster::v3::Cluster& config,
-                             Server::Configuration::TransportSocketFactoryContext& factory_context);
+                             Server::Configuration::GenericFactoryContext& factory_context);
 
 /**
  * Base class all primary clusters.
@@ -1266,7 +1266,7 @@ protected:
   absl::Status parseDropOverloadConfig(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
-  // This init manager is shared via TransportSocketFactoryContext. The initialization targets
+  // This init manager is shared via GenericFactoryContext. The initialization targets
   // that register with this init manager are expected to be for implementations of SdsApi (see
   // SdsApi::init_target_).
   Init::ManagerImpl init_manager_;
@@ -1282,7 +1282,7 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
   const bool wait_for_warm_on_init_;
 
-  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_{};
+  Server::GenericFactoryContextImplPtr transport_factory_context_;
 
 protected:
   Random::RandomGenerator& random_;

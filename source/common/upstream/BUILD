@@ -328,7 +328,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/server:transport_socket_config_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -411,7 +411,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/server:transport_socket_config_lib",
+        "//source/server:generic_factory_context_lib",
     ],
 )
 
@@ -473,7 +473,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
-        "//source/server:transport_socket_config_lib",
+        "//source/server:generic_factory_context_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -503,7 +503,7 @@ envoy_cc_library(
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "//source/server:transport_socket_config_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -538,7 +538,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "//source/server:transport_socket_config_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

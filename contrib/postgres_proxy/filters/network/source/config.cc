@@ -22,7 +22,7 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   config_options.upstream_ssl_ = proto_config.upstream_ssl();
 
   PostgresFilterConfigSharedPtr filter_config(
-      std::make_shared<PostgresFilterConfig>(config_options, context.scope()));
+      std::make_shared<PostgresFilterConfig>(config_options, context.statsScope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<PostgresFilter>(filter_config));
   };

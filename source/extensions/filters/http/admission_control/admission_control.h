@@ -62,7 +62,7 @@ public:
 
   Random::RandomGenerator& random() const { return random_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
-  Stats::Scope& scope() const { return scope_; }
+  Stats::Scope& statsScope() const { return scope_; }
   double aggression() const;
   double successRateThreshold() const;
   uint32_t rpsThreshold() const;

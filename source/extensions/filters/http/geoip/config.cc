@@ -15,7 +15,7 @@ Http::FilterFactoryCb GeoipFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   GeoipFilterConfigSharedPtr filter_config(
-      std::make_shared<GeoipFilterConfig>(proto_config, stat_prefix, context.scope()));
+      std::make_shared<GeoipFilterConfig>(proto_config, stat_prefix, context.statsScope()));
 
   const auto& provider_config = proto_config.provider();
   auto& geo_provider_factory =

@@ -108,7 +108,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
       use_original_src_ip_(config.use_original_src_ip()),
       use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
-      stats_(generateStats(config.stat_prefix(), context.scope())),
+      stats_(generateStats(config.stat_prefix(), context.statsScope())),
       // Default prefer_gro to true for upstream client traffic.
       upstream_socket_config_(config.upstream_socket_config(), true),
       udp_session_filter_config_provider_manager_(

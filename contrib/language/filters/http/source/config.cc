@@ -56,7 +56,7 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto config = std::make_shared<LanguageFilterConfigImpl>(
       std::make_shared<icu::Locale>(default_locale), locale_matcher,
-      proto_config.clear_route_cache(), stats_prefix, context.scope());
+      proto_config.clear_route_cache(), stats_prefix, context.statsScope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<LanguageFilter>(config);

@@ -10,7 +10,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/eds/eds.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"

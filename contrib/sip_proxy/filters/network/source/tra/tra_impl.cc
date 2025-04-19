@@ -203,7 +203,7 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
   auto client_or_error = context.serverFactoryContext()
                              .clusterManager()
                              .grpcAsyncClientManager()
-                             .getOrCreateRawAsyncClient(grpc_service, context.scope(), true);
+                             .getOrCreateRawAsyncClient(grpc_service, context.statsScope(), true);
   THROW_IF_NOT_OK_REF(client_or_error.status());
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
       client_or_error.value(), dispatcher, timeout);

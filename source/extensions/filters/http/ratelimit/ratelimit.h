@@ -81,7 +81,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Scope& scope() { return scope_; }
+  Stats::Scope& statsScope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   bool failureModeAllow() const { return !failure_mode_deny_; }
   bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }

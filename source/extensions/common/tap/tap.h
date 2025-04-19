@@ -77,9 +77,6 @@ public:
 };
 
 using SinkPtr = std::unique_ptr<Sink>;
-using SinkContext =
-    absl::variant<std::reference_wrapper<Server::Configuration::FactoryContext>,
-                  std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>;
 
 /**
  * Abstract tap sink factory. Produces a factory that can instantiate SinkPtr objects
@@ -92,18 +89,10 @@ public:
   /**
    * Create a Sink that can be used for writing out data produced by the tap filter.
    * @param config supplies the protobuf configuration for the sink factory
-   * @param  http_context supplies HTTP context
+   * @param  context supplies HTTP context
    */
-  virtual SinkPtr createHttpSinkPtr(const Protobuf::Message& config,
-                                    Server::Configuration::FactoryContext& http_context) PURE;
-  /**
-   * Create a Sink that can be used for writing out data produced by the tap filter.
-   * @param config supplies the protobuf configuration for the sink factory
-   * @param tsf_context supplies the transport socket context
-   */
-  virtual SinkPtr
-  createTransportSinkPtr(const Protobuf::Message& config,
-                         Server::Configuration::TransportSocketFactoryContext& tsf_context) PURE;
+  virtual SinkPtr createSinkPtr(const Protobuf::Message& config,
+                                Server::Configuration::GenericFactoryContext& context) PURE;
 };
 
 using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;

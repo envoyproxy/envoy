@@ -49,7 +49,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       config_update_info_(config_update_info),
-      scope_(factory_context.scope().createScope(
+      scope_(factory_context.statsScope().createScope(
           stat_prefix + "vhds." + config_update_info_->protobufConfigurationCast().name() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}",

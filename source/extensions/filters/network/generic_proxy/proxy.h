@@ -68,7 +68,7 @@ public:
                    const CodeOrFlags& code_or_flags,
                    Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix),
-        stats_(GenericFilterStats::generateStats(stat_prefix_, context.scope())),
+        stats_(GenericFilterStats::generateStats(stat_prefix_, context.statsScope())),
         code_or_flags_(code_or_flags), codec_factory_(std::move(codec)),
         route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
         drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
@@ -358,7 +358,7 @@ class Filter : public Envoy::Network::ReadFilter,
 public:
   Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
       : config_(std::move(config)),
-        stats_helper_(config_->codeOrFlags(), config_->stats(), context.scope()),
+        stats_helper_(config_->codeOrFlags(), config_->stats(), context.statsScope()),
         drain_decision_(config_->drainDecision()),
         time_source_(context.serverFactoryContext().timeSource()),
         runtime_(context.serverFactoryContext().runtime()),

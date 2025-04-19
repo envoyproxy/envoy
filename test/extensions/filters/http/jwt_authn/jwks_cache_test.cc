@@ -30,7 +30,7 @@ JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
 
 class JwksCacheTest : public testing::Test {
 protected:
-  JwksCacheTest() : stats_(generateMockStats(context_.scope())) {}
+  JwksCacheTest() : stats_(generateMockStats(context_.statsScope())) {}
 
   void SetUp() override {
     // fetcher is only called at async_fetch. In this test, it is never called.

@@ -22,7 +22,7 @@ ProxyFilterConfig::ProxyFilterConfig(
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Server::Configuration::FactoryContext& context)
     : dns_cache_manager_(cache_manager_factory.get()),
-      stats_scope_(context.scope().createScope(
+      stats_scope_(context.statsScope().createScope(
           absl::StrCat("udp.session.dynamic_forward_proxy.", config.stat_prefix(), "."))),
       filter_stats_(generateStats(*stats_scope_)), buffer_enabled_(config.has_buffer_options()),
       max_buffered_datagrams_(config.has_buffer_options()

@@ -81,9 +81,9 @@ public:
     return std::make_unique<test::integration::upstream_socket::v3::Config>();
   }
 
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override {
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override {
     const auto& outer_config =
         MessageUtil::downcastAndValidate<const test::integration::upstream_socket::v3::Config&>(
             config, context.messageValidationVisitor());

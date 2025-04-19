@@ -23,7 +23,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   Buffer::OwnedImpl response;
 
   // Setup a context that returns null cert details.
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   auto cfg =
       *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context);

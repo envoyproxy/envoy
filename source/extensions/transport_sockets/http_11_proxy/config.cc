@@ -14,8 +14,7 @@ namespace Http11Connect {
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
-    const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& context) {
   const auto& outer_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport&>(
       message, context.messageValidationVisitor());

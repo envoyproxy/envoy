@@ -18,7 +18,7 @@ Http::FilterFactoryCb ThriftToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   std::shared_ptr<FilterConfig> config =
-      std::make_shared<FilterConfig>(proto_config, context.scope());
+      std::make_shared<FilterConfig>(proto_config, context.statsScope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(config));

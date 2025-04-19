@@ -47,7 +47,7 @@ static const std::string INLINE_STRING = "<inline>";
 
 absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>> TlsCertificateConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) {
+    Server::Configuration::GenericFactoryContext& factory_context, Api::Api& api) {
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<TlsCertificateConfigImpl> ret(
       new TlsCertificateConfigImpl(config, factory_context, api, creation_status));
@@ -57,7 +57,7 @@ absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>> TlsCertificateConfigIm
 
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
+    Server::Configuration::GenericFactoryContext& factory_context, Api::Api& api,
     absl::Status& creation_status)
     : certificate_chain_(maybeSet(Config::DataSource::read(config.certificate_chain(), true, api),
                                   creation_status)),

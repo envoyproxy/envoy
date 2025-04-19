@@ -245,7 +245,7 @@ public:
                                                                std::move(inner_factory));
   }
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
   std::unique_ptr<UpstreamTcpStatsSocketFactory> factory_;
 };
@@ -293,7 +293,7 @@ TEST(TcpStatsTest, ConfigErrorOnUnsupportedPlatform) {
   proto_config.mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
   envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
   proto_config.mutable_transport_socket()->mutable_typed_config()->PackFrom(raw_buffer);
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
 
   envoy::config::core::v3::TransportSocket transport_socket_config;
   transport_socket_config.set_name("envoy.transport_sockets.tcp_stats");

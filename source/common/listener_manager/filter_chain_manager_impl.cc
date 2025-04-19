@@ -76,7 +76,7 @@ public:
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
+    : parent_context_(parent_context), scope_(parent_context_.statsScope().createScope("")),
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
       init_manager_(init_manager) {}
 
@@ -92,21 +92,19 @@ const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() co
   return parent_context_.listenerInfo();
 }
 
-ProtobufMessage::ValidationVisitor&
-PerFilterChainFactoryContextImpl::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
+Stats::Scope& PerFilterChainFactoryContextImpl::statsScope() { return *scope_; }
 
-Configuration::ServerFactoryContext&
-PerFilterChainFactoryContextImpl::serverFactoryContext() const {
+Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFactoryContext() {
   return parent_context_.serverFactoryContext();
 }
 
-Configuration::TransportSocketFactoryContext&
-PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return parent_context_.getTransportSocketFactoryContext();
+Configuration::GenericFactoryContext&
+PerFilterChainFactoryContextImpl::getGenericFactoryContext() const {
+  return parent_context_.getGenericFactoryContext();
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
