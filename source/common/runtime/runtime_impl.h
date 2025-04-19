@@ -223,7 +223,7 @@ public:
 
   // Runtime::Loader
   absl::Status initialize(Upstream::ClusterManager& cm) override;
-  const Snapshot& snapshot() override;
+  const Snapshot& snapshot() const override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
   absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
