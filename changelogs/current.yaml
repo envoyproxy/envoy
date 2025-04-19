@@ -22,6 +22,9 @@ removed_config_or_runtime:
 - area: websocket
   change: |
     Removed runtime guard ``envoy.reloadable_features.switch_protocol_websocket_handshake`` and legacy code paths.
+- area: http2
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http2_no_protocol_error_upon_clean_close`` and legacy code paths.
 - area: access_log
   change: |
     Removed runtime guard ``envoy.reloadable_features.sanitize_sni_in_access_log`` and legacy code paths.
