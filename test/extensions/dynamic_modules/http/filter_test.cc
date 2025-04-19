@@ -1,8 +1,12 @@
+#include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -21,9 +25,10 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -65,9 +70,10 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -112,9 +118,10 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -170,9 +177,10 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -243,9 +251,10 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()));
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
@@ -295,6 +304,208 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   response_body.add("cool");
   filter->encodeData(response_body, true);
   EXPECT_EQ(response_body.toString(), "barend");
+}
+
+TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
+  const std::string filter_name = "http_callouts";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "non_existent_cluster";
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillOnce(testing::Return(nullptr));
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+  filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true));
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+}
+
+TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
+  const std::string filter_name = "http_callouts";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "immediate_failing_cluster";
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillOnce(testing::Return(cluster.get()));
+
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            testing::NiceMock<Http::MockAsyncClientRequest> req{
+                &cluster->async_client_}; // This is not used, just for making compiler happy.
+            // Simulate immediate failure where onFailure is called inline.
+            callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+            return nullptr;
+          }));
+
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+  filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true));
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+}
+
+TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
+  const std::string filter_name = "http_callouts";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "success_cluster";
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions& option) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(message->headers().Path()->value().getStringView(), "/");
+            EXPECT_EQ(message->headers().Method()->value().getStringView(), "GET");
+            EXPECT_EQ(message->headers().Host()->value().getStringView(), "example.com");
+            EXPECT_EQ(message->body().toString(), "http_callout_body");
+            EXPECT_EQ(option.timeout.value(), std::chrono::milliseconds(1000));
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+  filter->setDecoderFilterCallbacks(callbacks);
+  EXPECT_CALL(callbacks, sendLocalReply(Http::Code::OK, _, _, _, _));
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks, encodeData(_, true));
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+
+  testing::NiceMock<Http::MockAsyncClientRequest> req{
+      &cluster->async_client_}; // This is not used, just for making compiler happy.
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
+      {"some_header", "some_value"},
+  }));
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add("response_body_from_callout");
+
+  EXPECT_TRUE(callbacks_captured);
+  callbacks_captured->onSuccess(req, std::move(response));
+}
+
+TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
+  const std::string filter_name = "http_callouts";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "resetting_cluster";
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(absl::string_view{filter_config}))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
+  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+  EXPECT_CALL(cluster->async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_captured = &callbacks;
+            return &request;
+          }));
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+
+  TestRequestHeaderMapImpl headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
+
+  testing::NiceMock<Http::MockAsyncClientRequest> req{
+      &cluster->async_client_}; // This is not used, just for making compiler happy.
+  EXPECT_TRUE(callbacks_captured);
+  callbacks_captured->onFailure(req, Http::AsyncClient::FailureReason::Reset);
 }
 
 } // namespace HttpFilters
