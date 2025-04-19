@@ -107,16 +107,10 @@ public:
   void setTrailersSize(uint32_t sz) { trailer_size_ = sz; }
 
   /**
-   * the offset from the start of the file to the start of the serialized headers proto.
-   * @return the offset in bytes.
-   */
-  static uint32_t offsetToHeaders() { return size(); }
-
-  /**
    * the offset from the start of the file to the start of the body data.
    * @return the offset in bytes.
    */
-  uint32_t offsetToBody() const { return offsetToHeaders() + headerSize(); }
+  static uint64_t offsetToBody() { return size(); }
 
   /**
    * the offset from the start of the file to the start of the serialized trailers proto.
@@ -125,10 +119,16 @@ public:
   uint64_t offsetToTrailers() const { return offsetToBody() + bodySize(); }
 
   /**
+   * the offset from the start of the file to the start of the serialized headers proto.
+   * @return the offset in bytes.
+   */
+  uint64_t offsetToHeaders() const { return offsetToTrailers() + trailerSize(); }
+
+  /**
    * the offset from the start of the file to the end of the file.
    * @return the offset in bytes.
    */
-  uint64_t offsetToEnd() const { return offsetToTrailers() + trailerSize(); }
+  uint64_t offsetToEnd() const { return offsetToHeaders() + headerSize(); }
 
   /**
    * is this a valid cache file header block for the current code version?

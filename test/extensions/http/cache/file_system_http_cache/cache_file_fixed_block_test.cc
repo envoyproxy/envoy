@@ -57,9 +57,9 @@ TEST_F(CacheFileFixedBlockTest, ReturnsCorrectOffsets) {
   block.setHeadersSize(100);
   block.setBodySize(1000);
   block.setTrailersSize(10);
-  EXPECT_EQ(block.offsetToHeaders(), CacheFileFixedBlock::size());
-  EXPECT_EQ(block.offsetToBody(), CacheFileFixedBlock::size() + 100);
-  EXPECT_EQ(block.offsetToTrailers(), CacheFileFixedBlock::size() + 1100);
+  EXPECT_EQ(block.offsetToHeaders(), CacheFileFixedBlock::size() + 1010);
+  EXPECT_EQ(block.offsetToBody(), CacheFileFixedBlock::size());
+  EXPECT_EQ(block.offsetToTrailers(), CacheFileFixedBlock::size() + 1000);
 }
 
 TEST_F(CacheFileFixedBlockTest, SerializesAndDeserializesCorrectly) {
@@ -75,9 +75,9 @@ TEST_F(CacheFileFixedBlockTest, SerializesAndDeserializesCorrectly) {
   block.serializeToBuffer(buf);
   block2.populateFromStringView(buf.toString());
   EXPECT_TRUE(block2.isValid());
-  EXPECT_EQ(block2.offsetToHeaders(), CacheFileFixedBlock::size());
-  EXPECT_EQ(block2.offsetToBody(), CacheFileFixedBlock::size() + 100);
-  EXPECT_EQ(block2.offsetToTrailers(), CacheFileFixedBlock::size() + large_body_size + 100);
+  EXPECT_EQ(block2.offsetToHeaders(), CacheFileFixedBlock::size() + large_body_size + 10);
+  EXPECT_EQ(block2.offsetToBody(), CacheFileFixedBlock::size());
+  EXPECT_EQ(block2.offsetToTrailers(), CacheFileFixedBlock::size() + large_body_size);
   EXPECT_EQ(block2.headerSize(), 100);
   EXPECT_EQ(block2.bodySize(), large_body_size);
   EXPECT_EQ(block2.trailerSize(), 10);
