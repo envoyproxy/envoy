@@ -1,37 +1,73 @@
+#include "source/extensions/common/wasm/oci/oci_async_datasource.h"
+
 #include "test/extensions/common/wasm/remote_async_datasource_base_test.h"
+#include "test/mocks/thread_local/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Wasm {
+namespace Oci {
 namespace {
 
-class RemoteAsyncDataSourceTest : public AsyncDataSourceTest {
+using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string>;
+
+class OciManifestProviderTest : public AsyncDataSourceTest {
 protected:
-  RemoteAsyncDataProviderPtr remote_data_provider_;
-};
+  ManifestProviderPtr oci_manifest_provider_;
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
+  std::string datasource_yaml_ = R"EOF(
     remote:
       http_uri:
-        uri: https://example.com/data
+        uri: oci://example.com/namespace/wasm-filter:latest
         cluster: cluster_1
         timeout: 1s
       sha256:
-        xxxxxx
+        image_blob_sha
   )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  const std::string response_body_ = R"EOF({
+  "schemaVersion": 2,
+  "config": {
+    "mediaType": "application/vnd.wasm.config.v1+json",
+    "digest": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "size": 2
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.wasm.content.layer.v1+wasm",
+      "digest": "sha256:4c7915b4c1f9b0c13f962998e4199ceb00db39a4a7fa4554f40ae0bed83d9510",
+      "size": 1624962
+    }
+  ]
+})EOF";
+  const std::string layer_digest_ =
+      "sha256:4c7915b4c1f9b0c13f962998e4199ceb00db39a4a7fa4554f40ae0bed83d9510";
+
+  envoy::config::core::v3::HttpUri manifestUri() {
+    envoy::config::core::v3::HttpUri manifest_uri;
+    manifest_uri.set_cluster("cluster_1");
+    manifest_uri.set_uri("https://example.com/v2/namespace/wasm-filter/manifests/latest");
+    manifest_uri.mutable_timeout()->set_seconds(1);
+    return manifest_uri;
+  }
+};
+
+MATCHER_P(ContainsPairAsHeader, pair, "") {
+  return arg->headers().get(pair.first)[0]->value().getStringView() == pair.second;
+}
+
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceNoCluster) {
+  AsyncDataSourcePb config;
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
   EXPECT_TRUE(config.has_remote());
 
   initialize(nullptr);
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+      "example.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -47,19 +83,9 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceReturnFailure) {
   AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
   EXPECT_TRUE(config.has_remote());
 
   cm_.initializeThreadLocalClusters({"cluster_1"});
@@ -70,9 +96,9 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   });
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+      "example.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -88,19 +114,9 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccessWith503) {
   AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
   EXPECT_TRUE(config.has_remote());
 
   cm_.initializeThreadLocalClusters({"cluster_1"});
@@ -113,9 +129,9 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   });
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+      "example.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -131,19 +147,9 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
   EXPECT_TRUE(config.has_remote());
 
   cm_.initializeThreadLocalClusters({"cluster_1"});
@@ -156,9 +162,9 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   });
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+      "example.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
         EXPECT_EQ(data, EMPTY_STRING);
         async_data = data;
@@ -174,86 +180,29 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceSuccess) {
   AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
   EXPECT_TRUE(config.has_remote());
 
-  const std::string body = "hello world";
-
   cm_.initializeThreadLocalClusters({"cluster_1"});
+
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body().add(body);
+    response->body().add(response_body_);
 
     callbacks.onSuccess(request_, std::move(response));
     return nullptr;
   });
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+      "example.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, EMPTY_STRING);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, EMPTY_STRING);
-}
-
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  const std::string body = "hello world";
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body().add(body);
-
-    callbacks.onSuccess(request_, std::move(response));
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, body);
+        EXPECT_EQ(data, layer_digest_);
         async_data = data;
       });
 
@@ -261,64 +210,89 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
   EXPECT_CALL(init_watcher_, ready());
   init_target_handle_->initialize(init_watcher_);
 
-  EXPECT_EQ(async_data, body);
+  EXPECT_EQ(async_data, layer_digest_);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceWithAuthenticationSuccess) {
   AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
+  TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
   EXPECT_TRUE(config.has_remote());
 
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret secret;
+  secret.mutable_secret()->set_inline_string(R"EOF({
+  "auths": {
+    "example.com":{
+      "auth": "credential"
+    }
+  }
+})EOF");
+
+  auto secret_provider = std::make_shared<Secret::MockGenericSecretConfigProvider>();
+  EXPECT_CALL(*secret_provider, addUpdateCallback(_))
+      .WillOnce(testing::Invoke([&](std::function<absl::Status()>) { return nullptr; }));
+  EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(&secret));
+
+  NiceMock<ThreadLocal::MockInstance> slot_alloc;
+  auto provider =
+      Secret::ThreadLocalGenericSecretProvider::create(secret_provider, slot_alloc, *api_);
+  std::shared_ptr<Secret::ThreadLocalGenericSecretProvider> image_pull_secret_provider =
+      std::move(provider.value());
+
+  EXPECT_TRUE(provider.ok());
+
   cm_.initializeThreadLocalClusters({"cluster_1"});
+
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(
-        request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+    response->body().add(response_body_);
+
+    callbacks.onSuccess(request_, std::move(response));
     return nullptr;
   });
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, false,
-      [&](const std::string& data) { async_data = data; });
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(),
+      image_pull_secret_provider, "example.com", [&](const std::string& data) {
+        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+        EXPECT_EQ(data, layer_digest_);
+        async_data = data;
+      });
 
+  const HeaderValuePair authz_header{"authorization", "Basic credential"};
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
+        EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+                    send_(ContainsPairAsHeader(authz_header), _, _))
+            .WillOnce(Invoke(
+                [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+                  Http::ResponseMessagePtr response(
+                      new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                          new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+                  response->body().add(response_body_);
+
+                  callbacks.onSuccess(request_, std::move(response));
+                  return nullptr;
+                }));
+
+        retry_timer_cb_();
+      }));
   init_target_handle_->initialize(init_watcher_);
 
-  EXPECT_EQ(async_data, "non-empty");
+  EXPECT_EQ(async_data, layer_digest_);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
-  const std::string body = "hello world";
+TEST_F(OciManifestProviderTest, DatasourceReleasedBeforeFetchingData) {
   std::string async_data = "non-empty";
 
   {
     AsyncDataSourcePb config;
-
-    std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-  )EOF";
-    TestUtility::loadFromYamlAndValidate(yaml, config);
+    TestUtility::loadFromYamlAndValidate(datasource_yaml_, config);
     EXPECT_TRUE(config.has_remote());
 
     cm_.initializeThreadLocalClusters({"cluster_1"});
@@ -326,17 +300,17 @@ TEST_F(RemoteAsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
       Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
           Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-      response->body().add(body);
+      response->body().add(response_body_);
 
       callbacks.onSuccess(request_, std::move(response));
       return nullptr;
     });
 
-    remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-        cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-        [&](const std::string& data) {
+    oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+        cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+        "example.com", [&](const std::string& data) {
           EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-          EXPECT_EQ(data, body);
+          EXPECT_EQ(data, layer_digest_);
           async_data = data;
         });
   }
@@ -344,20 +318,19 @@ TEST_F(RemoteAsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   init_target_handle_->initialize(init_watcher_);
-  EXPECT_EQ(async_data, body);
+  EXPECT_EQ(async_data, layer_digest_);
 }
 
-TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
+TEST_F(OciManifestProviderTest, LoadRemoteDataSourceWithRetry) {
   AsyncDataSourcePb config;
-
   std::string yaml = R"EOF(
     remote:
       http_uri:
-        uri: https://example.com/data
+        uri: oci://example.com/namespace/wasm-filter:latest
         cluster: cluster_1
         timeout: 1s
       sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+        image_blob_sha
       retry_policy:
         retry_back_off:
           base_interval: 1s
@@ -367,9 +340,8 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   EXPECT_TRUE(config.has_remote());
 
   cm_.initializeThreadLocalClusters({"cluster_1"});
-  const std::string body = "hello world";
-  int num_retries = 3;
 
+  int num_retries = 3;
   initialize(
       [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
@@ -382,11 +354,11 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
       num_retries);
 
   std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
+  oci_manifest_provider_ = std::make_unique<ManifestProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, manifestUri(), nullptr,
+      "example.com", [&](const std::string& data) {
         EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, body);
+        EXPECT_EQ(data, layer_digest_);
         async_data = data;
       });
 
@@ -402,7 +374,7 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
                     Http::ResponseMessagePtr response(
                         new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                             new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-                    response->body().add(body);
+                    response->body().add(response_body_);
 
                     callbacks.onSuccess(request_, std::move(response));
                     return nullptr;
@@ -413,55 +385,11 @@ TEST_F(RemoteAsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
       }));
   init_target_handle_->initialize(init_watcher_);
 
-  EXPECT_EQ(async_data, body);
-}
-
-TEST_F(RemoteAsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-      retry_policy:
-        retry_back_off:
-          base_interval: 10s
-          max_interval: 1s
-        num_retries: 3
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  EXPECT_THROW_WITH_MESSAGE(
-      std::make_unique<RemoteAsyncDataProvider>(cm_, init_manager_, config.remote(), dispatcher_,
-                                                random_, true, [&](const std::string&) {}),
-      EnvoyException, "max_interval must be greater than or equal to the base_interval");
-}
-
-TEST_F(RemoteAsyncDataSourceTest, BaseIntervalTest) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxx
-      retry_policy:
-        retry_back_off:
-          base_interval: 0.0001s
-        num_retries: 3
-  )EOF";
-  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, config), EnvoyException);
+  EXPECT_EQ(async_data, layer_digest_);
 }
 
 } // namespace
+} // namespace Oci
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
