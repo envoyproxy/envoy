@@ -85,6 +85,7 @@ without further review.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
 * Kirtimaan Rajshiva ([krajshiva](https://github.com/krajshiva))
 * Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
+* Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
 
 # Emeritus maintainers
 

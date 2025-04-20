@@ -1118,6 +1118,19 @@ TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
   installReadFilter();
 }
 
+TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  auto* quic_options = http3_options.mutable_quic_protocol_options();
+  quic_options->mutable_connection_keepalive()->mutable_max_interval()->set_seconds(0);
+  http3_options.set_allow_extended_connect(false);
+
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  EXPECT_FALSE(envoy_quic_session_.allow_extended_connect());
+
+  installReadFilter();
+}
+
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
   void SetUp() override {}
   void TearDown() override {

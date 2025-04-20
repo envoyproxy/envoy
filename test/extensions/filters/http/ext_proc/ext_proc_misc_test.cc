@@ -181,8 +181,6 @@ protected:
     }
 
     http_codec_type_ = Http::CodecType::HTTP1;
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
     auto* forward_rules = proto_config_.mutable_forward_rules();
     auto* allowed_headers = forward_rules->mutable_allowed_headers();
     allowed_headers->add_patterns()->set_exact("upgrade");

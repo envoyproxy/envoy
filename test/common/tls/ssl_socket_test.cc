@@ -51,7 +51,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -462,7 +461,7 @@ void testUtil(const TestUtilOptions& options) {
       test_private_key_method_factory(test_factory);
   PrivateKeyMethodManagerImpl private_key_method_manager;
   if (options.expectedPrivateKeyMethod()) {
-    EXPECT_CALL(transport_socket_factory_context, sslContextManager())
+    EXPECT_CALL(transport_socket_factory_context.server_context_, sslContextManager())
         .WillOnce(ReturnRef(context_manager))
         .WillRepeatedly(ReturnRef(context_manager));
     EXPECT_CALL(context_manager, privateKeyMethodManager())
@@ -955,7 +954,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   auto factory_or_error = ServerSslSocketFactory::create(
       std::move(server_cfg), manager, *server_stats_store.rootScope(), server_names);
-  THROW_IF_NOT_OK(factory_or_error.status());
+  THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto server_ssl_socket_factory = std::move(*factory_or_error);
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
@@ -978,7 +977,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       *ClientContextConfigImpl::create(options.clientCtxProto(), client_factory_context);
   auto client_factory_or_error = ClientSslSocketFactory::create(std::move(client_cfg), manager,
                                                                 *client_stats_store.rootScope());
-  THROW_IF_NOT_OK(client_factory_or_error.status());
+  THROW_IF_NOT_OK_REF(client_factory_or_error.status());
   auto client_ssl_socket_factory = std::move(*client_factory_or_error);
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1150,9 +1149,9 @@ void updateFilterChain(
 }
 
 struct OptionalServerConfig {
-  absl::optional<std::string> cert_hash{};
-  absl::optional<std::string> trusted_ca{};
-  absl::optional<bool> allow_expired_cert{};
+  absl::optional<std::string> cert_hash;
+  absl::optional<std::string> trusted_ca;
+  absl::optional<bool> allow_expired_cert;
 };
 
 void configureServerAndExpiredClientCertificate(
@@ -5657,6 +5656,44 @@ TEST_P(SslSocketTest, CipherSuites) {
   testUtilV2(cipher_test_options);
 #endif
   client_params->clear_cipher_suites();
+}
+
+TEST_P(SslSocketTest, CipherSuitesWithPolicy) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client.mutable_common_tls_context()->mutable_tls_params();
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+
+  // Connection using a common cipher (client & server) succeeds.
+  client_params->clear_cipher_suites();
+  client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_params->clear_cipher_suites();
+  server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_params->add_cipher_suites("AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 test_options(listener, client, true, version_);
+  testUtilV2(test_options);
+
+  // Client connects with an unsupported client cipher suite for a server policy, connection fails.
+  server_params->add_compliance_policies(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::FIPS_202205);
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 error_test_options(listener, client, false, version_);
+  error_test_options.setExpectedServerStats("ssl.connection_error");
+  testUtilV2(error_test_options);
 }
 
 TEST_P(SslSocketTest, EcdhCurves) {

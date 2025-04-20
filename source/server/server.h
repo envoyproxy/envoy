@@ -212,11 +212,11 @@ public:
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
-  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
-  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
