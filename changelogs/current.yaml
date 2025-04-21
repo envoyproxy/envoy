@@ -42,6 +42,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy_reloadable_features_filter_access_loggers_first`` and legacy code paths.
+- area: tcp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` and legacy code paths.
 - area: runtime
   change: |
     Removed runtime guard ``envoy_reloadable_features_boolean_to_string_fix`` and legacy code paths.
