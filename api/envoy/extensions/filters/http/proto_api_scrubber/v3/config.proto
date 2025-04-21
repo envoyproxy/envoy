@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.proto_api_scrubber.v3;
 import "envoy/config/core/v3/base.proto";
 
 import "xds/annotations/v3/status.proto";
-import "xds/type/v3/cel.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -240,9 +240,8 @@ message MethodRestrictions {
 
 // The restriction configuration.
 message RestrictionConfig {
-  // A CEL (https://cel.dev/overview/cel-overview) expression denoting
-  // the restriction. e.g., request.headers['X-User-Type'] == 'DEV'
-  // For the list of all available attributes of Envoy, please refer to
-  // https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
-  xds.type.v3.CelExpression cel_expr = 1;
+  // Matcher tree for matching requests and responses with the configured restrictions.
+  // NOTE: Currently, only CEL expressions are supported for matching. Support for more
+  // matchers will be added incrementally overtime.
+  xds.type.matcher.v3.Matcher matcher = 1;
 }
