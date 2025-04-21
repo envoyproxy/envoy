@@ -155,7 +155,6 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeAllow) {
             return std::move(stream);
           }));
 
-  // Initial call should succeed
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
@@ -163,7 +162,6 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeAllow) {
   // With failure_mode_allow=true, connection should NOT be closed
   EXPECT_CALL(connection_, close(_, _)).Times(0);
 
-  // Trigger onGrpcError callback
   filter_->onGrpcError(Grpc::Status::Internal, "test error");
 
   // Next data should pass through without issues
@@ -174,7 +172,6 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeAllow) {
 // Test gRPC error handling with failure mode disallow
 TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
   // With failure_mode_allow=false (default in setup)
-
   // Create a mock stream and set expectations
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
@@ -185,7 +182,6 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
   // Expect close to be called during cleanup after error
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
-  // Set up the client to return our mock stream
   EXPECT_CALL(*client_, start(_, _, _, _))
       .WillOnce(testing::Invoke(
           [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
@@ -194,7 +190,6 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
             return std::move(stream);
           }));
 
-  // Initial call should succeed
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
@@ -207,14 +202,12 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
 
 // Test normal processing flow
 TEST_F(NetworkExtProcFilterTest, NormalProcessing) {
-  // Set up a stream
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
 
   // Expect the send method to be called when processing data
   EXPECT_CALL(*stream_ptr, send(_, false));
 
-  // Set up the client to return our mock stream
   EXPECT_CALL(*client_, start(_, _, _, _))
       .WillOnce(testing::Invoke(
           [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
@@ -236,7 +229,6 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessing) {
   // Expect data to be injected to the filter chain
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
 
-  // Deliver the response
   filter_->onReceiveMessage(
       std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
 }

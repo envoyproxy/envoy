@@ -133,7 +133,7 @@ private:
   DownstreamCallbacks downstream_callbacks_;
   bool processing_complete_{false};
 
-  // Flow control counters
+  // Delay close counters
   uint32_t disable_count_write_{0};
   uint32_t disable_count_read_{0};
 };
