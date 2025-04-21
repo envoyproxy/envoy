@@ -83,7 +83,7 @@ public:
   void updateCloseCallbackStatus(bool enable, bool is_read);
 
   // ExternalProcessorCallbacks
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override;
+  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& res) override;
   void onGrpcClose() override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void logStreamInfo() override {};

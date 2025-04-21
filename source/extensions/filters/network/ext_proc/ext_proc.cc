@@ -185,19 +185,14 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
   data.drain(data.length());
 }
 
-void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) {
+void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& res) {
   if (processing_complete_) {
     ENVOY_CONN_LOG(debug, "Ignoring response message: processing already completed",
                    read_callbacks_->connection());
     return;
   }
 
-  if (!response) {
-    ENVOY_CONN_LOG(error, "Received null response from external processor",
-                   read_callbacks_->connection());
-    return;
-  }
-
+  auto response = std::move(res);
   ENVOY_CONN_LOG(debug, "Received response from external processor", read_callbacks_->connection());
 
   if (response->has_read_data()) {
