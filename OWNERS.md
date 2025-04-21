@@ -48,7 +48,7 @@ routing PRs, questions, etc. to the right place.
   * Overload manager, security, logging, wasm, data plane.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
-* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
   * Dynamic modules, API gateway, WASM, Istio.
 
 # Envoy mobile maintainers
