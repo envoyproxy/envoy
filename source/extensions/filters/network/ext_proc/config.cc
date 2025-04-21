@@ -22,8 +22,9 @@ Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromPro
 
   return [ext_proc_config, &context](Network::FilterManager& filter_manager) -> void {
     auto client = createExternalProcessorClient(
-      context.serverFactoryContext().clusterManager().grpcAsyncClientManager(), context.scope());
-    filter_manager.addFilter(std::make_shared<NetworkExtProcFilter>(ext_proc_config, std::move(client)));
+        context.serverFactoryContext().clusterManager().grpcAsyncClientManager(), context.scope());
+    filter_manager.addFilter(
+        std::make_shared<NetworkExtProcFilter>(ext_proc_config, std::move(client)));
   };
 }
 

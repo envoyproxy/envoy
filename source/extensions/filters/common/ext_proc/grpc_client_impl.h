@@ -121,6 +121,7 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::startStream(
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(service_method_);
   grpc_context_ = options.parent_context;
+  ENVOY_LOG_MISC(debug, "boteng ResponseType>::startStream(");
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;

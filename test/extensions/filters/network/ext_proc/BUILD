@@ -22,14 +22,16 @@ envoy_cc_test(
     name = "ext_proc_integration_test",
     srcs = ["ext_proc_integration_test.cc"],
     deps = [
+        "//envoy/http:codec_interface",
         "//source/extensions/filters/network/ext_proc:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
-        "//envoy/http:codec_interface",
         "//test/integration:base_integration_test_lib",
         "//test/integration:fake_upstream_lib",
         "//test/integration:integration_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/service/network_ext_proc/v3:pkg_cc_proto",
     ],
 )
