@@ -76,10 +76,9 @@ public:
   void initializeWriteFilterCallbacks(Envoy::Network::WriteFilterCallbacks& callbacks) override;
   Envoy::Network::FilterStatus onWrite(Envoy::Buffer::Instance& data, bool end_stream) override;
 
-  // Event handlers
   void onDownstreamEvent(Envoy::Network::ConnectionEvent event);
 
-  // Callback management
+  // Delay close management
   void updateCloseCallbackStatus(bool enable, bool is_read);
 
   // ExternalProcessorCallbacks
@@ -108,29 +107,22 @@ private:
   StreamOpenState openStream();
   void closeStream();
 
-  // Data handling
   void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
 
-  // Error handling
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason);
 
-  // Filter callbacks
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
-  // Configuration
   ConfigSharedPtr config_;
-
-  // gRPC client/stream management
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
   ::envoy::config::core::v3::GrpcService grpc_service_;
   Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
-
-  // Connection management
   DownstreamCallbacks downstream_callbacks_;
+
   bool processing_complete_{false};
 
   // Delay close counters
