@@ -62,11 +62,6 @@ public:
   MOCK_METHOD(absl::optional<std::string>, fetch, (Http::RequestMessage&), (const));
 };
 
-class DummyMetadataFetcher {
-public:
-  absl::optional<std::string> operator()(Http::RequestMessage&) { return absl::nullopt; }
-};
-
 class MockAwsClusterManager : public AwsClusterManager {
 public:
   ~MockAwsClusterManager() override = default;
@@ -117,17 +112,15 @@ public:
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-              (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
-               const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
-               absl::string_view, absl::string_view,
+              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef,
+               CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                absl::string_view));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-              (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
-               const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
-               MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-               absl::string_view));
+              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef,
+               CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
+               std::chrono::seconds, absl::string_view));
 };
 
 class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
