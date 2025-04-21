@@ -48,7 +48,7 @@ Network::FilterStatus NetworkExtProcFilter::onWrite(Buffer::Instance& data, bool
   ENVOY_CONN_LOG(debug, "ext_proc: writing {} bytes of data", write_callbacks_->connection(),
                  data.length());
   auto state = openStream();
-  ENVOY_CONN_LOG(debug, "onData openStreamState: {}", read_callbacks_->connection(),
+  ENVOY_CONN_LOG(debug, "onWrite openStreamState: {}", read_callbacks_->connection(),
                  static_cast<int>(state));
   switch (state) {
   case StreamOpenState::Ok:
@@ -104,7 +104,6 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
 
 void NetworkExtProcFilter::sendRequest(Envoy::Buffer::Instance& data, bool end_stream,
                                        bool is_read) {
-  ENVOY_CONN_LOG(debug, "boteng sendRequest", read_callbacks_->connection());
   if (stream_ == nullptr) {
     return;
   }
