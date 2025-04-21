@@ -143,7 +143,7 @@ public:
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
   MOCK_METHOD(bool, perEndpointStatsEnabled, (), (const));
-  MOCK_METHOD(const UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
+  MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
               (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));

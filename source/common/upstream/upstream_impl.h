@@ -977,8 +977,7 @@ public:
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
 
-  const UpstreamLocalAddressSelectorConstSharedPtr
-  getUpstreamLocalAddressSelector() const override {
+  UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const override {
     return upstream_local_address_selector_;
   }
   using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
