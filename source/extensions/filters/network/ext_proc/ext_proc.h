@@ -33,6 +33,7 @@ public:
   const envoy::extensions::filters::network::ext_proc::v3::ProcessingMode& processingMode() const {
     return processing_mode_;
   }
+
   const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
     return grpc_service_;
   }
@@ -44,6 +45,8 @@ private:
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
+using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
+using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
 
 class NetworkExtProcFilter : public Envoy::Network::Filter,
                              ExternalProcessorCallbacks,
@@ -61,31 +64,31 @@ public:
     IgnoreError,
   };
 
-  NetworkExtProcFilter(ConfigSharedPtr config, ExternalProcessorClientPtr&& client)
-      : config_(config), client_(std::move(client)),
-        grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
-                                                        : envoy::config::core::v3::GrpcService()),
-        config_with_hash_key_(grpc_service_), downstream_callbacks_(*this),
-        processing_complete_(false) {}
+  NetworkExtProcFilter(ConfigSharedPtr config, ExternalProcessorClientPtr&& client);
   ~NetworkExtProcFilter() override;
 
   // Network::ReadFilter
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    read_callbacks_ = &callbacks;
-    read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
-  }
-
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
   Envoy::Network::FilterStatus onNewConnection() override;
-
   Envoy::Network::FilterStatus onData(Envoy::Buffer::Instance& data, bool end_stream) override;
 
   // Network::WriteFilter
-  void initializeWriteFilterCallbacks(Envoy::Network::WriteFilterCallbacks& callbacks) override {
-    write_callbacks_ = &callbacks;
-  }
+  void initializeWriteFilterCallbacks(Envoy::Network::WriteFilterCallbacks& callbacks) override;
   Envoy::Network::FilterStatus onWrite(Envoy::Buffer::Instance& data, bool end_stream) override;
 
+  // Event handlers
   void onDownstreamEvent(Envoy::Network::ConnectionEvent event);
+
+  // Callback management
+  void updateCloseCallbackStatus(bool enable, bool is_read);
+
+  // ExternalProcessorCallbacks
+  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override;
+  void onGrpcClose() override;
+  void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
+  void logStreamInfo() override {};
+  void onComplete(ProcessingResponse&) override {};
+  void onError() override {};
 
 private:
   struct DownstreamCallbacks : public Envoy::Network::ConnectionCallbacks {
@@ -101,28 +104,38 @@ private:
     NetworkExtProcFilter& parent_;
   };
 
+  // Stream management
   StreamOpenState openStream();
   void closeStream();
+
+  // Data handling
   void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
 
-  void onReceiveMessage(std::unique_ptr<ProcessingResponse>&& response) override;
-  void onGrpcClose() override;
-  void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
-  void logStreamInfo() override {};
+  // Error handling
+  Envoy::Network::FilterStatus handleStreamError();
+  void closeConnection(const std::string& reason);
 
-  void onComplete(ProcessingResponse&) override {};
-  void onError() override {};
+  // Filter callbacks
+  Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
+  Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
-  Envoy::Network::ReadFilterCallbacks* read_callbacks_{};
-  Envoy::Network::WriteFilterCallbacks* write_callbacks_{};
+  // Configuration
   ConfigSharedPtr config_;
+
+  // gRPC client/stream management
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
   ::envoy::config::core::v3::GrpcService grpc_service_;
   Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
+
+  // Connection management
   DownstreamCallbacks downstream_callbacks_;
-  bool processing_complete_;
+  bool processing_complete_{false};
+
+  // Flow control counters
+  uint32_t disable_count_write_{0};
+  uint32_t disable_count_read_{0};
 };
 
 } // namespace ExtProc

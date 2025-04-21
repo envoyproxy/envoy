@@ -19,6 +19,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ext_proc_test",
+    srcs = ["ext_proc_test.cc"],
+    deps = [
+        "//source/extensions/filters/network/ext_proc:ext_proc_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "ext_proc_integration_test",
     srcs = ["ext_proc_integration_test.cc"],
     deps = [

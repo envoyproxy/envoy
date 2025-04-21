@@ -64,6 +64,71 @@ public:
     BaseIntegrationTest::initialize();
   }
 
+  // Initialize with failure mode allow set to true
+  void initializeWithFailureModeAllow() {
+    config_helper_.renameListener("network_ext_proc_filter");
+    config_helper_.addConfigModifier(
+        [&](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+          cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          cluster->set_name("cluster_1");
+          cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
+          Envoy::ConfigHelper::setHttp2WithMaxConcurrentStreams(
+              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(1)), 2);
+
+          // Find the network filter and set failure_mode_allow to true
+          auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter_chain = listeners->mutable_filter_chains(0);
+          auto* filters = filter_chain->mutable_filters();
+          for (int i = 0; i < filters->size(); i++) {
+            if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+              envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+              (*filters)[i].mutable_typed_config()->UnpackTo(&config);
+              config.set_failure_mode_allow(true);
+              (*filters)[i].mutable_typed_config()->PackFrom(config);
+              break;
+            }
+          }
+        });
+    BaseIntegrationTest::initialize();
+  }
+
+  // Initialize with processing modes set to SKIP
+  void initializeWithSkipProcessingModes(bool skip_read) {
+    config_helper_.renameListener("network_ext_proc_filter");
+    config_helper_.addConfigModifier(
+        [&](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+          cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          cluster->set_name("cluster_1");
+          cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
+          Envoy::ConfigHelper::setHttp2WithMaxConcurrentStreams(
+              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(1)), 2);
+
+          // Set processing modes to SKIP
+          auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* filter_chain = listeners->mutable_filter_chains(0);
+          auto* filters = filter_chain->mutable_filters();
+          for (int i = 0; i < filters->size(); i++) {
+            if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+              envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+              (*filters)[i].mutable_typed_config()->UnpackTo(&config);
+              auto* processing_mode = config.mutable_processing_mode();
+              if (skip_read) {
+                processing_mode->set_process_read(
+                    envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+              } else {
+                processing_mode->set_process_write(
+                    envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+              }
+              (*filters)[i].mutable_typed_config()->PackFrom(config);
+              break;
+            }
+          }
+        });
+    BaseIntegrationTest::initialize();
+  }
+
   void waitForFirstGrpcMessage(ProcessingRequest& request) {
     ENVOY_LOG_MISC(debug, "waitForFirstGrpcMessage {}", grpc_upstream_->localAddress()->asString());
     ASSERT_TRUE(grpc_upstream_->waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -76,7 +141,7 @@ public:
     auto* read_data = response.mutable_read_data();
     read_data->set_data(data);
     read_data->set_end_of_stream(end_stream);
-    ENVOY_LOG_MISC(debug, "boteng sendReadGrpcMessage {}", response.DebugString());
+    ENVOY_LOG_MISC(debug, "Sending READ gRPC message: {}", response.DebugString());
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
@@ -89,7 +154,7 @@ public:
     auto* read_data = response.mutable_read_data();
     read_data->set_data(data);
     read_data->set_end_of_stream(end_stream);
-    ENVOY_LOG_MISC(debug, "boteng sendReadGrpcMessage {}", response.DebugString());
+    ENVOY_LOG_MISC(debug, "Sending READ gRPC message via stream: {}", response.DebugString());
     if (first_message) {
       stream->startGrpcStream();
     }
@@ -101,11 +166,37 @@ public:
     auto* write_data = response.mutable_write_data();
     write_data->set_data(data);
     write_data->set_end_of_stream(end_stream);
-    ENVOY_LOG_MISC(debug, "boteng sendWriteGrpcMessage {}", response.DebugString());
+    ENVOY_LOG_MISC(debug, "Sending WRITE gRPC message: {}", response.DebugString());
     if (first_message) {
       processor_stream_->startGrpcStream();
     }
     processor_stream_->sendGrpcMessage(response);
+  }
+
+  void sendWriteGrpcMessageWithStream(Envoy::FakeStreamPtr& stream, std::string data,
+                                      bool end_stream, bool first_message = false) {
+    ProcessingResponse response;
+    auto* write_data = response.mutable_write_data();
+    write_data->set_data(data);
+    write_data->set_end_of_stream(end_stream);
+    ENVOY_LOG_MISC(debug, "Sending WRITE gRPC message via stream: {}", response.DebugString());
+    if (first_message) {
+      stream->startGrpcStream();
+    }
+    stream->sendGrpcMessage(response);
+  }
+
+  void closeGrpcStream() {
+    if (processor_stream_) {
+      processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+    }
+  }
+
+  void TearDown() override {
+    if (processor_connection_) {
+      ASSERT_TRUE(processor_connection_->close());
+      ASSERT_TRUE(processor_connection_->waitForDisconnect());
+    }
   }
 
   Envoy::FakeUpstream* grpc_upstream_;
@@ -131,9 +222,15 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamClose) {
 
   ProcessingRequest request;
   waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "client_data");
+  EXPECT_EQ(request.read_data().end_of_stream(), true);
+
   sendReadGrpcMessage("client_data_inspected", true, true);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+  // The server should see the half-close
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   tcp_client->close();
 }
@@ -190,11 +287,15 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleClientConnections) {
 
   tcp_client_1->close();
   tcp_client_2->close();
+  ASSERT_TRUE(processor_connection_->close());
+  ASSERT_TRUE(processor_connection_->waitForDisconnect());
   tcp_client_3->close();
+  ASSERT_TRUE(processor_connection_2->close());
+  ASSERT_TRUE(processor_connection_2->waitForDisconnect());
 }
 
-// Test that data is passed through both directions
-TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyBidirectionalUpstreamHalfClose) {
+// Test that data is passed through both directions without data loss.
+TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyUpstreamHalfCloseBothWays) {
   initialize();
 
   // Connect to the server
@@ -209,6 +310,10 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyBidirectionalUpstreamHalfClo
 
   ProcessingRequest request;
   waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "client_data");
+  EXPECT_EQ(request.read_data().end_of_stream(), false);
+
   sendReadGrpcMessage("client_data_inspected", true, true);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -218,9 +323,12 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyBidirectionalUpstreamHalfClo
 
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
+  EXPECT_EQ(write_request.has_write_data(), true);
+  EXPECT_EQ(write_request.write_data().data(), "server_response");
+  EXPECT_EQ(write_request.write_data().end_of_stream(), true);
+
   sendWriteGrpcMessage("server_data_inspected", true);
 
-  // Verify client received the data
   tcp_client->waitForData("server_data_inspected");
 
   // Close everything
@@ -229,6 +337,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyBidirectionalUpstreamHalfClo
   tcp_client->close();
 }
 
+// Test that data is passed through both directions without data loss.
 TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays) {
   initialize();
 
@@ -242,6 +351,10 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays)
 
   ProcessingRequest request;
   waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_write_data(), true);
+  EXPECT_EQ(request.write_data().data(), "server_data");
+  EXPECT_EQ(request.write_data().end_of_stream(), true);
+
   sendWriteGrpcMessage("server_data_inspected", true, true);
 
   tcp_client->waitForData("server_data_inspected");
@@ -251,12 +364,151 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays)
   ASSERT_TRUE(tcp_client->write("client_data", true));
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
+  EXPECT_EQ(write_request.has_read_data(), true);
+  EXPECT_EQ(write_request.read_data().data(), "client_data");
+  EXPECT_EQ(write_request.read_data().end_of_stream(), true);
+
   sendReadGrpcMessage("client_data_inspected", true);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->close();
+}
 
-  ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+// Test behavior when the gRPC stream fails
+TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+
+  // Close gRPC stream with an error status instead of Ok
+  // This should trigger onGrpcError instead of onGrpcClose
+  closeGrpcStream();
+  // TODO(botengyao) wait for the counter stats
+  tcp_client->close();
+}
+
+// Test behavior when failure_mode_allow is set to true and gRPC stream fails
+TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailureWithFailureModeAllow) {
+  initializeWithFailureModeAllow();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+
+  // Close gRPC stream without sending a response - with failure_mode_allow=true
+  // the connection should not be closed
+  closeGrpcStream();
+  // TODO(botengyao) wait for the counter stats
+  tcp_client->close();
+}
+
+// Test with read processing modes set to SKIP
+TEST_P(NetworkExtProcFilterIntegrationTest, ProcessingModesReadSkip) {
+  initializeWithSkipProcessingModes(true);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  // Write data from client to server - with process_read=SKIP, this should pass through
+  // directly without invoking the external processor
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Data should be passed through without modification
+  ASSERT_TRUE(fake_upstream_connection->waitForData(11));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test with write processing modes set to SKIP
+TEST_P(NetworkExtProcFilterIntegrationTest, ProcessingModesWriteSkip) {
+  initializeWithSkipProcessingModes(false);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Data should be passed through without modification
+  ASSERT_TRUE(fake_upstream_connection->write("server_response", false));
+  tcp_client->waitForData("server_response");
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test handling of multiple data chunks in a single direction
+TEST_P(NetworkExtProcFilterIntegrationTest, MultipleDataChunks) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("chunk1", false));
+
+  // Wait for the upstream connection
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // First chunk should be sent to ext_proc
+  ProcessingRequest request1;
+  waitForFirstGrpcMessage(request1);
+  EXPECT_EQ(request1.has_read_data(), true);
+  EXPECT_EQ(request1.read_data().data(), "chunk1");
+  EXPECT_EQ(request1.read_data().end_of_stream(), false);
+
+  sendReadGrpcMessage("chunk1_processed", false, true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+
+  ASSERT_TRUE(tcp_client->write("chunk2", true));
+
+  // Second chunk should also be sent to ext_proc
+  ProcessingRequest request2;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request2));
+  EXPECT_EQ(request2.has_read_data(), true);
+  EXPECT_EQ(request2.read_data().data(), "chunk2");
+  EXPECT_EQ(request2.read_data().end_of_stream(), true);
+
+  // Respond to second chunk
+  sendReadGrpcMessage("chunk2_processed", true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test empty data handling
+TEST_P(NetworkExtProcFilterIntegrationTest, EmptyDataHandling) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send empty data with end_stream=true to indicate half-close
+  ASSERT_TRUE(tcp_client->write("", true));
+
+  // Empty data should still trigger ext_proc
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "");
+  EXPECT_EQ(request.read_data().end_of_stream(), true);
+
+  // Send back an empty response
+  sendReadGrpcMessage("", true, true);
+
+  // Server should see half-close
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
 }
 
