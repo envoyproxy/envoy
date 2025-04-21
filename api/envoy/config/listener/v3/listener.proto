@@ -125,7 +125,7 @@ message Listener {
     string name = 1;
 
     // Configuration for the source of FCDS updates for this listener.
-    core.v3.ConfigSource config_source = 2 [(validate.rules).message = {required: true}];
+    core.v3.ConfigSource config_source = 2;
   }
 
   reserved 14, 23;
