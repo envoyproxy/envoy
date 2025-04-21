@@ -126,6 +126,10 @@ struct Response {
   // A set of metadata returned by the authorization server, that will be emitted as filter's
   // dynamic metadata that other filters can leverage.
   ProtobufWkt::Struct dynamic_metadata{};
+
+  // The gRPC status returned by the authorization server when it is making a
+  // gRPC call.
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status{absl::nullopt};
 };
 
 using ResponsePtr = std::unique_ptr<Response>;

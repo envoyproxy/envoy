@@ -168,7 +168,6 @@ def envoy_dependencies(skip_targets = []):
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
-    _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -185,7 +184,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
@@ -369,19 +367,6 @@ def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _com_github_intel_ipp_crypto_crypto_mb_fips():
-    # Temporary fix for building ipp-crypto when boringssl-fips is used.
-    # Build will fail if bn2lebinpad patch is applied. Remove this archive
-    # when upstream dependency fixes this issue.
-    external_http_archive(
-        name = "com_github_intel_ipp_crypto_crypto_mb_fips",
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch"],
-        patch_args = ["-p1"],
-        build_file_content = BUILD_ALL_CONTENT,
-        # Use existing ipp-crypto repository location name to avoid redefinition.
-        location_name = "com_github_intel_ipp_crypto_crypto_mb",
     )
 
 def _com_github_intel_qatlib():
@@ -690,29 +675,6 @@ def _com_google_protobuf():
     native.bind(
         name = "upb_reflection",
         actual = "@com_google_protobuf//upb:reflection",
-    )
-
-def _com_github_curl():
-    # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
-    # the deprecation period of 2 releases. Please DO NOT USE curl dependency for any new or existing extensions.
-    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
-    external_http_archive(
-        name = "com_github_curl",
-        build_file_content = BUILD_ALL_CONTENT + """
-cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
-""",
-        # Patch curl 7.74.0 and later due to CMake's problematic implementation of policy `CMP0091`
-        # and introduction of libidn2 dependency which is inconsistently available and must
-        # not be a dynamic dependency on linux.
-        # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
-        # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
-        # by elimination of the curl dependency.
-        patches = ["@envoy//bazel/foreign_cc:curl.patch"],
-        patch_args = ["-p1"],
-    )
-    native.bind(
-        name = "curl",
-        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _v8():
