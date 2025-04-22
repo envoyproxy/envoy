@@ -262,9 +262,6 @@ TEST_F(NetworkExtProcFilterTest, GrpcCloseHandling) {
 
 // Test edge case with null stream in sendRequest
 TEST_F(NetworkExtProcFilterTest, SendRequestWithNullStream) {
-  // Access the private sendRequest method directly through a friend test helper
-  // or recreate the scenario that would lead to this
-
   // Set filter's stream to nullptr
   auto filter_config = std::make_shared<Config>(createConfig(false));
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
@@ -275,9 +272,10 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithNullStream) {
 
   Buffer::OwnedImpl data("test");
   EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
-  EXPECT_CALL(connection_, close(_, _));
+  EXPECT_CALL(connection_, close(_, _)).WillOnce(Return());
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  testing::Mock::VerifyAndClearExpectations(&connection_);
 }
 
 // Test onWrite error path

@@ -239,7 +239,6 @@ void NetworkExtProcFilter::onGrpcClose() {
 }
 
 void NetworkExtProcFilter::closeStream() {
-  // Re-enable connection close operations
   if (stream_ == nullptr) {
     return;
   }

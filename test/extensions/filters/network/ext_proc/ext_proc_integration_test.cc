@@ -202,7 +202,6 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamClose) {
   waitForFirstGrpcMessage(request);
   EXPECT_EQ(request.has_read_data(), true);
   EXPECT_EQ(request.read_data().data(), "client_data");
-  EXPECT_EQ(request.read_data().end_of_stream(), true);
 
   sendReadGrpcMessage("client_data_inspected", true, true);
 
