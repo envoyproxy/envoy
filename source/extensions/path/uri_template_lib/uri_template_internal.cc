@@ -47,7 +47,7 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        ":@"
                                        "="; // user included "=" allowed
 
-// Updated literal that includes "*" in the match set.
+// Additional literal that allows "*" in the pattern.
 // Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
 constexpr absl::string_view kLiteralAsterisk = "a-zA-Z0-9-._~" // Unreserved
                                                "%"             // pct-encoded
