@@ -185,8 +185,13 @@ class RepoNotifier(runner.Runner):
             if age > self.slo_max + datetime.timedelta(hours=36):
                 stalled_prs.append(message)
 
+            if self.is_contrib(pull):
+                # If the PR is a contrib PR, we don't want to assign it to maintainer.
+                continue
+
             has_maintainer = False
             assignees = self.get_assignees(pull, {**self.maintainers, **self.first_pass_reviewers})
+            has_assignee = bool(assignees)
             for assignee in assignees:
                 if self.maintainers.get(assignee["login"]):
                     has_maintainer = True
@@ -194,8 +199,9 @@ class RepoNotifier(runner.Runner):
                     assignee["login"], [])
                 maintainers_and_prs[assignee["login"]].append(message)
 
-            # If there was no maintainer, track it as unassigned.
-            if not has_maintainer and not self.is_contrib(pull):
+            # If there is no assignee, or if no maintainer is assigned and it has been
+            # approved or lgtm'd by someone, track it as unassigned.
+            if not has_assignee or (not has_maintainer and await self.is_reviewed(pull)):
                 maintainers_and_prs['unassigned'].append(message)
 
         return dict(
@@ -224,6 +230,12 @@ class RepoNotifier(runner.Runner):
     def is_contrib(self, pr):
         for label in pr["labels"]:
             if label["name"] == "contrib":
+                return True
+        return False
+
+    async def is_reviewed(self, pr):
+        async for review in self.repo.getiter(f"pulls/{pr['number']}/reviews"):
+            if review["state"] == "APPROVED" or "/lgtm" in review["body"]:
                 return True
         return False
 
