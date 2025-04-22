@@ -22,37 +22,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Context passed to transport socket factory to access server resources.
- */
-class TransportSocketFactoryContext {
-public:
-  virtual ~TransportSocketFactoryContext() = default;
-
-  /**
-   * @return ServerFactoryContext& the server factory context.
-   */
-  virtual ServerFactoryContext& serverFactoryContext() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
-   * messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
-   * @return Stats::Scope& the transport socket's stats scope.
-   */
-  virtual Stats::Scope& statsScope() PURE;
-
-  /**
-   * @return the init manager of the particular context.
-   */
-  virtual Init::Manager& initManager() PURE;
-};
-
-using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
-
 class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
   ~TransportSocketConfigFactory() override = default;
@@ -68,7 +37,7 @@ public:
    * Create a particular transport socket factory implementation.
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
-   * @param context TransportSocketFactoryContext& supplies the transport socket's context.
+   * @param context GenericFactoryContext& supplies the transport socket's context.
    * @return absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> the transport socket factory
    * instance or error status. The returned TransportSocketFactoryPtr should not be nullptr.
    *
@@ -77,7 +46,7 @@ public:
    */
   virtual absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
-                               TransportSocketFactoryContext& context) PURE;
+                               GenericFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.transport_sockets.upstream"; }
 };
@@ -94,7 +63,7 @@ public:
    *        currently used by SNI implementation to know the expected server names.
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
-   * @param context TransportSocketFactoryContext& supplies the transport socket's context.
+   * @param context GenericFactoryContext& supplies the transport socket's context.
    * @return absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr> the transport socket
    * factory instance. The returned TransportSocketFactoryPtr should not be nullptr.
    *
@@ -102,8 +71,7 @@ public:
    *        parameters.
    */
   virtual absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
-  createTransportSocketFactory(const Protobuf::Message& config,
-                               TransportSocketFactoryContext& context,
+  createTransportSocketFactory(const Protobuf::Message& config, GenericFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
 
   std::string category() const override { return "envoy.transport_sockets.downstream"; }

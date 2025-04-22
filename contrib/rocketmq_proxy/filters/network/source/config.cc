@@ -34,7 +34,7 @@ REGISTER_FACTORY(RocketmqProxyFilterConfigFactory,
 ConfigImpl::ConfigImpl(const RocketmqProxyConfig& config,
                        Server::Configuration::FactoryContext& context)
     : context_(context), stats_prefix_(fmt::format("rocketmq.{}.", config.stat_prefix())),
-      stats_(RocketmqFilterStats::generateStats(stats_prefix_, context_.scope())),
+      stats_(RocketmqFilterStats::generateStats(stats_prefix_, context_.statsScope())),
       route_matcher_(
           new Router::RouteMatcher(config.route_config(), context.serverFactoryContext())),
       develop_mode_(config.develop_mode()),

@@ -18,7 +18,7 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromPro
   JsonTranscoderConfigSharedPtr filter_config =
       std::make_shared<JsonTranscoderConfig>(proto_config, context.serverFactoryContext().api());
   auto stats = std::make_shared<GrpcJsonTranscoderFilterStats>(
-      GrpcJsonTranscoderFilterStats::generateStats(stats_prefix, context.scope()));
+      GrpcJsonTranscoderFilterStats::generateStats(stats_prefix, context.statsScope()));
   return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(filter_config, stats));
   };

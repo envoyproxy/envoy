@@ -127,7 +127,7 @@ public:
   Regex::Engine& regexEngine() override { return *regex_engine_; }
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
-  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+  Configuration::GenericFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
   }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {

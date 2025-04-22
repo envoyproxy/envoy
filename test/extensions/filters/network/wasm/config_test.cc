@@ -28,7 +28,7 @@ class WasmNetworkFilterConfigTest
 protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
+    ON_CALL(context_, statsScope()).WillByDefault(ReturnRef(stats_scope_));
     ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
     ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));

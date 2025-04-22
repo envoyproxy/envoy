@@ -87,7 +87,7 @@ FilterConfigSubscription::FilterConfigSubscription(
       factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
-      scope_(factory_context.scope().createScope(stat_prefix)),
+      scope_(factory_context.statsScope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {

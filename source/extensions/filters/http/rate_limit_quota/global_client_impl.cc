@@ -54,11 +54,11 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
     Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
     Envoy::Event::Dispatcher& main_dispatcher)
     : domain_name_(domain_name),
-      aync_client_(getOrThrow(
-          context.serverFactoryContext()
-              .clusterManager()
-              .grpcAsyncClientManager()
-              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true))),
+      aync_client_(getOrThrow(context.serverFactoryContext()
+                                  .clusterManager()
+                                  .grpcAsyncClientManager()
+                                  .getOrCreateRawAsyncClientWithHashKey(
+                                      config_with_hash_key, context.statsScope(), true))),
       buckets_tls_(buckets_tls), send_reports_interval_(send_reports_interval),
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
       main_dispatcher_(main_dispatcher) {}

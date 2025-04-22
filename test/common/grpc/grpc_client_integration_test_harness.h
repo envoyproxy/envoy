@@ -668,7 +668,7 @@ public:
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
   GrpcSslClientIntegrationTest() {
-    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(server_factory_context_, mainThreadDispatcher()).WillByDefault(ReturnRef(*dispatcher_));
   }
@@ -757,7 +757,7 @@ public:
 
   bool use_client_cert_{};
   bool use_server_tls_13_{false};
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context_;
 };
 
 } // namespace

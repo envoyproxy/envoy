@@ -138,7 +138,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name),
-      scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
+      scope_(factory_context.statsScope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager) {

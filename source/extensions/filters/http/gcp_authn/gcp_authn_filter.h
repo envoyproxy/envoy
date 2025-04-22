@@ -49,7 +49,7 @@ public:
                  TokenCacheImpl<JwtToken>* token_cache)
       : filter_config_(std::move(filter_config)), context_(context),
         client_(std::make_unique<GcpAuthnClient>(*filter_config_, context_)),
-        stats_(generateStats(stats_prefix, context_.scope())), jwt_token_cache_(token_cache) {}
+        stats_(generateStats(stats_prefix, context_.statsScope())), jwt_token_cache_(token_cache) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

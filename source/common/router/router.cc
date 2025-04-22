@@ -84,7 +84,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            absl::Status& creation_status)
     : FilterConfig(
           context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
-          context.scope(), context.serverFactoryContext().clusterManager(),
+          context.statsScope(), context.serverFactoryContext().clusterManager(),
           context.serverFactoryContext().runtime(),
           context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
@@ -113,9 +113,9 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
-    std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+    std::string prefix = context.statsScope().symbolTable().toString(context.statsScope().prefix());
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
-        server_factory_ctx, context.initManager(), context.scope());
+        server_factory_ctx, context.initManager(), context.statsScope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_ctx,

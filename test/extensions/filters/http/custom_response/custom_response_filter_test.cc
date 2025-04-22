@@ -32,7 +32,7 @@ using RedirectPolicyProto =
 class CustomResponseFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(::testing::ReturnRef(scope_));
+    EXPECT_CALL(context_, statsScope()).WillRepeatedly(::testing::ReturnRef(scope_));
   }
 
   void setupFilterAndCallback() {
@@ -44,7 +44,7 @@ public:
   void createConfig(const absl::string_view config_str = kDefaultConfig) {
     envoy::extensions::filters::http::custom_response::v3::CustomResponse filter_config;
     TestUtility::loadFromYaml(std::string(config_str), filter_config);
-    Stats::StatNameManagedStorage prefix("stats", context_.scope().symbolTable());
+    Stats::StatNameManagedStorage prefix("stats", context_.statsScope().symbolTable());
     config_ = std::make_shared<FilterConfig>(filter_config, context_, prefix.statName());
   }
 

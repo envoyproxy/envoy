@@ -135,7 +135,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     downstream_cluster_ = std::string(headers.getEnvoyDownstreamServiceClusterValue());
     if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
-          downstream_cluster_, config_->scope().symbolTable());
+          downstream_cluster_, config_->statsScope().symbolTable());
     }
 
     downstream_cluster_delay_percent_key_ =

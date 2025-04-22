@@ -16,9 +16,9 @@ class UpstreamProxyProtocolSocketConfigFactory
 public:
   std::string name() const override { return "envoy.transport_sockets.upstream_proxy_protocol"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override;
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override;
 };
 
 } // namespace ProxyProtocol

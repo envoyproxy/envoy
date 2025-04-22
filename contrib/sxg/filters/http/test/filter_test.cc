@@ -357,15 +357,16 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   Secret::SecretManagerImpl secret_manager{config_tracker};
   envoy::config::core::v3::ConfigSource config_source;
 
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> secret_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   Api::ApiPtr api = Api::createApiForTest();
   NiceMock<Init::MockManager> init_manager;
   Init::TargetHandlePtr init_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api));
-  EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
+  EXPECT_CALL(secret_context.server_factory_context_, localInfo())
+      .WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context.server_factory_context_, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context.server_factory_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
@@ -376,11 +377,11 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   auto certificate_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "certificate", secret_context, init_manager);
   auto certificate_callback =
-      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
+      secret_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto private_key_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "private_key", secret_context, init_manager);
   auto private_key_callback =
-      secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
+      secret_context.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(certificate_secret_provider),

@@ -673,7 +673,7 @@ public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
-                               Server::Configuration::TransportSocketFactoryContext&) override {
+                               Server::Configuration::GenericFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

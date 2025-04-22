@@ -13,7 +13,7 @@ namespace TcpStats {
 
 class TcpStatsSocketFactory {
 public:
-  TcpStatsSocketFactory(Server::Configuration::TransportSocketFactoryContext& context,
+  TcpStatsSocketFactory(Server::Configuration::GenericFactoryContext& context,
                         const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config);
 
 protected:
@@ -25,7 +25,7 @@ protected:
 class UpstreamTcpStatsSocketFactory : public TcpStatsSocketFactory, public PassthroughFactory {
 public:
   UpstreamTcpStatsSocketFactory(
-      Server::Configuration::TransportSocketFactoryContext& context,
+      Server::Configuration::GenericFactoryContext& context,
       const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
       Network::UpstreamTransportSocketFactoryPtr&& inner_factory);
 
@@ -38,7 +38,7 @@ class DownstreamTcpStatsSocketFactory : public TcpStatsSocketFactory,
                                         public DownstreamPassthroughFactory {
 public:
   DownstreamTcpStatsSocketFactory(
-      Server::Configuration::TransportSocketFactoryContext& context,
+      Server::Configuration::GenericFactoryContext& context,
       const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
       Network::DownstreamTransportSocketFactoryPtr&& inner_factory);
 

@@ -14,8 +14,7 @@ namespace Tls {
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamSslSocketFactory::createTransportSocketFactory(
-    const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext& context) {
   absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> client_config_or_error =
       ClientContextConfigImpl::create(
           MessageUtil::downcastAndValidate<

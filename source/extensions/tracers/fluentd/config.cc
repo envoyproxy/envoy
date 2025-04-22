@@ -19,8 +19,8 @@ FluentdTracerCacheSharedPtr FluentdTracerFactory::getTracerCacheSingleton(
   return context.singletonManager().getTyped<FluentdTracerCacheImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(fluentd_tracer_cache),
       [&context] {
-        return std::make_shared<FluentdTracerCacheImpl>(context.clusterManager(), context.scope(),
-                                                        context.threadLocal());
+        return std::make_shared<FluentdTracerCacheImpl>(
+            context.clusterManager(), context.statsScope(), context.threadLocal());
       },
       /* pin = */ true);
 }

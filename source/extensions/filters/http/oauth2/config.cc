@@ -26,7 +26,7 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::GenericFactoryContext& transport_socket_factory,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
@@ -52,7 +52,7 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
 
   auto& cluster_manager = context.serverFactoryContext().clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+  auto& transport_socket_factory = context.getGenericFactoryContext();
   auto secret_provider_client_secret = secretsProvider(
       client_secret, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_client_secret == nullptr) {
@@ -75,7 +75,7 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
       std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
       context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api());
   auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(),
-                                               secret_reader, context.scope(), stats_prefix);
+                                               secret_reader, context.statsScope(), stats_prefix);
 
   return
       [&context, config, &cluster_manager](Http::FilterChainFactoryCallbacks& callbacks) -> void {

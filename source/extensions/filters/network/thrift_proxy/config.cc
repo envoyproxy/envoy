@@ -80,7 +80,7 @@ ConfigImpl::ConfigImpl(
     Server::Configuration::FactoryContext& context,
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
-      stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
+      stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.statsScope())),
       transport_(ProtoUtils::getTransportType(config.transport())),
       proto_(ProtoUtils::getProtocolType(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),

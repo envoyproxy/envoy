@@ -77,7 +77,7 @@ public:
             .clusterManagerFactory()
             .secretManager()
             .findOrCreateGenericSecretProvider(config_source_, "encryption_key",
-                                               factory_context.getTransportSocketFactoryContext(),
+                                               factory_context.getGenericFactoryContext(),
                                                factory_context.initManager());
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {

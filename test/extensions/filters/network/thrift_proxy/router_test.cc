@@ -126,13 +126,13 @@ public:
   }
 
   void initializeRouter(bool close_downstream_on_error = true) {
-    stats_ = std::make_shared<const RouterStats>("test", context_.scope(),
+    stats_ = std::make_shared<const RouterStats>("test", context_.statsScope(),
                                                  context_.server_factory_context_.localInfo());
     initializeRouter(shadow_writer_, close_downstream_on_error);
   }
 
   void initializeRouterWithShadowWriter() {
-    stats_ = std::make_shared<const RouterStats>("test", context_.scope(),
+    stats_ = std::make_shared<const RouterStats>("test", context_.statsScope(),
                                                  context_.server_factory_context_.localInfo());
     shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
         context_.server_factory_context_.clusterManager(), *stats_, dispatcher_,
@@ -939,7 +939,7 @@ TEST_P(ThriftRouterRainidayTest, NoRoute) {
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
+  EXPECT_EQ(1U, context_.statsScope().counterFromString("test.route_missing").value());
 }
 
 TEST_P(ThriftRouterRainidayTest, NoCluster) {
@@ -960,7 +960,7 @@ TEST_P(ThriftRouterRainidayTest, NoCluster) {
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
+  EXPECT_EQ(1U, context_.statsScope().counterFromString("test.unknown_cluster").value());
 }
 
 // Test the case where both dynamic metadata match criteria
@@ -1019,7 +1019,8 @@ TEST_P(ThriftRouterRainidayTest, ClusterMaintenanceMode) {
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
+  EXPECT_EQ(1U,
+            context_.statsScope().counterFromString("test.upstream_rq_maintenance_mode").value());
   EXPECT_EQ(1UL,
             context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
                 ->statsScope()
@@ -1047,7 +1048,7 @@ TEST_P(ThriftRouterRainidayTest, NoHealthyHosts) {
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
-  EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+  EXPECT_EQ(1U, context_.statsScope().counterFromString("test.no_healthy_upstream").value());
   EXPECT_EQ(1UL,
             context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
                 ->statsScope()

@@ -52,7 +52,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       context);
 
   auto filter_config = std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
+      proto_config, context.statsScope(), context.drainDecision(), server_context.runtime(),
       server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory);
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
@@ -70,12 +70,12 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
   auto redis_command_stats =
-      Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
+      Common::Redis::RedisCommandStats::createRedisCommandStats(context.statsScope().symbolTable());
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
     Stats::ScopeSharedPtr stats_scope =
-        context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
+        context.statsScope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
@@ -98,7 +98,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
-          std::move(router), context.scope(), filter_config->stat_prefix_,
+          std::move(router), context.statsScope(), filter_config->stat_prefix_,
           server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager),
           std::move(custom_commands));
 
@@ -116,7 +116,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
           context.serverFactoryContext()
               .clusterManager()
               .grpcAsyncClientManager()
-              .factoryForGrpcService(grpc_service, context.scope(), true);
+              .factoryForGrpcService(grpc_service, context.statsScope(), true);
       THROW_IF_NOT_OK_REF(auth_client_factory_or_error.status());
 
       auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(

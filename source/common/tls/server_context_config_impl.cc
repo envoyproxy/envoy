@@ -26,7 +26,7 @@ namespace Tls {
 namespace {
 
 Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfigProvider(
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::GenericFactoryContext& factory_context,
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     absl::Status& creation_status) {
   switch (config.session_ticket_keys_type_case()) {
@@ -107,7 +107,7 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES =
 
 absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context, bool for_quic) {
+    Server::Configuration::GenericFactoryContext& secret_provider_context, bool for_quic) {
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(
       new ServerContextConfigImpl(config, secret_provider_context, creation_status, for_quic));
@@ -117,8 +117,8 @@ absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl
 
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status, bool for_quic)
+    Server::Configuration::GenericFactoryContext& factory_context, absl::Status& creation_status,
+    bool for_quic)
     : ContextConfigImpl(config.common_tls_context(), false /* auto_sni_san_match */,
                         DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION, DEFAULT_CIPHER_SUITES,
                         DEFAULT_CURVES, factory_context, creation_status),

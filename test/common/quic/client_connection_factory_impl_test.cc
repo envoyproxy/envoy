@@ -30,7 +30,8 @@ class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   void initialize() {
-    ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+    ON_CALL(context_.server_factory_context_, threadLocal())
+        .WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(45));
     EXPECT_CALL(*cluster_, connectTimeout).WillOnce(Return(std::chrono::seconds(10)));
     auto* protocol_options = cluster_->http3_options_.mutable_quic_protocol_options();
@@ -66,7 +67,7 @@ protected:
     test_address_ = *Network::Utility::resolveUrl(absl::StrCat(
         "tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":", PEER_PORT));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
-    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+    EXPECT_CALL(context_.server_factory_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillOnce(Return(context));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
@@ -87,7 +88,7 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
   Network::Address::InstanceConstSharedPtr test_address_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   Stats::IsolatedStoreImpl store_;

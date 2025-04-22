@@ -100,7 +100,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
 
 Network::DownstreamTransportSocketFactoryPtr
 createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
-                             Server::Configuration::TransportSocketFactoryContext& factory_context);
+                             Server::Configuration::GenericFactoryContext& factory_context);
 
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);

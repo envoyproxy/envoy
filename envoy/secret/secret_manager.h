@@ -10,7 +10,7 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class TransportSocketFactoryContext;
+class GenericFactoryContext;
 } // namespace Configuration
 } // namespace Server
 
@@ -107,7 +107,7 @@ public:
    */
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) PURE;
 
   /**
@@ -124,7 +124,7 @@ public:
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) PURE;
 
   /**
@@ -141,7 +141,7 @@ public:
   virtual TlsSessionTicketKeysConfigProviderSharedPtr
   findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) PURE;
 
   /**
@@ -156,7 +156,7 @@ public:
    */
   virtual GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::GenericFactoryContext& secret_provider_context,
       Init::Manager& init_manager) PURE;
 };
 

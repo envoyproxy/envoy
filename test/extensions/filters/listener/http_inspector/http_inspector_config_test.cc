@@ -28,7 +28,7 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   Server::Configuration::MockListenerFactoryContext context;
-  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context, statsScope());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 

@@ -621,7 +621,7 @@ TEST_F(HdsTest, TestSocketContext) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
-        Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        Envoy::Server::GenericFactoryContextImpl factory_context(
             params.server_context_, *scope, params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
@@ -1110,7 +1110,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
-        Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        Envoy::Server::GenericFactoryContextImpl factory_context(
             params.server_context_, *scope, params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.

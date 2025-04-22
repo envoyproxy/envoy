@@ -14,13 +14,13 @@ namespace RawBuffer {
 
 absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamRawBufferSocketFactory::createTransportSocketFactory(
-    const Protobuf::Message&, Server::Configuration::TransportSocketFactoryContext&) {
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext&) {
   return std::make_unique<Network::RawBufferSocketFactory>();
 }
 
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 DownstreamRawBufferSocketFactory::createTransportSocketFactory(
-    const Protobuf::Message&, Server::Configuration::TransportSocketFactoryContext&,
+    const Protobuf::Message&, Server::Configuration::GenericFactoryContext&,
     const std::vector<std::string>&) {
   return std::make_unique<Network::RawBufferSocketFactory>();
 }

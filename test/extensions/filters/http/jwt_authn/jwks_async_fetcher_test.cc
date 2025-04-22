@@ -31,7 +31,7 @@ private:
 // TestParam is for fast_listener,
 class JwksAsyncFetcherTest : public testing::TestWithParam<bool> {
 public:
-  JwksAsyncFetcherTest() : stats_(generateMockStats(context_.scope())) {}
+  JwksAsyncFetcherTest() : stats_(generateMockStats(context_.statsScope())) {}
 
   // init manager is used in is_slow_listener mode
   bool initManagerUsed() const {

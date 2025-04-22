@@ -38,7 +38,7 @@ class DownstreamStartTlsSocketFactory
 public:
   absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
-                               Server::Configuration::TransportSocketFactoryContext& context,
+                               Server::Configuration::GenericFactoryContext& context,
                                const std::vector<std::string>& server_names) override;
 };
 
@@ -47,9 +47,9 @@ class UpstreamStartTlsSocketFactory
           Server::Configuration::UpstreamTransportSocketConfigFactory,
           envoy::extensions::transport_sockets::starttls::v3::UpstreamStartTlsConfig> {
 public:
-  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override;
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::GenericFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(DownstreamStartTlsSocketFactory);

@@ -66,8 +66,8 @@ public:
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
-  MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Stats::Scope&, serverScope, ());
+  MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(OptRef<Server::Admin>, admin, ());
@@ -76,8 +76,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
-              (const, override));
+  MOCK_METHOD(GenericFactoryContext&, getGenericFactoryContext, (), (const, override));
   MOCK_METHOD(Secret::SecretManager&, secretManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   Http::Context& httpContext() override { return http_context_; }
@@ -141,27 +140,12 @@ public:
   MockGenericFactoryContext();
   ~MockGenericFactoryContext() override;
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
-  MOCK_METHOD(Stats::Scope&, scope, ());
-  MOCK_METHOD(Init::Manager&, initManager, ());
-
-  NiceMock<MockServerFactoryContext> server_factory_context_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
-  testing::NiceMock<Init::MockManager> init_manager_;
-};
-
-class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
-public:
-  MockTransportSocketFactoryContext();
-  ~MockTransportSocketFactoryContext() override;
-
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), ());
   MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
-  testing::NiceMock<MockServerFactoryContext> server_context_;
+  NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   testing::NiceMock<Init::MockManager> init_manager_;
 };
@@ -181,7 +165,7 @@ public:
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
-  MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
@@ -191,8 +175,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
-              (const, override));
+  MOCK_METHOD(GenericFactoryContext&, getGenericFactoryContext, (), (const, override));
   MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());

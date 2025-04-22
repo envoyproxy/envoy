@@ -88,8 +88,8 @@ public:
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
 
     cluster_scope_ = stats_.createScope("cluster.xds_cluster.");
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, *cluster_scope_, validation_visitor_);
+    Envoy::Server::GenericFactoryContextImpl factory_context(server_context_, *cluster_scope_,
+                                                             validation_visitor_);
 
     // Setup LEDS subscription.
     EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,

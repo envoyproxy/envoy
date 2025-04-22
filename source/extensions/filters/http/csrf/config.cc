@@ -15,7 +15,7 @@ Http::FilterFactoryCb CsrfFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   CsrfFilterConfigSharedPtr config = std::make_shared<CsrfFilterConfig>(
-      policy, stats_prefix, context.scope(), context.serverFactoryContext());
+      policy, stats_prefix, context.statsScope(), context.serverFactoryContext());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<CsrfFilter>(config));
   };

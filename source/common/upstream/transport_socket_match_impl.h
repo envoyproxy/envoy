@@ -25,7 +25,7 @@ public:
   static absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> create(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
-      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Server::Configuration::GenericFactoryContext& factory_context,
       Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
   struct FactoryMatch {
@@ -57,7 +57,7 @@ protected:
   TransportSocketMatcherImpl(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
-      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Server::Configuration::GenericFactoryContext& factory_context,
       Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
       absl::Status& creation_status);
 

@@ -17,7 +17,7 @@ void WasmServiceExtension::onServerInitialized() { createWasm(context_); }
 
 void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContext& context) {
   plugin_config_ = std::make_unique<Common::Wasm::PluginConfig>(
-      config_.config(), context, context.scope(), context.initManager(),
+      config_.config(), context, context.statsScope(), context.initManager(),
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr,
       config_.singleton());
 }

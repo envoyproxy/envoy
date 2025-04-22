@@ -22,7 +22,7 @@ public:
   }
 
   Init::Manager& initManager() override { return init_manager_; }
-  Stats::Scope& scope() override { return scope_; }
+  Stats::Scope& statsScope() override { return scope_; }
 
 private:
   Server::Configuration::ServerFactoryContext& server_context_;

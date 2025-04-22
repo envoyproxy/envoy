@@ -45,7 +45,7 @@ private:
 class InternalSocketFactory : public PassthroughFactory {
 public:
   InternalSocketFactory(
-      Server::Configuration::TransportSocketFactoryContext& context,
+      Server::Configuration::GenericFactoryContext& context,
       const envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport&
           config_proto,
       Network::UpstreamTransportSocketFactoryPtr&& inner_factory);

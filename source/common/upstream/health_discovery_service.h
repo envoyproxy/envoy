@@ -22,7 +22,7 @@
 #include "source/common/upstream/locality_endpoint.h"
 #include "source/common/upstream/prod_cluster_info_factory.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
 

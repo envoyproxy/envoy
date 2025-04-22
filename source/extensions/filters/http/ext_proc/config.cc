@@ -133,14 +133,14 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
-      server_context.scope(), stats_prefix, false,
+      server_context.statsScope(), stats_prefix, false,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
 
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config),
             &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = createExternalProcessorClient(
-          server_context.clusterManager().grpcAsyncClientManager(), server_context.scope());
+          server_context.clusterManager().grpcAsyncClientManager(), server_context.statsScope());
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };

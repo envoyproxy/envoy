@@ -13,7 +13,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"

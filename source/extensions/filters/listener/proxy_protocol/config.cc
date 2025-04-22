@@ -28,7 +28,7 @@ public:
         const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol&>(
         message, context.messageValidationVisitor());
 
-    ConfigSharedPtr config = std::make_shared<Config>(context.scope(), proto_config);
+    ConfigSharedPtr config = std::make_shared<Config>(context.statsScope(), proto_config);
     return
         [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
           filter_manager.addAcceptFilter(listener_filter_matcher, std::make_unique<Filter>(config));

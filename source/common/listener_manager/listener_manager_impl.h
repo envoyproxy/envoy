@@ -32,7 +32,7 @@ namespace Envoy {
 namespace Server {
 
 namespace Configuration {
-class TransportSocketFactoryContextImpl;
+class GenericFactoryContextImpl;
 }
 
 class ListenerFilterChainFactoryBuilder;
@@ -366,8 +366,8 @@ private:
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
-  ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
+  ListenerFilterChainFactoryBuilder(ListenerImpl& listener,
+                                    Server::GenericFactoryContextImpl& factory_context);
 
   absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
@@ -381,7 +381,7 @@ private:
   ListenerImpl& listener_;
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
-  Configuration::TransportSocketFactoryContextImpl& factory_context_;
+  Server::GenericFactoryContextImpl& factory_context_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {

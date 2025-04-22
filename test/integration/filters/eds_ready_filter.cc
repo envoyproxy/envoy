@@ -62,7 +62,7 @@ public:
                Server::Configuration::FactoryContext& factory_context) override {
     return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
       const Stats::Scope& scope = factory_context.serverFactoryContext().api().rootScope();
-      Stats::SymbolTable& symbol_table = factory_context.scope().symbolTable();
+      Stats::SymbolTable& symbol_table = factory_context.statsScope().symbolTable();
       callbacks.addStreamFilter(std::make_shared<EdsReadyFilter>(scope, symbol_table));
     };
   }

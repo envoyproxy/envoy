@@ -108,7 +108,7 @@ public:
                       &context.serverFactoryContext().singletonManager()),
                   context.serverFactoryContext().api().threadFactory());
             });
-    return caches->get(caches, config, context.scope());
+    return caches->get(caches, config, context.statsScope());
   }
 };
 

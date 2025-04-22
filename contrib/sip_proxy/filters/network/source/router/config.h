@@ -17,7 +17,7 @@ public:
   RouterFilterConfigImpl(
       const envoy::extensions::filters::network::sip_proxy::router::v3alpha::Router& config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context)
-      : stats_(generateStats(stat_prefix, context.scope())) {
+      : stats_(generateStats(stat_prefix, context.statsScope())) {
     UNREFERENCED_PARAMETER(config);
   }
 

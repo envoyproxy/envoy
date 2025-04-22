@@ -681,7 +681,7 @@ void CryptoMbPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
 CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
+    Server::Configuration::GenericFactoryContext& factory_context, IppCryptoSharedPtr ipp)
     : api_(factory_context.serverFactoryContext().api()),
       tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(
           factory_context.serverFactoryContext().threadLocal())),

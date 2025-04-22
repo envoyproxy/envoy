@@ -213,9 +213,9 @@ protected:
     Stats::TestUtil::TestStore server_stats_store;
     Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
     NiceMock<Runtime::MockLoader> runtime;
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+    testing::NiceMock<Server::Configuration::MockGenericFactoryContext>
         transport_socket_factory_context;
-    ON_CALL(transport_socket_factory_context.server_context_, api())
+    ON_CALL(transport_socket_factory_context.server_factory_context_, api())
         .WillByDefault(ReturnRef(*server_api));
 
     MockFunction<TestTlsCertificateSelectorFactory::CreateProviderHook> mock_factory_cb;
@@ -257,9 +257,9 @@ protected:
 
     Stats::TestUtil::TestStore client_stats_store;
     Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
-        client_factory_context;
-    ON_CALL(client_factory_context.server_context_, api()).WillByDefault(ReturnRef(*client_api));
+    testing::NiceMock<Server::Configuration::MockGenericFactoryContext> client_factory_context;
+    ON_CALL(client_factory_context.server_factory_context_, api())
+        .WillByDefault(ReturnRef(*client_api));
 
     auto client_cfg = *ClientContextConfigImpl::create(client_tls_context, client_factory_context);
     auto client_ssl_socket_factory = *ClientSslSocketFactory::create(
@@ -380,9 +380,9 @@ TEST_P(TlsCertificateSelectorFactoryTest, QUICFactory) {
   Event::SimulatedTimeSystem time_system;
   Stats::TestUtil::TestStore server_stats_store;
   Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+  testing::NiceMock<Server::Configuration::MockGenericFactoryContext>
       transport_socket_factory_context;
-  ON_CALL(transport_socket_factory_context.server_context_, api())
+  ON_CALL(transport_socket_factory_context.server_factory_context_, api())
       .WillByDefault(ReturnRef(*server_api));
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;

@@ -56,7 +56,7 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
-#include "source/server/transport_socket_config_impl.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -1134,7 +1134,7 @@ ClusterInfoImpl::create(Init::Manager& info,
                         const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
                         Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
                         Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
-                        Server::Configuration::TransportSocketFactoryContext& ctx) {
+                        Server::Configuration::GenericFactoryContext& ctx) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<ClusterInfoImpl>(new ClusterInfoImpl(
       info, server_context, config, bind_config, runtime, std::move(socket_matcher),
@@ -1149,8 +1149,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
     Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status)
+    Server::Configuration::GenericFactoryContext& factory_context, absl::Status& creation_status)
     : runtime_(runtime), name_(config.name()),
       observability_name_(!config.alt_stat_name().empty()
                               ? std::make_unique<std::string>(config.alt_stat_name())
@@ -1503,9 +1502,9 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   return nullptr;
 }
 
-absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
-    const envoy::config::cluster::v3::Cluster& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+createTransportSocketFactory(const envoy::config::cluster::v3::Cluster& config,
+                             Server::Configuration::GenericFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
   // transport socket implementation based on the tls_context. We copy by value first then
   // override if necessary.
@@ -1596,9 +1595,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto& server_context = cluster_context.serverFactoryContext();
 
   auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
-  transport_factory_context_ =
-      std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-          server_context, *stats_scope, cluster_context.messageValidationVisitor());
+  transport_factory_context_ = std::make_unique<Server::GenericFactoryContextImpl>(
+      server_context, *stats_scope, cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
   auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);

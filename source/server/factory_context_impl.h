@@ -16,10 +16,10 @@ public:
                          const Network::ListenerInfoConstSharedPtr& listener_info);
 
   // Configuration::FactoryContext
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Stats::Scope& scope() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
+  Stats::Scope& statsScope() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::GenericFactoryContext& getGenericFactoryContext() const override;
   const Network::ListenerInfo& listenerInfo() const override;
 
   Stats::Scope& listenerScope() override;
