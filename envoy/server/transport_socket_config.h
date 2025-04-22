@@ -22,35 +22,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Context passed to transport socket factory to access server resources.
- */
-class TransportSocketFactoryContext {
-public:
-  virtual ~TransportSocketFactoryContext() = default;
-
-  /**
-   * @return ServerFactoryContext& the server factory context.
-   */
-  virtual ServerFactoryContext& serverFactoryContext() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
-   * messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
-   * @return Stats::Scope& the transport socket's stats scope.
-   */
-  virtual Stats::Scope& statsScope() PURE;
-
-  /**
-   * @return the init manager of the particular context.
-   */
-  virtual Init::Manager& initManager() PURE;
-};
-
+using TransportSocketFactoryContext = GenericFactoryContext;
 using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
 
 class TransportSocketConfigFactory : public Config::TypedFactory {

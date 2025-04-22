@@ -92,15 +92,13 @@ const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() co
   return parent_context_.listenerInfo();
 }
 
-ProtobufMessage::ValidationVisitor&
-PerFilterChainFactoryContextImpl::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
-Configuration::ServerFactoryContext&
-PerFilterChainFactoryContextImpl::serverFactoryContext() const {
+Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFactoryContext() {
   return parent_context_.serverFactoryContext();
 }
 
