@@ -235,7 +235,7 @@ class RepoNotifier(runner.Runner):
 
     async def is_reviewed(self, pr):
         async for review in self.repo.getiter(f"pulls/{pr['number']}/reviews"):
-            if review["state"] == "APPROVED" or "/lgtm" in review["body"]:
+            if review["state"] == "APPROVED" or "lgtm" in review["body"] or "LGTM" in review["body"]:
                 return True
         return False
 
