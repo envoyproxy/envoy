@@ -1779,6 +1779,11 @@ Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOp
   return parent_.upstream_options_;
 }
 
+bool ActiveStreamDecoderFilter::setDownstreamSocketOption(
+    const Network::Socket::OptionConstSharedPtr) {
+  return true;
+}
+
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->responseDataDrained(); },

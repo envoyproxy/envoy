@@ -301,6 +301,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
+
+  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) override;
+  
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
