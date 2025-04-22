@@ -150,7 +150,6 @@ envoy_cc_library(
             "-DENVOY_SSL_FIPS",
         ],
     ),
-    external_deps = ["curl"],
     deps = [
         "//envoy/common:pure_lib",
         "//envoy/http:message_interface",

@@ -107,6 +107,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
                                Tracing::Span& span) {
   ENVOY_LOG(trace, "Received CheckResponse: {}", response->DebugString());
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
+  authz_response->grpc_status = response->status().code();
   if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
@@ -151,6 +152,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;
+  response.grpc_status = status;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }

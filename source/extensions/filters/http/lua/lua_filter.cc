@@ -112,7 +112,12 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   const auto& metadata = callbacks->route()->metadata();
 
   {
-    const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
+    auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+    // TODO(wbpcode): deprecate this in favor of the above.
+    filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
     }
