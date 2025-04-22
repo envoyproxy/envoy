@@ -20,10 +20,10 @@ ParentBasedSamplerFactory::createSampler(const Protobuf::Message& config,
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::tracers::opentelemetry::samplers::v3::ParentBasedSamplerConfig&>(
       *mptr, context.messageValidationVisitor());
-  auto* factory =
-      Envoy::Config::Utility::getFactory<SamplerFactory>(proto_config.wrapped_sampler());
+  auto& factory =
+      Envoy::Config::Utility::getAndCheckFactory<SamplerFactory>(proto_config.wrapped_sampler());
   SamplerSharedPtr wrapped_sampler =
-      factory->createSampler(proto_config.wrapped_sampler().typed_config(), context);
+      factory.createSampler(proto_config.wrapped_sampler().typed_config(), context);
   return std::make_shared<ParentBasedSampler>(config, context, wrapped_sampler);
 }
 
