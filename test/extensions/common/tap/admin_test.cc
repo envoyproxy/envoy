@@ -329,6 +329,8 @@ TEST_F(AdminHandlerTest, CloseMidStream) {
   PerTapSinkHandlePtr sinkHandle =
       handler_->createPerTapSinkHandle(0, ProtoOutputSink::OutputSinkTypeCase::kStreamingAdmin);
 
+  EXPECT_EQ(nullptr, attachedRequest()->traceBuffer());
+
   EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(2);
   main_thread_dispatcher_.post([this] { attachedRequest().reset(); });
   sinkHandle->submitTrace(makeTraceWrapper(), format);
