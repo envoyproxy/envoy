@@ -102,6 +102,80 @@ protected:
   std::unique_ptr<NetworkExtProcFilter> filter_;
 };
 
+// Test receiving a message when processing is already complete
+TEST_F(NetworkExtProcFilterTest, ReceiveMessageAfterProcessingComplete) {
+  // First, mark processing as complete
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Create a message to send - the filter should ignore it
+  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  auto* read_data = response->mutable_read_data();
+  read_data->set_data("data");
+  read_data->set_end_of_stream(false);
+
+  // We expect the filter to ignore this message since processing is complete
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test receiving a message with no data (neither read_data nor write_data)
+TEST_F(NetworkExtProcFilterTest, ReceiveEmptyMessage) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Create a message with neither read_data nor write_data
+  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+
+  // Ensure no data is injected into either filter chain
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test openStream method when processing is already complete
+TEST_F(NetworkExtProcFilterTest, OpenStreamAfterProcessingComplete) {
+  // First, mark processing as complete
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Should not attempt to create a new stream
+  EXPECT_CALL(*client_, start(_, _, _, _)).Times(0);
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+}
+
+// Test the onLogStreamInfo method
+TEST_F(NetworkExtProcFilterTest, LogStreamInfo) {
+  // Simply call the method to ensure coverage
+  filter_->logStreamInfo();
+}
+
+// Test the onComplete method
+TEST_F(NetworkExtProcFilterTest, OnComplete) {
+  // Simply call the method to ensure coverage
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  filter_->onComplete(response);
+}
+
+// Test the onError method
+TEST_F(NetworkExtProcFilterTest, OnError) {
+  // Simply call the method to ensure coverage
+  filter_->onError();
+}
+
 // Test failure mode allow behavior when stream creation fails
 TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeAllow) {
   // Recreate filter with failure_mode_allow = true
