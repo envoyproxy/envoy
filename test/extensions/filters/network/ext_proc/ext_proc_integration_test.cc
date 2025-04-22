@@ -166,7 +166,9 @@ public:
 
   void closeGrpcStream() {
     if (processor_stream_) {
-      processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+      processor_stream_->encodeHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "500"}, {"grpc-status", "8"}, {"foo", "bar"}},
+          true);
     }
   }
 
