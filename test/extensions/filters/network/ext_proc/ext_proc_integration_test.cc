@@ -50,7 +50,6 @@ public:
     grpc_upstream_ = &addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  // Base initialization with customizable config modifier
   void initializeWithModifier(
       std::function<
           void(envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor&)>
