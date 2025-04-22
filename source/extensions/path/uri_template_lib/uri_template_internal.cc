@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "source/common/common/fmt.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/flags/flag.h"
@@ -44,7 +45,15 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        "%"             // pct-encoded
                                        "!$&'()+,;"     // sub-delims excluding *=
                                        ":@"
-                                       "=*"; // restricted characters
+                                       "="; // user included "=" allowed
+
+// Updated literal that includes "*" in the match set.
+// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
+constexpr absl::string_view kLiteralNew = "a-zA-Z0-9-._~" // Unreserved
+                                          "%"             // pct-encoded
+                                          "!$&'()+,;"     // sub-delims excluding *=
+                                          ":@"
+                                          "=*"; // reserved characters
 
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
@@ -122,16 +131,20 @@ std::string ParsedPathPattern::debugString() const {
 }
 
 bool isValidLiteral(absl::string_view literal) {
-  static const std::string* kValidLiteralRegex =
-      new std::string(absl::StrCat("^[", kLiteral, "]+$"));
-  static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
+  const std::string* kValidLiteralRegex =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
+          ? new std::string(absl::StrCat("^[", kLiteralNew, "]+$"))
+          : new std::string(absl::StrCat("^[", kLiteral, "]+$"));
+  const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
   return RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidRewriteLiteral(absl::string_view literal) {
-  static const std::string* kValidLiteralRegex =
-      new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
-  static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
+  const std::string* kValidLiteralRegex =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
+          ? new std::string(absl::StrCat("^[", kLiteralNew, "/]+$"))
+          : new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
+  const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
   return RE2::FullMatch(literal, *literal_regex);
 }
 
@@ -358,8 +371,17 @@ std::string toRegexPattern(absl::string_view pattern) {
 }
 
 std::string toRegexPattern(Operator pattern) {
-  static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
-  static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
+  const std::string* kPathGlobRegex;
+  const std::string* kTextGlobRegex;
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")) {
+    kPathGlobRegex = new std::string(absl::StrCat("[", kLiteralNew, "]+"));
+    kTextGlobRegex = new std::string(absl::StrCat("[", kLiteralNew, "/]*"));
+  } else {
+    kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
+    kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
+  }
+
   switch (pattern) {
   case Operator::PathGlob: // "*"
     return *kPathGlobRegex;

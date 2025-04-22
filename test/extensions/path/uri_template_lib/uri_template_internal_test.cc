@@ -11,6 +11,7 @@
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -29,6 +30,10 @@ namespace {
 using ::Envoy::StatusHelpers::StatusIs;
 
 TEST(InternalParsing, ParsedPathDebugString) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"}});
+
   ParsedPathPattern patt1 = {
       {
           "abc",
@@ -49,6 +54,15 @@ TEST(InternalParsing, ParsedPathDebugString) {
   EXPECT_EQ(patt2.debugString(), "/{var}");
 }
 
+TEST(InternalParsing, IsValidLiteralAsteriskDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
+
+  EXPECT_FALSE(isValidLiteral("ab*c"));
+  EXPECT_FALSE(isValidLiteral("a**c"));
+}
+
 TEST(InternalParsing, IsValidLiteralWorks) {
   EXPECT_TRUE(isValidLiteral("123abcABC"));
   EXPECT_TRUE(isValidLiteral("._~-"));
@@ -63,6 +77,14 @@ TEST(InternalParsing, IsValidLiteralWorks) {
   EXPECT_FALSE(isValidLiteral("{abc"));
   EXPECT_FALSE(isValidLiteral("abc}"));
   EXPECT_FALSE(isValidLiteral("{abc}"));
+}
+
+TEST(InternalParsing, IsValidRewriteAsteriskDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
+
+  EXPECT_FALSE(isValidRewriteLiteral("a*c"));
 }
 
 TEST(InternalParsing, IsValidRewriteLiteralWorks) {
@@ -264,6 +286,15 @@ TEST(InternalRegexGen, RegexLikePatternIsMatchedLiterally) {
 TEST(InternalRegexGen, DollarSignMatchesIfself) {
   EXPECT_TRUE(RE2::FullMatch("abc$", toRegexPattern("abc$")));
   EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("abc$")));
+}
+
+TEST(InternalRegexGen, OperatorRegexPatternAsteriskDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
+
+  EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=]+");
+  EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*");
 }
 
 TEST(InternalRegexGen, OperatorRegexPattern) {
