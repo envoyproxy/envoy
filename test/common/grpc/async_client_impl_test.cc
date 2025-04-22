@@ -171,7 +171,10 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -222,7 +225,10 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescap
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -274,7 +280,10 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnesc
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  Http::MockAsyncClientStream http_stream;
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
           Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
