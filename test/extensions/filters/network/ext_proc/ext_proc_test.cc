@@ -233,6 +233,151 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessing) {
       std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
 }
 
+// Test onGrpcClose handling
+TEST_F(NetworkExtProcFilterTest, GrpcCloseHandling) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Trigger onGrpcClose and verify behavior
+  filter_->onGrpcClose();
+
+  // Subsequent data should pass through directly
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+}
+
+// Test edge case with null stream in sendRequest
+TEST_F(NetworkExtProcFilterTest, SendRequestWithNullStream) {
+  // Access the private sendRequest method directly through a friend test helper
+  // or recreate the scenario that would lead to this
+
+  // Set filter's stream to nullptr
+  auto filter_config = std::make_shared<Config>(createConfig(false));
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+  EXPECT_CALL(connection_, close(_, _));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test onWrite error path
+TEST_F(NetworkExtProcFilterTest, OnWriteErrorPath) {
+  // Recreate filter with failure_mode_allow = true to test different error path
+  recreateFilterWithConfig(true);
+
+  // Expect client->start to return nullptr to trigger error condition
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+
+  // With failure_mode_allow=true, should continue
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
+}
+
+// Test updateCloseCallbackStatus edge cases
+TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusEdgeCases) {
+  // Test multiple enable/disable for read callbacks
+  Buffer::OwnedImpl data("test");
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Send multiple responses to trigger disable/enable cycles
+  // This will test the counter logic in updateCloseCallbackStatus
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified");
+  read_data->set_end_of_stream(false);
+
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  // Test write callbacks with multiple enable/disable
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  response = envoy::service::network_ext_proc::v3::ProcessingResponse();
+  auto* write_data = response.mutable_write_data();
+  write_data->set_data("modified_write");
+  write_data->set_end_of_stream(false);
+
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+}
+
+// Test processing mode configurations
+TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
+  // Test with SKIP for read processing
+  auto config = createConfig(false);
+  config.mutable_processing_mode()->set_process_read(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+
+  auto filter_config = std::make_shared<Config>(config);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // With process_read set to SKIP, data should pass through directly
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // Testing SKIP for write processing
+  config = createConfig(false);
+  config.mutable_processing_mode()->set_process_write(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+
+  filter_config = std::make_shared<Config>(config);
+  client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // With process_write set to SKIP, data should pass through directly
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
+}
+
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters

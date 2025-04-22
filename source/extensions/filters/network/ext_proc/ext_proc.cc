@@ -100,7 +100,7 @@ void NetworkExtProcFilter::updateCloseCallbackStatus(bool enable, bool is_read) 
     if (enable) {
       disable_count_read_++;
       read_callbacks_->disableClose(true);
-    } else if (disable_count_read_ > 0) {
+    } else {
       disable_count_read_--;
       if (disable_count_read_ == 0) {
         read_callbacks_->disableClose(false);
@@ -110,7 +110,7 @@ void NetworkExtProcFilter::updateCloseCallbackStatus(bool enable, bool is_read) 
     if (enable) {
       disable_count_write_++;
       write_callbacks_->disableClose(true);
-    } else if (disable_count_write_ > 0) {
+    } else {
       disable_count_write_--;
       if (disable_count_write_ == 0) {
         write_callbacks_->disableClose(false);

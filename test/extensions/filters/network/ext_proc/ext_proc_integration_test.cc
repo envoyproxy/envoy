@@ -390,8 +390,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // Close gRPC stream with an error status instead of Ok
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
-  // TODO(botengyao) wait for the counter stats
-  tcp_client->close();
+  ASSERT_TRUE(tcp_client->write("data", true));
+  tcp_client->waitForDisconnect();
 }
 
 // Test behavior when failure_mode_allow is set to true and gRPC stream fails
