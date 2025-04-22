@@ -50,25 +50,15 @@ public:
     grpc_upstream_ = &addFakeUpstream(Http::CodecType::HTTP2);
   }
 
-  void initialize() override {
+  // Base initialization with customizable config modifier
+  void initializeWithModifier(
+      std::function<
+          void(envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor&)>
+          config_modifier = nullptr) {
     config_helper_.renameListener("network_ext_proc_filter");
     config_helper_.addConfigModifier(
-        [&](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-          cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-          cluster->set_name("cluster_1");
-          cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
-          Envoy::ConfigHelper::setHttp2WithMaxConcurrentStreams(
-              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(1)), 2);
-        });
-    BaseIntegrationTest::initialize();
-  }
-
-  // Initialize with failure mode allow set to true
-  void initializeWithFailureModeAllow() {
-    config_helper_.renameListener("network_ext_proc_filter");
-    config_helper_.addConfigModifier(
-        [&](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        [&, config_modifier](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          // Common cluster setup
           auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
           cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
           cluster->set_name("cluster_1");
@@ -76,57 +66,46 @@ public:
           Envoy::ConfigHelper::setHttp2WithMaxConcurrentStreams(
               *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(1)), 2);
 
-          // Find the network filter and set failure_mode_allow to true
-          auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          auto* filter_chain = listeners->mutable_filter_chains(0);
-          auto* filters = filter_chain->mutable_filters();
-          for (int i = 0; i < filters->size(); i++) {
-            if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
-              envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-              (*filters)[i].mutable_typed_config()->UnpackTo(&config);
-              config.set_failure_mode_allow(true);
-              (*filters)[i].mutable_typed_config()->PackFrom(config);
-              break;
-            }
-          }
-        });
-    BaseIntegrationTest::initialize();
-  }
+          // Apply config modifier if provided
+          if (config_modifier) {
+            // Find the network filter
+            auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
+            auto* filter_chain = listeners->mutable_filter_chains(0);
+            auto* filters = filter_chain->mutable_filters();
+            for (int i = 0; i < filters->size(); i++) {
+              if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+                envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+                (*filters)[i].mutable_typed_config()->UnpackTo(&config);
 
-  // Initialize with processing modes set to SKIP
-  void initializeWithSkipProcessingModes(bool skip_read) {
-    config_helper_.renameListener("network_ext_proc_filter");
-    config_helper_.addConfigModifier(
-        [&](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-          cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-          cluster->set_name("cluster_1");
-          cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
-          Envoy::ConfigHelper::setHttp2WithMaxConcurrentStreams(
-              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(1)), 2);
+                // Apply the provided modifier function
+                config_modifier(config);
 
-          // Set processing modes to SKIP
-          auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          auto* filter_chain = listeners->mutable_filter_chains(0);
-          auto* filters = filter_chain->mutable_filters();
-          for (int i = 0; i < filters->size(); i++) {
-            if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
-              envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-              (*filters)[i].mutable_typed_config()->UnpackTo(&config);
-              auto* processing_mode = config.mutable_processing_mode();
-              if (skip_read) {
-                processing_mode->set_process_read(
-                    envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
-              } else {
-                processing_mode->set_process_write(
-                    envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+                (*filters)[i].mutable_typed_config()->PackFrom(config);
+                break;
               }
-              (*filters)[i].mutable_typed_config()->PackFrom(config);
-              break;
             }
           }
         });
     BaseIntegrationTest::initialize();
+  }
+
+  void initialize() override { initializeWithModifier(); }
+
+  void initializeWithFailureModeAllow() {
+    initializeWithModifier([](auto& config) { config.set_failure_mode_allow(true); });
+  }
+
+  void initializeWithSkipProcessingModes(bool skip_read) {
+    initializeWithModifier([skip_read](auto& config) {
+      auto* processing_mode = config.mutable_processing_mode();
+      if (skip_read) {
+        processing_mode->set_process_read(
+            envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+      } else {
+        processing_mode->set_process_write(
+            envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+      }
+    });
   }
 
   void waitForFirstGrpcMessage(ProcessingRequest& request) {
