@@ -52,7 +52,6 @@ Network::FilterStatus NetworkExtProcFilter::onWrite(Buffer::Instance& data, bool
   ENVOY_CONN_LOG(debug, "ext_proc: writing {} bytes of data, end stream={}",
                  write_callbacks_->connection(), data.length(), end_stream);
 
-  // Skip processing if completed or configured to skip write processing
   if (config_->processingMode().process_write() ==
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
     return Network::FilterStatus::Continue;
