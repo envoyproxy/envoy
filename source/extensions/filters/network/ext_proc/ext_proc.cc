@@ -33,10 +33,8 @@ Network::FilterStatus NetworkExtProcFilter::onData(Buffer::Instance& data, bool 
   ENVOY_CONN_LOG(debug, "ext_proc: received {} bytes of data, end stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
 
-  // Skip processing if completed or configured to skip read processing
-  if (processing_complete_ ||
-      config_->processingMode().process_read() ==
-          envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+  if (config_->processingMode().process_read() ==
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
     return Network::FilterStatus::Continue;
   }
 
@@ -55,9 +53,8 @@ Network::FilterStatus NetworkExtProcFilter::onWrite(Buffer::Instance& data, bool
                  write_callbacks_->connection(), data.length(), end_stream);
 
   // Skip processing if completed or configured to skip write processing
-  if (processing_complete_ ||
-      config_->processingMode().process_write() ==
-          envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+  if (config_->processingMode().process_write() ==
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
     return Network::FilterStatus::Continue;
   }
 
