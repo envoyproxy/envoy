@@ -172,7 +172,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 extensions/upstreams/http @yanavlasov @mattklein123
 extensions/upstreams/tcp @ggreenway @mattklein123
 # OAuth2
-extensions/filters/http/oauth2 @derekargueta @mattklein123
+/*/extensions/filters/http/oauth2 @derekargueta @mattklein123
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/common/local_ratelimit @mattklein123 @wbpcode
