@@ -2917,24 +2917,6 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeout) {
   verifyDownstreamResponse(*response, 504);
 }
 
-TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutOldErrorCode) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_timeout_error", "false"}});
-  // ensure 200 ms timeout
-  proto_config_.mutable_message_timeout()->set_nanos(200000000);
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
-  processRequestHeadersMessage(*grpc_upstreams_[0], true,
-                               [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 400 ms
-                                 timeSystem().advanceTimeWaitImpl(400ms);
-                                 return false;
-                               });
-
-  // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 500);
-}
-
 TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
   // ensure 200 ms timeout
   proto_config_.mutable_message_timeout()->set_nanos(200000000);
