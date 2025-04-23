@@ -51,6 +51,9 @@ removed_config_or_runtime:
 - area: sni
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san`` and legacy code paths.
+- area: ext_proc
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.ext_proc_timeout_error`` and legacy code paths.
 
 
 new_features:
