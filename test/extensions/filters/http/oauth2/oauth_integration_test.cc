@@ -761,7 +761,7 @@ TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1", /* expect_failure */ true);
 }
 
-// After an hmac secret change, a request should cause a reauth, but not an auth failure
+// After an hmac secret change, a request should cause a re-authorization, but not an auth failure
 TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
   on_server_init_function_ = [&]() {
     createLdsStream();
