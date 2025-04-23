@@ -343,18 +343,18 @@ absl::Status GrpcJsonReverseTranscoderFilter::ExtractHttpAnnotationValues(
   if (!http_request_body_field_.empty() && http_request_body_field_ != "*") {
     // Change the field name to `json_name` annotation value if it exists else change it to
     // camelCase, if the filter is not configured to preserve the proto field name.
-    auto request_body_field_or = per_route_config_->ChangeBodyFieldName(
-        method_descriptor->input_type()->full_name(), http_request_body_field_);
-    if (!request_body_field_or.ok()) {
-      return request_body_field_or.status();
-    }
-    http_request_body_field_ = request_body_field_or.value();
+    absl::StatusOr<std::string> request_body_field_or_error =
+        per_route_config_->ChangeBodyFieldName(method_descriptor->input_type()->full_name(),
+                                               http_request_body_field_);
+    RETURN_IF_NOT_OK_REF(request_body_field_or_error.status());
+    http_request_body_field_ = std::move(request_body_field_or_error.value());
     // Update the path template as well, if it's referencing fields from the http body object.
+    const std::string http_rule_prefix = absl::StrCat("{", http_rule.body(), ".");
     if (http_request_body_field_ != http_rule.body() &&
-        absl::StrContains(http_request_path_template_, absl::StrCat("{", http_rule.body(), "."))) {
+        absl::StrContains(http_request_path_template_, http_rule_prefix)) {
       http_request_path_template_ = absl::StrReplaceAll(
-          http_request_path_template_, {{absl::StrCat("{", http_rule.body(), "."),
-                                         absl::StrCat("{", http_request_body_field_, ".")}});
+          http_request_path_template_,
+          {{http_rule_prefix, absl::StrCat("{", http_request_body_field_, ".")}});
     }
   }
   return absl::OkStatus();

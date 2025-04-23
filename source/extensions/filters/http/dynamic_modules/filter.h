@@ -108,6 +108,13 @@ private:
    */
   void destroy();
 
+  // This helps to avoid reentering the module when sending a local reply. For example, if
+  // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
+  // the stack calling it, which can be problematic. For example, with Rust, that might cause
+  // multiple mutable borrows of the same object. In practice, a module shouldn't need encodeHeaders
+  // and encodeData to be called for local reply contents, so we just skip them with this flag.
+  bool sent_local_reply_ = false;
+
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
 };

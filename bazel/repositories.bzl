@@ -184,7 +184,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
@@ -676,29 +675,6 @@ def _com_google_protobuf():
     native.bind(
         name = "upb_reflection",
         actual = "@com_google_protobuf//upb:reflection",
-    )
-
-def _com_github_curl():
-    # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
-    # the deprecation period of 2 releases. Please DO NOT USE curl dependency for any new or existing extensions.
-    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
-    external_http_archive(
-        name = "com_github_curl",
-        build_file_content = BUILD_ALL_CONTENT + """
-cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
-""",
-        # Patch curl 7.74.0 and later due to CMake's problematic implementation of policy `CMP0091`
-        # and introduction of libidn2 dependency which is inconsistently available and must
-        # not be a dynamic dependency on linux.
-        # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
-        # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
-        # by elimination of the curl dependency.
-        patches = ["@envoy//bazel/foreign_cc:curl.patch"],
-        patch_args = ["-p1"],
-    )
-    native.bind(
-        name = "curl",
-        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _v8():
