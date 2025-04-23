@@ -661,7 +661,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
   return absl::OkStatus();
 }
 
-const Snapshot& LoaderImpl::snapshot() {
+const Snapshot& LoaderImpl::snapshot() const {
   ASSERT(tls_->currentThreadRegistered(),
          "snapshot can only be called from a worker thread or after the main thread is registered");
   return tls_->getTyped<Snapshot>();
