@@ -221,8 +221,8 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
       path += MessageUtil::FileExtensions::get().ProtoText;
       break;
-    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
       path += MessageUtil::FileExtensions::get().Json;
       break;
     }
@@ -250,8 +250,8 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
     output_file_ << MessageUtil::toTextProto(*trace);
     break;
-  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
   }
