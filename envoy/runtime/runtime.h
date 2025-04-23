@@ -236,7 +236,7 @@ public:
    *         the calling routine, but may be overwritten on a future event loop cycle so should be
    *         fetched again when needed. This may only be called from worker threads.
    */
-  virtual const Snapshot& snapshot() PURE;
+  virtual const Snapshot& snapshot() const PURE;
 
   /**
    * @return shared_ptr<const Snapshot> the current snapshot. This function may safely be called
