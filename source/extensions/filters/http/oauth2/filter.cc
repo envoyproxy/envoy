@@ -763,6 +763,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   // Validate the CSRF token HMAC if the CSRF token cookie exists.
   if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
     csrf_token_cookie_exists = false;
+    csrf_token.clear();
   }
 
   // Set the CSRF token cookie if it does not exist.
