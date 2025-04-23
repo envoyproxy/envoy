@@ -30,6 +30,7 @@ const char SecondClusterName[] = "cluster_2";
 // Index in fake_upstreams_
 const int FirstUpstreamIndex = 2;
 const int SecondUpstreamIndex = 3;
+
 struct CircuitBreakerLimits {
   uint32_t max_connections = 1024;
   uint32_t max_requests = 1024;
@@ -37,29 +38,68 @@ struct CircuitBreakerLimits {
   uint32_t max_retries = 3;
   uint32_t max_connection_pools = std::numeric_limits<uint32_t>::max();
 
-  CircuitBreakerLimits withMaxConnections(uint32_t max_connections) const {
-    CircuitBreakerLimits limits = *this;
-    limits.max_connections = max_connections;
-    return limits;
+  CircuitBreakerLimits& withMaxConnections(uint32_t max_connections) {
+    this->max_connections = max_connections;
+    return *this;
   }
 
-  CircuitBreakerLimits withMaxRequests(uint32_t max_requests) const {
-    CircuitBreakerLimits limits = *this;
-    limits.max_requests = max_requests;
-    return limits;
+  CircuitBreakerLimits& withMaxRequests(uint32_t max_requests) {
+    this->max_requests = max_requests;
+    return *this;
   }
 
-  CircuitBreakerLimits withMaxPendingRequests(uint32_t max_pending_requests) const {
-    CircuitBreakerLimits limits = *this;
-    limits.max_pending_requests = max_pending_requests;
-    return limits;
+  CircuitBreakerLimits& withMaxPendingRequests(uint32_t max_pending_requests) {
+    this->max_pending_requests = max_pending_requests;
+    return *this;
   }
 
-  CircuitBreakerLimits withMaxRetries(uint32_t max_retries) const {
-    CircuitBreakerLimits limits = *this;
-    limits.max_retries = max_retries;
-    return limits;
+  CircuitBreakerLimits& withMaxRetries(uint32_t max_retries) {
+    this->max_retries = max_retries;
+    return *this;
   }
+};
+
+void setCircuitBreakerLimits(envoy::config::cluster::v3::Cluster& cluster,
+                             const CircuitBreakerLimits& limits) {
+  auto* cluster_circuit_breakers = cluster.mutable_circuit_breakers();
+
+  auto* cluster_circuit_breakers_threshold_default = cluster_circuit_breakers->add_thresholds();
+  cluster_circuit_breakers_threshold_default->set_priority(
+      envoy::config::core::v3::RoutingPriority::DEFAULT);
+
+  cluster_circuit_breakers_threshold_default->mutable_max_connections()->set_value(
+      limits.max_connections);
+  cluster_circuit_breakers_threshold_default->mutable_max_pending_requests()->set_value(
+      limits.max_pending_requests);
+  cluster_circuit_breakers_threshold_default->mutable_max_requests()->set_value(
+      limits.max_requests);
+  cluster_circuit_breakers_threshold_default->mutable_max_retries()->set_value(limits.max_retries);
+  cluster_circuit_breakers_threshold_default->mutable_max_connection_pools()->set_value(
+      limits.max_connection_pools);
+  cluster_circuit_breakers_threshold_default->set_track_remaining(true);
+};
+
+void setMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
+                             uint32_t max_concurrent_streams) {
+  envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_protocol_options;
+  http_protocol_options.mutable_explicit_http_config()
+      ->mutable_http2_protocol_options()
+      ->mutable_max_concurrent_streams()
+      ->set_value(max_concurrent_streams);
+  (*cluster.mutable_typed_extension_protocol_options())
+      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+          .PackFrom(http_protocol_options);
+};
+
+void reduceAggregateClustersListToOneCluster(
+    envoy::config::cluster::v3::Cluster& aggregate_cluster) {
+  auto* aggregate_cluster_type = aggregate_cluster.mutable_cluster_type();
+  auto* aggregate_cluster_typed_config = aggregate_cluster_type->mutable_typed_config();
+  envoy::extensions::clusters::aggregate::v3::ClusterConfig new_aggregate_cluster_typed_config;
+  aggregate_cluster_typed_config->UnpackTo(&new_aggregate_cluster_typed_config);
+  new_aggregate_cluster_typed_config.clear_clusters();
+  new_aggregate_cluster_typed_config.add_clusters("cluster_1");
+  aggregate_cluster_typed_config->PackFrom(new_aggregate_cluster_typed_config);
 };
 
 const std::string& config() {
@@ -211,50 +251,6 @@ public:
     xds_stream_->startGrpcStream();
   }
 
-  void setCircuitBreakerLimits(envoy::config::cluster::v3::Cluster& cluster,
-                               const CircuitBreakerLimits& limits) {
-    auto* cluster_circuit_breakers = cluster.mutable_circuit_breakers();
-
-    auto* cluster_circuit_breakers_threshold_default = cluster_circuit_breakers->add_thresholds();
-    cluster_circuit_breakers_threshold_default->set_priority(
-        envoy::config::core::v3::RoutingPriority::DEFAULT);
-
-    cluster_circuit_breakers_threshold_default->mutable_max_connections()->set_value(
-        limits.max_connections);
-    cluster_circuit_breakers_threshold_default->mutable_max_pending_requests()->set_value(
-        limits.max_pending_requests);
-    cluster_circuit_breakers_threshold_default->mutable_max_requests()->set_value(
-        limits.max_requests);
-    cluster_circuit_breakers_threshold_default->mutable_max_retries()->set_value(
-        limits.max_retries);
-    cluster_circuit_breakers_threshold_default->mutable_max_connection_pools()->set_value(
-        limits.max_connection_pools);
-    cluster_circuit_breakers_threshold_default->set_track_remaining(true);
-  }
-
-  void setMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
-                               uint32_t max_concurrent_streams) {
-    envoy::extensions::upstreams::http::v3::HttpProtocolOptions http_protocol_options;
-    http_protocol_options.mutable_explicit_http_config()
-        ->mutable_http2_protocol_options()
-        ->mutable_max_concurrent_streams()
-        ->set_value(max_concurrent_streams);
-    (*cluster.mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(http_protocol_options);
-  }
-
-  void
-  reduceAggregateClustersListToOneCluster(envoy::config::cluster::v3::Cluster& aggregate_cluster) {
-    auto* aggregate_cluster_type = aggregate_cluster.mutable_cluster_type();
-    auto* aggregate_cluster_typed_config = aggregate_cluster_type->mutable_typed_config();
-    envoy::extensions::clusters::aggregate::v3::ClusterConfig new_aggregate_cluster_typed_config;
-    aggregate_cluster_typed_config->UnpackTo(&new_aggregate_cluster_typed_config);
-    new_aggregate_cluster_typed_config.clear_clusters();
-    new_aggregate_cluster_typed_config.add_clusters("cluster_1");
-    aggregate_cluster_typed_config->PackFrom(new_aggregate_cluster_typed_config);
-  }
-
   const bool deferred_cluster_creation_;
   envoy::config::cluster::v3::Cluster cluster1_;
   envoy::config::cluster::v3::Cluster cluster2_;
@@ -388,7 +384,7 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
 TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxConnections) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
 
@@ -510,7 +506,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxConnections) {
 TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
 
@@ -630,7 +626,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxRequests) {
 TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxPendingRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* aggregate_cluster = static_resources->mutable_clusters(1);
 
@@ -771,7 +767,7 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxPendingRequests) {
 TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
 
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* listener = static_resources->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
