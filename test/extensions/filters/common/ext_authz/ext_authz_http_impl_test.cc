@@ -579,10 +579,13 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   envoy::service::auth::v3::CheckRequest request;
 
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -592,10 +595,13 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
   envoy::service::auth::v3::CheckRequest request;
 
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
@@ -614,10 +620,13 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   InSequence s;
 
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
   EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
                  stream_info_);
 }
