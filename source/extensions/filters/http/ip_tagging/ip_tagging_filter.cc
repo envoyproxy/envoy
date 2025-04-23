@@ -68,7 +68,6 @@ void IpTagsProvider::updateIpTags(const LcTrieSharedPtr reloaded_tags)
     ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
   absl::MutexLock lock(&ip_tags_mutex_);
   tags_ = reloaded_tags;
-  std::cerr << "***Finishes reloading ip tags" << std::endl;
 }
 
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -82,14 +81,27 @@ LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path) {
       throw EnvoyException("Unsupported file format, unable to parse ip tags from file.");
     }
     auto file_or_error = api_.fileSystem().fileReadToEnd(ip_tags_path);
-    THROW_IF_NOT_OK_REF(file_or_error.status());
-    IpTagFileProto ip_tags_proto;
-    if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Yaml)) {
-      MessageUtil::loadFromYaml(file_or_error.value(), ip_tags_proto, validation_visitor_);
-    } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
-      MessageUtil::loadFromJson(file_or_error.value(), ip_tags_proto, validation_visitor_);
+    if (file_or_error.status().ok()) {
+      IpTagFileProto ip_tags_proto;
+      if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Yaml)) {
+        try {
+          MessageUtil::loadFromYaml(file_or_error.value(), ip_tags_proto, validation_visitor_);
+        } catch (const EnvoyException& e) {
+          ENVOY_LOG_MISC(warn, "failed to parse ip tags file: {}", e.what());
+          return nullptr;
+        }
+      } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
+        try {
+          MessageUtil::loadFromJson(file_or_error.value(), ip_tags_proto, validation_visitor_);
+        } catch (const EnvoyException& e) {
+          ENVOY_LOG_MISC(warn, "failed to parse ip tags file: {}", e.what());
+          return nullptr;
+        }
+      }
+      return parseIpTags(ip_tags_proto.ip_tags());
+    } else {
+      return nullptr;
     }
-    return parseIpTags(ip_tags_proto.ip_tags());
   }
   return nullptr;
 }
@@ -112,7 +124,6 @@ LcTrieSharedPtr IpTagsLoader::parseIpTags(
                         entry.address_prefix(), entry.prefix_len().value()));
       }
     }
-    std::cerr << "***PArsing ip tag: " << ip_tag.ip_tag_name() << std::endl;
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
@@ -153,7 +164,6 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
-    std::cerr << "***Resolving provider for: " << ip_tags_path_ << std::endl;
     provider_ = ip_tags_registry_->get(
         ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
         [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_);
@@ -179,7 +189,6 @@ IpTaggingFilter::~IpTaggingFilter() = default;
 void IpTaggingFilter::onDestroy() {}
 
 Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  std::cerr << "***Decode headers called: " << std::endl;
   const bool is_internal_request = headers.EnvoyInternalRequest() &&
                                    (headers.EnvoyInternalRequest()->value() ==
                                     Http::Headers::get().EnvoyInternalRequestValues.True.c_str());

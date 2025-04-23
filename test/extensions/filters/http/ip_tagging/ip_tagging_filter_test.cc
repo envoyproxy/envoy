@@ -921,6 +921,54 @@ TEST_P(IpTagsFileReloadImplTest, IpTagsFileReloaded) {
   TestEnvironment::renameFile(source_ip_tags_file_path + "1", source_ip_tags_file_path);
 }
 
+TEST_P(IpTagsFileReloadImplTest, IpTagsFileNotReloaded) {
+  IpTagsFileReloadTestCase test_case = GetParam();
+  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  initializeFilter(test_case.yaml_config_, cb_added_opt);
+  EXPECT_EQ(test_case.request_type_, config_->requestType());
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow(test_case.remote_address_);
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(stats_,
+              counter(absl::StrCat(ip_tagging_prefix, test_case.hit_counter_prefix_, ".hit")));
+  EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "total")));
+  auto request_headers = test_case.tagged_headers_;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(test_case.hit_counter_prefix_, request_headers.get_(Http::Headers::get().EnvoyIpTags));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->decodeHeaders(test_case.not_tagged_headers_, false));
+  EXPECT_FALSE(test_case.not_tagged_headers_.has(Http::Headers::get().EnvoyIpTags));
+  std::string source_ip_tags_file_path =
+      TestEnvironment::substitute(test_case.source_ip_tags_file_path_);
+  std::string reloaded_ip_tags_file_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml");
+  TestEnvironment::renameFile(source_ip_tags_file_path, source_ip_tags_file_path + "1");
+  TestEnvironment::renameFile(reloaded_ip_tags_file_path, source_ip_tags_file_path);
+  EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "ip_tags_reload_error")));
+  cb_added_opt.value().waitReady();
+  {
+    absl::ReaderMutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
+  // Current ip tags should be used if reload failed.
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(stats_,
+              counter(absl::StrCat(ip_tagging_prefix, test_case.hit_counter_prefix_, ".hit")));
+  EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "total")));
+  request_headers = test_case.tagged_headers_;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(test_case.hit_counter_prefix_, request_headers.get_(Http::Headers::get().EnvoyIpTags));
+  // Clean up modifications to ip tags file names.
+  TestEnvironment::renameFile(source_ip_tags_file_path, reloaded_ip_tags_file_path);
+  TestEnvironment::renameFile(source_ip_tags_file_path + "1", source_ip_tags_file_path);
+}
+
 struct IpTagsFileReloadTestCase ip_tags_file_reload_test_cases[] = {
     {internal_request_with_yaml_file_config,
      FilterRequestType::INTERNAL,
