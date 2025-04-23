@@ -20,8 +20,18 @@ DnsClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
     Upstream::ClusterFactoryContext& context) {
-  absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =
-      selectDnsResolver(cluster, context);
+  absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error;
+  if (proto_config.has_typed_dns_resolver_config()) {
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromTypedConfig(proto_config.typed_dns_resolver_config());
+    auto& server_context = context.serverFactoryContext();
+    dns_resolver_or_error = dns_resolver_factory.createDnsResolver(
+        server_context.mainThreadDispatcher(), server_context.api(),
+        proto_config.typed_dns_resolver_config());
+  } else {
+    dns_resolver_or_error = selectDnsResolver(cluster, context);
+  }
+
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
   absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
