@@ -265,61 +265,6 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "curl",
-    cache_entries = {
-        "BUILD_CURL_EXE": "off",
-        "BUILD_TESTING": "off",
-        "BUILD_LIBCURL_DOCS": "off",
-        "BUILD_SHARED_LIBS": "off",
-        "CURL_HIDDEN_SYMBOLS": "off",
-        "CURL_USE_LIBSSH2": "off",
-        "CURL_USE_LIBPSL": "off",
-        "CURL_BROTLI": "off",
-        "CURL_USE_GSSAPI": "off",
-        "HTTP_ONLY": "on",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-        # Explicitly enable Unix sockets, once afunix.h is correctly detected
-        # "USE_UNIX_SOCKETS": "on",
-        # Explicitly disable "Windows" crypto for Windows
-        "CURL_DISABLE_CRYPTO_AUTH": "on",
-        # C-Ares.
-        "ENABLE_ARES": "on",
-        "CARES_LIBRARY": "$$EXT_BUILD_DEPS/ares",
-        "CARES_INCLUDE_DIR": "$$EXT_BUILD_DEPS/ares/include",
-        # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses
-        # FindOpenSSL.cmake which fails at what looks like version parsing
-        # (the libraries are found ok).
-        "CURL_CA_PATH": "none",
-        "CURL_USE_OPENSSL": "off",
-        "OPENSSL_ROOT_DIR": "$$EXT_BUILD_DEPS",
-        # Avoid libidn2
-        "USE_LIBIDN2": "off",
-        # NGHTTP2.
-        "USE_NGHTTP2": "on",
-        "NGHTTP2_LIBRARY": "$$EXT_BUILD_DEPS/nghttp2",
-        "NGHTTP2_INCLUDE_DIR": "$$EXT_BUILD_DEPS/nghttp2/include",
-        # ZLIB.
-        "CURL_ZLIB": "on",
-        "ZLIB_LIBRARY": "$$EXT_BUILD_DEPS/zlib",
-        "ZLIB_INCLUDE_DIR": "$$EXT_BUILD_DEPS/zlib/include",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-    },
-    defines = ["CURL_STATICLIB"],
-    generate_crosstool_file = True,
-    lib_source = "@com_github_curl//:all",
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["libcurl.lib"],
-        "//conditions:default": ["libcurl.a"],
-    }),
-    deps = [
-        ":ares",
-        ":nghttp2",
-        ":zlib",
-        "//external:ssl",
-    ],
-)
-
-envoy_cmake(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",

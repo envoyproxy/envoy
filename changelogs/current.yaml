@@ -2,9 +2,19 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: aws_iam
+  change: |
+    As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
+    grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
+    will fail to load.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: lua
+  change: |
+    The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>` first.
+    And if not found, it will search by the canonical name of the filter ``envoy.filters.http.lua``.
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
@@ -14,7 +24,38 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: websocket
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.switch_protocol_websocket_handshake`` and legacy code paths.
+- area: http2
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http2_no_protocol_error_upon_clean_close`` and legacy code paths.
+- area: access_log
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.sanitize_sni_in_access_log`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.quic_connect_client_udp_sockets`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.quic_support_certificate_compression`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy_reloadable_features_filter_access_loggers_first`` and legacy code paths.
+- area: tcp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed runtime guard ``envoy_reloadable_features_boolean_to_string_fix`` and legacy code paths.
+- area: sni
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san`` and legacy code paths.
+
 
 new_features:
+- area: ext_authz
+  change: |
+    Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
 
 deprecated:

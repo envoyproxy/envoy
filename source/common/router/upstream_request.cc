@@ -391,9 +391,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     // If this is a websocket upgrade request, pause the request until the upstream sends
     // the 101 Switching Protocols response code. Using the else logic here to obey CONNECT
     // method which is expecting 2xx response.
-  } else if ((Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.check_switch_protocol_websocket_handshake")) &&
-             Http::Utility::isWebSocketUpgradeRequest(*headers)) {
+  } else if (Http::Utility::isWebSocketUpgradeRequest(*headers)) {
     paused_for_websocket_ = true;
   }
 

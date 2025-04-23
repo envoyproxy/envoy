@@ -25,13 +25,13 @@ static_resources:
                   cluster: upstream_com
               metadata:
                 filter_metadata:
-                  envoy.filters.http.lua:
+                  lua-custom-name:
                     foo: bar
                     baz:
                     - bad
                     - baz
           http_filters:
-          - name: envoy.filters.http.lua
+          - name: lua-custom-name
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
               default_source_code:

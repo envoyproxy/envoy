@@ -2087,18 +2087,27 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
 
   const std::string METADATA{R"EOF(
     filter_metadata:
-      envoy.filters.http.lua:
+      lua-filter-config-name:
         foo.bar:
           name: foo
           prop: bar
         baz.bat:
           name: baz
           prop: bat
+      envoy.filters.http.lua:
+        foo.bar:
+          name: foo-xxx
+          prop: bar-xxx
+        baz.bat:
+          name: baz-xxx
+          prop: bat-xxx
   )EOF"};
 
   InSequence s;
   setup(SCRIPT);
   setupMetadata(METADATA);
+
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return("lua-filter-config-name"));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
@@ -2106,6 +2115,47 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
                                  {"trace", "bar"},
                                  {"trace", "baz"},
                                  {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithCanonicalName) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["prop"])
+      request_handle:logTrace(request_handle:metadata():get("baz.bat")["name"])
+      request_handle:logTrace(request_handle:metadata():get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.filters.http.lua:
+        foo.bar:
+          name: foo-xxx
+          prop: bar-xxx
+        baz.bat:
+          name: baz-xxx
+          prop: bat-xxx
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupMetadata(METADATA);
+
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return("lua-filter-config-name"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo-xxx"},
+                                 {"trace", "bar-xxx"},
+                                 {"trace", "baz-xxx"},
+                                 {"trace", "bat-xxx"},
                              }),
                              {
                                EXPECT_EQ(Http::FilterHeadersStatus::Continue,
