@@ -372,6 +372,10 @@ public:
     EXPECT_EQ(actual.clusterInfo(), expected.clusterInfo());
     EXPECT_EQ(actual.bytesSent(), expected.bytesSent());
     EXPECT_EQ(actual.bytesReceived(), expected.bytesReceived());
+    EXPECT_EQ(actual.grpcStatus().has_value(), expected.grpcStatus().has_value());
+    if (expected.grpcStatus().has_value()) {
+      EXPECT_EQ(actual.grpcStatus().value(), expected.grpcStatus().value());
+    }
 
     ASSERT_EQ(actual.filterMetadata().has_value(), expected.filterMetadata().has_value());
     if (expected.filterMetadata().has_value()) {
@@ -4017,6 +4021,10 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
 TEST_P(EmitFilterStateTest, OkResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4024,6 +4032,10 @@ TEST_P(EmitFilterStateTest, OkResponse) {
 TEST_P(EmitFilterStateTest, Error) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Canceled;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Canceled);
+  }
 
   test(response);
 }
@@ -4031,6 +4043,10 @@ TEST_P(EmitFilterStateTest, Error) {
 TEST_P(EmitFilterStateTest, Denied) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  }
 
   test(response);
 }
@@ -4048,6 +4064,10 @@ TEST_P(EmitFilterStateTest, NullStreamInfo) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4067,6 +4087,10 @@ TEST_P(EmitFilterStateTest, NullStreamInfoFields) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4082,6 +4106,10 @@ TEST_P(EmitFilterStateTest, NullUpstreamHost) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4100,6 +4128,10 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4117,6 +4149,10 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
