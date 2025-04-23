@@ -53,7 +53,7 @@ resource monitors. Envoy's builtin resource monitors are listed
 .. _config_overload_manager_cgroup_memory:
 
 Cgroup Memory
-^^^^^^^^^^^^
+^^^^^^^^^^^^^
 
 The cgroup memory resource monitor tracks memory pressure by reading memory usage and limits from the cgroup memory subsystem.
 This monitor supports both cgroup v1 and cgroup v2.
