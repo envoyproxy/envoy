@@ -13,43 +13,63 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-/**
- * A singleton for file based loading of ip tags and looking up parsed trie data structures with Ip
- * tags. When given equivalent file paths to the Ip tags, the singleton returns pointers to the same
- * trie structure.
- */
-class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
-public:
-  IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
-  IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                              Api::Api& api, Event::Dispatcher& dispatcher,
-                              std::shared_ptr<IpTagsRegistrySingleton> singleton);
-
-IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                             Api::Api& api, Event::Dispatcher& dispatcher,
-                             std::shared_ptr<IpTagsRegistrySingleton> singleton) {
-  std::shared_ptr<IpTagsProvider> ip_tags_provider;
-  const uint64_t key = std::hash<std::string>()(ip_tags_path);
-  absl::MutexLock lock(&mu_);
-  auto it = ip_tags_registry_.find(key);
-  if (it != ip_tags_registry_.end()) {
-    ip_tags_provider = it->second.lock();
-  } else {
-    ip_tags_provider =
-        std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, dispatcher, api, singleton);
-    ip_tags_registry_[key] = ip_tags_provider;
+IpTagsProvider::IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                               IpTagsReloadSuccessCb reload_success_cb,
+                               IpTagsReloadErrorCb reload_error_cb, Event::Dispatcher& dispatcher,
+                               Api::Api& api, Singleton::InstanceSharedPtr owner)
+    : ip_tags_path_(ip_tags_path), tags_loader_(tags_loader), reload_success_cb_(reload_success_cb),
+      reload_error_cb_(reload_error_cb), tags_(tags_loader_.loadTags(ip_tags_path_)),
+      ip_tags_reload_dispatcher_(api.allocateDispatcher("ip_tags_reload_routine")),
+      ip_tags_file_watcher_(dispatcher.createFilesystemWatcher()), owner_(owner) {
+  if (ip_tags_path.empty()) {
+    throw EnvoyException("Cannot load tags from empty file path.");
   }
-  return ip_tags_provider;
+  ip_tags_reload_thread_ = api.threadFactory().createThread(
+      [this]() -> void {
+        ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
+        THROW_IF_NOT_OK(
+            ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
+                                            [this](uint32_t) { return onIpTagsFileUpdate(); }));
+        ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      },
+      Thread::Options{std::string("ip_tags_reload_routine")});
 }
 
-private:
-  absl::Mutex mu_;
-  //  We keep weak_ptr here so the trie structures can be destroyed if the config is updated to stop
-  //  using that trie. Each provider stores shared_ptrs to this singleton, which keeps the singleton
-  //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
-  //  shared_ptr is *only* held by driver instances.)
-  absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
+IpTagsProvider::~IpTagsProvider() {
+  ENVOY_LOG(debug, "Shutting down ip tags provider");
+  ip_tags_reload_dispatcher_->exit();
+  if (ip_tags_reload_thread_) {
+    ip_tags_reload_thread_->join();
+    ip_tags_reload_thread_.reset();
+  }
 };
+
+LcTrieSharedPtr IpTagsProvider::ipTags() const ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
+  absl::ReaderMutexLock lock(&ip_tags_mutex_);
+  return tags_;
+};
+
+absl::Status IpTagsProvider::onIpTagsFileUpdate() {
+  LcTrieSharedPtr reloaded_tags = tags_loader_.loadTags(ip_tags_path_);
+  return ipTagsReload(reloaded_tags);
+}
+
+absl::Status IpTagsProvider::ipTagsReload(const LcTrieSharedPtr reloaded_tags) {
+  if (reloaded_tags) {
+    updateIpTags(reloaded_tags);
+    reload_success_cb_();
+  } else {
+    reload_error_cb_();
+  }
+  return absl::OkStatus();
+}
+
+void IpTagsProvider::updateIpTags(const LcTrieSharedPtr reloaded_tags)
+    ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
+  absl::MutexLock lock(&ip_tags_mutex_);
+  tags_ = reloaded_tags;
+  std::cerr << "***Finishes reloading ip tags" << std::endl;
+}
 
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                            Stats::StatNameSetPtr& stat_name_set)
@@ -92,14 +112,12 @@ LcTrieSharedPtr IpTagsLoader::parseIpTags(
                         entry.address_prefix(), entry.prefix_len().value()));
       }
     }
+    std::cerr << "***PArsing ip tag: " << ip_tag.ip_tag_name() << std::endl;
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
-
-
-SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
@@ -135,14 +153,17 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
-    std::cerr << "***Resolving provider for: " << ip_tags_path_ <<std::endl;
-    auto provider =
-        ip_tags_registry_->get(ip_tags_path_, tags_loader_, api, dispatcher, ip_tags_registry_);
-    if (provider && provider->ipTags()) {
-      trie_ = provider->ipTags();
+    std::cerr << "***Resolving provider for: " << ip_tags_path_ << std::endl;
+    provider_ = ip_tags_registry_->get(
+        ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
+        [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_);
+    if (provider_ && provider_->ipTags()) {
+      trie_ = provider_->ipTags();
     } else {
       throw EnvoyException("Failed to get ip tags from provider");
     }
+    stat_name_set_->rememberBuiltin("ip_tags_reload_success");
+    stat_name_set_->rememberBuiltin("ip_tags_reload_error");
   }
 }
 
@@ -151,13 +172,14 @@ void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
-IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
+IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config){};
 
 IpTaggingFilter::~IpTaggingFilter() = default;
 
 void IpTaggingFilter::onDestroy() {}
 
 Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  std::cerr << "***Decode headers called: " << std::endl;
   const bool is_internal_request = headers.EnvoyInternalRequest() &&
                                    (headers.EnvoyInternalRequest()->value() ==
                                     Http::Headers::get().EnvoyInternalRequestValues.True.c_str());
@@ -170,7 +192,10 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   std::vector<std::string> tags =
       config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
-
+  std::cerr << "***Tags from decodeHeaders: " << std::endl;
+  for (auto t : tags)
+    std::cerr << t << ' ';
+  std::cerr << std::endl;
   applyTags(headers, tags);
   if (!tags.empty()) {
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.

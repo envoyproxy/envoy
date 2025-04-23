@@ -90,6 +90,7 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
 
 DispatcherImpl::~DispatcherImpl() {
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
+  std::cerr << "deleting dispatcher" << std::endl;
   FatalErrorHandler::removeFatalErrorHandler(*this);
   // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and enable
   // ASSERT(deletable_in_dispatcher_thread_.empty())
@@ -237,7 +238,10 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
+void DispatcherImpl::exit() {
+  std::cerr << "*****Exiting dispatcher" << std::endl;
+  base_scheduler_.loopExit();
+}
 
 SignalEventPtr DispatcherImpl::listenForSignal(signal_t signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());

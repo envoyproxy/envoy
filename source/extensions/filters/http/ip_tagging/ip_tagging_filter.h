@@ -26,7 +26,6 @@ using IpTagFileProto = envoy::data::ip_tagging::v3::IPTagFile;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 
 // TODO supports stats for ip tags
-// Add tests for singleton
 // Support async reload of tags file
 class IpTagsLoader {
 public:
@@ -44,48 +43,30 @@ private:
   Stats::StatNameSetPtr& stat_name_set_;
 };
 
-// todo nezdolik move to impl file
+using IpTagsReloadSuccessCb = std::function<void()>;
+using IpTagsReloadErrorCb = std::function<void()>;
+
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner)
-      : ip_tags_path_(ip_tags_path), tags_loader_(tags_loader), owner_(owner) {
-    if (ip_tags_path.empty()) {
-      throw EnvoyException("Cannot load tags from empty file path.");
-    }
-    tags_ = tags_loader_.loadTags(ip_tags_path_);
-    ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
-    ip_tags_file_watcher_ = dispatcher.createFilesystemWatcher();
-    ip_tags_reload_thread_ = api.threadFactory().createThread(
-        [this]() -> void {
-          ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
-          THROW_IF_NOT_OK(
-              ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
-                                              [this](uint32_t) { return onIpTagsFileUpdate(); }));
-          ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-        },
-        Thread::Options{std::string("ip_tags_reload_routine")});
-  }
+                 IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
+                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner);
 
-  ~IpTagsProvider() {
-    ENVOY_LOG(debug, "Shutting down ip tags provider");
-    if (ip_tags_reload_dispatcher_) {
-      ip_tags_reload_dispatcher_->exit();
-    }
-    if (ip_tags_reload_thread_) {
-      ip_tags_reload_thread_->join();
-      ip_tags_reload_thread_.reset();
-    }
-  };
+  ~IpTagsProvider();
 
-  LcTrieSharedPtr ipTags() { return tags_; };
+  LcTrieSharedPtr ipTags() const ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
-  absl::Status onIpTagsFileUpdate() { return absl::OkStatus(); }
+  absl::Status onIpTagsFileUpdate();
+  absl::Status ipTagsReload(const LcTrieSharedPtr reloaded_tags);
+  void updateIpTags(const LcTrieSharedPtr reloaded_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
 private:
   const std::string ip_tags_path_;
   IpTagsLoader& tags_loader_;
-  LcTrieSharedPtr tags_;
+  IpTagsReloadSuccessCb reload_success_cb_;
+  IpTagsReloadErrorCb reload_error_cb_;
+  mutable absl::Mutex ip_tags_mutex_;
+  LcTrieSharedPtr tags_ ABSL_GUARDED_BY(ip_tags_mutex_);
   Thread::ThreadPtr ip_tags_reload_thread_;
   Event::DispatcherPtr ip_tags_reload_dispatcher_;
   Filesystem::WatcherPtr ip_tags_file_watcher_;
@@ -103,14 +84,40 @@ using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
   IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
-  IpTagsProviderSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                              Api::Api& api, Event::Dispatcher& dispatcher,
-                              std::shared_ptr<IpTagsRegistrySingleton> singleton);
+
+  std::shared_ptr<IpTagsProvider> get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                                      IpTagsReloadSuccessCb reload_success_cb,
+                                      IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
+                                      Event::Dispatcher& dispatcher,
+                                      std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+    std::shared_ptr<IpTagsProvider> ip_tags_provider;
+    const uint64_t key = std::hash<std::string>()(ip_tags_path);
+    absl::MutexLock lock(&mu_);
+    auto it = ip_tags_registry_.find(key);
+    std::cerr << "****Found provider " << std::endl;
+    if (it != ip_tags_registry_.end()) {
+      if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
+        std::cerr << "****Returning existing provider " << std::endl;
+        ip_tags_provider = provider;
+      } else {
+        ip_tags_provider =
+            std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
+                                             reload_error_cb, dispatcher, api, singleton);
+        ip_tags_registry_[key] = ip_tags_provider;
+      }
+    } else {
+      std::cerr << "****Creating new provider " << std::endl;
+      ip_tags_provider =
+          std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
+                                           reload_error_cb, dispatcher, api, singleton);
+      ip_tags_registry_[key] = ip_tags_provider;
+    }
+    return ip_tags_provider;
+  }
 
 private:
   absl::Mutex mu_;
-  //  We keep weak_ptr here so the trie structures can be destroyed if the config is updated to stop
-  //  using that trie. Each provider stores shared_ptrs to this singleton, which keeps the singleton
+  // Each provider stores shared_ptrs to this singleton, which keeps the singleton
   //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
   //  shared_ptr is *only* held by driver instances.)
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
@@ -139,7 +146,13 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
-  const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
+  const Network::LcTrie::LcTrie<std::string>& trie() const {
+    if (provider_) {
+      return *(provider_->ipTags());
+    } else {
+      return *trie_;
+    }
+  }
 
   OptRef<const Http::LowerCaseString> ipTagHeader() const {
     if (ip_tag_header_.get().empty()) {
@@ -152,6 +165,14 @@ public:
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
+
+  void incIpTagsReloadSuccess() {
+    incCounter(stat_name_set_->getBuiltin("ip_tags_reload_success", unknown_tag_));
+  }
+  void incIpTagsReloadError() {
+    incCounter(stat_name_set_->getBuiltin("ip_tags_reload_error", unknown_tag_));
+  }
+
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
 
@@ -181,7 +202,6 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
-  LcTrieSharedPtr trie_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;
@@ -190,6 +210,8 @@ private:
   // are in use.
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
   IpTagsLoader tags_loader_;
+  LcTrieSharedPtr trie_;
+  std::shared_ptr<IpTagsProvider> provider_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
