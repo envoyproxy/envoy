@@ -16,8 +16,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.resource_monitors.cgroup_memory]
 
 message CgroupMemoryConfig {
-  // The maximum memory available to the monitored cgroup in bytes.
-  // If not specified, will use only the cgroup's memory limit.
-  // If specified, must be greater than 0.
-  google.protobuf.UInt64Value max_memory_bytes = 1 [(validate.rules).uint64.gt = 0];
+  // Optional maximum memory limit in bytes used for memory pressure calculations.
+  // If set, this value is used as an upper bound on the memory limit, taking the minimum
+  // between this value and the system's cgroup memory limit. If not set, the system's
+  // cgroup memory limit is always used.
+  uint64 max_memory_bytes = 1 [(validate.rules).uint64.gt = 0];
 }

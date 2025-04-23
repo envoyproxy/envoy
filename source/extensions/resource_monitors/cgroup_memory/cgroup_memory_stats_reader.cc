@@ -1,9 +1,5 @@
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_stats_reader.h"
 
-#include <filesystem>
-#include <fstream>
-#include <limits>
-
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
@@ -15,17 +11,14 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CgroupMemory {
 
-uint64_t CgroupMemoryStatsReader::readMemoryStats(const std::string& path) {
-  std::ifstream file(path);
-  if (!file.is_open()) {
-    throw EnvoyException(fmt::format("Unable to open memory stats file at {}", path));
-  }
-  // Memory usage and limit files in both cgroup v1 and v2 contain single-line values
-  std::string value_str;
-  if (!std::getline(file, value_str)) {
-    throw EnvoyException(fmt::format("Unable to read memory stats from file at {}", path));
+uint64_t CgroupMemoryStatsReader::readMemoryStats(Filesystem::Instance& fs,
+                                                  const std::string& path) {
+  auto result = fs.fileReadToEnd(path);
+  if (!result.ok()) {
+    throw EnvoyException(fmt::format("Unable to read memory stats file at {}", path));
   }
 
+  std::string value_str = result.value();
   // Trim whitespace
   value_str.erase(std::remove_if(value_str.begin(), value_str.end(), ::isspace), value_str.end());
 
@@ -53,29 +46,37 @@ uint64_t CgroupMemoryStatsReader::readMemoryStats(const std::string& path) {
   return value;
 }
 
-std::unique_ptr<CgroupMemoryStatsReader> CgroupMemoryStatsReader::create() {
+CgroupMemoryStatsReader::StatsReaderPtr CgroupMemoryStatsReader::create(Filesystem::Instance& fs) {
   // Check if host supports cgroup v2
-  if (CgroupPaths::isV2()) {
-    return std::make_unique<CgroupV2StatsReader>();
+  if (CgroupPaths::isV2(fs)) {
+    return std::make_unique<CgroupV2StatsReader>(fs);
   }
 
   // Check if host supports cgroup v1
-  if (CgroupPaths::isV1()) {
-    return std::make_unique<CgroupV1StatsReader>();
+  if (CgroupPaths::isV1(fs)) {
+    return std::make_unique<CgroupV1StatsReader>(fs);
   }
 
   throw EnvoyException("No supported cgroup memory implementation found");
 }
 
 // CgroupV1StatsReader implementation
-uint64_t CgroupV1StatsReader::getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
+uint64_t CgroupV1StatsReader::getMemoryUsage() {
+  return readMemoryStats(fs_, getMemoryUsagePath());
+}
 
-uint64_t CgroupV1StatsReader::getMemoryLimit() { return readMemoryStats(getMemoryLimitPath()); }
+uint64_t CgroupV1StatsReader::getMemoryLimit() {
+  return readMemoryStats(fs_, getMemoryLimitPath());
+}
 
 // CgroupV2StatsReader implementation
-uint64_t CgroupV2StatsReader::getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
+uint64_t CgroupV2StatsReader::getMemoryUsage() {
+  return readMemoryStats(fs_, getMemoryUsagePath());
+}
 
-uint64_t CgroupV2StatsReader::getMemoryLimit() { return readMemoryStats(getMemoryLimitPath()); }
+uint64_t CgroupV2StatsReader::getMemoryLimit() {
+  return readMemoryStats(fs_, getMemoryLimitPath());
+}
 
 } // namespace CgroupMemory
 } // namespace ResourceMonitors

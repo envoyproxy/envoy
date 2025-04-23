@@ -11,10 +11,10 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "cgroup_memory_paths",
-    srcs = ["cgroup_memory_paths.cc"],
     hdrs = ["cgroup_memory_paths.h"],
     deps = [
         "//envoy/common:pure_lib",
+        "//envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
     ],
 )
@@ -26,6 +26,7 @@ envoy_cc_library(
     deps = [
         ":cgroup_memory_paths",
         "//envoy/common:exception_lib",
+        "//envoy/filesystem:filesystem_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
         "//source/common/common:thread_lib",
@@ -39,6 +40,7 @@ envoy_cc_library(
     deps = [
         ":cgroup_memory_stats_reader",
         "//envoy/common:exception_lib",
+        "//envoy/filesystem:filesystem_interface",
         "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",

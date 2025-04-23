@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "cgroup_memory_paths.h"
 
@@ -19,6 +20,8 @@ namespace CgroupMemory {
  */
 class CgroupMemoryStatsReader {
 public:
+  using StatsReaderPtr = std::unique_ptr<CgroupMemoryStatsReader>;
+
   virtual ~CgroupMemoryStatsReader() = default;
 
   // Use a large value that's unlikely to be an actual limit.
@@ -39,19 +42,23 @@ public:
 
   /**
    * Factory method to create the appropriate cgroup stats reader.
+   * @param fs Filesystem instance to use for file operations.
    * @return Unique pointer to concrete CgroupMemoryStatsReader implementation.
    * @throw EnvoyException if no supported cgroup implementation is found.
    */
-  static std::unique_ptr<CgroupMemoryStatsReader> create();
+  static StatsReaderPtr create(Filesystem::Instance& fs);
 
 protected:
+  CgroupMemoryStatsReader(Filesystem::Instance& fs) : fs_(fs) {}
+
   /**
    * Helper method to read and parse memory stats from cgroup files.
+   * @param fs Filesystem instance to use for file operations.
    * @param path Path to the memory stats file.
    * @return Memory value in bytes.
    * @throw EnvoyException if file cannot be read or parsed.
    */
-  static uint64_t readMemoryStats(const std::string& path);
+  static uint64_t readMemoryStats(Filesystem::Instance& fs, const std::string& path);
 
   /**
    * @return Path to the memory usage file.
@@ -62,6 +69,8 @@ protected:
    * @return Path to the memory limit file.
    */
   virtual std::string getMemoryLimitPath() const PURE;
+
+  Filesystem::Instance& fs_;
 };
 
 /**
@@ -69,6 +78,7 @@ protected:
  */
 class CgroupV1StatsReader : public CgroupMemoryStatsReader {
 public:
+  explicit CgroupV1StatsReader(Filesystem::Instance& fs) : CgroupMemoryStatsReader(fs) {}
   uint64_t getMemoryUsage() override;
   uint64_t getMemoryLimit() override;
 
@@ -82,6 +92,7 @@ protected:
  */
 class CgroupV2StatsReader : public CgroupMemoryStatsReader {
 public:
+  explicit CgroupV2StatsReader(Filesystem::Instance& fs) : CgroupMemoryStatsReader(fs) {}
   uint64_t getMemoryUsage() override;
   uint64_t getMemoryLimit() override;
 

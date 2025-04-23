@@ -13,9 +13,18 @@ using testing::NiceMock;
 using testing::Return;
 
 // Mock filesystem implementation for testing.
-class MockFileSystem : public FileSystem {
+class MockFilesystem : public Filesystem::Instance {
 public:
-  MOCK_METHOD(bool, exists, (const std::string&), (const, override));
+  MOCK_METHOD(Filesystem::FilePtr, createFile, (const Filesystem::FilePathAndType&), (override));
+  MOCK_METHOD(bool, fileExists, (const std::string&), (override));
+  MOCK_METHOD(Api::IoCallResult<Filesystem::FileInfo>, stat, (absl::string_view), (override));
+  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view), (override));
+  MOCK_METHOD(bool, directoryExists, (const std::string&), (override));
+  MOCK_METHOD(ssize_t, fileSize, (const std::string&), (override));
+  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&), (override));
+  MOCK_METHOD(absl::StatusOr<Filesystem::PathSplitResult>, splitPathFromFilename,
+              (absl::string_view), (override));
+  MOCK_METHOD(bool, illegalPath, (const std::string&), (override));
 };
 
 // Tests that base paths and path construction methods work correctly.
@@ -36,101 +45,54 @@ TEST(CgroupMemoryPathsTest, TestCgroupBasePaths) {
 
 // Tests that cgroup v2 detection works when both required files exist.
 TEST(CgroupMemoryPathsTest, DetectsCgroupV2) {
-  auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
-  const auto* mock_ptr = mock_file_system.get();
-  ON_CALL(*mock_file_system, exists).WillByDefault(Return(true));
+  NiceMock<MockFilesystem> mock_fs;
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(true));
 
-  const FileSystem* original = &FileSystem::instance();
-  FileSystem::setInstance(mock_ptr);
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillOnce(Return(true));
 
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(true));
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getLimitPath())).WillOnce(Return(true));
-
-  EXPECT_TRUE(CgroupPaths::isV2());
-
-  FileSystem::setInstance(original);
+  EXPECT_TRUE(CgroupPaths::isV2(mock_fs));
 }
 
 // Tests that cgroup v1 detection works when the base directory exists.
 TEST(CgroupMemoryPathsTest, DetectsCgroupV1) {
-  auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
-  const auto* mock_ptr = mock_file_system.get();
-  ON_CALL(*mock_file_system, exists).WillByDefault(Return(true));
+  NiceMock<MockFilesystem> mock_fs;
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(true));
 
-  const FileSystem* original = &FileSystem::instance();
-  FileSystem::setInstance(mock_ptr);
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillOnce(Return(true));
 
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::CGROUP_V1_BASE)).WillOnce(Return(true));
-
-  EXPECT_TRUE(CgroupPaths::isV1());
-
-  FileSystem::setInstance(original);
+  EXPECT_TRUE(CgroupPaths::isV1(mock_fs));
 }
 
 // Tests that cgroup v2 detection fails when required files don't exist.
 TEST(CgroupMemoryPathsTest, DetectsCgroupV2WhenFilesDoNotExist) {
-  auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
-  const auto* mock_ptr = mock_file_system.get();
-  ON_CALL(*mock_file_system, exists).WillByDefault(Return(false));
+  NiceMock<MockFilesystem> mock_fs;
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
 
-  const FileSystem* original = &FileSystem::instance();
-  FileSystem::setInstance(mock_ptr);
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).Times(0);
 
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(false));
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getLimitPath())).Times(0);
-
-  EXPECT_FALSE(CgroupPaths::isV2());
-
-  FileSystem::setInstance(original);
+  EXPECT_FALSE(CgroupPaths::isV2(mock_fs));
 }
 
 // Tests that cgroup v2 detection fails when only usage file exists.
 TEST(CgroupMemoryPathsTest, DetectsCgroupV2WhenOnlyUsageExists) {
-  auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
-  const auto* mock_ptr = mock_file_system.get();
+  NiceMock<MockFilesystem> mock_fs;
 
-  const FileSystem* original = &FileSystem::instance();
-  FileSystem::setInstance(mock_ptr);
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillOnce(Return(false));
 
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(true));
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getLimitPath())).WillOnce(Return(false));
-
-  EXPECT_FALSE(CgroupPaths::isV2());
-
-  FileSystem::setInstance(original);
+  EXPECT_FALSE(CgroupPaths::isV2(mock_fs));
 }
 
 // Tests that cgroup v1 detection fails when base directory doesn't exist.
 TEST(CgroupMemoryPathsTest, DetectsCgroupV1WhenFileDoesNotExist) {
-  auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
-  const auto* mock_ptr = mock_file_system.get();
-  ON_CALL(*mock_file_system, exists).WillByDefault(Return(false));
+  NiceMock<MockFilesystem> mock_fs;
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
 
-  const FileSystem* original = &FileSystem::instance();
-  FileSystem::setInstance(mock_ptr);
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillOnce(Return(false));
 
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::CGROUP_V1_BASE)).WillOnce(Return(false));
-
-  EXPECT_FALSE(CgroupPaths::isV1());
-
-  FileSystem::setInstance(original);
-}
-
-// Tests that cleanup properly restores the original filesystem instance.
-TEST(CgroupMemoryPathsTest, CleanupRestoresOriginalInstance) {
-  const FileSystem* original = &FileSystem::instance();
-
-  {
-    auto scoped_mock = std::make_unique<NiceMock<MockFileSystem>>();
-    FileSystem::setInstance(scoped_mock.get());
-
-    EXPECT_CALL(*scoped_mock, exists("/some/path")).WillOnce(Return(true));
-    EXPECT_TRUE(FileSystem::instance().exists("/some/path"));
-  }
-
-  FileSystem::setInstance(original);
-
-  EXPECT_NO_THROW(FileSystem::instance().exists("/some/path"));
+  EXPECT_FALSE(CgroupPaths::isV1(mock_fs));
 }
 
 } // namespace

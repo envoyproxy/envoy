@@ -1,37 +1,13 @@
 #pragma once
 
-#include <filesystem>
 #include <string>
 
-#include "envoy/common/pure.h"
+#include "envoy/filesystem/filesystem.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace CgroupMemory {
-
-/**
- * Interface for filesystem operations to support testing.
- */
-class FileSystem {
-public:
-  virtual ~FileSystem() = default;
-  virtual bool exists(const std::string& path) const PURE;
-
-  /**
-   * @return A singleton instance of the filesystem implementation.
-   */
-  static const FileSystem& instance() { return *instance_; }
-
-  /**
-   * For testing: Sets the global filesystem instance.
-   * @param instance The filesystem instance to use.
-   */
-  static void setInstance(const FileSystem* instance) { instance_ = instance; }
-
-private:
-  static const FileSystem* instance_;
-};
 
 /**
  * Utility class providing paths and detection methods for cgroup memory subsystem.
@@ -80,15 +56,14 @@ struct CgroupPaths {
   /**
    * @return Whether cgroup v2 memory subsystem is available.
    */
-  static bool isV2() {
-    return FileSystem::instance().exists(V2::getUsagePath()) &&
-           FileSystem::instance().exists(V2::getLimitPath());
+  static bool isV2(Filesystem::Instance& fs) {
+    return fs.fileExists(V2::getUsagePath()) && fs.fileExists(V2::getLimitPath());
   }
 
   /**
    * @return Whether cgroup v1 memory subsystem is available.
    */
-  static bool isV1() { return FileSystem::instance().exists(CGROUP_V1_BASE); }
+  static bool isV1(Filesystem::Instance& fs) { return fs.fileExists(CGROUP_V1_BASE); }
 };
 
 } // namespace CgroupMemory

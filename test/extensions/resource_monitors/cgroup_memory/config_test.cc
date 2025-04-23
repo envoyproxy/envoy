@@ -2,11 +2,14 @@
 #include "envoy/server/resource_monitor_config.h"
 
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_monitor.h"
+#include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_paths.h"
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_stats_reader.h"
 #include "source/extensions/resource_monitors/cgroup_memory/config.h"
 #include "source/server/resource_monitor_config_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/options.h"
 
 #include "gmock/gmock.h"
@@ -19,19 +22,6 @@ namespace CgroupMemory {
 
 using testing::NiceMock;
 using testing::Return;
-
-class MockCgroupMemoryStatsReader : public CgroupMemoryStatsReader {
-public:
-  MOCK_METHOD(uint64_t, getMemoryUsage, (), (override));
-  MOCK_METHOD(uint64_t, getMemoryLimit, (), (override));
-  MOCK_METHOD(std::string, getMemoryUsagePath, (), (const, override));
-  MOCK_METHOD(std::string, getMemoryLimitPath, (), (const, override));
-};
-
-class MockFileSystem : public FileSystem {
-public:
-  MOCK_METHOD(bool, exists, (const std::string&), (const, override));
-};
 
 // Basic test to verify factory registration
 TEST(CgroupMemoryConfigTest, BasicTest) {
@@ -49,9 +39,18 @@ TEST(CgroupMemoryConfigTest, CreateMonitorDefault) {
           "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
-  auto mock_reader = std::make_unique<MockCgroupMemoryStatsReader>();
-  EXPECT_CALL(*mock_reader, getMemoryUsage()).WillRepeatedly(Return(100));
-  EXPECT_CALL(*mock_reader, getMemoryLimit()).WillRepeatedly(Return(1000));
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Mock the filesystem to indicate that cgroup v2 paths exist
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+
+  // Mock the file reads to return memory usage and limit
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("100")));
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("1000")));
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   Event::MockDispatcher dispatcher;
@@ -59,7 +58,7 @@ TEST(CgroupMemoryConfigTest, CreateMonitorDefault) {
   Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(mock_reader));
+  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
   EXPECT_NE(monitor, nullptr);
 }
 
@@ -70,19 +69,28 @@ TEST(CgroupMemoryConfigTest, CreateMonitorWithLimit) {
           "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
-  auto mock_reader = std::make_unique<MockCgroupMemoryStatsReader>();
-  EXPECT_CALL(*mock_reader, getMemoryUsage()).WillRepeatedly(Return(500));
-  EXPECT_CALL(*mock_reader, getMemoryLimit()).WillRepeatedly(Return(2000));
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Mock the filesystem to indicate that cgroup v2 paths exist
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+
+  // Mock the file reads to return memory usage and limit
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("500")));
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("2000")));
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.mutable_max_memory_bytes()->set_value(1234); // Set explicit memory limit
+  config.set_max_memory_bytes(1234);
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, std::move(mock_reader));
+  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
   EXPECT_NE(monitor, nullptr);
 }
 
@@ -94,7 +102,7 @@ TEST(CgroupMemoryConfigTest, InvalidConfig) {
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.mutable_max_memory_bytes(); // Creates an empty wrapper which will fail validation
+  config.set_max_memory_bytes(0);
 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
@@ -104,52 +112,54 @@ TEST(CgroupMemoryConfigTest, InvalidConfig) {
 
   EXPECT_THROW_WITH_MESSAGE(
       factory->createResourceMonitor(config, context), ProtoValidationException,
-      "max_memory_bytes {\n}\n: Proto constraint validation failed "
-      "(CgroupMemoryConfigValidationError.MaxMemoryBytes: value must be greater than 0)");
+      ": Proto constraint validation failed (CgroupMemoryConfigValidationError.MaxMemoryBytes: "
+      "value must be greater than 0)");
 }
 
 // Test that factory creates a monitor successfully with ignored context
 TEST(CgroupMemoryConfigTest, CreateMonitorIgnoresContext) {
-  auto mock_file_system = std::make_unique<NiceMock<MockFileSystem>>();
-  const auto* mock_ptr = mock_file_system.get();
-  const FileSystem* original = &FileSystem::instance();
-  FileSystem::setInstance(mock_ptr);
-
-  // Mock filesystem to indicate cgroup v2 is available
-  ON_CALL(*mock_file_system, exists(_)).WillByDefault(Return(false));
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getUsagePath()))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(*mock_file_system, exists(CgroupPaths::V2::getLimitPath()))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(*mock_file_system, exists("/sys/fs/cgroup/memory")).Times(0);
-
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.mutable_max_memory_bytes()->set_value(1234);
+  config.set_max_memory_bytes(1234);
 
+  // Create mock filesystem
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Mock the filesystem to indicate that cgroup v2 paths exist
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+
+  // Mock the file reads to return memory usage and limit
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("500")));
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("2000")));
+
+  // Create mock API with the mock filesystem
+  NiceMock<Api::MockApi> mock_api;
+  EXPECT_CALL(mock_api, fileSystem()).WillRepeatedly(ReturnRef(mock_fs));
+
+  // Create contexts with the mock API
   Event::MockDispatcher dispatcher1;
-  Api::ApiPtr api1 = Api::createApiForTest();
   Server::MockOptions options1;
   Server::Configuration::ResourceMonitorFactoryContextImpl context1(
-      dispatcher1, options1, *api1, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher1, options1, mock_api, ProtobufMessage::getStrictValidationVisitor());
 
   Event::MockDispatcher dispatcher2;
-  Api::ApiPtr api2 = Api::createApiForTest();
   Server::MockOptions options2;
   Server::Configuration::ResourceMonitorFactoryContextImpl context2(
-      dispatcher2, options2, *api2, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher2, options2, mock_api, ProtobufMessage::getStrictValidationVisitor());
 
   auto monitor1 = factory->createResourceMonitor(config, context1);
   auto monitor2 = factory->createResourceMonitor(config, context2);
 
   EXPECT_NE(monitor1, nullptr);
   EXPECT_NE(monitor2, nullptr);
-
-  FileSystem::setInstance(original);
 }
 
 } // namespace CgroupMemory
