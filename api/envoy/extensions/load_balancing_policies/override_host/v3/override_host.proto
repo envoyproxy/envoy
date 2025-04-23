@@ -20,21 +20,24 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the Override Host Load Balancing policy.
 //
 // This policy allows endpoint picking to be implemented in an external to Envoy
-// component. While it can work with a built in HTTP filter it is primarily intended to
-// work in conjunction with the ext_proc or WASM HTTP filters.
-//
-// The ext_proc or WASM filter must implement k8s proposal for AI gateway inferences extensions
+// component. For example an ext_proc RPC to a service that implements k8s proposal for AI gateway inferences extensions
 // https://github.com/kubernetes-sigs/gateway-api-inference-extension/tree/main/docs/proposals/004-endpoint-picker-protocol
-// to integrate with this load balancing policy.
+// can provide hosts for serving a request using Override Host load balancing policy.
 //
 // This policy uses selected endpoints from either request headers or request metadata.
 //
-// The endpoint picker protocol for k8s gateway inference extensions uses the
-// ``x-gateway-destination-endpoint`` header for the primary endpoint. The value must contain a single ``IP:port`` token.
-// For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
-// Alternatively untyped request metadata under the ``envoy.lb`` key can be set to a ``protobuf.Struct``
-// containing a string value under the ``x-gateway-destination-endpoint`` key. The value has the same
-// format as the ``x-gateway-destination-endpoint`` header.
+// The primary host override source must specify a single ``IP:port`` value in either the header or the
+// metadata. For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
+//
+// For example, to support k8s gateway inference extensions, which uses the ``x-gateway-destination-endpoint`` header or metadata value value under the "envoy.lb" key for the primary endpoint,
+// the Override Host load balancing policy should be configured in the following way:
+//
+// primary_host_sources:
+//   - header: "x-gateway-destination-endpoint"
+//     metadata:
+//       key: "envoy.lb"
+//       path:
+//       - key: "x-gateway-destination-endpoint"
 //
 // If neither header nor metadata is present or there were errors parsing header or metadata values the
 // specified fallback load balancing policy is used. This allows load balancing to degrade to a
