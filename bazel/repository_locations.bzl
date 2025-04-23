@@ -1444,8 +1444,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.56.0",
-        sha256 = "f1306aac0b258b790df01ad9abc6abb0df0b65416c74b4ef27f4aab298780a64",
+        version = "0.60.0",
+        sha256 = "7825214ccad7c2482cb490ac91dbc1e88b30223062796ce328aca893b74ae342",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
