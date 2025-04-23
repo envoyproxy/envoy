@@ -25,14 +25,14 @@ absl::string_view referGoString(void* str) {
 extern "C" {
 #endif
 
-// Returns the number of headers in the request.
-uint64_t envoyGoClusterSpecifierGetNumHeaders(unsigned long long header_ptr) {
-  return reinterpret_cast<Http::RequestHeaderMap*>(header_ptr)->size();
-}
-
-// Returns the total byte size of the request headers.
-uint64_t envoyGoClusterSpecifierGetHeadersByteSize(unsigned long long header_ptr) {
-  return reinterpret_cast<Http::RequestHeaderMap*>(header_ptr)->byteSize();
+// Assigns the number of request headers and their total byte size to the provided uint64 pointers.
+void envoyGoClusterSpecifierGetNumHeadersAndByteSize(unsigned long long header_ptr,
+                                                     void* header_num, void* byte_size) {
+  auto header = reinterpret_cast<Http::RequestHeaderMap*>(header_ptr);
+  auto go_header_num = reinterpret_cast<GoUint64*>(header_num);
+  auto go_byte_size = reinterpret_cast<GoUint64*>(byte_size);
+  *go_header_num = header->size();
+  *go_byte_size = header->byteSize();
 }
 
 // Get the value of the specified header key from the request header map.

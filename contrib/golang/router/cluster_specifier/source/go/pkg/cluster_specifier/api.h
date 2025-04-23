@@ -6,10 +6,8 @@
 extern "C" {
 #endif
 
-#include <stdint.h> // NOLINT(modernize-deprecated-headers)
-
-uint64_t envoyGoClusterSpecifierGetNumHeaders(unsigned long long header_ptr);
-uint64_t envoyGoClusterSpecifierGetHeadersByteSize(unsigned long long header_ptr);
+void envoyGoClusterSpecifierGetNumHeadersAndByteSize(unsigned long long header_ptr,
+                                                     void* header_num, void* byte_size);
 int envoyGoClusterSpecifierGetHeader(unsigned long long header_ptr, void* key, void* value);
 void envoyGoClusterSpecifierLogError(unsigned long long plugin_ptr, void* msg);
 void envoyGoClusterSpecifierGetAllHeaders(unsigned long long header_ptr, void* strs, void* buf);

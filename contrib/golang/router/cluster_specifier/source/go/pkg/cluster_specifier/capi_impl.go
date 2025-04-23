@@ -46,8 +46,9 @@ func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *strin
 }
 
 func (c *httpCApiImpl) HttpGetAllHeaders(headerPtr uint64) map[string][]string {
-	headerNum := uint64(C.envoyGoClusterSpecifierGetNumHeaders(C.ulonglong(headerPtr)))
-	headerBytes := uint64(C.envoyGoClusterSpecifierGetHeadersByteSize(C.ulonglong(headerPtr)))
+	var headerNum uint64
+	var headerBytes uint64
+	C.envoyGoClusterSpecifierGetNumHeadersAndByteSize(C.ulonglong(headerPtr), unsafe.Pointer(&headerNum), unsafe.Pointer(&headerBytes))
 
 	m := make(map[string][]string, headerNum)
 	if headerNum == 0 {
