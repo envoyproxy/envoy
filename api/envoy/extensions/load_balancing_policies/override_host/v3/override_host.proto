@@ -32,12 +32,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // For example, to support k8s gateway inference extensions, which uses the ``x-gateway-destination-endpoint`` header or metadata value value under the "envoy.lb" key for the primary endpoint,
 // the Override Host load balancing policy should be configured in the following way:
 //
-// primary_host_sources:
-//   - header: "x-gateway-destination-endpoint"
-//     metadata:
-//       key: "envoy.lb"
-//       path:
-//       - key: "x-gateway-destination-endpoint"
+// .. validate-code-block:: yaml
+//
+//    primary_host_sources:
+//      - header: "x-gateway-destination-endpoint"
+//        metadata:
+//          key: "envoy.lb"
+//          path:
+//          - key: "x-gateway-destination-endpoint"
 //
 // If neither header nor metadata is present or there were errors parsing header or metadata values the
 // specified fallback load balancing policy is used. This allows load balancing to degrade to a
