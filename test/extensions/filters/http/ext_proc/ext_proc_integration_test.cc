@@ -862,7 +862,7 @@ protected:
       header_resp = response_header.mutable_request_headers();
     }
     auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
-    auto *sh = header_mutation->add_set_headers();
+    auto* sh = header_mutation->add_set_headers();
     auto* header = sh->mutable_header();
     sh->mutable_append()->set_value(false);
     header->set_key("x-new-header");
@@ -895,7 +895,7 @@ protected:
   void serverSendTrailerRespDuplexStreamed() {
     ProcessingResponse response_trailer;
     auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
-    auto *sh = trailer_resp->add_set_headers();
+    auto* sh = trailer_resp->add_set_headers();
     sh->mutable_append()->set_value(false);
     auto* header = sh->mutable_header();
     header->set_key("x-new-trailer");
