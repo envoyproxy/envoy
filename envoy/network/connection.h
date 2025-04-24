@@ -347,7 +347,7 @@ public:
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 
-  virtual bool setSocketOption(Network::Socket::OptionConstPtr option) PURE;
+  virtual bool setSocketOption(const Network::Socket::OptionConstSharedPtr option) PURE;
  
   /**
    * The StreamInfo object associated with this connection. This is typically

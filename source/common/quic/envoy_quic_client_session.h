@@ -54,6 +54,8 @@ public:
   // Set up socket and start handshake.
   void connect() override;
 
+  bool setSocketOption(const Network::Socket::OptionConstSharedPtr) override { return false; }
+
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;

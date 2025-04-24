@@ -561,6 +561,9 @@ public:
     uint32_t decoderBufferLimit() override { return 0; }
     bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }
     void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
+    bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) override {
+      return false;
+    }
     Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return nullptr; }
     const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
       return nullptr;

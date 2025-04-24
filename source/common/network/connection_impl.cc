@@ -921,7 +921,7 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
-bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstPtr option) {
+bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstSharedPtr option) {
   if (socket_ == nullptr) {
     return false;
   }

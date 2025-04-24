@@ -1780,8 +1780,8 @@ Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOp
 }
 
 bool ActiveStreamDecoderFilter::setDownstreamSocketOption(
-    const Network::Socket::OptionConstSharedPtr) {
-  return true;
+    const Network::Socket::OptionConstSharedPtr option) {
+  return parent_.setDownstreamSocketOption(option);
 }
 
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
