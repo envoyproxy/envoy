@@ -61,6 +61,9 @@ public:
     log_format_ = log_format;
     log_format_set_ = true;
   }
+  void setEnableFineGrainLogging(bool enable_fine_grain_logging) {
+    enable_fine_grain_logging_ = enable_fine_grain_logging;
+  }
   void setLogPath(const std::string& log_path) { log_path_ = log_path; }
   void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
   void setMode(Server::Mode mode) { mode_ = mode; }
