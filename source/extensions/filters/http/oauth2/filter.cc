@@ -760,7 +760,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   std::string csrf_token =
       Http::Utility::parseCookieValue(headers, config_->cookieNames().oauth_nonce_);
   bool csrf_token_cookie_exists = !csrf_token.empty();
+
   // Validate the CSRF token HMAC if the CSRF token cookie exists.
+  // If the CSRF token HMAC is invalid, it might be that the HMAC secret has changed. Clear the
+  // token and regenerate it
   if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
     csrf_token_cookie_exists = false;
     csrf_token.clear();
