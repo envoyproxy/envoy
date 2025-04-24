@@ -232,8 +232,6 @@ public:
    *              marking the filter as close ready.
    */
   virtual void disableClose(bool disable) PURE;
-  
-  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) PURE;
 };
 
 /**

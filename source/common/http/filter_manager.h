@@ -595,7 +595,7 @@ public:
    */
   virtual bool isHalfCloseEnabled() PURE;
 
-  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) PURE;
+  virtual bool setSocketOption(const Network::Socket::OptionConstSharedPtr) PURE;
 };
 
 /**
@@ -925,7 +925,7 @@ public:
   }
 
   bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
-    return filter_manager_callbacks_.setDownstreamSocketOption(option);
+    return filter_manager_callbacks_.setSocketOption(option);
   }
 
 protected:
