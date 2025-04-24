@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.lua.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -104,4 +105,18 @@ message LuaPerRoute {
     // A configured per-route Lua source code that can be served by RDS or provided inline.
     config.core.v3.DataSource source_code = 3;
   }
+
+  // Optional filter context for Lua script. This could be used to pass configuration
+  // to Lua script. The Lua script can access the filter context using ``handle:filterContext()``.
+  // For example:
+  //
+  // .. code-block:: lua
+  //   function envoy_on_request(request_handle)
+  //     local filter_context = request_handle:filterContext()
+  //     local filter_context_value = filter_context["key"]
+  //     -- Do something with filter_context_value.
+  //   end
+  //
+  // [#not-implemented-hide:]
+  google.protobuf.Struct filter_context = 4;
 }
