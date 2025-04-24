@@ -18,6 +18,10 @@ minor_behavior_changes:
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
+- area: cel
+  change: |
+    Precompile regexes in cel expressions. This can be disabled by setting the runtime guard 
+    ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
