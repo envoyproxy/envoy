@@ -347,6 +347,8 @@ public:
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
 
+  virtual bool setSocketOption(Network::Socket::OptionConstPtr option) PURE;
+ 
   /**
    * The StreamInfo object associated with this connection. This is typically
    * used for logging purposes. Individual filters may add specific information

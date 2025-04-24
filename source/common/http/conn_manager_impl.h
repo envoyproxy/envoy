@@ -293,6 +293,7 @@ private:
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
     bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
+    bool setSocketOption(const Network::Socket::OptionConstSharedPtr) override;
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
@@ -587,6 +588,8 @@ private:
                          absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   void sendGoAwayAndClose();
+
+  bool setSocketOption(const Network::Socket::OptionConstSharedPtr option);
 
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than

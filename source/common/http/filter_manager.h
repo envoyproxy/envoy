@@ -303,7 +303,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
 
   bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) override;
-  
+
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
@@ -594,6 +594,8 @@ public:
    * This is used for HTTP/1.1 codec.
    */
   virtual bool isHalfCloseEnabled() PURE;
+
+  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) PURE;
 };
 
 /**
@@ -920,6 +922,10 @@ public:
       state_.encoder_filter_chain_aborted_ = true;
     }
     filter_manager_callbacks_.sendGoAwayAndClose();
+  }
+
+  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+    return filter_manager_callbacks_.setDownstreamSocketOption(option);
   }
 
 protected:
