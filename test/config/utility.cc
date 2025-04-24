@@ -990,6 +990,15 @@ void ConfigHelper::setHttp2(envoy::config::cluster::v3::Cluster& cluster) {
   setProtocolOptions(cluster, protocol_options);
 }
 
+void ConfigHelper::setHttp2WithMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
+                                                    uint32_t max_concurrent_streams) {
+  HttpProtocolOptions protocol_options;
+  auto* http2_options =
+      protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  http2_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams);
+  setProtocolOptions(cluster, protocol_options);
+}
+
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   RELEASE_ASSERT(!finalized_, "");
 

@@ -54,6 +54,9 @@ removed_config_or_runtime:
 - area: ext_proc
   change: |
     Removed runtime guard ``envoy.reloadable_features.ext_proc_timeout_error`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.extend_h3_accept_untrusted`` and legacy code paths.
 
 
 new_features:
