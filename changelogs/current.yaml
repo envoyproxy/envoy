@@ -41,6 +41,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.quic_support_certificate_compression`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy_reloadable_features_filter_access_loggers_first`` and legacy code paths.
 - area: tcp_proxy
   change: |
