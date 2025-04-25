@@ -7,45 +7,34 @@
 #include <sstream>
 #include <string>
 
+#include "envoy/type/v3/percent.pb.h"
+
 #include "source/common/common/safe_memcpy.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 
 namespace {
 /**
- * Converts a ratio in [0, 1] to a threshold in [0, UINT64_MAX].
- *
- * Adapted from https://github.com/open-telemetry/opentelemetry-cpp
+ * Converts a ratio in [0, 1] to a threshold in [0, MILLION].
  */
 uint64_t ratioToThreshold(double ratio) noexcept {
+  const uint64_t MAX_VALUE = Envoy::ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+      envoy::type::v3::FractionalPercent::MILLION);
+
   if (ratio <= 0.0) {
     return 0;
   }
   if (ratio >= 1.0) {
-    return UINT64_MAX;
+    return MAX_VALUE;
   }
 
-  // We can't directly return ratio * UINT64_MAX because of precision issues with doubles.
-  //
-  // UINT64_MAX is (2^64 - 1), but a double has limited precision and rounds up when
-  // converting large numbers. For probabilities >= 1 - (2^-54), multiplying by UINT64_MAX
-  // can cause overflow and the result wraps around to zero!
-  // We know (UINT64_MAX)*ratio = (UINT32_MAX*2^32 + UINT32_MAX)*ratio. So, To avoid this,
-  // we calculate the high and low 32 bits separately by using the double's precision to
-  // get the most accurate result.
-  // Then we add the the high and low bits to get the result.
-  const double product = UINT32_MAX * ratio;
-  double hi_bits;
-  double lo_bits = modf(product, &hi_bits);
-  lo_bits = ldexp(lo_bits, 32) + product;
-  return (static_cast<uint64_t>(hi_bits) << 32) + static_cast<uint64_t>(lo_bits);
+  return static_cast<uint64_t>(ratio * static_cast<double>(MAX_VALUE));
 }
 
 /**
  * @param trace_id a required value to be converted to uint64_t. trace_id must
  * at least 8 bytes long. trace_id is expected to be a valid hex string.
- * @return Returns the uint64 value associated with first 8 bytes of the trace_id.
+ * @return Returns the uint64 value associated with first 8 bytes of the trace_id modulo MILLION.
  *
- * Adapted from https://github.com/open-telemetry/opentelemetry-cpp
  */
 uint64_t calculateThresholdFromBuffer(const std::string& trace_id) noexcept {
   uint8_t buffer[8] = {0};
@@ -56,9 +45,9 @@ uint64_t calculateThresholdFromBuffer(const std::string& trace_id) noexcept {
 
   uint64_t first_8_bytes = 0;
   Envoy::safeMemcpyUnsafeSrc(&first_8_bytes, buffer);
-  double ratio = static_cast<double>(first_8_bytes) / static_cast<double>(UINT64_MAX);
 
-  return ratioToThreshold(ratio);
+  return first_8_bytes % Envoy::ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                             envoy::type::v3::FractionalPercent::MILLION);
 }
 } // namespace
 

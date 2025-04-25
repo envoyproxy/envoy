@@ -30,5 +30,6 @@ envoy_cc_library(
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
