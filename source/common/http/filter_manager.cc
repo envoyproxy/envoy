@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
+#include "filter_manager.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/scope_tracked_object_stack.h"
 #include "source/common/common/scope_tracker.h"
@@ -1963,6 +1964,14 @@ ActiveStreamDecoderFilter::upstreamOverrideHost() const {
   return Upstream::LoadBalancerContext::OverrideHost{
       absl::string_view(parent_.upstream_override_host_.first),
       parent_.upstream_override_host_.second};
+}
+
+bool FilterManager::setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+  return false;
+}
+
+bool DownstreamFilterManager::setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+  return filter_manager_callbacks_.setSocketOption(option);
 }
 
 } // namespace Http

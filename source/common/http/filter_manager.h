@@ -927,9 +927,7 @@ public:
     filter_manager_callbacks_.sendGoAwayAndClose();
   }
 
-  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
-    return filter_manager_callbacks_.setSocketOption(option);
-  }
+  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option);
 
 protected:
   struct State {
@@ -1258,6 +1256,9 @@ public:
     return downstream_filter_load_shed_point_ != nullptr &&
            downstream_filter_load_shed_point_->shouldShedLoad();
   }
+
+  // Only this filter manager actually implements this feature.
+  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) override;
 
 private:
   /**

@@ -110,6 +110,7 @@ public:
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(bool, isHalfCloseEnabled, ());
+  MOCK_METHOD(bool, setDownstreamSocketOption, (Network::Socket::OptionConstSharedPtr), ());
 
   ResponseHeaderMapPtr informational_headers_;
   ResponseHeaderMapPtr response_headers_;
