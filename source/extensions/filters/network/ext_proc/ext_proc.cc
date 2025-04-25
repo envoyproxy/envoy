@@ -5,11 +5,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
 
-NetworkExtProcFilter::NetworkExtProcFilter(ConfigSharedPtr config,
+namespace {
+const envoy::config::core::v3::GrpcService& defaultGrpcService() {
+  CONSTRUCT_ON_FIRST_USE(envoy::config::core::v3::GrpcService);
+}
+} // namespace
+
+NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
                                            ExternalProcessorClientPtr&& client)
     : config_(config), client_(std::move(client)),
-      grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
-                                                      : envoy::config::core::v3::GrpcService()),
+      grpc_service_(config->grpcService().has_value() ? *config->grpcService()
+                                                      : defaultGrpcService()),
       config_with_hash_key_(grpc_service_), downstream_callbacks_(*this) {}
 
 NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
