@@ -67,10 +67,11 @@ struct TlsContext {
   }
   absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
   absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
-                              const std::string& password);
+                              const std::string& password, bool fips_mode);
   absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
-                          const std::string& password);
-  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
+                          const std::string& password, bool fips_mode);
+  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
+                               bool fips_mode);
 };
 } // namespace Ssl
 

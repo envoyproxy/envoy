@@ -57,14 +57,15 @@ using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
-
 using Http::LowerCaseString;
+using test::integration::filters::LoggingTestFilterConfig;
 
 using namespace std::chrono_literals;
 
 struct ConfigOptions {
   bool valid_grpc_server = true;
   bool add_logging_filter = false;
+  absl::optional<LoggingTestFilterConfig> logging_filter_config = absl::nullopt;
   bool http1_codec = false;
   bool add_metadata = false;
   bool downstream_filter = true;
@@ -224,12 +225,17 @@ protected:
       // gRPC side stream logging is only supported in Envoy gRPC mode at the moment.
       if (clientType() == Grpc::ClientType::EnvoyGrpc && config_option.add_logging_filter &&
           config_option.valid_grpc_server) {
-        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
         // No need to check the bytes received for observability mode because it is a
         // "send and go" mode.
         logging_filter_config.set_check_received_bytes(!proto_config_.observability_mode());
+        logging_filter_config.set_http_rcd("via_upstream");
+        if (config_option.logging_filter_config) {
+          logging_filter_config.MergeFrom(*config_option.logging_filter_config);
+        }
+
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
@@ -1044,6 +1050,26 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithLogging) {
   config_option.add_logging_filter = true;
   initializeConfig(config_option);
   testGetAndFailStream();
+}
+
+TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithUpstreamResetLogging) {
+  ConfigOptions config_option = {};
+  config_option.add_logging_filter = true;
+  config_option.logging_filter_config = LoggingTestFilterConfig();
+  config_option.logging_filter_config->set_http_rcd(
+      "upstream_reset_after_response_started{remote_reset}");
+  initializeConfig(config_option);
+
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->encodeResetStream();
+
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Test the filter connecting to an invalid ext_proc server that will result in open stream failure.
@@ -3444,7 +3470,7 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
 
     // Add logging test filter here in place since it has a different GrpcService from route.
     if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-      test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+      LoggingTestFilterConfig logging_filter_config;
       logging_filter_config.set_logging_id("envoy.filters.http.ext_proc");
       logging_filter_config.set_upstream_cluster_name("ext_proc_server_1");
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;

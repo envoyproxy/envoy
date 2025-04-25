@@ -1100,6 +1100,10 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
   if (logging_info_->clusterInfo() == nullptr) {
     logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
   }
+
+  // Response code details should actually be set as many times as possible, since it's
+  // the *final* response code details that will give the most useful information.
+  logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
 }
 
 void Filter::logStreamInfo() {
