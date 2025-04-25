@@ -2578,6 +2578,25 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
+MATCHER(SockOptionEnabled, "") { return *static_cast<const int*>(arg) == 1; }
+
+TEST_P(ConnectionImplTest, SetSocketOptionTest) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<TestThreadsafeSingletonInjector<Api::OsSysCallsImpl>>(&os_sys_calls);
+
+  setUpBasicConnection();
+
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection_->write(buffer, false);
+  client_connection_->connect();
+  // EXPECT_CALL(os_sys_calls, readv(_, _, _))
+  //     .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
+  //       return {-1, SOCKET_ERROR_AGAIN};
+  //     }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _));
+}
+
 class FakeReadFilter : public Network::ReadFilter {
 public:
   FakeReadFilter() = default;
