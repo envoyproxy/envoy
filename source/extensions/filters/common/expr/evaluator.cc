@@ -3,8 +3,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
-#include "extensions/regex_functions.h"
 #include "source/common/runtime/runtime_features.h"
+
+#include "extensions/regex_functions.h"
 
 #include "cel/expr/syntax.pb.h"
 #include "eval/public/builtin_func_registrar.h"
