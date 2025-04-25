@@ -15,6 +15,7 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
+#include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -332,21 +333,21 @@ const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
 
 const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
-#ifndef BORINGSSL_FIPS
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-#else // BoringSSL FIPS
-    "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-#endif
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:";
 
-const std::string ClientContextConfigImpl::DEFAULT_CURVES =
-#ifndef BORINGSSL_FIPS
-    "X25519:"
-#endif
-    "P-256";
+const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES_FIPS =
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES = "X25519:"
+                                                            "P-256";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
 absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -362,9 +363,10 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
-    : ContextConfigImpl(config.common_tls_context(), config.auto_sni_san_validation(),
-                        DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION, DEFAULT_CIPHER_SUITES,
-                        DEFAULT_CURVES, factory_context, creation_status),
+    : ContextConfigImpl(
+          config.common_tls_context(), config.auto_sni_san_validation(), DEFAULT_MIN_VERSION,
+          DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
+          FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
       enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),

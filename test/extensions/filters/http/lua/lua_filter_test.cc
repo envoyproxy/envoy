@@ -904,67 +904,61 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
     end
   )EOF"};
 
-  for (const bool flow_control : std::vector<bool>({false, true})) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lua_flow_control_while_http_call",
-                                  flow_control);
-    InSequence s;
-    setup(SCRIPT);
+  InSequence s;
+  setup(SCRIPT);
 
-    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-    Http::AsyncClient::Callbacks* callbacks;
-    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke(
-            [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-              const Http::TestRequestHeaderMapImpl expected_headers{
-                  {":method", "POST"},
-                  {":path", "/"},
-                  {":authority", "foo"},
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            const Http::TestRequestHeaderMapImpl expected_headers{
+                {":method", "POST"},
+                {":path", "/"},
+                {":authority", "foo"},
 
-                  {"set-cookie", "flavor=chocolate; Path=/"},
-                  {"set-cookie", "variant=chewy; Path=/"},
-                  {"content-length", "11"}};
-              EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-              // The parent span always be set for lua http call.
-              EXPECT_NE(options.parent_span_, nullptr);
+                {"set-cookie", "flavor=chocolate; Path=/"},
+                {"set-cookie", "variant=chewy; Path=/"},
+                {"content-length", "11"}};
+            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+            // The parent span always be set for lua http call.
+            EXPECT_NE(options.parent_span_, nullptr);
 
-              callbacks = &cb;
-              return &request;
-            }));
+            callbacks = &cb;
+            return &request;
+          }));
 
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-              filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-    Buffer::OwnedImpl data("hello");
-    EXPECT_EQ(flow_control ? Http::FilterDataStatus::StopIterationAndWatermark
-                           : Http::FilterDataStatus::StopIterationAndBuffer,
-              filter_->decodeData(data, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
 
-    Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-    Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
-    response_message->body().add(response, 8);
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
-                                   {"trace", ":status 200"},
-                                   {"trace", "8"},
-                                   {"trace", std::string("resp\0nse", 8)},
-                                   {"trace", "0"},
-                                   {"trace", "nse"},
-                               }),
-                               {
-                                 callbacks->onBeforeFinalizeUpstreamSpan(
-                                     child_span_, &response_message->headers());
-                                 callbacks->onSuccess(request, std::move(response_message));
-                               });
-    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
-  }
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  const char response[8] = {'r', 'e', 's', 'p', '\0', 'n', 's', 'e'};
+  response_message->body().add(response, 8);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", ":status 200"},
+                                 {"trace", "8"},
+                                 {"trace", std::string("resp\0nse", 8)},
+                                 {"trace", "0"},
+                                 {"trace", "nse"},
+                             }),
+                             {
+                               callbacks->onBeforeFinalizeUpstreamSpan(
+                                   child_span_, &response_message->headers());
+                               callbacks->onSuccess(request, std::move(response_message));
+                             });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 // HTTP request flow with multiple header values for same header name.
@@ -992,47 +986,41 @@ TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
     end
   )EOF"};
 
-  for (const bool flow_control : std::vector<bool>({false, true})) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lua_flow_control_while_http_call",
-                                  flow_control);
-    InSequence s;
-    setup(SCRIPT);
+  InSequence s;
+  setup(SCRIPT);
 
-    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-    Http::AsyncClient::Callbacks* callbacks;
-    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              callbacks = &cb;
-              return &request;
-            }));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks = &cb;
+            return &request;
+          }));
 
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-              filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-    Buffer::OwnedImpl data("hello");
-    EXPECT_EQ(flow_control ? Http::FilterDataStatus::StopIterationAndWatermark
-                           : Http::FilterDataStatus::StopIterationAndBuffer,
-              filter_->decodeData(data, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
 
-    Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-    Http::ResponseMessagePtr response_message(
-        new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-            new Http::TestResponseHeaderMapImpl{{"key", "value"}, {"key", "second_value"}}}));
+  Http::ResponseMessagePtr response_message(
+      new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+          new Http::TestResponseHeaderMapImpl{{"key", "value"}, {"key", "second_value"}}}));
 
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    EXPECT_LOG_CONTAINS("trace", "key value,second_value", {
-      callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
-      callbacks->onSuccess(request, std::move(response_message));
-    });
-    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
-  }
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_CONTAINS("trace", "key value,second_value", {
+    callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
+    callbacks->onSuccess(request, std::move(response_message));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 // Basic HTTP request flow. Asynchronous flag set to false.
@@ -1057,55 +1045,49 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
     end
   )EOF"};
 
-  for (const bool flow_control : std::vector<bool>({false, true})) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lua_flow_control_while_http_call",
-                                  flow_control);
-    InSequence s;
-    setup(SCRIPT);
+  InSequence s;
+  setup(SCRIPT);
 
-    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-    Http::AsyncClient::Callbacks* callbacks;
-    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              const Http::TestRequestHeaderMapImpl expected_headers{
-                  {":path", "/"},
-                  {":method", "POST"},
-                  {":authority", "foo"},
-                  {"set-cookie", "flavor=chocolate; Path=/"},
-                  {"set-cookie", "variant=chewy; Path=/"},
-                  {"content-length", "11"}};
-              EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-              callbacks = &cb;
-              return &request;
-            }));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const Http::TestRequestHeaderMapImpl expected_headers{
+                {":path", "/"},
+                {":method", "POST"},
+                {":authority", "foo"},
+                {"set-cookie", "flavor=chocolate; Path=/"},
+                {"set-cookie", "variant=chewy; Path=/"},
+                {"content-length", "11"}};
+            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+            callbacks = &cb;
+            return &request;
+          }));
 
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-              filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-    Buffer::OwnedImpl data("hello");
-    EXPECT_EQ(flow_control ? Http::FilterDataStatus::StopIterationAndWatermark
-                           : Http::FilterDataStatus::StopIterationAndBuffer,
-              filter_->decodeData(data, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
 
-    Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-    Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response_message->body().add("response");
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
-                                   {"trace", ":status 200"},
-                                   {"trace", "response"},
-                               }),
-                               { callbacks->onSuccess(request, std::move(response_message)); });
-    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
-  }
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  response_message->body().add("response");
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", ":status 200"},
+                                 {"trace", "response"},
+                             }),
+                             { callbacks->onSuccess(request, std::move(response_message)); });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 // Basic asynchronous, fire-and-forget HTTP request flow.
@@ -1338,51 +1320,45 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
     end
   )EOF"};
 
-  for (const bool flow_control : std::vector<bool>({false, true})) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lua_flow_control_while_http_call",
-                                  flow_control);
-    InSequence s;
-    setup(SCRIPT);
+  InSequence s;
+  setup(SCRIPT);
 
-    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-    Http::AsyncClient::Callbacks* callbacks;
-    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke(
-            [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-              // We are actively deferring to the parent span's sampled state.
-              EXPECT_FALSE(options.sampled_.has_value());
-              const Http::TestRequestHeaderMapImpl expected_headers{
-                  {":path", "/"}, {":method", "GET"}, {":authority", "foo"}};
-              EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-              callbacks = &cb;
-              return &request;
-            }));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            // We are actively deferring to the parent span's sampled state.
+            EXPECT_FALSE(options.sampled_.has_value());
+            const Http::TestRequestHeaderMapImpl expected_headers{
+                {":path", "/"}, {":method", "GET"}, {":authority", "foo"}};
+            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+            callbacks = &cb;
+            return &request;
+          }));
 
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-              filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-    Buffer::OwnedImpl data("hello");
-    EXPECT_EQ(flow_control ? Http::FilterDataStatus::StopIterationAndWatermark
-                           : Http::FilterDataStatus::StopIterationAndBuffer,
-              filter_->decodeData(data, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
 
-    Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-    Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
-                                   {"trace", ":status 200"},
-                                   {"trace", "no body"},
-                               }),
-                               { callbacks->onSuccess(request, std::move(response_message)); });
-    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
-  }
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", ":status 200"},
+                                 {"trace", "no body"},
+                             }),
+                             { callbacks->onSuccess(request, std::move(response_message)); });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 // HTTP call followed by immediate response.
@@ -1698,46 +1674,40 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
     end
   )EOF"};
 
-  for (const bool flow_control : std::vector<bool>({false, true})) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.lua_flow_control_while_http_call",
-                                  flow_control);
-    InSequence s;
-    setup(SCRIPT);
+  InSequence s;
+  setup(SCRIPT);
 
-    Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
-    Http::AsyncClient::Callbacks* callbacks;
-    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
-    EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke(
-            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-              EXPECT_EQ(options.timeout->count(), 5000);
-              EXPECT_EQ(options.sampled_.value(), false);
-              EXPECT_EQ(options.send_xff, false);
-              callbacks = &cb;
-              return &request;
-            }));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(options.timeout->count(), 5000);
+            EXPECT_EQ(options.sampled_.value(), false);
+            EXPECT_EQ(options.send_xff, false);
+            callbacks = &cb;
+            return &request;
+          }));
 
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-              filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-    Buffer::OwnedImpl data("hello");
-    EXPECT_EQ(flow_control ? Http::FilterDataStatus::StopIterationAndWatermark
-                           : Http::FilterDataStatus::StopIterationAndBuffer,
-              filter_->decodeData(data, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
 
-    Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
-    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-    Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
-    callbacks->onSuccess(request, std::move(response_message));
-    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
-  }
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
+  callbacks->onSuccess(request, std::move(response_message));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 // HTTP request flow with timeout and invalid flag in options.
