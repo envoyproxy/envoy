@@ -353,7 +353,7 @@ public:
    * @return boolean telling if the socket option was set successfully.
    */
   virtual bool setSocketOption(const Network::Socket::OptionConstSharedPtr option) PURE;
- 
+
   /**
    * The StreamInfo object associated with this connection. This is typically
    * used for logging purposes. Individual filters may add specific information

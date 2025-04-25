@@ -153,9 +153,7 @@ public:
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
 
-  bool setDownstreamSocketOption(Network::Socket::OptionConstSharedPtr _) override {
-    return false;
-  }
+  bool setDownstreamSocketOption(Network::Socket::OptionConstSharedPtr _) override { return false; }
 
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }

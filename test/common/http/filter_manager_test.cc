@@ -291,8 +291,9 @@ TEST_F(FilterManagerTest, OnLocalReply) {
           [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
             return Http::LocalErrorStatus::Continue;
-          }));MockFilterManagerCallbacks
-  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+          }));
+  MockFilterManagerCallbacks std::shared_ptr<MockStreamDecoderFilter> decoder_filter(
+      new NiceMock<MockStreamDecoderFilter>());
   std::shared_ptr<MockStreamEncoderFilter> encoder_filter(new NiceMock<MockStreamEncoderFilter>());
   std::shared_ptr<MockStreamFilter> stream_filter(new NiceMock<MockStreamFilter>());
 
@@ -733,8 +734,8 @@ TEST_F(FilterManagerTest, SetSocketOptionTest) {
   auto option = std::make_shared<MockSocketOption>();
 
   EXPECT_CALL(filter_manager_callbacks_, setDownstreamSocketOption(_))
-  .Times(1)
-  .WillRepeatedly(Return(true));
+      .Times(1)
+      .WillRepeatedly(Return(true));
   auto option = std::make_shared<MockSocketOption>();
 
   EXPECT_TRUE(filter_manager_->setDownstreamSocketOption(option));

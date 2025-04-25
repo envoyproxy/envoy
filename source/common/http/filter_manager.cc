@@ -1,3 +1,4 @@
+#include "filter_manager.h"
 #include "source/common/http/filter_manager.h"
 
 #include <functional>
@@ -5,7 +6,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
-#include "filter_manager.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/scope_tracked_object_stack.h"
 #include "source/common/common/scope_tracker.h"
@@ -1970,7 +1970,8 @@ bool FilterManager::setDownstreamSocketOption(const Network::Socket::OptionConst
   return false;
 }
 
-bool DownstreamFilterManager::setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+bool DownstreamFilterManager::setDownstreamSocketOption(
+    const Network::Socket::OptionConstSharedPtr option) {
   return filter_manager_callbacks_.setSocketOption(option);
 }
 

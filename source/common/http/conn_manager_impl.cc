@@ -10,7 +10,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "conn_manager_config.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -56,6 +55,7 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "conn_manager_config.h"
 
 namespace Envoy {
 namespace Http {
