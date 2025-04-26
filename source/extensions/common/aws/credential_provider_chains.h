@@ -37,18 +37,16 @@ public:
           web_identity_config) PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, Server::Configuration::ServerFactoryContext& context,
       AwsClusterManagerOptRef aws_cluster_manager,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, Server::Configuration::ServerFactoryContext& context,
       AwsClusterManagerOptRef aws_cluster_manager,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
@@ -100,17 +98,15 @@ public:
 class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
-  DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
-      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config =
-          {})
-      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl,
-                                        credential_provider_config, *this) {}
+  DefaultCredentialsProviderChain(Api::Api& api,
+                                  Server::Configuration::ServerFactoryContext& context,
+                                  absl::string_view region,
+                                  const envoy::extensions::common::aws::v3::AwsCredentialProvider&
+                                      credential_provider_config = {})
+      : DefaultCredentialsProviderChain(api, context, region, credential_provider_config, *this) {}
 
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+      Api::Api& api, Server::Configuration::ServerFactoryContext& context, absl::string_view region,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
       CredentialsProviderChainFactories& factories);
 
@@ -129,18 +125,16 @@ private:
   };
 
   CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, Server::Configuration::ServerFactoryContext& context,
       AwsClusterManagerOptRef aws_cluster_manager,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view authorization_token) override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, Server::Configuration::ServerFactoryContext& context,
       AwsClusterManagerOptRef aws_cluster_manager,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) override;

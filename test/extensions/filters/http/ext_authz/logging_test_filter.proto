@@ -11,4 +11,44 @@ message LoggingTestFilterConfig {
   bool expect_envoy_grpc_specific_stats = 4;
   bool expect_response_bytes = 5;
   google.protobuf.Struct filter_metadata = 6;
+
+  enum GrpcStatus {
+    // GRPC status is not specified.
+    UNSPECIFIED = 0;
+    // The RPC completed successfully.
+    OK = 1;
+    // The RPC was canceled.
+    CANCELLED = 2;
+    // Some unknown error occurred.
+    UNKNOWN = 3;
+    // An argument to the RPC was invalid.
+    INVALID_ARGUMENT = 4;
+    // The deadline for the RPC expired before the RPC completed.
+    DEADLINE_EXCEEDED = 5;
+    // Some resource for the RPC was not found.
+    NOT_FOUND = 6;
+    // A resource the RPC attempted to create already exists.
+    ALREADY_EXISTS = 7;
+    // Permission was denied for the RPC.
+    PERMISSION_DENIED = 8;
+    // Some resource is exhausted, resulting in RPC failure.
+    RESOURCE_EXHAUSTED = 9;
+    // Some precondition for the RPC failed.
+    FAILED_PRECONDITION = 10;
+    // The RPC was aborted.
+    ABORTED = 11;
+    // Some operation was requested outside of a legal range.
+    OUT_OF_RANGE = 12;
+    // The RPC requested was not implemented.
+    UNIMPLEMENTED = 13;
+    // Some internal error occurred.
+    INTERNAL = 14;
+    // The RPC endpoint is current unavailable.
+    UNAVAILABLE = 15;
+    // There was some data loss resulting in RPC failure.
+    DATA_LOSS = 16;
+    // The RPC does not have required credentials for the RPC to succeed.
+    UNAUTHENTICATED = 17;
+  }
+  GrpcStatus expect_grpc_status = 7;
 }
