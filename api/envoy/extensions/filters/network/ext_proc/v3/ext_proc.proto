@@ -60,6 +60,9 @@ message NetworkExternalProcessor {
     lte {seconds: 3600}
     gte {}
   }];
+
+  // Options related to the sending and receiving of dynamic metadata.
+  MetadataOptions metadata_options = 16;
 }
 
 // Options for controlling processing behavior.
@@ -81,4 +84,31 @@ message ProcessingMode {
   // Controls whether outbound (write) data to the client is sent to the external processor.
   // Default: STREAMED
   DataSendMode process_write = 2;
+}
+
+// The MetadataOptions structure defines options for the sending and receiving of
+// dynamic metadata. Specifically, which namespaces to send to the server, whether
+// metadata returned by the server may be written, and how that metadata may be written.
+message MetadataOptions {
+  message MetadataNamespaces {
+    // Specifies a list of metadata namespaces whose values, if present,
+    // will be passed to the ext_proc service as an opaque *protobuf::Struct*.
+    repeated string untyped = 1;
+
+    // Specifies a list of metadata namespaces whose values, if present,
+    // will be passed to the ext_proc service as a *protobuf::Any*. This allows
+    // envoy and the external processing server to share the protobuf message
+    // definition for safe parsing.
+    repeated string typed = 2;
+  }
+
+  // Describes which typed or untyped dynamic metadata namespaces to forward to
+  // the external processing server.
+  MetadataNamespaces forwarding_namespaces = 1;
+
+  // Describes which typed or untyped dynamic metadata namespaces to accept from
+  // the external processing server. Set to empty or leave unset to disallow writing
+  // any received dynamic metadata. Receiving of typed metadata is not supported.
+  // [#not-implemented-hide:]
+  MetadataNamespaces receiving_namespaces = 2;
 }

@@ -253,6 +253,53 @@ void NetworkExtProcFilter::closeConnection(const std::string& reason) {
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite, reason);
 }
 
+void NetworkExtProcFilter::addDynamicMetadata(const Config& config, ProcessingRequest& req) {
+  // get the callbacks from the ProcessorState. This will be the appropriate
+  // callbacks for the current state of the filter
+  envoy::config::core::v3::Metadata forwarding_metadata;
+
+  // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
+  // service.
+  const auto& request_metadata = read_callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
+  for (const auto& context_key : state.untypedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = request_metadata.find(context_key);
+        metadata_it != request_metadata.end()) {
+      (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    } else if (cb->connection().has_value()) {
+      const auto& connection_metadata =
+          cb->connection().value().get().streamInfo().dynamicMetadata().filter_metadata();
+      if (const auto metadata_it = connection_metadata.find(context_key);
+          metadata_it != connection_metadata.end()) {
+        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+      }
+    }
+  }
+
+  // If typed_metadata_context_namespaces is specified, pass matching typed filter metadata to the
+  // ext_proc service. If metadata key is set in both the connection and request metadata then
+  // the value will be the request metadata value. The metadata will only be searched for the
+  // callbacks corresponding to the traffic direction at the time of the external processing
+  // request.
+  const auto& request_typed_metadata = ead_callbacks_->connection()->streamInfo().dynamicMetadata().typed_filter_metadata();
+  for (const auto& context_key : state.typedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = request_typed_metadata.find(context_key);
+        metadata_it != request_typed_metadata.end()) {
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
+    } else if (cb->connection().has_value()) {
+      const auto& connection_typed_metadata =
+          cb->connection().value().get().streamInfo().dynamicMetadata().typed_filter_metadata();
+      if (const auto metadata_it = connection_typed_metadata.find(context_key);
+          metadata_it != connection_typed_metadata.end()) {
+        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+      }
+    }
+  }
+
+  *req.mutable_metadata_context() = forwarding_metadata;
+}
+
 } // namespace ExtProc
 } // namespace NetworkFilters
 } // namespace Extensions
