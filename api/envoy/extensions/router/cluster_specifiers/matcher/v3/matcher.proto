@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.router.cluster_specifier_plugin.matcher]
 // [#not-implemented-hide:]
 
-message SpecifierConfig {
+message MatcherClusterSpecifier {
   // The matcher for cluster selection after the route has been selected. This is used when the
   // route has multiple clusters (like multiple clusters for different users) and the matcher
   // is used to select the cluster to use for the request.
