@@ -119,6 +119,8 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   return status;
 }
 
+/*TODO: @nbaws split this method and move common functionality into source/common/tls/utility.h */
+
 absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(std::string pem,
                                                                   std::string& output, bool chain) {
   absl::Status status = absl::OkStatus();
