@@ -17,7 +17,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
         iam_roles_anywhere_config)
 
     : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
-                                      nullptr, create_metadata_fetcher_cb, refresh_state,
+                                      create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(iam_roles_anywhere_config.role_arn()),
       role_session_name_(iam_roles_anywhere_config.role_session_name()),
@@ -41,9 +41,6 @@ void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
             metadata_fetcher_->failureToString(reason));
   credentialsRetrievalError();
 }
-
-// TODO: @nbaws Unused and will be removed when curl is deprecated
-bool IAMRolesAnywhereCredentialsProvider::needsRefresh() { return true; }
 
 void IAMRolesAnywhereCredentialsProvider::refresh() {
 
@@ -88,7 +85,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   }
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
-    metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
+    metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
   } else {
     metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
   }

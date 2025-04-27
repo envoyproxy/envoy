@@ -7,7 +7,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-
+#include "source/common/tls/utility.h" // IWYU pragma: export
 namespace Envoy {
 namespace Extensions {
 namespace Common {

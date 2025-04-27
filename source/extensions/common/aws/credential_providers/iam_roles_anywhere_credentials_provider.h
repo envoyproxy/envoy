@@ -73,10 +73,7 @@ public:
   std::string providerName() override { return "IAMRolesAnywhereCredentialsProvider"; };
 
 private:
-  bool needsRefresh() override;
   void refresh() override;
-  void fetchCredentialFromRolesAnywhere(const std::string&& instance_role,
-                                        const std::string&& token);
   void extractCredentials(const std::string&& credential_document_value);
 
   const std::string role_arn_;
@@ -85,7 +82,7 @@ private:
   const std::string trust_anchor_arn_;
   const std::string region_;
   absl::optional<uint16_t> session_duration_;
-  ServerFactoryContextOptRef server_factory_context_;
+  Server::Configuration::ServerFactoryContext &server_factory_context_;
   std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer_;
 };
 

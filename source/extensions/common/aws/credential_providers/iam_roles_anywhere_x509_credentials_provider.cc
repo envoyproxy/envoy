@@ -9,6 +9,7 @@ using std::chrono::seconds;
 
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
   if (needsRefresh()) {
@@ -27,7 +28,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
 
   auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
       certificate_data_source_, context.mainThreadDispatcher(), context.threadLocal(),
-      context.api(), false, 2048);
+      context.api(), false, X509_CERTIFICATE_MAX_BYTES);
   if (provider_or_error_.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
@@ -39,7 +40,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
   if (certificate_chain_data_source_.has_value()) {
     auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
         certificate_chain_data_source_.value(), context.mainThreadDispatcher(),
-        context.threadLocal(), context.api(), false, 2048);
+        context.threadLocal(), context.api(), false, X509_CERTIFICATE_MAX_BYTES * 5);
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
@@ -71,16 +72,6 @@ bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {
   } else {
     return expired;
   }
-}
-
-const ASN1_TIME& epochASN1Time() {
-  static ASN1_TIME* e = []() -> ASN1_TIME* {
-    ASN1_TIME* epoch = ASN1_TIME_new();
-    const time_t epoch_time = 0;
-    RELEASE_ASSERT(ASN1_TIME_set(epoch, epoch_time) != nullptr, "");
-    return epoch;
-  }();
-  return *e;
 }
 
 absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpiration(
@@ -116,7 +107,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   int days, seconds;
 
-  int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1Time(), X509_get0_notAfter(cert.get()));
+  int rc = ASN1_TIME_diff(&days, &seconds, &Envoy::Extensions::TransportSockets::Tls::Utility::epochASN1Time(), X509_get0_notAfter(cert.get()));
   ASSERT(rc == 1);
   // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
   // beyond 2038-01-19T03:14:08Z.
@@ -138,6 +129,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(std::string pe
 
   auto max_certs = 1;
   if (chain) {
+    // Maximum trust chain depth is 5 per https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
     max_certs = 5;
   }
   for (int i = 0; i < max_certs; i++) {
@@ -173,7 +165,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   X509Credentials::PublicKeySignatureAlgorithm cert_algorithm;
   std::string pem;
   absl::Status status;
-  SystemTime time;
+  SystemTime expiration_time;
 
   if (certificate_data_source_provider_ == nullptr ||
       private_key_data_source_provider_ == nullptr) {
@@ -190,14 +182,14 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
       return;
     }
 
-    status = pemToAlgorithmSerialExpiration(cert_pem, cert_algorithm, cert_serial, time);
+    status = pemToAlgorithmSerialExpiration(cert_pem, cert_algorithm, cert_serial, expiration_time);
     if (!status.ok()) {
       ENVOY_LOG(error, "IAMRolesAnywhere: Certificate algorithm and serial decoding failed: {}",
                 status.message());
       cached_credentials_ = X509Credentials();
       return;
     }
-    expiration_time_ = time;
+    expiration_time_ = expiration_time;
   }
 
   // Certificate Chain
@@ -231,18 +223,18 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
               "(algorithm: {}) "
               "and cert chain, with expiration time {}",
               cert_algorithm == X509Credentials::PublicKeySignatureAlgorithm::RSA ? "RSA" : "ECDSA",
-              fmt::format("{:%Y-%m-%d %H:%M}", time));
+              fmt::format("{:%Y-%m-%d %H:%M}", expiration_time));
 
     cached_credentials_ = X509Credentials(cert_der_b64, cert_algorithm, cert_serial,
-                                          cert_chain_der_b64, private_key_pem, time);
+                                          cert_chain_der_b64, private_key_pem, expiration_time);
   } else {
     ENVOY_LOG(info,
               "IAMRolesAnywhere: Setting certificate credentials with cert, serial and private "
               "key (algorithm: {}) with expiration time {}",
               cert_algorithm == X509Credentials::PublicKeySignatureAlgorithm::RSA ? "RSA" : "ECDSA",
-              fmt::format("{:%Y-%m-%d %H:%M}", time));
+              fmt::format("{:%Y-%m-%d %H:%M}", expiration_time));
     cached_credentials_ = X509Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt,
-                                          private_key_pem, time);
+                                          private_key_pem, expiration_time);
   }
 }
 
