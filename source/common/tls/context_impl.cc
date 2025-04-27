@@ -34,6 +34,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "cert_validator/cert_validator.h"
+#include "openssl/crypto.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/pkcs12.h"
@@ -186,13 +187,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-#ifdef BORINGSSL_FIPS
-  if (!capabilities_.is_fips_compliant) {
-    creation_status = absl::InvalidArgumentError(
-        "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
-    return;
+  const bool fips_mode = FIPS_mode();
+
+  if (fips_mode) {
+    if (!capabilities_.is_fips_compliant) {
+      creation_status = absl::InvalidArgumentError(
+          "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
+      return;
+    }
   }
-#endif
 
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
@@ -201,7 +204,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       const auto& tls_certificate = tls_certificates[i].get();
       if (!tls_certificate.pkcs12().empty()) {
         creation_status = ctx.loadPkcs12(tls_certificate.pkcs12(), tls_certificate.pkcs12Path(),
-                                         tls_certificate.password());
+                                         tls_certificate.password(), fips_mode);
       } else {
         creation_status = ctx.loadCertificateChain(tls_certificate.certificateChain(),
                                                    tls_certificate.certificateChainPath());
@@ -245,32 +248,32 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         // Since we checked the key type above, this should be valid.
         ASSERT(rsa_public_key != nullptr);
         const unsigned rsa_key_length = RSA_bits(rsa_public_key);
-#ifdef BORINGSSL_FIPS
-        if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
-                          "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
-                          ctx.cert_chain_file_path_));
-          return;
+        if (fips_mode) {
+          if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
+            creation_status = absl::InvalidArgumentError(
+                fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
+                            "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
+                            ctx.cert_chain_file_path_));
+            return;
+          }
+        } else {
+          if (rsa_key_length < 2048) {
+            creation_status = absl::InvalidArgumentError(
+                fmt::format("Failed to load certificate chain from {}, only RSA "
+                            "certificates with 2048-bit or larger keys are supported",
+                            ctx.cert_chain_file_path_));
+            return;
+          }
         }
-#else
-        if (rsa_key_length < 2048) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only RSA "
-                          "certificates with 2048-bit or larger keys are supported",
-                          ctx.cert_chain_file_path_));
-          return;
-        }
-#endif
       } break;
-#ifdef BORINGSSL_FIPS
       default:
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("Failed to load certificate chain from {}, only RSA and "
-                        "ECDSA certificates are supported in FIPS mode",
-                        ctx.cert_chain_file_path_));
-        return;
-#endif
+        if (fips_mode) {
+          creation_status = absl::InvalidArgumentError(
+              fmt::format("Failed to load certificate chain from {}, only RSA and "
+                          "ECDSA certificates are supported in FIPS mode",
+                          ctx.cert_chain_file_path_));
+          return;
+        }
       }
 
       Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider =
@@ -286,19 +289,19 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
               fmt::format("Failed to get BoringSSL private key method from provider"));
           return;
         }
-#ifdef BORINGSSL_FIPS
-        if (!ctx.private_key_method_provider_->checkFips()) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Private key method doesn't support FIPS mode with current parameters"));
-          return;
+        if (fips_mode) {
+          if (!ctx.private_key_method_provider_->checkFips()) {
+            creation_status = absl::InvalidArgumentError(fmt::format(
+                "Private key method doesn't support FIPS mode with current parameters"));
+            return;
+          }
         }
-#endif
         SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
       } else if (!tls_certificate.privateKey().empty()) {
         // Load private key.
         creation_status =
             ctx.loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
-                               tls_certificate.password());
+                               tls_certificate.password(), fips_mode);
         if (!creation_status.ok()) {
           return;
         }
@@ -349,6 +352,31 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       SSL_CTX* ctx = context.ssl_ctx_.get();
       ASSERT(ctx != nullptr);
       SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+    }
+  }
+
+  // Compliance policy must be applied last to have a defined behavior.
+  if (const auto policy = config.compliancePolicy(); policy.has_value()) {
+    switch (policy.value()) {
+      using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    case ProtoPolicy::FIPS_202205:
+      if (!fips_mode) {
+        ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
+      }
+      for (auto& tls_context : tls_contexts_) {
+        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
+                                               ssl_compliance_policy_fips_202205);
+        if (rc != 1) {
+          creation_status = absl::InvalidArgumentError(
+              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
+                           Utility::getLastCryptoError().value_or("")));
+          return;
+        }
+      }
+      break;
+    default:
+      creation_status = absl::InvalidArgumentError("Unknown compliance policy");
+      return;
     }
   }
 }
@@ -696,7 +724,7 @@ absl::Status TlsContext::loadCertificateChain(const std::string& data,
 }
 
 absl::Status TlsContext::loadPrivateKey(const std::string& data, const std::string& data_path,
-                                        const std::string& password) {
+                                        const std::string& password, bool fips_mode) {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
   bssl::UniquePtr<EVP_PKEY> pkey(
@@ -709,11 +737,11 @@ absl::Status TlsContext::loadPrivateKey(const std::string& data, const std::stri
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  return checkPrivateKey(pkey, data_path);
+  return checkPrivateKey(pkey, data_path, fips_mode);
 }
 
 absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& data_path,
-                                    const std::string& password) {
+                                    const std::string& password, bool fips_mode) {
   cert_chain_file_path_ = data_path;
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
@@ -748,37 +776,34 @@ absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& 
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  return checkPrivateKey(pkey, data_path);
+  return checkPrivateKey(pkey, data_path, fips_mode);
 }
 
 absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
-                                         const std::string& key_path) {
-#ifdef BORINGSSL_FIPS
-  // Verify that private keys are passing FIPS pairwise consistency tests.
-  switch (EVP_PKEY_id(pkey.get())) {
-  case EVP_PKEY_EC: {
-    const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
-    if (!EC_KEY_check_fips(ecdsa_private_key)) {
-      return absl::InvalidArgumentError(
-          fmt::format("Failed to load private key from {}, ECDSA key failed "
-                      "pairwise consistency test required in FIPS mode",
-                      key_path));
+                                         const std::string& key_path, bool fips_mode) {
+  if (fips_mode) {
+    // Verify that private keys are passing FIPS pairwise consistency tests.
+    switch (EVP_PKEY_id(pkey.get())) {
+    case EVP_PKEY_EC: {
+      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+      if (!EC_KEY_check_fips(ecdsa_private_key)) {
+        return absl::InvalidArgumentError(
+            fmt::format("Failed to load private key from {}, ECDSA key failed "
+                        "pairwise consistency test required in FIPS mode",
+                        key_path));
+      }
+    } break;
+    case EVP_PKEY_RSA: {
+      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+      if (!RSA_check_fips(rsa_private_key)) {
+        return absl::InvalidArgumentError(
+            fmt::format("Failed to load private key from {}, RSA key failed "
+                        "pairwise consistency test required in FIPS mode",
+                        key_path));
+      }
+    } break;
     }
-  } break;
-  case EVP_PKEY_RSA: {
-    RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
-    if (!RSA_check_fips(rsa_private_key)) {
-      return absl::InvalidArgumentError(
-          fmt::format("Failed to load private key from {}, RSA key failed "
-                      "pairwise consistency test required in FIPS mode",
-                      key_path));
-    }
-  } break;
   }
-#else
-  UNREFERENCED_PARAMETER(pkey);
-  UNREFERENCED_PARAMETER(key_path);
-#endif
   return absl::OkStatus();
 }
 

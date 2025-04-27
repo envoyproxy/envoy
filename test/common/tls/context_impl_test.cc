@@ -32,6 +32,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
@@ -1350,14 +1351,11 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg(
-      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
-#ifdef BORINGSSL_FIPS
-      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-      "with 2048-bit or larger keys are supported"
-#endif
-  );
+  std::string error_msg(absl::StrCat(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA "
+      "certificates ",
+      (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                   : "with 2048-bit or larger keys are supported")));
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),
@@ -1376,14 +1374,11 @@ TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg("Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
-                        "only RSA certificates "
-#ifdef BORINGSSL_FIPS
-                        "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-                        "with 2048-bit or larger keys are supported"
-#endif
-  );
+  std::string error_msg(absl::StrCat(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
+      "only RSA certificates ",
+      (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                   : "with 2048-bit or larger keys are supported")));
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),

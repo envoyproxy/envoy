@@ -203,6 +203,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
     X509* leaf_cert, absl::string_view sni,
     const Network::TransportSocketOptions* transport_socket_options,
+    const CertValidator::ExtraValidationContext& validation_context,
     Envoy::Ssl::ClientValidationStatus& detailed_status, std::string* error_details,
     uint8_t* out_alert) {
 
@@ -218,9 +219,13 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
     match_sni_san.emplace_back(std::make_unique<DnsExactStringSanMatcher>(sni));
     match_san_override = match_sni_san;
   }
-  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
-      leaf_cert, verify_san_override.value_or(std::vector<std::string>()),
-      match_san_override.value_or(subject_alt_name_matchers_), error_details, out_alert);
+  Envoy::Ssl::ClientValidationStatus validated =
+      verifyCertificate(leaf_cert, verify_san_override.value_or(std::vector<std::string>()),
+                        match_san_override.value_or(subject_alt_name_matchers_),
+                        validation_context.callbacks != nullptr
+                            ? makeOptRef(validation_context.callbacks->connection().streamInfo())
+                            : absl::nullopt,
+                        error_details, out_alert);
 
   if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
       validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
@@ -241,6 +246,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
 Envoy::Ssl::ClientValidationStatus
 DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
                                         const std::vector<SanMatcherPtr>& subject_alt_name_matchers,
+                                        OptRef<const StreamInfo::StreamInfo> stream_info,
                                         std::string* error_details, uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
   if (!verify_san_list.empty()) {
@@ -257,7 +263,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   }
 
   if (!subject_alt_name_matchers.empty()) {
-    if (!matchSubjectAltName(cert, subject_alt_name_matchers)) {
+    if (!matchSubjectAltName(cert, stream_info, subject_alt_name_matchers)) {
       const char* error = "verify cert failed: SAN matcher";
       if (error_details != nullptr) {
         *error_details = error;
@@ -299,7 +305,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
 ValidationResults DefaultCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
+    const CertValidator::ExtraValidationContext& context, bool is_server,
     absl::string_view host_name) {
   if (sk_X509_num(&cert_chain) == 0) {
     stats_.fail_verify_error_.inc();
@@ -352,7 +358,7 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   std::string error_details;
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
   const bool succeeded =
-      verifyCertAndUpdateStatus(leaf_cert, host_name, transport_socket_options.get(),
+      verifyCertAndUpdateStatus(leaf_cert, host_name, transport_socket_options.get(), context,
                                 detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        detailed_status, absl::nullopt, absl::nullopt}
@@ -380,7 +386,8 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
 }
 
 bool DefaultCertValidator::matchSubjectAltName(
-    X509* cert, const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
+    X509* cert, OptRef<const StreamInfo::StreamInfo> stream_info,
+    const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
@@ -388,7 +395,11 @@ bool DefaultCertValidator::matchSubjectAltName(
   }
   for (const auto& config_san_matcher : subject_alt_name_matchers) {
     for (const GENERAL_NAME* general_name : san_names.get()) {
-      if (config_san_matcher->match(general_name)) {
+      if (stream_info) {
+        if (config_san_matcher->match(general_name, stream_info.ref())) {
+          return true;
+        }
+      } else if (config_san_matcher->match(general_name)) {
         return true;
       }
     }

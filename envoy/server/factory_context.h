@@ -260,12 +260,12 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server and provides
    *         access to the server's resources.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
@@ -278,6 +278,13 @@ public:
    *         backend implementation.
    */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   * TODO(wbpcode): move all scope() calling to this method.
+   */
+  virtual Stats::Scope& statsScope() { return scope(); }
 };
 
 /**
@@ -361,7 +368,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return the init manager of the particular context. This can be used for extensions that need

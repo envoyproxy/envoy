@@ -19,9 +19,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "ext_proc_test",
+    srcs = ["ext_proc_test.cc"],
+    deps = [
+        "//source/extensions/filters/network/ext_proc:ext_proc_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "ext_proc_integration_test",
     srcs = ["ext_proc_integration_test.cc"],
     deps = [
+        "//envoy/http:codec_interface",
         "//source/extensions/filters/network/ext_proc:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
@@ -29,6 +42,8 @@ envoy_cc_test(
         "//test/integration:fake_upstream_lib",
         "//test/integration:integration_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/service/network_ext_proc/v3:pkg_cc_proto",
     ],
 )

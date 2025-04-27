@@ -1129,7 +1129,7 @@ public:
   virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
+   * @return std::shared_ptr<const UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
