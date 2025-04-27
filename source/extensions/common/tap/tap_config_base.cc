@@ -47,16 +47,14 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                                     Common::Tap::Sink* admin_streamer, SinkContext context)
+                                     Common::Tap::Sink* admin_streamer,
+                                     Server::Configuration::GenericFactoryContext& context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
 
-  using TsfContextRef =
-      std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>;
-  using HttpContextRef = std::reference_wrapper<Server::Configuration::FactoryContext>;
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
   ASSERT(sinks.size() == 1);
@@ -103,24 +101,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
         Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
 
     // extract message validation visitor from the context and use it to define config
-    ProtobufTypes::MessagePtr config;
-    if (absl::holds_alternative<TsfContextRef>(context)) {
-      Server::Configuration::TransportSocketFactoryContext& tsf_context =
-          absl::get<TsfContextRef>(context).get();
-      config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
-                                                            tsf_context.messageValidationVisitor(),
-                                                            tap_sink_factory);
-      sink_ = tap_sink_factory.createTransportSinkPtr(*config, tsf_context);
-    } else {
-      Server::Configuration::FactoryContext& http_context =
-          absl::get<HttpContextRef>(context).get();
-      config = Config::Utility::translateAnyToFactoryConfig(
-          sinks[0].custom_sink().typed_config(),
-          http_context.serverFactoryContext().messageValidationContext().staticValidationVisitor(),
-          tap_sink_factory);
-      sink_ = tap_sink_factory.createHttpSinkPtr(*config, http_context);
-    }
-
+    ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
+        sinks[0].custom_sink().typed_config(), context.messageValidationVisitor(),
+        tap_sink_factory);
+    sink_ = tap_sink_factory.createSinkPtr(*config, context);
     sink_to_use_ = sink_.get();
     break;
   }
@@ -148,16 +132,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
                                      proto_config.DebugString()));
   }
 
-  Server::Configuration::CommonFactoryContext* server_context = nullptr;
-  if (absl::holds_alternative<TsfContextRef>(context)) {
-    Server::Configuration::TransportSocketFactoryContext& tsf_context =
-        absl::get<TsfContextRef>(context).get();
-    server_context = &tsf_context.serverFactoryContext();
-  } else {
-    Server::Configuration::FactoryContext& http_context = absl::get<HttpContextRef>(context).get();
-    server_context = &http_context.serverFactoryContext();
-  }
-  buildMatcher(match, matchers_, *server_context);
+  buildMatcher(match, matchers_, context.serverFactoryContext());
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
@@ -246,8 +221,8 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
       path += MessageUtil::FileExtensions::get().ProtoText;
       break;
-    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
       path += MessageUtil::FileExtensions::get().Json;
       break;
     }
@@ -275,8 +250,8 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
     output_file_ << MessageUtil::toTextProto(*trace);
     break;
-  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
   }

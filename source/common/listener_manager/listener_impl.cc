@@ -923,11 +923,10 @@ const Network::ListenerInfo& PerListenerFactoryContextImpl::listenerInfo() const
   return listener_factory_context_base_->listenerInfo();
 }
 
-ProtobufMessage::ValidationVisitor&
-PerListenerFactoryContextImpl::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValidationVisitor() {
   return listener_factory_context_base_->messageValidationVisitor();
 }
-Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() const {
+Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() {
   return listener_factory_context_base_->serverFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&

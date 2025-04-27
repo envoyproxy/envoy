@@ -128,7 +128,9 @@ private:
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
 public:
   static const std::string DEFAULT_CIPHER_SUITES;
+  static const std::string DEFAULT_CIPHER_SUITES_FIPS;
   static const std::string DEFAULT_CURVES;
+  static const std::string DEFAULT_CURVES_FIPS;
 
   static absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
