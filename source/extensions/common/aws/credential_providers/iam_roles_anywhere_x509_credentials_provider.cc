@@ -107,7 +107,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   int days, seconds;
 
-  int rc = ASN1_TIME_diff(&days, &seconds, &Envoy::Extensions::TransportSockets::Tls::Utility::epochASN1Time(), X509_get0_notAfter(cert.get()));
+  int rc = ASN1_TIME_diff(&days, &seconds,
+                          &Envoy::Extensions::TransportSockets::Tls::Utility::epochASN1Time(),
+                          X509_get0_notAfter(cert.get()));
   ASSERT(rc == 1);
   // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
   // beyond 2038-01-19T03:14:08Z.
@@ -131,7 +133,8 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(std::string pe
 
   auto max_certs = 1;
   if (chain) {
-    // Maximum trust chain depth is 5 per https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
+    // Maximum trust chain depth is 5 per
+    // https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
     max_certs = 5;
   }
   for (int i = 0; i < max_certs; i++) {
