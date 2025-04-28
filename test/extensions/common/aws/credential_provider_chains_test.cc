@@ -2,13 +2,13 @@
 #include "source/extensions/common/aws/credential_providers/inline_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/api/mocks.h"              // IWYU pragma: export
+#include "test/mocks/server/factory_context.h" // IWYU pragma: export
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 
-#include "gmock/gmock.h"
+#include "gmock/gmock.h" // IWYU pragma: export
 #include "gtest/gtest.h"
 
 using testing::_;

@@ -3,13 +3,13 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
-#include "envoy/http/message.h"
+#include "envoy/http/message.h" // IWYU pragma: export
 
-#include "source/common/common/matchers.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/common/common/matchers.h"                 // IWYU pragma: export
+#include "source/common/http/headers.h"                    // IWYU pragma: export
+#include "source/common/http/utility.h"                    // IWYU pragma: export
+#include "source/common/json/json_loader.h"                // IWYU pragma: export
+#include "source/extensions/common/aws/signer_base_impl.h" // IWYU pragma: export
 
 namespace Envoy {
 namespace Extensions {
