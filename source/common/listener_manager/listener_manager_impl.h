@@ -32,7 +32,7 @@ namespace Envoy {
 namespace Server {
 
 namespace Configuration {
-class TransportSocketFactoryContextImpl;
+using TransportSocketFactoryContextImpl = Server::GenericFactoryContextImpl;
 }
 
 class ListenerFilterChainFactoryBuilder;

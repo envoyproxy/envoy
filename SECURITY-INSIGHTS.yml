@@ -11,25 +11,25 @@ project-lifecycle:
   bug-fixes-only: false
   core-maintainers:  # from https://github.com/envoyproxy/envoy/blob/main/OWNERS.md
   # Senior maintainers
-  - github:mattklein123
-  - github:zuercher
-  - github:lizan
   - github:ggreenway
-  - github:yanavlasov
+  - github:mattklein123
   - github:phlax
   - github:RyanTheOptimist
   - github:wbpcode
+  - github:yanavlasov
+  - github:zuercher
   # Maintainers
-  - github:jmarantz
   - github:adisuissa
+  - github:botengyao
+  - github:jmarantz
   - github:KBaichoo
   - github:keith
   - github:kyessenov
-  - github:ravenblackx
+  - github:mathetake
   - github:nezdolik
+  - github:ravenblackx
   - github:tonya11en
   - github:tyxia
-  - github:mathetake
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true

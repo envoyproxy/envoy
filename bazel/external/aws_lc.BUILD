@@ -6,7 +6,6 @@ cc_library(
         "crypto/libcrypto.a",
     ],
     hdrs = glob(["include/openssl/*.h"]),
-    defines = ["BORINGSSL_FIPS"],
     includes = ["include"],
     visibility = ["//visibility:public"],
 )

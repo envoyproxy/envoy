@@ -428,6 +428,7 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;
+  const bool force_locality_direct_routing_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;

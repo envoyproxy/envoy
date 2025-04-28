@@ -1,9 +1,7 @@
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/lock_guard.h"
@@ -21,13 +19,14 @@ constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
 
 /**
- * AWS credentials container
+ * AWS credentials containers
  *
  * If a credential component was not found in the execution environment, it's getter method will
  * return absl::nullopt. Credential components with the empty string value are treated as not found.
  */
 class Credentials {
 public:
+  // Access Key Credentials
   explicit Credentials(absl::string_view access_key_id = absl::string_view(),
                        absl::string_view secret_access_key = absl::string_view(),
                        absl::string_view session_token = absl::string_view()) {
@@ -66,7 +65,67 @@ private:
 
 using CredentialsPendingCallback = std::function<void()>;
 
-/**
+/*
+ * X509 Credentials used for IAM Roles Anywhere
+ */
+
+class X509Credentials {
+public:
+  enum class PublicKeySignatureAlgorithm {
+    RSA,
+    ECDSA,
+  };
+
+  // X509 Credentials
+  X509Credentials(absl::string_view certificate_b64,
+                  PublicKeySignatureAlgorithm certificate_signature_algorithm,
+                  absl::string_view certificate_serial,
+                  absl::optional<absl::string_view> certificate_chain_b64,
+                  absl::string_view certificate_private_key_pem,
+                  SystemTime certificate_expiration_time)
+      : certificate_b64_(certificate_b64),
+        certificate_private_key_pem_(certificate_private_key_pem),
+        certificate_serial_(certificate_serial),
+        certificate_expiration_(certificate_expiration_time),
+        certificate_signature_algorithm_(certificate_signature_algorithm) {
+    if (certificate_chain_b64.has_value()) {
+      certificate_chain_b64_ = certificate_chain_b64.value();
+    }
+  }
+
+  X509Credentials() = default;
+
+  const absl::optional<std::string>& certificateDerB64() const { return certificate_b64_; }
+
+  const absl::optional<std::string>& certificateSerial() const { return certificate_serial_; }
+
+  const absl::optional<SystemTime>& certificateExpiration() const {
+    return certificate_expiration_;
+  }
+
+  const absl::optional<std::string>& certificateChainDerB64() const {
+    return certificate_chain_b64_;
+  }
+
+  const absl::optional<PublicKeySignatureAlgorithm>& publicKeySignatureAlgorithm() const {
+    return certificate_signature_algorithm_;
+  }
+
+  const absl::optional<std::string> certificatePrivateKey() const {
+    return certificate_private_key_pem_;
+  }
+
+private:
+  // RolesAnywhere certificate based credentials
+  absl::optional<std::string> certificate_b64_ = absl::nullopt;
+  absl::optional<std::string> certificate_chain_b64_ = absl::nullopt;
+  absl::optional<std::string> certificate_private_key_pem_ = absl::nullopt;
+  absl::optional<std::string> certificate_serial_ = absl::nullopt;
+  absl::optional<SystemTime> certificate_expiration_ = absl::nullopt;
+  absl::optional<PublicKeySignatureAlgorithm> certificate_signature_algorithm_ = absl::nullopt;
+};
+
+/*
  * Interface for classes able to fetch AWS credentials from the execution environment.
  */
 class CredentialsProvider {
@@ -154,6 +213,23 @@ protected:
 };
 
 using CredentialsProviderChainSharedPtr = std::shared_ptr<CredentialsProviderChain>;
+
+/*
+ * X509 credential provider used for IAM Roles Anywhere
+ */
+class X509CredentialsProvider {
+public:
+  virtual ~X509CredentialsProvider() = default;
+
+  /**
+   * Get credentials from the environment.
+   *
+   * @return AWS credentials
+   */
+  virtual X509Credentials getCredentials() PURE;
+};
+
+using X509CredentialsProviderSharedPtr = std::shared_ptr<X509CredentialsProvider>;
 
 } // namespace Aws
 } // namespace Common

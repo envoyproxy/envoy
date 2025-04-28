@@ -15,19 +15,20 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.2"
+"source/common/quic:93.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
-"source/common/tls:95.5"
+"source/common/tls:94.4" # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
 "source/common/tls/cert_validator:94.7"
 "source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/extensions/common/aws:96.3"
+"source/extensions/common/aws/credential_providers:94.4"
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.6"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
-"source/extensions/filters/common/ext_proc:85.6" # comment is counted by LCOV #37911
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:92.6"
 "source/extensions/filters/http/cache:95.9"

@@ -50,7 +50,6 @@ EXTENSIONS = {
     #
 
     "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
-    "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
     # WASM
@@ -284,6 +283,7 @@ EXTENSIONS = {
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
     "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
+    "envoy.tracers.fluentd":                            "//source/extensions/tracers/fluentd:config",
 
     #
     # OpenTelemetry Resource Detectors
@@ -462,6 +462,12 @@ EXTENSIONS = {
     #
 
     "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
+
+    #
+    # RBAC principals
+    #
+
+    "envoy.rbac.principals.mtls_authenticated":        "//source/extensions/filters/common/rbac/principals/mtls_authenticated:config",
 
     #
     # DNS Resolver

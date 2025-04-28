@@ -534,6 +534,24 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via_upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via_upstream")));
+  }
+
+  {
+    StreamInfoFormatter response_code_format("RESPONSE_CODE_DETAILS", "ALLOW_WHITESPACES");
+    absl::optional<std::string> rc_details{"via upstream"};
+    EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
+    EXPECT_EQ("via upstream", response_code_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(response_code_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("via upstream")));
+  }
+
+  {
     StreamInfoFormatter termination_details_format("CONNECTION_TERMINATION_DETAILS");
     absl::optional<std::string> details;
     EXPECT_CALL(stream_info, connectionTerminationDetails()).WillRepeatedly(ReturnRef(details));
@@ -1081,20 +1099,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
               upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::stringValue("invalid:prefix__valid_middle_valid_suffix")));
-  }
-
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({
-        {"envoy.reloadable_features.sanitize_sni_in_access_log", "false"},
-    });
-
-    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
-    std::string requested_server_name = "stub_server\n";
-    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
-    EXPECT_EQ("stub_server\n", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::stringValue("stub_server\n")));
   }
 
   {

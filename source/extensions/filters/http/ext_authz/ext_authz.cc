@@ -410,13 +410,17 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   decoder_callbacks_ = &callbacks;
 }
 
-void Filter::updateLoggingInfo() {
+void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   if (!config_->emitFilterStateStats()) {
     return;
   }
 
   if (logging_info_ == nullptr) {
     return;
+  }
+
+  if (grpc_status.has_value()) {
+    logging_info_->setGrpcStatus(grpc_status.value());
   }
 
   // Latency is the only stat available if we aren't using envoy grpc.
@@ -472,7 +476,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
-  updateLoggingInfo();
+  updateLoggingInfo(response->grpc_status);
 
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {

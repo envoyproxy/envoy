@@ -45,6 +45,7 @@ envoy_cc_test(
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",

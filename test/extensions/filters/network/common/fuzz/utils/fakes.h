@@ -38,7 +38,7 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   Stats::Scope& scope() override { return scope_; }
   Stats::Scope& listenerScope() override { return listener_scope_; }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override {
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return ProtobufMessage::getStrictValidationVisitor();
   }
   const Network::ListenerInfo& listenerInfo() const override { return listener_info_; }
