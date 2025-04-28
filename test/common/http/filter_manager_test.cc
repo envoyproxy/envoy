@@ -30,8 +30,8 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-using Protobuf::util::MessageDifferencer;
 using ::Envoy::Network::MockSocketOption;
+using Protobuf::util::MessageDifferencer;
 
 class FilterManagerTest : public testing::Test {
 public:
@@ -295,8 +295,39 @@ TEST_F(FilterManagerTest, OnLocalReply) {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
             return Http::LocalErrorStatus::Continue;
           }));
-  MockFilterManagerCallbacks std::shared_ptr<MockStreamDecoderFilter> decoder_filter(
-      new NiceMock<MockStreamDecoderFilter>());
+  EXPECT_CALL(*stream_filter, onLocalReply(_))
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return LocalErrorStatus::ContinueAndResetStream;
+          }));
+  EXPECT_CALL(*encoder_filter, onLocalReply(_))
+      .WillOnce(Invoke(
+          [&](const StreamFilterBase::LocalReplyData& local_reply_data) -> Http::LocalErrorStatus {
+            EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
+            return Http::LocalErrorStatus::Continue;
+          }));
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(_, _));
+  decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
+                                             Grpc::Status::Internal, "details");
+
+  // The reason for the response (in this case the reset) will still be tracked
+  // but as no response is sent the response code will remain absent.
+
+  ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
+  EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details");
+  EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  validateFilterStateData("configName1");
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, MultipleOnLocalReply) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
   std::shared_ptr<MockStreamEncoderFilter> encoder_filter(new NiceMock<MockStreamEncoderFilter>());
   std::shared_ptr<MockStreamFilter> stream_filter(new NiceMock<MockStreamFilter>());
 
@@ -736,10 +767,7 @@ TEST_F(FilterManagerTest, SetSocketOptionTest) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(filter_manager_callbacks_, setDownstreamSocketOption(_))
-      .Times(1)
-      .WillRepeatedly(Return(true));
-  auto option = std::make_shared<MockSocketOption>();
+  EXPECT_CALL(filter_manager_callbacks_, setSocketOption(_)).Times(1).WillRepeatedly(Return(true));
 
   EXPECT_TRUE(filter_manager_->setDownstreamSocketOption(option));
   filter_manager_->destroyFilters();
