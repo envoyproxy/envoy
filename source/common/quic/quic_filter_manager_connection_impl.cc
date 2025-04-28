@@ -61,10 +61,10 @@ bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() const {
   return false;
 }
 
-bool QuicFilterManagerConnectionImpl::setSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+bool QuicFilterManagerConnectionImpl::setSocketOption(
+    const Network::Socket::OptionConstSharedPtr option) {
   return network_connection_->connectionSocket()->setSocketOption(option);
 }
-
 
 void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // Currently read buffer is capped by connection level flow control. And write buffer limit is set
