@@ -108,9 +108,6 @@ func requestFinalize(r *httpRequest) {
 func getOrCreateState(s *C.processState) *processState {
 	r := s.req
 	req := getRequest(r)
-	if req == nil {
-		req = createRequest(r)
-	}
 	if s.is_encoding == 0 {
 		if req.decodingState.processState == nil {
 			req.decodingState.processState = s
@@ -151,7 +148,11 @@ func createRequest(r *C.httpRequest) *httpRequest {
 }
 
 func getRequest(r *C.httpRequest) *httpRequest {
-	return Requests.GetReq(r)
+	req := Requests.GetReq(r)
+	if req == nil {
+		req = createRequest(r)
+	}
+	return req
 }
 
 func getState(s *C.processState) *processState {
@@ -274,11 +275,6 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
 	decodingState := getOrCreateState(decodingStateWrapper)
 	encodingState := getOrCreateState(encodingStateWrapper)
 	req := getRequest(r)
-	if req == nil {
-		// When creating DownstreamStart access log, the request is not initialized yet
-		req = createRequest(r)
-	}
-
 	defer req.recoverPanic()
 
 	v := api.AccessLogType(logType)
@@ -352,10 +348,6 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
 //export envoyGoFilterOnHttpStreamComplete
 func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 	req := getRequest(r)
-	if req == nil {
-		// When the client aborts, the request may be not initialized yet
-		req = createRequest(r)
-	}
 	defer req.recoverPanic()
 
 	f := req.httpFilter
