@@ -77,5 +77,3 @@ jobs:
           diskspace-hack: true
           diskspace-hack-paths: |
             /opt/hostedtoolcache
-        - target: fuzz_coverage
-          name: Fuzz coverage
