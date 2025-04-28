@@ -27,8 +27,6 @@ secret access key (the session token is optional).
    variable and role arn read from ``AWS_ROLE_ARN`` environment variable. The credentials are extracted from the fields ``AccessKeyId``,
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
    ``Expiration``).
-   This provider is not compatible with :ref:`Grpc Credentials AWS AwsIamConfig <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>`
-   plugin which can only support deprecated libcurl credentials fetcher (see `issue #30626 <https://github.com/envoyproxy/envoy/pull/30626>`_).
    To fetch the credentials a static cluster is created with the name ``sts_token_service_internal-<region>`` pointing towards regional
    AWS Security Token Service.
 

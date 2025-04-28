@@ -188,7 +188,7 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
     return server_.transportSocketFactoryContext();
   };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }

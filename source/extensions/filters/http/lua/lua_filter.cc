@@ -112,7 +112,12 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   const auto& metadata = callbacks->route()->metadata();
 
   {
-    const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
+    auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+    // TODO(wbpcode): deprecate this in favor of the above.
+    filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
     }
@@ -280,10 +285,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   }
 
   if (state_ == State::HttpCall) {
-    return (Runtime::runtimeFeatureEnabled(
-               "envoy.reloadable_features.lua_flow_control_while_http_call"))
-               ? Http::FilterDataStatus::StopIterationAndWatermark
-               : Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationAndWatermark;
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;

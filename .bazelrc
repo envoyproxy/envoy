@@ -458,6 +458,7 @@ build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+build:asan-fuzzer --linkopt=-lc++
 
 build:oss-fuzz --config=fuzzing
 build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz

@@ -218,7 +218,7 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed()
 Status::GrpcStatus
 GrpcJsonReverseTranscoderFilter::GrpcStatusFromHeaders(ResponseHeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
-  if (http_response_status == 200) {
+  if (http_response_status >= 200 && http_response_status <= 299) {
     return Status::WellKnownGrpcStatus::Ok;
   } else {
     is_non_ok_response_ = true;
@@ -294,6 +294,9 @@ bool GrpcJsonReverseTranscoderFilter::CreateDataBuffer(const json& payload,
     if (payload[http_request_body_field_].contains("content_type")) {
       request_headers_->setContentType(
           payload[http_request_body_field_]["content_type"].get<std::string>());
+    } else if (payload[http_request_body_field_].contains("contentType")) {
+      request_headers_->setContentType(
+          payload[http_request_body_field_]["contentType"].get<std::string>());
     }
   } else {
     buffer.add(payload[http_request_body_field_].dump());
@@ -337,6 +340,23 @@ absl::Status GrpcJsonReverseTranscoderFilter::ExtractHttpAnnotationValues(
     return absl::InvalidArgumentError("Invalid or missing http annotations");
   }
   http_request_body_field_ = http_rule.body();
+  if (!http_request_body_field_.empty() && http_request_body_field_ != "*") {
+    // Change the field name to `json_name` annotation value if it exists else change it to
+    // camelCase, if the filter is not configured to preserve the proto field name.
+    absl::StatusOr<std::string> request_body_field_or_error =
+        per_route_config_->ChangeBodyFieldName(method_descriptor->input_type()->full_name(),
+                                               http_request_body_field_);
+    RETURN_IF_NOT_OK_REF(request_body_field_or_error.status());
+    http_request_body_field_ = std::move(request_body_field_or_error.value());
+    // Update the path template as well, if it's referencing fields from the http body object.
+    const std::string http_rule_prefix = absl::StrCat("{", http_rule.body(), ".");
+    if (http_request_body_field_ != http_rule.body() &&
+        absl::StrContains(http_request_path_template_, http_rule_prefix)) {
+      http_request_path_template_ = absl::StrReplaceAll(
+          http_request_path_template_,
+          {{http_rule_prefix, absl::StrCat("{", http_request_body_field_, ".")}});
+    }
+  }
   return absl::OkStatus();
 }
 

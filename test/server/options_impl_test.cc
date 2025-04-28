@@ -332,6 +332,14 @@ TEST_F(OptionsImplTest, DefaultParamsNoConstructorArgs) {
   EXPECT_EQ(spdlog::level::info, options->logLevel());
 }
 
+TEST_F(OptionsImplTest, SetEnableFineGrainLogging) {
+  std::unique_ptr<OptionsImplBase> options = std::make_unique<OptionsImplBase>();
+
+  EXPECT_FALSE(options->enableFineGrainLogging());
+  options->setEnableFineGrainLogging(true);
+  EXPECT_TRUE(options->enableFineGrainLogging());
+}
+
 // Validates that the server_info proto is in sync with the options.
 TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
