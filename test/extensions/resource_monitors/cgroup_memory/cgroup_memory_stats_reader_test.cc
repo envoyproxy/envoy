@@ -1,5 +1,6 @@
 #include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_stats_reader.h"
 
+#include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -15,21 +16,6 @@ namespace {
 using testing::NiceMock;
 using testing::Return;
 using testing::Throw;
-
-// Mock filesystem implementation for testing.
-class MockFilesystem : public Filesystem::Instance {
-public:
-  MOCK_METHOD(Filesystem::FilePtr, createFile, (const Filesystem::FilePathAndType&), (override));
-  MOCK_METHOD(bool, fileExists, (const std::string&), (override));
-  MOCK_METHOD(Api::IoCallResult<Filesystem::FileInfo>, stat, (absl::string_view), (override));
-  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view), (override));
-  MOCK_METHOD(bool, directoryExists, (const std::string&), (override));
-  MOCK_METHOD(ssize_t, fileSize, (const std::string&), (override));
-  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&), (override));
-  MOCK_METHOD(absl::StatusOr<Filesystem::PathSplitResult>, splitPathFromFilename,
-              (absl::string_view), (override));
-  MOCK_METHOD(bool, illegalPath, (const std::string&), (override));
-};
 
 // Test implementation of V1 stats reader with configurable paths.
 class TestCgroupV1StatsReader : public CgroupV1StatsReader {
@@ -79,12 +65,12 @@ public:
 
 // Tests that the stats reader correctly reads memory usage from a file.
 TEST(CgroupMemoryStatsReaderTest, ReadsMemoryUsage) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock fileExists to return true for V1 paths
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
 
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getUsagePath()))
       .WillOnce(Return(absl::StatusOr<std::string>("500")));
@@ -96,12 +82,12 @@ TEST(CgroupMemoryStatsReaderTest, ReadsMemoryUsage) {
 
 // Tests that the stats reader correctly reads memory limit from a file.
 TEST(CgroupMemoryStatsReaderTest, ReadsMemoryLimit) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock fileExists to return true for V1 paths
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
 
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getLimitPath()))
       .WillOnce(Return(absl::StatusOr<std::string>("1000")));
@@ -113,12 +99,12 @@ TEST(CgroupMemoryStatsReaderTest, ReadsMemoryLimit) {
 
 // Tests that the stats reader handles empty files.
 TEST(CgroupMemoryStatsReaderTest, HandlesEmptyFiles) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock fileExists to return true for V1 paths
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
 
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getUsagePath()))
       .WillOnce(Return(absl::StatusOr<std::string>("")));
@@ -130,12 +116,12 @@ TEST(CgroupMemoryStatsReaderTest, HandlesEmptyFiles) {
 
 // Tests that the stats reader handles invalid values.
 TEST(CgroupMemoryStatsReaderTest, HandlesInvalidValues) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock fileExists to return true for V1 paths
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
 
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getUsagePath()))
       .WillOnce(Return(absl::StatusOr<std::string>("invalid")));
@@ -147,12 +133,12 @@ TEST(CgroupMemoryStatsReaderTest, HandlesInvalidValues) {
 
 // Tests that the stats reader handles file read errors.
 TEST(CgroupMemoryStatsReaderTest, HandlesFileReadErrors) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock fileExists to return true for V1 paths
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
 
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getUsagePath()))
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read file")));
@@ -162,36 +148,28 @@ TEST(CgroupMemoryStatsReaderTest, HandlesFileReadErrors) {
   EXPECT_THROW(reader->getMemoryUsage(), EnvoyException);
 }
 
-// Tests that the stats reader handles unlimited memory.
-TEST(CgroupMemoryStatsReaderTest, HandlesUnlimitedMemory) {
-  NiceMock<MockFilesystem> mock_fs;
+// Tests that the stats reader handles unlimited memory in different formats
+TEST(CgroupMemoryStatsReaderTest, HandlesUnlimitedMemoryFormats) {
+  NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock fileExists to return true for V1 paths
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
   ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
 
+  // Test case 1: "max" format (V2 style)
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getLimitPath()))
       .WillOnce(Return(absl::StatusOr<std::string>("max")));
 
   auto reader = CgroupV1StatsReader::create(mock_fs);
   ASSERT_NE(reader, nullptr);
   EXPECT_EQ(reader->getMemoryLimit(), CgroupMemoryStatsReader::UNLIMITED_MEMORY);
-}
 
-// Tests that the stats reader handles unlimited memory with different formats.
-TEST(CgroupMemoryStatsReaderTest, HandlesUnlimitedMemoryFormats) {
-  NiceMock<MockFilesystem> mock_fs;
-
-  // Mock fileExists to return true for V1 paths
-  ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
-  ON_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillByDefault(Return(true));
-
+  // Test case 2: "-1" format (V1 style)
   EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V1::getLimitPath()))
       .WillOnce(Return(absl::StatusOr<std::string>("-1")));
 
-  auto reader = CgroupV1StatsReader::create(mock_fs);
+  reader = CgroupV1StatsReader::create(mock_fs);
   ASSERT_NE(reader, nullptr);
   EXPECT_EQ(reader->getMemoryLimit(), CgroupMemoryStatsReader::UNLIMITED_MEMORY);
 }
@@ -210,7 +188,7 @@ TEST(CgroupMemoryStatsReaderTest, ReadsV1MemoryStats) {
     file_updater_limit.update("2000\n");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(usage_path))
       .WillOnce(Return(absl::StatusOr<std::string>("1000\n")));
   EXPECT_CALL(mock_fs, fileReadToEnd(limit_path))
@@ -235,7 +213,7 @@ TEST(CgroupMemoryStatsReaderTest, ReadsV2MemoryStats) {
     file_updater_limit.update("3000\n");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(usage_path))
       .WillOnce(Return(absl::StatusOr<std::string>("1500\n")));
   EXPECT_CALL(mock_fs, fileReadToEnd(limit_path))
@@ -260,7 +238,7 @@ TEST(CgroupMemoryStatsReaderTest, HandlesV2MaxValue) {
     file_updater_limit.update("max\n");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(usage_path))
       .WillOnce(Return(absl::StatusOr<std::string>("1000\n")));
   EXPECT_CALL(mock_fs, fileReadToEnd(limit_path))
@@ -280,7 +258,7 @@ TEST(CgroupMemoryStatsReaderTest, HandlesV1UnlimitedValue) {
     file_updater.update("-1\n"); // V1 format for unlimited
   }
 
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(limit_path))
       .WillOnce(Return(absl::StatusOr<std::string>("-1\n")));
 
@@ -288,52 +266,51 @@ TEST(CgroupMemoryStatsReaderTest, HandlesV1UnlimitedValue) {
   EXPECT_EQ(stats_reader.getMemoryLimit(), CgroupMemoryStatsReader::UNLIMITED_MEMORY);
 }
 
-// Tests that an exception is thrown when the memory stats file is missing.
-TEST(CgroupMemoryStatsReaderTest, ThrowsOnMissingFile) {
+// Tests that the stats reader handles various error scenarios
+TEST(CgroupMemoryStatsReaderTest, HandlesErrorScenarios) {
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Mock fileExists to return true for V1 paths
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillByDefault(Return(false));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillByDefault(Return(false));
+  ON_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillByDefault(Return(true));
+
+  // Test case 1: Missing file
   const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
-  NiceMock<MockFilesystem> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(nonexistent_path))
       .WillOnce(Throw(EnvoyException("Unable to read memory stats file")));
 
-  TestCgroupV1StatsReader stats_reader(mock_fs, nonexistent_path, "dummy");
-  EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
+  TestCgroupV1StatsReader stats_reader1(mock_fs, nonexistent_path, "dummy");
+  EXPECT_THROW_WITH_MESSAGE(stats_reader1.getMemoryUsage(), EnvoyException,
                             "Unable to read memory stats file");
-}
 
-// Tests that an exception is thrown when the memory stats file contains invalid content.
-TEST(CgroupMemoryStatsReaderTest, ThrowsOnInvalidContent) {
+  // Test case 2: Invalid content
   const std::string invalid_path = TestEnvironment::temporaryPath("invalid");
   {
     AtomicFileUpdater file_updater(invalid_path);
     file_updater.update("not_a_number\n");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(invalid_path))
       .WillOnce(Return(absl::StatusOr<std::string>("not_a_number\n")));
 
-  TestCgroupV1StatsReader stats_reader(mock_fs, invalid_path, "dummy");
-  EXPECT_THROW(stats_reader.getMemoryUsage(), EnvoyException);
-}
+  TestCgroupV1StatsReader stats_reader2(mock_fs, invalid_path, "dummy");
+  EXPECT_THROW(stats_reader2.getMemoryUsage(), EnvoyException);
 
-// Tests that an exception is thrown when the memory stats file is empty.
-TEST(CgroupMemoryStatsReaderTest, ThrowsOnEmptyFile) {
+  // Test case 3: Empty file
   const std::string empty_path = TestEnvironment::temporaryPath("empty");
   {
     AtomicFileUpdater file_updater(empty_path);
     file_updater.update("");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(empty_path)).WillOnce(Return(absl::StatusOr<std::string>("")));
 
-  TestCgroupV1StatsReader stats_reader(mock_fs, empty_path, "dummy");
-  EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
+  TestCgroupV1StatsReader stats_reader3(mock_fs, empty_path, "dummy");
+  EXPECT_THROW_WITH_MESSAGE(stats_reader3.getMemoryUsage(), EnvoyException,
                             fmt::format("Empty memory stats file at {}", empty_path));
-}
 
-// Tests that an exception is thrown when the memory stats file is unreadable.
-TEST(CgroupMemoryStatsReaderTest, ThrowsOnUnreadableFile) {
+  // Test case 4: Unreadable file
   const std::string unreadable_path = TestEnvironment::temporaryPath("unreadable");
   {
     AtomicFileUpdater file_updater(unreadable_path);
@@ -341,53 +318,47 @@ TEST(CgroupMemoryStatsReaderTest, ThrowsOnUnreadableFile) {
     chmod(unreadable_path.c_str(), 0000);
   }
 
-  NiceMock<MockFilesystem> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(unreadable_path))
       .WillOnce(Return(absl::InvalidArgumentError("Unable to open memory stats file")));
 
-  TestCgroupV1StatsReader stats_reader(mock_fs, unreadable_path, "dummy");
-  EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
+  TestCgroupV1StatsReader stats_reader4(mock_fs, unreadable_path, "dummy");
+  EXPECT_THROW_WITH_MESSAGE(stats_reader4.getMemoryUsage(), EnvoyException,
                             fmt::format("Unable to read memory stats file at {}", unreadable_path));
 
   chmod(unreadable_path.c_str(), 0644);
-}
 
-// Tests that an exception is thrown when the memory stats file cannot be read.
-TEST(CgroupMemoryStatsReaderTest, ThrowsOnReadError) {
+  // Test case 5: Read error
   const std::string path = TestEnvironment::temporaryPath("read_error");
   {
     AtomicFileUpdater file_updater(path);
     file_updater.update("");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(path))
       .WillOnce(Return(absl::InvalidArgumentError("Unable to read memory stats from file")));
 
-  TestCgroupV1StatsReader stats_reader(mock_fs, path, "dummy");
-  EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
+  TestCgroupV1StatsReader stats_reader5(mock_fs, path, "dummy");
+  EXPECT_THROW_WITH_MESSAGE(stats_reader5.getMemoryUsage(), EnvoyException,
                             fmt::format("Unable to read memory stats file at {}", path));
-}
 
-TEST(CgroupMemoryStatsReaderTest, ThrowsOnWhitespaceOnlyFile) {
+  // Test case 6: Whitespace-only file
   const std::string whitespace_path = TestEnvironment::temporaryPath("whitespace");
   {
     AtomicFileUpdater file_updater(whitespace_path);
     file_updater.update("  \n\t  \n");
   }
 
-  NiceMock<MockFilesystem> mock_fs;
   EXPECT_CALL(mock_fs, fileReadToEnd(whitespace_path))
       .WillOnce(Return(absl::StatusOr<std::string>("  \n\t  \n")));
 
-  TestCgroupV1StatsReader stats_reader(mock_fs, whitespace_path, "dummy");
-  EXPECT_THROW_WITH_MESSAGE(stats_reader.getMemoryUsage(), EnvoyException,
+  TestCgroupV1StatsReader stats_reader6(mock_fs, whitespace_path, "dummy");
+  EXPECT_THROW_WITH_MESSAGE(stats_reader6.getMemoryUsage(), EnvoyException,
                             fmt::format("Empty memory stats file at {}", whitespace_path));
 }
 
 // Tests that factory creates V2 reader when V2 implementation is available.
 TEST(CgroupMemoryStatsReaderTest, CreateReturnsV2ReaderWhenV2Available) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
 
   EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(true));
@@ -399,11 +370,11 @@ TEST(CgroupMemoryStatsReaderTest, CreateReturnsV2ReaderWhenV2Available) {
 
 // Tests that factory falls back to V1 reader when V2 is not available.
 TEST(CgroupMemoryStatsReaderTest, CreateReturnsV1ReaderWhenV1Available) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
 
   EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillOnce(Return(true));
 
   auto reader = CgroupMemoryStatsReader::create(mock_fs);
   EXPECT_NE(dynamic_cast<CgroupV1StatsReader*>(reader.get()), nullptr);
@@ -411,30 +382,88 @@ TEST(CgroupMemoryStatsReaderTest, CreateReturnsV1ReaderWhenV1Available) {
 
 // Tests that factory throws when no cgroup implementation is available.
 TEST(CgroupMemoryStatsReaderTest, CreateThrowsWhenNoImplementationAvailable) {
-  NiceMock<MockFilesystem> mock_fs;
+  NiceMock<Filesystem::MockInstance> mock_fs;
   ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
 
   EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::CGROUP_V1_BASE)).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillOnce(Return(false));
 
   EXPECT_THROW_WITH_MESSAGE(CgroupMemoryStatsReader::create(mock_fs), EnvoyException,
                             "No supported cgroup memory implementation found");
 }
 
-// Tests that V1 reader returns correct paths
-TEST(CgroupMemoryStatsReaderTest, V1ReaderReturnsPaths) {
-  NiceMock<MockFilesystem> mock_fs;
-  TestableV1StatsReader stats_reader(mock_fs);
-  EXPECT_EQ(stats_reader.getMemoryUsagePath(), CgroupPaths::V1::getUsagePath());
-  EXPECT_EQ(stats_reader.getMemoryLimitPath(), CgroupPaths::V1::getLimitPath());
+// Tests that V1 and V2 readers return correct paths
+TEST(CgroupMemoryStatsReaderTest, ReadersReturnCorrectPaths) {
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Test V1 reader paths
+  TestableV1StatsReader v1_stats_reader(mock_fs);
+  EXPECT_EQ(v1_stats_reader.getMemoryUsagePath(), CgroupPaths::V1::getUsagePath());
+  EXPECT_EQ(v1_stats_reader.getMemoryLimitPath(), CgroupPaths::V1::getLimitPath());
+
+  // Test V2 reader paths
+  TestableV2StatsReader v2_stats_reader(mock_fs);
+  EXPECT_EQ(v2_stats_reader.getMemoryUsagePath(), CgroupPaths::V2::getUsagePath());
+  EXPECT_EQ(v2_stats_reader.getMemoryLimitPath(), CgroupPaths::V2::getLimitPath());
 }
 
-// Tests that V2 reader returns correct paths
-TEST(CgroupMemoryStatsReaderTest, V2ReaderReturnsPaths) {
-  NiceMock<MockFilesystem> mock_fs;
-  TestableV2StatsReader stats_reader(mock_fs);
-  EXPECT_EQ(stats_reader.getMemoryUsagePath(), CgroupPaths::V2::getUsagePath());
-  EXPECT_EQ(stats_reader.getMemoryLimitPath(), CgroupPaths::V2::getLimitPath());
+TEST(CgroupMemoryStatsReaderTest, CreateV1Reader) {
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Set up default behavior for all fileExists calls
+  ON_CALL(mock_fs, fileExists(testing::_)).WillByDefault(Return(false));
+
+  // First, isV2 will check V2 usage path and return false (short-circuit)
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(false));
+  // Note: V2 limit path should not be checked due to short-circuit
+
+  // Then, isV1 will check V1 base path and return true
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillOnce(Return(true));
+
+  auto reader = CgroupMemoryStatsReader::create(mock_fs);
+  EXPECT_NE(reader, nullptr);
+  EXPECT_NE(dynamic_cast<CgroupV1StatsReader*>(reader.get()), nullptr);
+}
+
+TEST(CgroupMemoryStatsReaderTest, CreateV2Reader) {
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Set up default behavior for all fileExists calls
+  ON_CALL(mock_fs, fileExists(testing::_)).WillByDefault(Return(false));
+
+  // isV2 will check V2 paths and return true
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillOnce(Return(true));
+
+  // isV1 will not be called because isV2 returned true
+
+  auto reader = CgroupMemoryStatsReader::create(mock_fs);
+  EXPECT_NE(reader, nullptr);
+  EXPECT_NE(dynamic_cast<CgroupV2StatsReader*>(reader.get()), nullptr);
+}
+
+// Tests that subclasses only implement path-related methods
+TEST(CgroupMemoryStatsReaderTest, SubclassesOnlyImplementPathMethods) {
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Create V1 and V2 readers
+  TestCgroupV1StatsReader v1_reader(mock_fs, "v1_usage", "v1_limit");
+  TestCgroupV2StatsReader v2_reader(mock_fs, "v2_usage", "v2_limit");
+
+  // Verify that path methods return the correct paths
+  EXPECT_EQ(v1_reader.getMemoryUsagePath(), "v1_usage");
+  EXPECT_EQ(v1_reader.getMemoryLimitPath(), "v1_limit");
+  EXPECT_EQ(v2_reader.getMemoryUsagePath(), "v2_usage");
+  EXPECT_EQ(v2_reader.getMemoryLimitPath(), "v2_limit");
+
+  // Verify that memory usage and limit methods are handled by base class
+  EXPECT_CALL(mock_fs, fileReadToEnd("v1_usage"))
+      .WillOnce(Return(absl::StatusOr<std::string>("1000\n")));
+  EXPECT_CALL(mock_fs, fileReadToEnd("v1_limit"))
+      .WillOnce(Return(absl::StatusOr<std::string>("2000\n")));
+
+  EXPECT_EQ(v1_reader.getMemoryUsage(), 1000);
+  EXPECT_EQ(v1_reader.getMemoryLimit(), 2000);
 }
 
 } // namespace

@@ -6,21 +6,22 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace CgroupMemory {
 
-uint64_t CgroupMemoryStatsReader::readMemoryStats(Filesystem::Instance& fs,
-                                                  const std::string& path) {
-  auto result = fs.fileReadToEnd(path);
+uint64_t CgroupMemoryStatsReader::readMemoryStats(const std::string& path) {
+  auto result = fs_.fileReadToEnd(path);
   if (!result.ok()) {
     throw EnvoyException(fmt::format("Unable to read memory stats file at {}", path));
   }
 
-  std::string value_str = result.value();
-  // Trim whitespace
-  value_str.erase(std::remove_if(value_str.begin(), value_str.end(), ::isspace), value_str.end());
+  // Use Abseil's StripAsciiWhitespace and StrCat for string handling
+  std::string value_str = absl::StrCat(absl::StripAsciiWhitespace(result.value()));
 
   if (value_str.empty()) {
     throw EnvoyException(fmt::format("Empty memory stats file at {}", path));
@@ -58,24 +59,6 @@ CgroupMemoryStatsReader::StatsReaderPtr CgroupMemoryStatsReader::create(Filesyst
   }
 
   throw EnvoyException("No supported cgroup memory implementation found");
-}
-
-// CgroupV1StatsReader implementation
-uint64_t CgroupV1StatsReader::getMemoryUsage() {
-  return readMemoryStats(fs_, getMemoryUsagePath());
-}
-
-uint64_t CgroupV1StatsReader::getMemoryLimit() {
-  return readMemoryStats(fs_, getMemoryLimitPath());
-}
-
-// CgroupV2StatsReader implementation
-uint64_t CgroupV2StatsReader::getMemoryUsage() {
-  return readMemoryStats(fs_, getMemoryUsagePath());
-}
-
-uint64_t CgroupV2StatsReader::getMemoryLimit() {
-  return readMemoryStats(fs_, getMemoryLimitPath());
 }
 
 } // namespace CgroupMemory

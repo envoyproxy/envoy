@@ -31,14 +31,14 @@ public:
    * @return Current memory usage in bytes.
    * @throw EnvoyException if stats cannot be read.
    */
-  virtual uint64_t getMemoryUsage() PURE;
+  uint64_t getMemoryUsage() { return readMemoryStats(getMemoryUsagePath()); }
 
   /**
    * @return Memory limit in bytes.
    * @return UNLIMITED_MEMORY if no limit is set.
    * @throw EnvoyException if stats cannot be read.
    */
-  virtual uint64_t getMemoryLimit() PURE;
+  uint64_t getMemoryLimit() { return readMemoryStats(getMemoryLimitPath()); }
 
   /**
    * Factory method to create the appropriate cgroup stats reader.
@@ -53,12 +53,11 @@ protected:
 
   /**
    * Helper method to read and parse memory stats from cgroup files.
-   * @param fs Filesystem instance to use for file operations.
    * @param path Path to the memory stats file.
    * @return Memory value in bytes.
    * @throw EnvoyException if file cannot be read or parsed.
    */
-  static uint64_t readMemoryStats(Filesystem::Instance& fs, const std::string& path);
+  uint64_t readMemoryStats(const std::string& path);
 
   /**
    * @return Path to the memory usage file.
@@ -70,6 +69,7 @@ protected:
    */
   virtual std::string getMemoryLimitPath() const PURE;
 
+private:
   Filesystem::Instance& fs_;
 };
 
@@ -79,8 +79,6 @@ protected:
 class CgroupV1StatsReader : public CgroupMemoryStatsReader {
 public:
   explicit CgroupV1StatsReader(Filesystem::Instance& fs) : CgroupMemoryStatsReader(fs) {}
-  uint64_t getMemoryUsage() override;
-  uint64_t getMemoryLimit() override;
 
 protected:
   std::string getMemoryUsagePath() const override { return CgroupPaths::V1::getUsagePath(); }
@@ -93,8 +91,6 @@ protected:
 class CgroupV2StatsReader : public CgroupMemoryStatsReader {
 public:
   explicit CgroupV2StatsReader(Filesystem::Instance& fs) : CgroupMemoryStatsReader(fs) {}
-  uint64_t getMemoryUsage() override;
-  uint64_t getMemoryLimit() override;
 
 protected:
   std::string getMemoryUsagePath() const override { return CgroupPaths::V2::getUsagePath(); }

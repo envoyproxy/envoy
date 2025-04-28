@@ -18,21 +18,6 @@ namespace ResourceMonitors {
 namespace CgroupMemory {
 namespace {
 
-// Mock filesystem implementation for testing.
-class MockFilesystem : public Filesystem::Instance {
-public:
-  MOCK_METHOD(Filesystem::FilePtr, createFile, (const Filesystem::FilePathAndType&), (override));
-  MOCK_METHOD(bool, fileExists, (const std::string&), (override));
-  MOCK_METHOD(Api::IoCallResult<Filesystem::FileInfo>, stat, (absl::string_view), (override));
-  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view), (override));
-  MOCK_METHOD(bool, directoryExists, (const std::string&), (override));
-  MOCK_METHOD(ssize_t, fileSize, (const std::string&), (override));
-  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&), (override));
-  MOCK_METHOD(absl::StatusOr<Filesystem::PathSplitResult>, splitPathFromFilename,
-              (absl::string_view), (override));
-  MOCK_METHOD(bool, illegalPath, (const std::string&), (override));
-};
-
 class ResourcePressure : public Server::ResourceUpdateCallbacks {
 public:
   void onSuccess(const Server::ResourceUsage& usage) override {
@@ -57,7 +42,7 @@ TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingConfigLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   config.set_max_memory_bytes(250);
 
-  testing::NiceMock<MockFilesystem> mock_fs;
+  testing::NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock the filesystem to indicate that cgroup v2 paths exist
   ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
@@ -83,7 +68,7 @@ TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingConfigLimit) {
 TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingCgroupLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
 
-  testing::NiceMock<MockFilesystem> mock_fs;
+  testing::NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock the filesystem to indicate that cgroup v2 paths exist
   ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
@@ -109,7 +94,7 @@ TEST(CgroupMemoryMonitorTest, ComputesCorrectUsageUsingCgroupLimit) {
 TEST(CgroupMemoryMonitorTest, UsageExceedsLimit) {
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
 
-  testing::NiceMock<MockFilesystem> mock_fs;
+  testing::NiceMock<Filesystem::MockInstance> mock_fs;
 
   // Mock the filesystem to indicate that cgroup v2 paths exist
   ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
@@ -132,138 +117,131 @@ TEST(CgroupMemoryMonitorTest, UsageExceedsLimit) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 2.0);
 }
 
-// Test that the monitor handles unlimited cgroup memory
-TEST(CgroupMemoryMonitorTest, HandlesUnlimitedCgroupMemory) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+// Test that the monitor handles various unlimited memory scenarios
+TEST(CgroupMemoryMonitorTest, HandlesUnlimitedMemoryScenarios) {
+  // Test case 1: Unlimited cgroup memory
+  {
+    envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+    testing::NiceMock<Filesystem::MockInstance> mock_fs;
 
-  testing::NiceMock<MockFilesystem> mock_fs;
+    // Mock the filesystem to indicate that cgroup v2 paths exist
+    ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
 
-  // Mock the filesystem to indicate that cgroup v2 paths exist
-  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+    // Mock the file reads to return memory usage and unlimited limit
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+        .WillOnce(Return(absl::StatusOr<std::string>("500")));
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+        .WillOnce(Return(absl::StatusOr<std::string>("max"))); // "max" means unlimited in cgroup v2
 
-  // Mock the file reads to return memory usage and unlimited limit
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("500")));
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("max"))); // "max" means unlimited in cgroup v2
+    auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
 
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
+    ResourcePressure resource;
+    monitor->updateResourceUsage(resource);
+    ASSERT_TRUE(resource.hasPressure());
+    ASSERT_FALSE(resource.hasError());
+    // Unlimited cgroup memory means no pressure
+    EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);
+  }
 
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasPressure());
-  ASSERT_FALSE(resource.hasError());
-  // Unlimited cgroup memory means no pressure
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);
+  // Test case 2: Unlimited configured memory
+  {
+    envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+    config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
+    testing::NiceMock<Filesystem::MockInstance> mock_fs;
+
+    // Mock the filesystem to indicate that cgroup v2 paths exist
+    ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+
+    // Mock the file reads to return memory usage and limit
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+        .WillOnce(Return(absl::StatusOr<std::string>("500")));
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+        .WillOnce(Return(absl::StatusOr<std::string>("500")));
+
+    auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
+
+    ResourcePressure resource;
+    monitor->updateResourceUsage(resource);
+    EXPECT_TRUE(resource.hasPressure());
+    EXPECT_FALSE(resource.hasError());
+    EXPECT_DOUBLE_EQ(resource.pressure(),
+                     1.0); // Should report no pressure when cgroup limit is unlimited
+  }
+
+  // Test case 3: Both limits unlimited
+  {
+    envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+    config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
+    testing::NiceMock<Filesystem::MockInstance> mock_fs;
+
+    // Mock the filesystem to indicate that cgroup v2 paths exist
+    ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+
+    // Mock the file reads to return memory usage and unlimited limit
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+        .WillOnce(Return(absl::StatusOr<std::string>("500")));
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+        .WillOnce(Return(absl::StatusOr<std::string>("max"))); // "max" means unlimited in cgroup v2
+
+    auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
+
+    ResourcePressure resource;
+    monitor->updateResourceUsage(resource);
+    EXPECT_TRUE(resource.hasPressure());
+    EXPECT_FALSE(resource.hasError());
+    EXPECT_DOUBLE_EQ(resource.pressure(),
+                     0.0); // Should report no pressure when both limits are unlimited
+  }
 }
 
-// Test that the monitor handles unlimited configured memory
-TEST(CgroupMemoryMonitorTest, HandlesUnlimitedConfigMemory) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
+// Test that the monitor handles various error scenarios
+TEST(CgroupMemoryMonitorTest, HandlesErrorScenarios) {
+  // Test case 1: Error from stats reader
+  {
+    envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+    testing::NiceMock<Filesystem::MockInstance> mock_fs;
 
-  testing::NiceMock<MockFilesystem> mock_fs;
+    // Mock the filesystem to indicate that cgroup v2 paths exist
+    ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
 
-  // Mock the filesystem to indicate that cgroup v2 paths exist
-  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+    // Create monitor first
+    auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
 
-  // Mock the file reads to return memory usage and limit
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("500")));
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("500")));
+    // Then mock the file read to fail
+    EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+        .WillOnce(Return(absl::Status(absl::StatusCode::kNotFound, "File not found")));
 
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
+    ResourcePressure resource;
+    monitor->updateResourceUsage(resource);
+    EXPECT_FALSE(resource.hasPressure());
+    EXPECT_TRUE(resource.hasError());
+    EXPECT_THAT(resource.error().what(), testing::HasSubstr("Unable to read memory stats file"));
+  }
 
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  EXPECT_TRUE(resource.hasPressure());
-  EXPECT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(),
-                   1.0); // Should report no pressure when cgroup limit is unlimited
-}
+  // Test case 2: No implementation available
+  {
+    envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+    testing::NiceMock<Filesystem::MockInstance> mock_fs;
 
-// Test that the monitor handles unlimited configured memory
-TEST(CgroupMemoryMonitorTest, HandlesUnlimitedConfigAndCgroupMemory) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
+    // Mock the filesystem to indicate that neither cgroup v1 nor v2 paths exist
+    ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
 
-  testing::NiceMock<MockFilesystem> mock_fs;
+    // Set up expectations before creating the monitor
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(false));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(false));
+    EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V1::getBasePath())).WillRepeatedly(Return(false));
 
-  // Mock the filesystem to indicate that cgroup v2 paths exist
-  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
-
-  // Mock the file reads to return memory usage and unlimited limit
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("500")));
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("max"))); // "max" means unlimited in cgroup v2
-
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
-
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  EXPECT_TRUE(resource.hasPressure());
-  EXPECT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(),
-                   0.0); // Should report no pressure when cgroup limit is unlimited
-}
-
-// Test that the monitor handles errors from the stats reader
-TEST(CgroupMemoryMonitorTest, HandlesErrorFromStatsReader) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-
-  testing::NiceMock<MockFilesystem> mock_fs;
-
-  // Mock the filesystem to indicate that cgroup v2 paths exist
-  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
-
-  // Mock the file read to fail
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
-      .WillOnce(Return(absl::Status(absl::StatusCode::kNotFound, "File not found")));
-
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
-
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  EXPECT_FALSE(resource.hasPressure());
-  EXPECT_TRUE(resource.hasError());
-  EXPECT_THAT(resource.error().what(), testing::HasSubstr("Unable to read memory stats file"));
-}
-
-// Test that the monitor handles both limits being unlimited
-TEST(CgroupMemoryMonitorTest, HandlesBothLimitsUnlimited) {
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(CgroupMemoryStatsReader::UNLIMITED_MEMORY);
-
-  testing::NiceMock<MockFilesystem> mock_fs;
-
-  // Mock the filesystem to indicate that cgroup v2 paths exist
-  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
-
-  // Mock the file reads to return memory usage and unlimited limit
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("500")));
-  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
-      .WillOnce(Return(absl::StatusOr<std::string>("max"))); // "max" means unlimited in cgroup v2
-
-  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
-
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  EXPECT_TRUE(resource.hasPressure());
-  EXPECT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0);
+    EXPECT_THROW(
+        { auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs); }, EnvoyException);
+  }
 }
 
 } // namespace
