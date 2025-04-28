@@ -140,7 +140,7 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
       echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
-      echo "Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}"
+      echo "ERROR: Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}" >&2
       exit 1
   else
       echo "Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}"
