@@ -34,9 +34,7 @@ public:
     return processing_mode_;
   }
 
-  const OptRef<const envoy::config::core::v3::GrpcService> grpcService() const {
-    return grpc_service_;
-  }
+  const envoy::config::core::v3::GrpcService& grpcService() const { return grpc_service_; }
 
 private:
   const bool failure_mode_allow_;
@@ -118,9 +116,6 @@ private:
   const ConfigConstSharedPtr config_;
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
-  // Holds a reference either to the config_.grpc_service_ field, or to a
-  // default instantiation of the GrpcService proto.
-  const ::envoy::config::core::v3::GrpcService& grpc_service_;
   const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;

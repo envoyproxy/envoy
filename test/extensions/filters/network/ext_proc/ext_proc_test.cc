@@ -450,20 +450,6 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
 }
 
-// Creates a config without a GrpcService so the default will be used.
-TEST_F(NetworkExtProcFilterTest, DefaultGrpcServiceConfig) {
-  // Set up basic config with failure_mode_allow = false, and remove the
-  // grpc_service field.
-  auto internal_config = createConfig(false);
-  internal_config.clear_grpc_service();
-  auto filter_config = std::make_shared<Config>(internal_config);
-  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
-  client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
-  filter_->initializeReadFilterCallbacks(read_callbacks_);
-  filter_->initializeWriteFilterCallbacks(write_callbacks_);
-}
-
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters
