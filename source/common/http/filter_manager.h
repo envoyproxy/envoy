@@ -927,7 +927,7 @@ public:
     filter_manager_callbacks_.sendGoAwayAndClose();
   }
 
-  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option);
+  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option);
 
 protected:
   struct State {

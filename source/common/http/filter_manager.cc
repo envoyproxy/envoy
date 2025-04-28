@@ -1966,7 +1966,7 @@ ActiveStreamDecoderFilter::upstreamOverrideHost() const {
       parent_.upstream_override_host_.second};
 }
 
-bool FilterManager::setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+bool FilterManager::setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) {
   return false;
 }
 
