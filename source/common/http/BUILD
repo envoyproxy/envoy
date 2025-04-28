@@ -631,3 +631,13 @@ envoy_cc_library(
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "header_map_optimized_lib",
+    srcs = ["header_map_optimized.cc"],
+    hdrs = ["header_map_optimized.h"],
+    deps = [
+        ":headers_lib",
+        "//source/common/common:non_copyable",
+    ],
+)

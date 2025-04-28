@@ -2839,3 +2839,14 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test_binary(
+    name = "header_map_performance_test",
+    srcs = ["header_map_performance_test.cc"],
+    deps = [
+        "//source/common/http:header_map_optimized_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)

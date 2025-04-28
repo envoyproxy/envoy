@@ -707,3 +707,12 @@ envoy_cc_fuzz_test(
         "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "header_map_optimized_test",
+    srcs = ["header_map_optimized_test.cc"],
+    deps = [
+        "//source/common/http:header_map_optimized_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
