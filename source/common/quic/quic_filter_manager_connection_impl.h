@@ -180,6 +180,8 @@ public:
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
 
+  bool setSocketOption(const Network::Socket::OptionConstSharedPtr option) override;
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,

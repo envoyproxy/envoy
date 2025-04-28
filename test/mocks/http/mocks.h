@@ -110,7 +110,7 @@ public:
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(bool, isHalfCloseEnabled, ());
-  MOCK_METHOD(bool, setDownstreamSocketOption, (Network::Socket::OptionConstSharedPtr), ());
+  MOCK_METHOD(bool, setSocketOption, (Network::Socket::OptionConstSharedPtr), ());
 
   ResponseHeaderMapPtr informational_headers_;
   ResponseHeaderMapPtr response_headers_;
@@ -341,6 +341,7 @@ public:
   MOCK_METHOD(absl::optional<Upstream::LoadBalancerContext::OverrideHost>, upstreamOverrideHost, (),
               (const));
   MOCK_METHOD(bool, shouldLoadShed, (), (const));
+  MOCK_METHOD(bool, setDownstreamSocketOption, (Network::Socket::OptionConstSharedPtr), ());
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
