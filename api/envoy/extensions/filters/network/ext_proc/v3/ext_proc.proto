@@ -86,9 +86,8 @@ message ProcessingMode {
   DataSendMode process_write = 2;
 }
 
-// The MetadataOptions structure defines options for the sending and receiving of
-// dynamic metadata. Specifically, which namespaces to send to the server, whether
-// metadata returned by the server may be written, and how that metadata may be written.
+// The MetadataOptions structure defines options for sending dynamic metadata. Specifically,
+// which namespaces to send to the server.
 message MetadataOptions {
   message MetadataNamespaces {
     // Specifies a list of metadata namespaces whose values, if present,
@@ -105,10 +104,4 @@ message MetadataOptions {
   // Describes which typed or untyped dynamic metadata namespaces to forward to
   // the external processing server.
   MetadataNamespaces forwarding_namespaces = 1;
-
-  // Describes which typed or untyped dynamic metadata namespaces to accept from
-  // the external processing server. Set to empty or leave unset to disallow writing
-  // any received dynamic metadata. Receiving of typed metadata is not supported.
-  // [#not-implemented-hide:]
-  MetadataNamespaces receiving_namespaces = 2;
 }

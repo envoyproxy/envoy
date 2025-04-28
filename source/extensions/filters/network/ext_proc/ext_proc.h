@@ -28,11 +28,11 @@ public:
       : failure_mode_allow_(config.failure_mode_allow()),
         processing_mode_(config.processing_mode()), grpc_service_(config.grpc_service()),
         untyped_forwarding_namespaces_(
-          config.metadata_options().forwarding_namespaces().untyped().begin(),
-          config.metadata_options().forwarding_namespaces().untyped().end()),
+            config.metadata_options().forwarding_namespaces().untyped().begin(),
+            config.metadata_options().forwarding_namespaces().untyped().end()),
         typed_forwarding_namespaces_(
-          config.metadata_options().forwarding_namespaces().typed().begin(),
-          config.metadata_options().forwarding_namespaces().typed().end()) {};
+            config.metadata_options().forwarding_namespaces().typed().begin(),
+            config.metadata_options().forwarding_namespaces().typed().end()) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -53,9 +53,9 @@ public:
   }
 
 private:
-  bool failure_mode_allow_;
-  envoy::extensions::filters::network::ext_proc::v3::ProcessingMode processing_mode_;
-  envoy::config::core::v3::GrpcService grpc_service_;
+  const bool failure_mode_allow_;
+  const envoy::extensions::filters::network::ext_proc::v3::ProcessingMode processing_mode_;
+  const envoy::config::core::v3::GrpcService grpc_service_;
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
 };
@@ -124,6 +124,7 @@ private:
   void closeStream();
 
   void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
+  void addDynamicMetadata(ProcessingRequest& req);
 
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason);

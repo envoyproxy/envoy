@@ -93,6 +93,56 @@ public:
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
 
+  // Create a config with metadata options
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
+  createConfigWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
+                                  const std::vector<std::string>& typed_namespaces) {
+    envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+    config.set_failure_mode_allow(false);
+    config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+
+    auto* metadata_options = config.mutable_metadata_options();
+    auto* forwarding_namespaces = metadata_options->mutable_forwarding_namespaces();
+
+    for (const auto& ns : untyped_namespaces) {
+      forwarding_namespaces->add_untyped(ns);
+    }
+
+    for (const auto& ns : typed_namespaces) {
+      forwarding_namespaces->add_typed(ns);
+    }
+
+    return config;
+  }
+
+  // Set up a new filter with metadata options
+  void recreateFilterWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
+                                         const std::vector<std::string>& typed_namespaces) {
+    auto filter_config = std::make_shared<Config>(
+        createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces));
+    auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+    client_ = client.get();
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_->initializeReadFilterCallbacks(read_callbacks_);
+    filter_->initializeWriteFilterCallbacks(write_callbacks_);
+  }
+
+  // Add dynamic metadata to the stream info
+  void addDynamicMetadata(const std::string& namespace_key, const std::string& key,
+                          const std::string& value) {
+    auto& metadata = *stream_info_.metadata_.mutable_filter_metadata();
+    ProtobufWkt::Struct struct_obj;
+    auto& fields = *struct_obj.mutable_fields();
+    fields[key].set_string_value(value);
+    metadata[namespace_key] = struct_obj;
+  }
+
+  // Add typed dynamic metadata to the stream info
+  void addTypedDynamicMetadata(const std::string& namespace_key,
+                               const ProtobufWkt::Any& typed_value) {
+    stream_info_.metadata_.mutable_typed_filter_metadata()->insert({namespace_key, typed_value});
+  }
+
 protected:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
@@ -448,6 +498,220 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
 
   // With process_write set to SKIP, data should pass through directly
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
+}
+
+// Test metadata forwarding when no namespaces are configured
+TEST_F(NetworkExtProcFilterTest, NoMetadataForwardingConfigured) {
+  // Create a filter with no metadata options
+  recreateFilterWithMetadataOptions({}, {});
+
+  // Add some metadata to the stream info
+  addDynamicMetadata("test-namespace", "key1", "value1");
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(
+          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                             bool /*end_stream*/) {
+            // Verify the request doesn't have metadata
+            EXPECT_FALSE(request.has_metadata());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test untyped metadata forwarding
+TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
+  // Create a filter with untyped metadata forwarding
+  recreateFilterWithMetadataOptions({"test-namespace"}, {});
+
+  // Add metadata to the stream info
+  addDynamicMetadata("test-namespace", "key1", "value1");
+  addDynamicMetadata("other-namespace", "key2", "value2"); // Should not be forwarded
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(
+          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                             bool /*end_stream*/) {
+            // Verify the request has metadata
+            EXPECT_TRUE(request.has_metadata());
+
+            // Verify it has the test-namespace but not other-namespace
+            const auto& metadata = request.metadata().filter_metadata();
+            EXPECT_TRUE(metadata.contains("test-namespace"));
+            EXPECT_FALSE(metadata.contains("other-namespace"));
+
+            // Verify the key-value pairs within test-namespace
+            const auto& test_ns = metadata.at("test-namespace");
+            EXPECT_TRUE(test_ns.fields().contains("key1"));
+            EXPECT_EQ(test_ns.fields().at("key1").string_value(), "value1");
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test typed metadata forwarding
+TEST_F(NetworkExtProcFilterTest, TypedMetadataForwarding) {
+  // Create a filter with typed metadata forwarding
+  recreateFilterWithMetadataOptions({}, {"typed-namespace"});
+
+  // Create a typed metadata value
+  ProtobufWkt::Any typed_value;
+  typed_value.set_type_url("type.googleapis.com/envoy.test.TestMessage");
+  typed_value.set_value("test-value");
+
+  // Add typed metadata to the stream info
+  addTypedDynamicMetadata("typed-namespace", typed_value);
+
+  // Create another typed value that shouldn't be forwarded
+  ProtobufWkt::Any other_typed_value;
+  other_typed_value.set_type_url("type.googleapis.com/envoy.test.OtherMessage");
+  other_typed_value.set_value("other-value");
+  addTypedDynamicMetadata("other-namespace", other_typed_value);
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(testing::Invoke(
+          [&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                         bool /*end_stream*/) {
+            // Verify the request has metadata
+            EXPECT_TRUE(request.has_metadata());
+
+            // Verify it has the typed-namespace but not other-namespace
+            const auto& typed_metadata = request.metadata().typed_filter_metadata();
+            EXPECT_TRUE(typed_metadata.contains("typed-namespace"));
+            EXPECT_FALSE(typed_metadata.contains("other-namespace"));
+
+            // Verify the typed value matches what we set
+            const auto& actual_typed_value = typed_metadata.at("typed-namespace");
+            EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
+            EXPECT_EQ(actual_typed_value.value(), typed_value.value());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test both untyped and typed metadata forwarding together
+TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
+  // Create a filter that forwards both typed and untyped metadata
+  recreateFilterWithMetadataOptions({"untyped-ns"}, {"typed-ns"});
+
+  // Add untyped metadata
+  addDynamicMetadata("untyped-ns", "key1", "value1");
+
+  // Add typed metadata
+  ProtobufWkt::Any typed_value;
+  typed_value.set_type_url("type.googleapis.com/envoy.test.TestMessage");
+  typed_value.set_value("test-value");
+  addTypedDynamicMetadata("typed-ns", typed_value);
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(testing::Invoke(
+          [&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                         bool /*end_stream*/) {
+            // Verify the request has metadata
+            EXPECT_TRUE(request.has_metadata());
+
+            // Verify untyped metadata
+            const auto& filter_metadata = request.metadata().filter_metadata();
+            EXPECT_TRUE(filter_metadata.contains("untyped-ns"));
+            const auto& untyped_ns = filter_metadata.at("untyped-ns");
+            EXPECT_TRUE(untyped_ns.fields().contains("key1"));
+            EXPECT_EQ(untyped_ns.fields().at("key1").string_value(), "value1");
+
+            // Verify typed metadata
+            const auto& typed_metadata = request.metadata().typed_filter_metadata();
+            EXPECT_TRUE(typed_metadata.contains("typed-ns"));
+            const auto& actual_typed_value = typed_metadata.at("typed-ns");
+            EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
+            EXPECT_EQ(actual_typed_value.value(), typed_value.value());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test metadata forwarding with empty metadata
+TEST_F(NetworkExtProcFilterTest, MetadataForwardingWithEmptyMetadata) {
+  // Create a filter with metadata options but don't add any metadata
+  recreateFilterWithMetadataOptions({"untyped-ns"}, {"typed-ns"});
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(
+          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                             bool /*end_stream*/) {
+            // Verify the request doesn't have metadata since no matching metadata exists
+            EXPECT_FALSE(request.has_metadata());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 }
 
 } // namespace
