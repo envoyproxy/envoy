@@ -63,7 +63,7 @@ public:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
-  UnionStringBase() : buffer_(InlinedStringVector()) {
+  UnionStringBase() : buffer_(std::in_place_type<InlinedStringVector>) {
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
