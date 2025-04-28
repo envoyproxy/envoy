@@ -18,6 +18,10 @@ minor_behavior_changes:
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
+- area: cel
+  change: |
+    Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
+    ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -41,6 +45,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.quic_support_certificate_compression`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy_reloadable_features_filter_access_loggers_first`` and legacy code paths.
 - area: tcp_proxy
   change: |
@@ -57,7 +64,9 @@ removed_config_or_runtime:
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.extend_h3_accept_untrusted`` and legacy code paths.
-
+- area: lua
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
 - area: ext_authz

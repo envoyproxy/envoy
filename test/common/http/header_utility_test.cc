@@ -1016,23 +1016,7 @@ TEST(HeaderIsValidTest, AuthorityIsValid) {
   EXPECT_TRUE(HeaderUtility::authorityIsValid("strangebutlegal$-%&'"));
   EXPECT_FALSE(HeaderUtility::authorityIsValid("illegal{}"));
   // Validate that the "@" character is allowed.
-  // TODO(adisuissa): Once the envoy.reloadable_features.internal_authority_header_validator
-  // runtime flag is deprecated, this test should only validate the assignment
-  // to "true".
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.internal_authority_header_validator", "true"}});
-    EXPECT_TRUE(HeaderUtility::authorityIsValid("username@example.com'"));
-  }
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.internal_authority_header_validator", "false"}});
-    // When the above is false, Envoy should use oghttp2's validator which will
-    // reject the "@" character.
-    EXPECT_FALSE(HeaderUtility::authorityIsValid("username@example.com'"));
-  }
+  EXPECT_TRUE(HeaderUtility::authorityIsValid("username@example.com'"));
 }
 
 TEST(HeaderIsValidTest, IsConnect) {
