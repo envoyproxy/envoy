@@ -455,7 +455,7 @@ TEST_F(NetworkExtProcFilterTest, DefaultGrpcServiceConfig) {
   // Set up basic config with failure_mode_allow = false, and remove the
   // grpc_service field.
   auto internal_config = createConfig(false);
-  internal_config.mutable_grpc_service()->Clear();
+  internal_config.clear_grpc_service();
   auto filter_config = std::make_shared<Config>(internal_config);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
