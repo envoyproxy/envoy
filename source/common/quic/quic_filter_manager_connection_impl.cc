@@ -62,7 +62,7 @@ bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() const {
 }
 
 bool QuicFilterManagerConnectionImpl::setSocketOption(const Network::Socket::OptionConstSharedPtr option) {
-  return filter_manager_->setDownstreamSocketOption(option);
+  return network_connection_->connectionSocket()->setSocketOption(option);
 }
 
 
