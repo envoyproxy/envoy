@@ -24,7 +24,10 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::OrcaParserTestCase& input) {
   }
 
   // Try to parse the load report, expect no crash.
-  Http::TestResponseHeaderMapImpl headers{{input.header_name(), input.header_value()}};
+  Http::TestResponseHeaderMapImpl headers;
+  for (const auto& header : input.response_headers().headers()) {
+    headers.addCopy(header.key(), header.value());
+  }
   auto ignored_load_report = Orca::parseOrcaLoadReportHeaders(headers);
 }
 
