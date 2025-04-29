@@ -109,6 +109,7 @@ message LuaPerRoute {
   // For example:
   //
   // .. code-block:: lua
+  //
   //   function envoy_on_request(request_handle)
   //     local filter_context = request_handle:filterContext()
   //     local filter_context_value = filter_context["key"]
