@@ -130,10 +130,12 @@ LcTrieSharedPtr IpTagsLoader::parseIpTags(
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
+SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
+
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-    std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry, const std::string& stat_prefix,
-    Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
+    const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
+    Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
@@ -144,7 +146,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       ip_tag_header_action_(config.has_ip_tag_header()
                                 ? config.ip_tag_header().action()
                                 : HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE),
-      ip_tags_path_(config.ip_tags_path()), ip_tags_registry_(ip_tags_registry),
+      ip_tags_path_(config.ip_tags_path()),
+      ip_tags_registry_(singleton_manager.getTyped<IpTagsRegistrySingleton>(
+          SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
+          [] { return std::make_shared<IpTagsRegistrySingleton>(); })),
       tags_loader_(api, validation_visitor, stat_name_set_) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
@@ -164,6 +169,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
+    // ip_tags_registry_ =
+    //   std::make_shared<IpTagsRegistrySingleton>(singleton_manager.getTyped<IpTagsRegistrySingleton>(
+    //       SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
+    //       [] { return std::make_shared<IpTagsRegistrySingleton>(); }));
     provider_ = ip_tags_registry_->get(
         ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
         [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_);

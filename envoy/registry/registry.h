@@ -220,7 +220,7 @@ public:
   }
 
   static bool& allowDuplicates() {
-    static bool* allow_duplicates = new bool(true);
+    static bool* allow_duplicates = new bool(false);
     return *allow_duplicates;
   }
 

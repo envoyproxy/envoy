@@ -83,7 +83,7 @@ using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
  */
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
-  IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
+  IpTagsRegistrySingleton() {}
 
   std::shared_ptr<IpTagsProvider> get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
                                       IpTagsReloadSuccessCb reload_success_cb,
@@ -94,10 +94,8 @@ public:
     const uint64_t key = std::hash<std::string>()(ip_tags_path);
     absl::MutexLock lock(&mu_);
     auto it = ip_tags_registry_.find(key);
-    std::cerr << "****Found provider " << std::endl;
     if (it != ip_tags_registry_.end()) {
       if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
-        std::cerr << "****Returning existing provider " << std::endl;
         ip_tags_provider = provider;
       } else {
         ip_tags_provider =
@@ -106,7 +104,6 @@ public:
         ip_tags_registry_[key] = ip_tags_provider;
       }
     } else {
-      std::cerr << "****Creating new provider " << std::endl;
       ip_tags_provider =
           std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
                                            reload_error_cb, dispatcher, api, singleton);
@@ -123,8 +120,6 @@ private:
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
 };
 
-SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
-
 /**
  * Type of requests the filter should apply to.
  */
@@ -139,9 +134,9 @@ public:
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IpTagHeader::HeaderAction;
 
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-                        std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry,
-                        const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
+                        const std::string& stat_prefix, Singleton::Manager& singleton_manager,
+                        Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
+                        Event::Dispatcher& dispatcher,
                         ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }

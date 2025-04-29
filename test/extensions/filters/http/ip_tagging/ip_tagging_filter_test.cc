@@ -816,7 +816,7 @@ public:
         .WillByDefault(Return(true));
   }
 
-  static void SetUpTestSuite() { ip_tags_registry = std::make_shared<IpTagsRegistrySingleton>(); }
+  static void SetUpTestSuite() {}
 
   void initializeFilter(const std::string& yaml,
                         absl::optional<ConditionalInitializer>& conditional) {
@@ -840,7 +840,7 @@ public:
         }));
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
-    config_ = std::make_shared<IpTaggingFilterConfig>(config, ip_tags_registry, "prefix.",
+    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", *singleton_manager_,
                                                       *stats_.rootScope(), runtime_, *api_,
                                                       dispatcher_, validation_visitor_);
     filter_ = std::make_unique<IpTaggingFilter>(config_);
@@ -857,6 +857,8 @@ public:
     }
   }
 
+  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_ =
+      std::make_unique<Singleton::ManagerImpl>();
   Event::MockDispatcher dispatcher_;
   NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
