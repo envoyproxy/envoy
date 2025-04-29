@@ -41,6 +41,9 @@ envoy_extension_cc_test(
     name = "ip_tagging_integration_test",
     size = "large",
     srcs = ["ip_tagging_integration_test.cc"],
+    data = [
+        "//test/extensions/filters/http/ip_tagging/test_data:ip_tagging_files",
+    ],
     extension_names = ["envoy.filters.http.ip_tagging"],
     rbe_pool = "6gig",
     deps = [

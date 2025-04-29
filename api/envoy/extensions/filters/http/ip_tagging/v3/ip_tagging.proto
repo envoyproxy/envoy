@@ -79,7 +79,7 @@ message IPTagging {
   // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
   // or :ref:`ip_tags_path <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_path>`
   // can be set for the Ip Tagging filter.
-  repeated data.ip_tagging.v3.IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
+  repeated data.ip_tagging.v3.IPTag ip_tags = 4;
 
   // Specify to which header the tags will be written.
   //
@@ -91,5 +91,5 @@ message IPTagging {
   // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
   // or :ref:`ip_tags_path <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_path>`
   // can be set for the Ip Tagging filter.
-  string ip_tags_path = 6 [(validate.rules).string = {min_len: 1}];
+  string ip_tags_path = 6;
 }
