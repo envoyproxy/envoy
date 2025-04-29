@@ -30,7 +30,7 @@ jobs:
       # for github/codeql-action/analyze to upload SARIF results
       security-events: write
       pull-requests: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: Checkout repository
@@ -78,21 +78,21 @@ jobs:
       run: |
        sudo apt-get update --error-on=any
        sudo apt-get install --yes \
-           libtool cmake automake autoconf make ninja-build curl \
+           libtool libtinfo5 cmake automake autoconf make ninja-build curl \
            unzip virtualenv openjdk-11-jdk build-essential libc++1
        # Note: the llvm/clang version should match the version specifed in:
        #  - bazel/repository_locations.bzl
        #  - .github/workflows/codeql-daily.yml
        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-       mkdir -p bin/clang14
-       cd bin/clang14
-       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-       tar -xf clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       mkdir -p bin/clang18.1.8
+       cd bin/clang18.1.8
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
 
     - name: Build
       if: ${{ env.BUILD_TARGETS != '' }}
       run: |
-       bazel/setup_clang.sh bin/clang14
+       bazel/setup_clang.sh bin/clang18.1.8
        bazel shutdown
        bazel build \
            -c fastbuild \
