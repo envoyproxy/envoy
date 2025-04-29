@@ -34,8 +34,7 @@ namespace ExtProc {
   COUNTER(streams_grpc_close)                                                                      \
   COUNTER(connections_closed)                                                                      \
   COUNTER(failure_mode_allowed)                                                                    \
-  COUNTER(stream_open_failures)                                                                    \
-  COUNTER(processing_errors)
+  COUNTER(stream_open_failures)
 
 struct NetworkExtProcStats {
   ALL_NETWORK_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
