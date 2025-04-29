@@ -12,7 +12,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 namespace Envoy {
@@ -64,14 +63,11 @@ public:
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("169.254.170.2:80/path/to/doc"));
 
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, context_, manager_optref_,
+        *api_, context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -240,9 +236,7 @@ public:
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
