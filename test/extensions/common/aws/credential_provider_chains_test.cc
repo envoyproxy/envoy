@@ -2,7 +2,7 @@
 #include "source/extensions/common/aws/credential_providers/inline_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/api/mocks.h"             
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
