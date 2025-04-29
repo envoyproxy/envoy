@@ -71,9 +71,7 @@ public:
   WebIdentityCredentialsProviderPtr provider_;
   Event::MockTimer* timer_{};
   NiceMock<Upstream::MockClusterManager> cm_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
   Http::RequestMessagePtr message_;
 };
 
@@ -90,13 +88,11 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
   cred_provider.set_role_session_name("role-session-name");
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
+      context_, mock_manager_, "cluster_2",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
@@ -138,13 +134,11 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
   cred_provider.set_role_session_name("role-session-name");
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
+      context_, mock_manager_, "cluster_2",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
@@ -209,13 +203,10 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   cred_provider.set_role_session_name("role-session-name");
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
+      context_, mock_manager_, "cluster_2",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);

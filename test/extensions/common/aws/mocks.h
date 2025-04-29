@@ -108,17 +108,17 @@ public:
 
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr, absl::string_view,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef,
+              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                absl::string_view));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef,
+              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                std::chrono::seconds, absl::string_view));
 };
@@ -140,7 +140,7 @@ public:
 
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr, absl::string_view,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 };
 
