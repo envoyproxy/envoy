@@ -107,8 +107,8 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
   return absl::OkStatus();
 }
 
-void IAMRolesAnywhereSignerBaseImpl::addRequiredCertHeaders(Http::RequestHeaderMap& headers,
-                                                            X509Credentials x509_credentials) {
+void IAMRolesAnywhereSignerBaseImpl::addRequiredCertHeaders(
+    Http::RequestHeaderMap& headers, const X509Credentials& x509_credentials) {
   headers.setCopy(IAMRolesAnywhereSignatureHeaders::get().X509,
                   x509_credentials.certificateDerB64().value());
   if (x509_credentials.certificateChainDerB64().has_value()) {
@@ -127,7 +127,7 @@ void IAMRolesAnywhereSignerBaseImpl::addRequiredHeaders(Http::RequestHeaderMap& 
 }
 
 std::string IAMRolesAnywhereSignerBaseImpl::createAuthorizationCredential(
-    const X509Credentials x509_credentials, absl::string_view credential_scope) const {
+    const X509Credentials& x509_credentials, absl::string_view credential_scope) const {
   return fmt::format(IAMRolesAnywhereSignatureConstants::AuthorizationCredentialFormat,
                      x509_credentials.certificateSerial().value(), credential_scope);
 }

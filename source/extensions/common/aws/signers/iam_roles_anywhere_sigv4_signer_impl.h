@@ -37,18 +37,20 @@ private:
   std::string createCredentialScope(const absl::string_view short_date,
                                     const absl::string_view override_region) const override;
 
-  std::string createSignature(const X509Credentials credentials,
+  std::string createSignature(const X509Credentials& x509_credentials,
                               const absl::string_view string_to_sign) const override;
 
-  std::string createAuthorizationHeader(const X509Credentials x509_credentials,
+  std::string createAuthorizationHeader(const X509Credentials& x509_credentials,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
 
-  std::string createStringToSign(const X509Credentials x509_credentials,
+  std::string createStringToSign(const X509Credentials& x509_credentials,
                                  const absl::string_view canonical_request,
                                  const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
+
+  absl::string_view getAlgorithmName(const X509Credentials& x509_credentials) const;
 };
 
 } // namespace Aws
