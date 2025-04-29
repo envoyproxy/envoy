@@ -1236,12 +1236,13 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   // filter chains.
   auto validate_required_headers = absl::MakeCleanup([&]() {
     const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-    if (!status.ok()) {
+    if (!status.ok() && !state.local_reply_sent_) {
       // If the check failed, then we reply with BadGateway, and stop the further processing.
       sendLocalReply(
           Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
           absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
                        "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
+      state_.local_reply_sent_ = true;
       should_exit = true;
     }
   });
