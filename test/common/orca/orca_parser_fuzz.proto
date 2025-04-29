@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.proto";
+
+message OrcaParserTestCase {
+  string header_name = 1 [(validate.rules).string = {pattern: "([A-Za-z0-9-]+)$", max_bytes: 50}];
+  string header_value = 2 [(validate.rules).string = {pattern: "([^\0^\r^\n]+)$"}];
+}
