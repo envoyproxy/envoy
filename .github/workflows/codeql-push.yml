@@ -73,7 +73,7 @@ jobs:
         trap-caching: false
 
     - name: Install deps
-      # if: ${{ env.BUILD_TARGETS != '' }}
+      if: ${{ env.BUILD_TARGETS != '' }}
       shell: bash
       run: |
        sudo apt-get update --error-on=any
