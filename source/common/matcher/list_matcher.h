@@ -37,7 +37,7 @@ public:
         continue;
       // Provide a reentrant ListMatcher to continue traversal from the next index.
       return {MatchState::MatchComplete, matcher.second,
-              std::make_unique<ListMatcherReentrant<DataType>>(this, i + 1)};
+              std::make_unique<ListMatcherReentrant<DataType>>(*this, i + 1)};
     }
     return {MatchState::MatchComplete, on_no_match_, nullptr};
   }
@@ -59,11 +59,11 @@ public:
       : parent_matcher_(parent_matcher), starting_index_(starting_index) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& matching_data) override {
-    return parent_matcher_->matchImpl(matching_data, starting_index_);
+    return parent_matcher_.matchImpl(matching_data, starting_index_);
   }
 
 private:
-  ListMatcher<DataType>* parent_matcher_;
+  ListMatcher<DataType>& parent_matcher_;
   int starting_index_;
 };
 
