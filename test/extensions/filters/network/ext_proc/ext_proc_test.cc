@@ -66,7 +66,7 @@ public:
     ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 
     // Set up basic config with failure_mode_allow = false
-    auto filter_config = std::make_shared<Config>(createConfig(false));
+    auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
     filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
@@ -78,6 +78,7 @@ public:
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
   createConfig(bool failure_mode_allow) {
     envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+    config.set_stat_prefix("test_ext_proc");
     config.set_failure_mode_allow(failure_mode_allow);
     config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
     return config;
@@ -85,7 +86,7 @@ public:
 
   // Set up a new filter with the specified failure_mode_allow setting
   void recreateFilterWithConfig(bool failure_mode_allow) {
-    auto filter_config = std::make_shared<Config>(createConfig(failure_mode_allow));
+    auto filter_config = std::make_shared<Config>(createConfig(failure_mode_allow), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
     filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
@@ -93,7 +94,14 @@ public:
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
 
+  uint64_t getCounterValue(const std::string& name) {
+    const auto counter = TestUtility::findCounter(store_, name);
+    return counter != nullptr ? counter->value() : 0;
+  }
+
 protected:
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
@@ -117,6 +125,9 @@ TEST_F(NetworkExtProcFilterTest, ReceiveMessageAfterProcessingComplete) {
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
 
   filter_->onReceiveMessage(std::move(response));
+
+  // Check counter for spurious messages
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.spurious_msgs_received"));
 }
 
 // Test receiving a message with no data (neither read_data nor write_data)
@@ -135,6 +146,10 @@ TEST_F(NetworkExtProcFilterTest, ReceiveEmptyMessage) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
+  // Verify read_data_sent counter incremented
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
   // Create a message with neither read_data nor write_data
   auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
 
@@ -143,6 +158,10 @@ TEST_F(NetworkExtProcFilterTest, ReceiveEmptyMessage) {
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
 
   filter_->onReceiveMessage(std::move(response));
+
+  // Verify we count empty responses
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.empty_response_received"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
 }
 
 // Test openStream method when processing is already complete
@@ -150,11 +169,17 @@ TEST_F(NetworkExtProcFilterTest, OpenStreamAfterProcessingComplete) {
   // First, mark processing as complete
   filter_->onGrpcError(Grpc::Status::Internal, "test error");
 
+  // Verify the failure counter was incremented
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+
   // Should not attempt to create a new stream
   EXPECT_CALL(*client_, start(_, _, _, _)).Times(0);
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // No new streams should be started
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
 }
 
 // Test the onLogStreamInfo method
@@ -190,6 +215,8 @@ TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeAllow) {
 
   // Buffer should be untouched since we're continuing
   EXPECT_EQ(data.length(), 4);
+  // Check failure counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_open_failures"));
 }
 
 // Test failure mode disallow behavior when stream creation fails
@@ -203,6 +230,9 @@ TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeDisallow) {
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  // Verify stream open failure counter and connection closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_open_failures"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
 }
 
 // Test gRPC error handling with failure mode allow
@@ -232,11 +262,19 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeAllow) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
+  // Stream should be started
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+
   // Now simulate a gRPC error
   // With failure_mode_allow=true, connection should NOT be closed
   EXPECT_CALL(connection_, close(_, _)).Times(0);
 
   filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Verify error counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.failure_mode_allowed"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
 
   // Next data should pass through without issues
   Buffer::OwnedImpl more_data("more");
@@ -272,10 +310,18 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
 
   // Trigger onGrpcError callback
   filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Verify error counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+
+  // Failure mode allowed should not be incremented
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.failure_mode_allowed"));
 }
 
-// Test normal processing flow
-TEST_F(NetworkExtProcFilterTest, NormalProcessing) {
+// Test normal processing flow for read data
+TEST_F(NetworkExtProcFilterTest, NormalProcessingReadData) {
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
 
@@ -294,6 +340,10 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessing) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
+  // Check read data sent counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
   // Simulate response from external processor
   envoy::service::network_ext_proc::v3::ProcessingResponse response;
   auto* read_data = response.mutable_read_data();
@@ -305,6 +355,51 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessing) {
 
   filter_->onReceiveMessage(
       std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  // Check data counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+}
+
+// Test normal processing flow for write data
+TEST_F(NetworkExtProcFilterTest, NormalProcessingWriteData) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // Expect the send method to be called when processing data
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Initial call should stop iteration until we get a response
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  // Check write data sent counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
+  // Simulate response from external processor
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* write_data = response.mutable_write_data();
+  write_data->set_data("modified");
+  write_data->set_end_of_stream(false);
+
+  // Expect data to be injected to the filter chain
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  // Check data counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
 }
 
 // Test onGrpcClose handling
@@ -329,6 +424,10 @@ TEST_F(NetworkExtProcFilterTest, GrpcCloseHandling) {
   // Trigger onGrpcClose and verify behavior
   filter_->onGrpcClose();
 
+  // Verify counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_close"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+
   // Subsequent data should pass through directly
   Buffer::OwnedImpl more_data("more");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
@@ -337,7 +436,7 @@ TEST_F(NetworkExtProcFilterTest, GrpcCloseHandling) {
 // Test edge case with null stream in sendRequest
 TEST_F(NetworkExtProcFilterTest, SendRequestWithNullStream) {
   // Set filter's stream to nullptr
-  auto filter_config = std::make_shared<Config>(createConfig(false));
+  auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
   filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
@@ -416,6 +515,35 @@ TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusEdgeCases) {
       std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
 }
 
+// Test downstream connection close event
+TEST_F(NetworkExtProcFilterTest, DownstreamConnectionCloseEvent) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Set up expectation for stream closure
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  // Simulate downstream connection close
+  Network::ConnectionEvent close_event = Network::ConnectionEvent::RemoteClose;
+  filter_->onDownstreamEvent(close_event);
+
+  // Verify stream close counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+}
+
 // Test processing mode configurations
 TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
   // Test with SKIP for read processing
@@ -423,7 +551,7 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
   config.mutable_processing_mode()->set_process_read(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
 
-  auto filter_config = std::make_shared<Config>(config);
+  auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
   filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
@@ -434,12 +562,16 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
+  // No stream should be created and no messages should be sent
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
   // Testing SKIP for write processing
   config = createConfig(false);
   config.mutable_processing_mode()->set_process_write(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
 
-  filter_config = std::make_shared<Config>(config);
+  filter_config = std::make_shared<Config>(config, scope_);
   client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
   filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
@@ -448,6 +580,10 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
 
   // With process_write set to SKIP, data should pass through directly
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
+
+  // No stream should be created and no messages should be sent
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
 }
 
 } // namespace

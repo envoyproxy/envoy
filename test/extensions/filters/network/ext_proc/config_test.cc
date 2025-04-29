@@ -13,8 +13,17 @@ namespace NetworkFilters {
 namespace ExtProc {
 namespace {
 
+class ConfigTest : public testing::Test {
+public:
+  ConfigTest() {}
+
+protected:
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
+};
+
 // Test the basic config setter and getter.
-TEST(ConfigTest, BasicConfigTest) {
+TEST_F(ConfigTest, BasicConfigTest) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
   proto_config.set_failure_mode_allow(true);
 
@@ -24,7 +33,7 @@ TEST(ConfigTest, BasicConfigTest) {
   processing_mode->set_process_write(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::STREAMED);
 
-  Config config(proto_config);
+  Config config(proto_config, scope_);
 
   EXPECT_TRUE(config.failureModeAllow());
 
@@ -35,10 +44,10 @@ TEST(ConfigTest, BasicConfigTest) {
             envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::STREAMED);
 }
 
-TEST(ConfigTest, DefaultValues) {
+TEST_F(ConfigTest, DefaultValues) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
 
-  Config config(proto_config);
+  Config config(proto_config, scope_);
 
   // Test the default value for failureModeAllow (should be false by default in protobuf)
   EXPECT_FALSE(config.failureModeAllow());
@@ -52,7 +61,7 @@ TEST(ConfigTest, DefaultValues) {
 }
 
 // Test when both read and write are set to SKIP
-TEST(ConfigTest, BothSkipMode) {
+TEST_F(ConfigTest, BothSkipMode) {
   // Create a protobuf config with both read and write set to SKIP
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
 
@@ -62,7 +71,7 @@ TEST(ConfigTest, BothSkipMode) {
   processing_mode->set_process_write(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
 
-  Config config(proto_config);
+  Config config(proto_config, scope_);
 
   const auto& mode = config.processingMode();
   EXPECT_EQ(mode.process_read(),
@@ -77,6 +86,7 @@ TEST(NetworkExtProcConfigTest, SimpleConfig) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
+  stat_prefix: "test_ext_proc"
   )EOF";
 
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
@@ -97,6 +107,7 @@ TEST(NetworkExtProcConfigTest, ConfigWithOptions) {
       cluster_name: "ext_proc_server"
   failure_mode_allow: true
   message_timeout: 2s
+  stat_prefix: "test_ext_proc"
   )EOF";
 
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;

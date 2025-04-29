@@ -18,7 +18,8 @@ namespace ExtProc {
 Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& proto_config,
     Server::Configuration::FactoryContext& context) {
-  ConfigConstSharedPtr ext_proc_config = std::make_shared<const Config>(proto_config);
+  ConfigConstSharedPtr ext_proc_config =
+      std::make_shared<const Config>(proto_config, context.scope());
 
   return [ext_proc_config, &context](Network::FilterManager& filter_manager) -> void {
     auto client = createExternalProcessorClient(
