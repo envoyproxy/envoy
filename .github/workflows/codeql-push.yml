@@ -30,7 +30,7 @@ jobs:
       # for github/codeql-action/analyze to upload SARIF results
       security-events: write
       pull-requests: read
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: Checkout repository
@@ -77,8 +77,6 @@ jobs:
       shell: bash
       run: |
        sudo apt-get update --error-on=any
-       wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-       sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
        sudo apt-get install --yes \
            libtool libtinfo5 cmake automake autoconf make ninja-build curl \
            unzip virtualenv openjdk-11-jdk build-essential libc++1
