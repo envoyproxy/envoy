@@ -535,7 +535,11 @@ def _io_vectorscan():
     )
 
 def _io_opentelemetry_api_cpp():
-    external_http_archive(name = "io_opentelemetry_cpp")
+    external_http_archive(
+        name = "io_opentelemetry_cpp",
+        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _com_github_datadog_dd_trace_cpp():
     external_http_archive("com_github_datadog_dd_trace_cpp")
@@ -582,6 +586,7 @@ def _com_google_absl():
         name = "com_google_absl",
         patches = ["@envoy//bazel:abseil.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@googletest": "@com_google_googletest"},
     )
 
     # keep these until jwt_verify_lib is updated.
