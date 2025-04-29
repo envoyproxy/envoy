@@ -127,6 +127,38 @@ void LoadStatsReporter::sendLoadStatsRequest() {
                 metric.second.num_requests_with_metric);
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
           }
+          // check if endpoint granularity should be reported
+          if (message_->report_endpoint_granularity()) {
+            for (const HostSharedPtr& host : hosts) {
+              ENVOY_LOG(info, "Load report endpoint {}:{} count {}", host->address()->asString(),
+                        host->address()->ip()->port(), hosts.size());
+              // add upstream endpoint stats to locality stats
+              auto* upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
+              // add address and socket address port
+              auto* address = upstream_endpoint_stats->mutable_address();
+              auto* socket_address = address->mutable_socket_address();
+              socket_address->set_address(host->address()->ip()->addressAsString());
+              socket_address->set_port_value(host->address()->ip()->port());
+
+              // add endpoint stats (successful requests, requests in progress, error requests, and
+              // issued requests)
+              upstream_endpoint_stats->set_total_successful_requests(
+                  host->stats().rq_success_.latch());
+              upstream_endpoint_stats->set_total_requests_in_progress(
+                  host->stats().rq_active_.value());
+              upstream_endpoint_stats->set_total_error_requests(host->stats().rq_error_.latch());
+              upstream_endpoint_stats->set_total_issued_requests(host->stats().rq_total_.latch());
+
+              // add load metric stats
+              for (const auto& metric : load_metrics) {
+                auto* endpoint_metric_stats = upstream_endpoint_stats->add_load_metric_stats();
+                endpoint_metric_stats->set_metric_name(metric.first);
+                endpoint_metric_stats->set_num_requests_finished_with_metric(
+                    metric.second.num_requests_with_metric);
+                endpoint_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+              }
+            }
+          }
         }
       }
     }
