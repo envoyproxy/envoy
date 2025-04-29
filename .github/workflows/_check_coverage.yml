@@ -8,8 +8,6 @@ on:
     secrets:
       gcs-cache-key:
         required: true
-      gcp-key:
-        required: true
 
     inputs:
       gcs-cache-bucket:
@@ -31,14 +29,13 @@ jobs:
   coverage:
     secrets:
       gcs-cache-key: ${{ secrets.gcs-cache-key }}
-      gcp-key: ${{ secrets.gcp-key }}
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      # bazel-extra: '--config=remote-envoy-engflow'
+      bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
       diskspace-hack: ${{ matrix.diskspace-hack && true || false }}
@@ -50,7 +47,6 @@ jobs:
         lower than limit
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
-      rbe-google: true
       request: ${{ inputs.request }}
       runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
       steps-post: |
