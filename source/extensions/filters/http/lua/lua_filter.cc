@@ -824,7 +824,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     Server::Configuration::ServerFactoryContext& context)
     : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
-    return; // Filter is disabled or explict script name is provided.
+    return; // Filter is disabled or explicit script name is provided.
   } else if (config.has_source_code()) {
     // Read and parse the inline Lua code defined in the route configuration.
     const std::string code_str = THROW_OR_RETURN_VALUE(
