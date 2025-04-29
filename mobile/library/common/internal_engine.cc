@@ -19,8 +19,13 @@ namespace Envoy {
 namespace {
 constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 
+consteval int GetInt(int x){
+  return x;
+}
+
 // There is only one shared MobileProcessWide instance for all Envoy Mobile engines.
 MobileProcessWide& initOnceMobileProcessWide(const OptionsImplBase& options) {
+  std::cerr << "Testing a C++ 20 feature: " << GetInt(123) << std::endl;
   MUTABLE_CONSTRUCT_ON_FIRST_USE(MobileProcessWide, options);
 }
 
