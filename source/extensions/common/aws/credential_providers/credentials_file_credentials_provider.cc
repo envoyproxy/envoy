@@ -1,6 +1,9 @@
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
+
 #include "envoy/server/factory_context.h"
+
 #include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

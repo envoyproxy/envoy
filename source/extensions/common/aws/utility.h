@@ -1,9 +1,10 @@
 #pragma once
 
-#include "envoy/config/cluster/v3/cluster.pb.h"
-#include "source/common/common/logger.h"
 #include "envoy/common/matchers.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/json/json_object.h"
+
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {

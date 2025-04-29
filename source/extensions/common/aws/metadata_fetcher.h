@@ -4,7 +4,6 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

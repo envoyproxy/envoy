@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/common/logger.h"
+
 #include "openssl/base.h"
 
 namespace Envoy {

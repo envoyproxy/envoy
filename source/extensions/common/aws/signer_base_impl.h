@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
