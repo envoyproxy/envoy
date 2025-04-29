@@ -25,8 +25,6 @@ namespace IpTagging {
 using IpTagFileProto = envoy::data::ip_tagging::v3::IPTagFile;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 
-// TODO supports stats for ip tags
-// Support async reload of tags file
 class IpTagsLoader {
 public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,

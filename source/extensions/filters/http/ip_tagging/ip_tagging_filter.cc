@@ -169,10 +169,6 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
-    // ip_tags_registry_ =
-    //   std::make_shared<IpTagsRegistrySingleton>(singleton_manager.getTyped<IpTagsRegistrySingleton>(
-    //       SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
-    //       [] { return std::make_shared<IpTagsRegistrySingleton>(); }));
     provider_ = ip_tags_registry_->get(
         ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
         [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_);
