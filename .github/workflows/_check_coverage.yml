@@ -8,6 +8,8 @@ on:
     secrets:
       gcs-cache-key:
         required: true
+      gcp-key:
+        required: true
 
     inputs:
       gcs-cache-bucket:
@@ -29,6 +31,7 @@ jobs:
   coverage:
     secrets:
       gcs-cache-key: ${{ secrets.gcs-cache-key }}
+      gcp-key: ${{ secrets.gcp-key }}
     permissions:
       contents: read
       packages: read

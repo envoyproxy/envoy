@@ -64,6 +64,7 @@ jobs:
   coverage:
     secrets:
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+      gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
