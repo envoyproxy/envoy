@@ -1,5 +1,9 @@
-#include "source/extensions/common/aws/iam_roles_anywhere_signer_base.h"
-
+#include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/aws/utility.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "envoy/http/query_params.h"
 namespace Envoy {
 namespace Extensions {
 namespace Common {

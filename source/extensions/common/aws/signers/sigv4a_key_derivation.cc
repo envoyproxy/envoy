@@ -1,5 +1,6 @@
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
-
+#include "source/extensions/common/aws/signers/sigv4a_common.h"
+#include "source/common/crypto/utility.h"
 namespace Envoy {
 namespace Extensions {
 namespace Common {

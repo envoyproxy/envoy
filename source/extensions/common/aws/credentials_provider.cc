@@ -1,5 +1,6 @@
 #include "source/extensions/common/aws/credentials_provider.h"
-
+#include "source/common/common/lock_guard.h"
+#include "source/common/http/message_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace Common {

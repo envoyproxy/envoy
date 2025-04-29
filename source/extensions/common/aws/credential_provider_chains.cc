@@ -1,4 +1,7 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/utility.h"
+#include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
 namespace Envoy {
 namespace Extensions {
