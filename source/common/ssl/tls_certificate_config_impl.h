@@ -12,7 +12,7 @@ namespace Ssl {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
-  static absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>>
+  static absl::StatusOr<TlsCertificateConfigImpl>
   create(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
          Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api);
 
