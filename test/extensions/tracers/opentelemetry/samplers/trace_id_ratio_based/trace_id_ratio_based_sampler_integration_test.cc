@@ -40,7 +40,9 @@ public:
         name: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
-          ratio: 0.002
+          sampling_percentage:
+              numerator: 20
+              denominator: TEN_THOUSAND
   )EOF";
 
     auto tracing_config =

@@ -2,6 +2,7 @@
 #include <string>
 
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/random_generator.h"
 #include "source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based/trace_id_ratio_based_sampler.h"
@@ -17,6 +18,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+const auto percentage_denominator = envoy::type::v3::FractionalPercent::MILLION;
+
 // As per the docs: https://opentelemetry.io/docs/specs/otel/trace/sdk/#traceidratiobased
 // > A TraceIDRatioBased sampler with a given sampling rate MUST also sample
 //	 all traces that any TraceIDRatioBased sampler with a lower sampling rate
@@ -27,19 +30,24 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioSamplesInclusively) {
 
   std::srand(std::time(nullptr));
   for (int i = 0; i < 100; ++i) {
-    double ratio_low = static_cast<double>(std::rand()) / RAND_MAX;
-    double ratio_high = static_cast<double>(std::rand()) / RAND_MAX;
-    if (ratio_low > ratio_high) {
-      double holder = ratio_low;
-      ratio_low = ratio_high;
-      ratio_high = holder;
+    uint64_t numerator_low = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                               percentage_denominator);
+    uint64_t numerator_high =
+        std::rand() %
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(percentage_denominator);
+    if (numerator_low > numerator_high) {
+      double holder = numerator_low;
+      numerator_low = numerator_high;
+      numerator_high = holder;
     }
     envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig
         config_low;
     envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig
         config_high;
-    config_low.set_ratio(ratio_low);
-    config_high.set_ratio(ratio_high);
+    config_low.mutable_sampling_percentage()->set_denominator(percentage_denominator);
+    config_low.mutable_sampling_percentage()->set_numerator(numerator_low);
+    config_high.mutable_sampling_percentage()->set_denominator(percentage_denominator);
+    config_high.mutable_sampling_percentage()->set_numerator(numerator_high);
     auto sampler_low = std::make_shared<TraceIdRatioBasedSampler>(config_low, context);
     auto sampler_high = std::make_shared<TraceIdRatioBasedSampler>(config_high, context);
 
@@ -72,7 +80,8 @@ TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
   std::srand(std::time(nullptr));
 
   // ratio = 0, should never sample
-  config.set_ratio(0);
+  config.mutable_sampling_percentage()->set_denominator(percentage_denominator);
+  config.mutable_sampling_percentage()->set_numerator(0);
   auto sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
 
   for (int i = 0; i < 10; ++i) {
@@ -85,22 +94,9 @@ TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
     EXPECT_EQ(sampling_result.decision, Decision::Drop);
   }
 
-  // ratio < 0, should never sample
-  config.set_ratio(-5);
-  sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
-
-  for (int i = 0; i < 10; ++i) {
-    Random::RandomGeneratorImpl random_generator;
-    auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
-                                 Hex::uint64ToHex(random_generator.random()));
-    auto sampling_result =
-        sampler->shouldSample(info, absl::nullopt, trace_id, "operation_name",
-                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
-    EXPECT_EQ(sampling_result.decision, Decision::Drop);
-  }
-
   // ratio = 1, should always sample
-  config.set_ratio(1);
+  config.mutable_sampling_percentage()->set_numerator(
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percentage_denominator));
   sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
 
   for (int i = 0; i < 10; ++i) {
@@ -113,8 +109,9 @@ TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
     EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   }
 
-  // ratio < 0, should never sample
-  config.set_ratio(7);
+  // ratio > 1, should always sample
+  config.mutable_sampling_percentage()->set_numerator(
+      7 * ProtobufPercentHelper::fractionalPercentDenominatorToInt(percentage_denominator));
   sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
 
   for (int i = 0; i < 10; ++i) {
@@ -132,9 +129,10 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioDescription) {
   envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig config;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   NiceMock<StreamInfo::MockStreamInfo> info;
-  config.set_ratio(0.0157);
+  config.mutable_sampling_percentage()->set_denominator(percentage_denominator);
+  config.mutable_sampling_percentage()->set_numerator(157);
   auto sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
-  EXPECT_STREQ(sampler->getDescription().c_str(), "TraceIdRatioBasedSampler{0.015700}");
+  EXPECT_STREQ(sampler->getDescription().c_str(), "TraceIdRatioBasedSampler{157/1000000}");
 }
 
 TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioAttrs) {
@@ -142,7 +140,10 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioAttrs) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   NiceMock<StreamInfo::MockStreamInfo> info;
   std::srand(std::time(nullptr));
-  config.set_ratio(static_cast<double>(std::rand()) / RAND_MAX);
+  uint64_t numerator = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                         percentage_denominator);
+  config.mutable_sampling_percentage()->set_denominator(percentage_denominator);
+  config.mutable_sampling_percentage()->set_numerator(numerator);
   auto sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
   SpanContext parent_context("0", "12345", "45678", true, "random_key=random_value");
   auto sampling_result = sampler->shouldSample(

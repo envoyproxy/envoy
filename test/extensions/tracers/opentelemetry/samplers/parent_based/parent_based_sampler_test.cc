@@ -18,6 +18,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
+const auto percentage_denominator = envoy::type::v3::FractionalPercent::MILLION;
+
 // // Verify the ShouldSample function
 TEST(ParentBasedSamplerTest, TestShouldSample) {
   // Case 1: Parent doesn't exist -> Return result of delegateSampler()
@@ -30,7 +32,11 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
   std::srand(std::time(nullptr));
 
   for (int i = 0; i < 100; ++i) {
-    trace_id_ratio_based_config.set_ratio(static_cast<double>(std::rand()) / RAND_MAX);
+    uint64_t numerator = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                           percentage_denominator);
+    trace_id_ratio_based_config.mutable_sampling_percentage()->set_denominator(
+        percentage_denominator);
+    trace_id_ratio_based_config.mutable_sampling_percentage()->set_numerator(numerator);
     auto wrapped_sampler =
         std::make_shared<TraceIdRatioBasedSampler>(trace_id_ratio_based_config, context);
 
@@ -56,7 +62,11 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
 
   // Case 2: Parent exists and SampledFlag is true -> Return RecordAndSample.
   for (int i = 0; i < 10; ++i) {
-    trace_id_ratio_based_config.set_ratio(static_cast<double>(std::rand()) / RAND_MAX);
+    uint64_t numerator = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                           percentage_denominator);
+    trace_id_ratio_based_config.mutable_sampling_percentage()->set_denominator(
+        percentage_denominator);
+    trace_id_ratio_based_config.mutable_sampling_percentage()->set_numerator(numerator);
     auto wrapped_sampler =
         std::make_shared<TraceIdRatioBasedSampler>(trace_id_ratio_based_config, context);
 
@@ -79,7 +89,11 @@ TEST(ParentBasedSamplerTest, TestShouldSample) {
 
   // Case 3: Parent exists and SampledFlag is false -> Return Drop.
   for (int i = 0; i < 10; ++i) {
-    trace_id_ratio_based_config.set_ratio(static_cast<double>(std::rand()) / RAND_MAX);
+    uint64_t numerator = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                           percentage_denominator);
+    trace_id_ratio_based_config.mutable_sampling_percentage()->set_denominator(
+        percentage_denominator);
+    trace_id_ratio_based_config.mutable_sampling_percentage()->set_numerator(numerator);
     auto wrapped_sampler =
         std::make_shared<TraceIdRatioBasedSampler>(trace_id_ratio_based_config, context);
 
@@ -108,7 +122,11 @@ TEST(ParentBasedSamplerTest, TestGetDescriptionAndContext) {
   envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig
       trace_id_ratio_based_config;
   std::srand(std::time(nullptr));
-  trace_id_ratio_based_config.set_ratio(static_cast<double>(std::rand()) / RAND_MAX);
+  uint64_t numerator = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                         percentage_denominator);
+  trace_id_ratio_based_config.mutable_sampling_percentage()->set_denominator(
+      percentage_denominator);
+  trace_id_ratio_based_config.mutable_sampling_percentage()->set_numerator(numerator);
   auto wrapped_sampler =
       std::make_shared<TraceIdRatioBasedSampler>(trace_id_ratio_based_config, context);
 

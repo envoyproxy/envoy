@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.tracers.opentelemetry.samplers.v3;
 
+import "envoy/type/v3/percent.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.samplers.v3";
@@ -20,10 +22,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based]
 
 message TraceIdRatioBasedSamplerConfig {
-  // This is a required value in the [0, 1] interval, If the given trace_id
-  // falls into a given ratio of all possible trace_id values, ShouldSample will
-  // return RECORD_AND_SAMPLE.
+  // If the given trace_id falls into a given percentage of all possible
+  // trace_id values, ShouldSample will return RECORD_AND_SAMPLE.
   // required
   // [#extension-category: envoy.tracers.opentelemetry.samplers]
-  double ratio = 1;
+  type.v3.FractionalPercent sampling_percentage = 2;
 }

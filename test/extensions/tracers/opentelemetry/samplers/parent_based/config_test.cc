@@ -29,7 +29,9 @@ TEST(ParentBasedSamplerFactoryTest, Test) {
             name: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based
             typed_config:
                 "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
-                ratio: "0.002"
+                sampling_percentage:
+                    numerator: 20
+                    denominator: TEN_THOUSAND
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;

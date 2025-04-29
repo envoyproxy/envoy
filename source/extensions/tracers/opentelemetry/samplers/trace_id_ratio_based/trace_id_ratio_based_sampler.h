@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/tracers/opentelemetry/samplers/v3/trace_id_ratio_based_sampler.pb.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
@@ -33,7 +34,7 @@ public:
 
 private:
   std::string description_;
-  const uint64_t threshold_;
+  const envoy::type::v3::FractionalPercent sampling_percentage_;
 };
 
 } // namespace OpenTelemetry
