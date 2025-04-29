@@ -40,9 +40,7 @@ public:
     return processing_mode_;
   }
 
-  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
-    return grpc_service_;
-  }
+  const envoy::config::core::v3::GrpcService& grpcService() const { return grpc_service_; }
 
   const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
     return untyped_forwarding_namespaces_;
@@ -60,7 +58,7 @@ private:
   const std::vector<std::string> typed_forwarding_namespaces_;
 };
 
-using ConfigSharedPtr = std::shared_ptr<Config>;
+using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
 
@@ -80,7 +78,7 @@ public:
     IgnoreError,
   };
 
-  NetworkExtProcFilter(ConfigSharedPtr config, ExternalProcessorClientPtr&& client);
+  NetworkExtProcFilter(ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client);
   ~NetworkExtProcFilter() override;
 
   // Network::ReadFilter
@@ -132,11 +130,10 @@ private:
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
-  ConfigSharedPtr config_;
+  const ConfigConstSharedPtr config_;
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
-  ::envoy::config::core::v3::GrpcService grpc_service_;
-  Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
+  const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
 

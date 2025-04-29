@@ -285,10 +285,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   }
 
   if (state_ == State::HttpCall) {
-    return (Runtime::runtimeFeatureEnabled(
-               "envoy.reloadable_features.lua_flow_control_while_http_call"))
-               ? Http::FilterDataStatus::StopIterationAndWatermark
-               : Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationAndWatermark;
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
