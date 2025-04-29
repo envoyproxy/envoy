@@ -1032,8 +1032,8 @@ TEST_F(ConnectivityGridTest, H3FailsFirstFollowedByTcpFailure) {
   failover_timer->invokeCallback();
   EXPECT_NE(grid_->http2Pool(), nullptr);
 
-  // HTTP/3 pool failed first. Failure shouldn't be propagated to the original
-  // caller, but instead wait for the HTTP/2 pool to finish.
+  // HTTP/3 pool fails first. Failure shouldn't be propagated to the original caller, but instead
+  // wait for the HTTP/2 pool to finish.
   EXPECT_NE(grid_->callbacks(0), nullptr);
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
