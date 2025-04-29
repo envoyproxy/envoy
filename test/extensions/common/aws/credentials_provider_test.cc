@@ -3,7 +3,7 @@
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/server/factory_context.h" // IWYU pragma: export
+#include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"
 

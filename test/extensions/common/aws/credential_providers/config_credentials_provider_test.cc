@@ -1,6 +1,6 @@
 #include "source/extensions/common/aws/credential_providers/config_credentials_provider.h"
 
-#include "gmock/gmock.h" // IWYU pragma: export
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

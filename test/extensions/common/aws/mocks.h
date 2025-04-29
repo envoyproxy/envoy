@@ -2,7 +2,7 @@
 
 #include "envoy/http/message.h"
 
-#include "source/common/http/message_impl.h" // IWYU pragma: export
+#include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/credentials_provider.h"
@@ -11,7 +11,7 @@
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
-#include "gmock/gmock.h" // IWYU pragma: export
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {

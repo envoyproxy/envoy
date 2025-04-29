@@ -1,13 +1,13 @@
-#include "envoy/extensions/common/aws/v3/credential_provider.pb.h" // IWYU pragma: export
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/server/factory_context.h" // IWYU pragma: export
-#include "test/test_common/environment.h"      // IWYU pragma: export
+#include "test/mocks/server/factory_context.h"
+#include "test/test_common/environment.h"     
 #include "test/test_common/test_runtime.h"
 
-#include "gmock/gmock.h" // IWYU pragma: export
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
