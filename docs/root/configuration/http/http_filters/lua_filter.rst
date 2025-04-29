@@ -582,6 +582,30 @@ Example:
     request_handle:clearRouteCache()
   end
 
+.. _config_http_filters_lua_stream_handle_api_filter_context:
+
+``filterContext()``
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local filter_context = handle:filterContext()
+
+Returns the filter context that configured in the the
+:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`.
+
+Example:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Get the filter context
+    local filter_context = request_handle:filterContext()
+
+    -- Access the filter context data
+    local value = filter_context["key"]
+  end
+
 ``importPublicKey()``
 ^^^^^^^^^^^^^^^^^^^^^
 

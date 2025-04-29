@@ -69,6 +69,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: lua
+  change: |
+    Added support for accessing filter context.
+    See :ref:`filterContext() <config_http_filters_lua_stream_handle_api_filter_context>` for more details.
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
