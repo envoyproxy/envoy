@@ -40,7 +40,6 @@ GetAddrInfoDnsResolver::~GetAddrInfoDnsResolver() {
   {
     absl::MutexLock guard(&mutex_);
     shutting_down_ = true;
-    // Signal all waiting threads to wake up and check the shutting_down_ flag.
     pending_queries_.clear();
   }
 
