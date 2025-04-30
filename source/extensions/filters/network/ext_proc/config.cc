@@ -15,9 +15,34 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
 
+namespace {
+
+absl::Status verifyFilterConfig(
+    const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config) {
+  if (!config.has_grpc_service()) {
+    return absl::InvalidArgumentError("A grpc_service must be configured");
+  }
+
+  if (config.processing_mode().process_read() ==
+          envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP &&
+      config.processing_mode().process_write() ==
+          envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP) {
+    return absl::InvalidArgumentError(
+        "both read and write paths are skipped, at least one must be enabled.");
+  }
+  return absl::OkStatus();
+}
+
+} // namespace
+
 Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& proto_config,
     Server::Configuration::FactoryContext& context) {
+  absl::Status result = verifyFilterConfig(proto_config);
+  if (!result.ok()) {
+    throw EnvoyException(std::string(result.message()));
+  }
+
   ConfigConstSharedPtr ext_proc_config = std::make_shared<const Config>(proto_config);
 
   return [ext_proc_config, &context](Network::FilterManager& filter_manager) -> void {
