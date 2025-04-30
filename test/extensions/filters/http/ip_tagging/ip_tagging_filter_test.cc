@@ -239,9 +239,8 @@ public:
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     auto config_or =
-        IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_,
-                                                      *stats_.rootScope(), runtime_, *api_,
-                                                      dispatcher_, validation_visitor_);
+        IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_, *stats_.rootScope(),
+                                      runtime_, *api_, dispatcher_, validation_visitor_);
     if (expected_error.has_value()) {
       EXPECT_FALSE(config_or.ok());
       EXPECT_EQ(expected_error.value(), absl::StrCat(config_or.status()));
@@ -280,8 +279,8 @@ ip_tag_header:
   header: x-envoy-optional-header
   action: SANITIZE
 )EOF";
-      initializeFilter(config_yaml,
-      "INVALID_ARGUMENT: HTTP IP Tagging Filter requires either ip_tags or ip_tags_path to be specified.");
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: HTTP IP Tagging Filter requires either ip_tags "
+                                "or ip_tags_path to be specified.");
 }
 
 TEST_F(IpTaggingFilterTest, BothIpTagsAndIpTagsFileConfigured) {
@@ -297,7 +296,7 @@ ip_tags:
 ip_tags_path: /test/tags.yaml
 )EOF";
   initializeFilter(config_yaml,
-                            "INVALID_ARGUMENT: Only one of ip_tags or ip_tags_path can be configured.");
+                   "INVALID_ARGUMENT: Only one of ip_tags or ip_tags_path can be configured.");
 }
 
 TEST_F(IpTaggingFilterTest, UnsupportedFormatForIpTagsFile) {
@@ -306,7 +305,7 @@ request_type: internal
 ip_tags_path: /test/tags.csv
 )EOF";
   initializeFilter(config_yaml,
-                            "INVALID_ARGUMENT: Unsupported file format, unable to parse ip tags from file.");
+                   "INVALID_ARGUMENT: Unsupported file format, unable to parse ip tags from file.");
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidr) {
@@ -854,9 +853,8 @@ public:
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     auto config_or =
-        IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_,
-                                                      *stats_.rootScope(), runtime_, *api_,
-                                                      dispatcher_, validation_visitor_);
+        IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_, *stats_.rootScope(),
+                                      runtime_, *api_, dispatcher_, validation_visitor_);
     EXPECT_TRUE(config_or.ok());
     config_ = std::move(config_or.value());
     filter_ = std::make_unique<IpTaggingFilter>(config_);
@@ -953,7 +951,8 @@ TEST_P(IpTagsFileReloadImplTest, IpTagsFileReloaded) {
 //   EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "total")));
 //   auto request_headers = test_case.tagged_headers_;
 //   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-//   EXPECT_EQ(test_case.hit_counter_prefix_, request_headers.get_(Http::Headers::get().EnvoyIpTags));
+//   EXPECT_EQ(test_case.hit_counter_prefix_,
+//   request_headers.get_(Http::Headers::get().EnvoyIpTags));
 //   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
 //   Http::TestRequestTrailerMapImpl request_trailers;
 //   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
@@ -980,7 +979,8 @@ TEST_P(IpTagsFileReloadImplTest, IpTagsFileReloaded) {
 //   EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "total")));
 //   request_headers = test_case.tagged_headers_;
 //   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-//   EXPECT_EQ(test_case.hit_counter_prefix_, request_headers.get_(Http::Headers::get().EnvoyIpTags));
+//   EXPECT_EQ(test_case.hit_counter_prefix_,
+//   request_headers.get_(Http::Headers::get().EnvoyIpTags));
 //   // Clean up modifications to ip tags file names.
 //   TestEnvironment::renameFile(source_ip_tags_file_path, reloaded_ip_tags_file_path);
 //   TestEnvironment::renameFile(source_ip_tags_file_path + "1", source_ip_tags_file_path);

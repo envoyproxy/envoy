@@ -17,7 +17,7 @@ absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createFilterFactor
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config = IpTaggingFilterConfig::create(
-            proto_config, stat_prefix, context.serverFactoryContext().singletonManager(), context.scope(),
+      proto_config, stat_prefix, context.serverFactoryContext().singletonManager(), context.scope(),
       context.serverFactoryContext().runtime(), context.serverFactoryContext().api(),
       context.serverFactoryContext().mainThreadDispatcher(), context.messageValidationVisitor());
   RETURN_IF_NOT_OK_REF(config.status());

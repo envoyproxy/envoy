@@ -33,7 +33,8 @@ public:
   LcTrieSharedPtr loadTags(const std::string& ip_tags_path, absl::Status& creation_status);
 
   LcTrieSharedPtr
-  parseIpTags(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags, absl::Status& creation_status);
+  parseIpTags(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
+              absl::Status& creation_status);
 
 private:
   Api::Api& api_;
@@ -48,7 +49,8 @@ class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
+                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner,
+                 absl::Status& creation_status);
 
   ~IpTagsProvider();
 
@@ -87,7 +89,8 @@ public:
                                       IpTagsReloadSuccessCb reload_success_cb,
                                       IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
                                       Event::Dispatcher& dispatcher,
-                                      std::shared_ptr<IpTagsRegistrySingleton> singleton, absl::Status& creation_status) {
+                                      std::shared_ptr<IpTagsRegistrySingleton> singleton,
+                                      absl::Status& creation_status) {
     std::shared_ptr<IpTagsProvider> ip_tags_provider;
     const uint64_t key = std::hash<std::string>()(ip_tags_path);
     absl::MutexLock lock(&mu_);
@@ -96,15 +99,15 @@ public:
       if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
         ip_tags_provider = provider;
       } else {
-        ip_tags_provider =
-            std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
-                                             reload_error_cb, dispatcher, api, singleton, creation_status);
+        ip_tags_provider = std::make_shared<IpTagsProvider>(
+            ip_tags_path, tags_loader, reload_success_cb, reload_error_cb, dispatcher, api,
+            singleton, creation_status);
         ip_tags_registry_[key] = ip_tags_provider;
       }
     } else {
-      ip_tags_provider =
-          std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
-                                           reload_error_cb, dispatcher, api, singleton, creation_status);
+      ip_tags_provider = std::make_shared<IpTagsProvider>(
+          ip_tags_path, tags_loader, reload_success_cb, reload_error_cb, dispatcher, api, singleton,
+          creation_status);
       ip_tags_registry_[key] = ip_tags_provider;
     }
     return ip_tags_provider;
@@ -133,10 +136,9 @@ public:
 
   static absl::StatusOr<std::shared_ptr<IpTaggingFilterConfig>>
   create(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-         const std::string& stat_prefix, Singleton::Manager& singleton_manager,
-                        Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
-                        Event::Dispatcher& dispatcher,
-                        ProtobufMessage::ValidationVisitor& validation_visitor);
+         const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
+         Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
+         ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
@@ -171,10 +173,12 @@ public:
   void incTotal() { incCounter(total_); }
 
 private:
-  IpTaggingFilterConfig(    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-    const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-    Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
-    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
+  IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+                        const std::string& stat_prefix, Singleton::Manager& singleton_manager,
+                        Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
+                        Event::Dispatcher& dispatcher,
+                        ProtobufMessage::ValidationVisitor& validation_visitor,
+                        absl::Status& creation_status);
 
   static FilterRequestType requestTypeEnum(
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
