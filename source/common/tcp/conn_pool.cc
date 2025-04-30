@@ -13,7 +13,7 @@ namespace Tcp {
 
 ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
                                  const Upstream::HostConstSharedPtr& host,
-                                 uint64_t concurrent_stream_limit,
+                                 uint32_t concurrent_stream_limit,
                                  absl::optional<std::chrono::milliseconds> idle_timeout)
     : Envoy::ConnectionPool::ActiveClient(parent, host->cluster().maxRequestsPerConnection(),
                                           concurrent_stream_limit),
