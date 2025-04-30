@@ -120,7 +120,7 @@ TEST(NetworkExtProcConfigFactoryTest, MissingGrpcService) {
                             EnvoyException, "A grpc_service must be configured");
 }
 
-// Test the config with both skiped modes.
+// Test the config with both SKIP modes.
 TEST(NetworkExtProcConfigFactoryTest, BothModesSkipped) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
   proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
