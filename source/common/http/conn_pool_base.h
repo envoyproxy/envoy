@@ -105,9 +105,9 @@ private:
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t effective_concurrent_stream_limit,
-               uint64_t configured_concurrent_stream_limit,
+  ActiveClient(HttpConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t effective_concurrent_stream_limit,
+               uint32_t configured_concurrent_stream_limit,
                OptRef<Upstream::Host::CreateConnectionData> opt_data)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
