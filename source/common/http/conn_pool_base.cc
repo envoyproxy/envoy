@@ -95,7 +95,7 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
 
 // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
 // side we do 2^29.
-static const uint32_t DEFAULT_MAX_STREAMS = (1 << 29);
+constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
 
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
