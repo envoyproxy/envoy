@@ -294,6 +294,7 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
+        on_match_validation_visitor_(validation_visitor),
         match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
@@ -465,6 +466,13 @@ private:
 
   template <class OnMatchType>
   absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
+    on_match_validation_visitor_.validateOnMatch(on_match);
+    if (const std::vector<absl::Status>& errors = on_match_validation_visitor_.errors();
+        !errors.empty()) {
+      return [error_message = std::string(errors.at(0).message())]() -> OnMatch<DataType> {
+        throwEnvoyExceptionOrPanic(error_message);
+      };
+    }
     if (on_match.has_matcher()) {
       return [matcher_factory = std::move(create(on_match.matcher())),
               keep_matching = on_match.keep_matching()]() {
@@ -511,6 +519,7 @@ private:
   const std::string stats_prefix_;
   ActionFactoryContext& action_factory_context_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
+  MatchTreeValidationVisitor<DataType>& on_match_validation_visitor_;
   MatchInputFactory<DataType> match_input_factory_;
 };
 } // namespace Matcher

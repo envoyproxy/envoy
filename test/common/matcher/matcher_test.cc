@@ -1078,6 +1078,7 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(8);
+  validation_visitor_.setSupportKeepMatching(true);
 
   std::shared_ptr<MatchTree<TestData>> top_matcher = nullptr;
   if (GetParam()) {
@@ -1151,6 +1152,7 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   auto inner_factory = TestDataInputStringFactory("foo");
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  validation_visitor_.setSupportKeepMatching(true);
 
   std::shared_ptr<MatchTree<TestData>> matcher = nullptr;
   if (GetParam()) {
@@ -1167,6 +1169,69 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   MaybeMatchResult result = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasNoMatchResult());
   EXPECT_THAT(skipped_results, AreStringActions(std::vector<std::string>{"keep matching"}));
+}
+
+TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
+  // Expect a failure during config validation when keep_matching is set but not supported.
+  const std::string yaml = R"EOF(
+    matcher_tree:
+      input:
+        name: inner_input
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+      exact_match_map:
+        map:
+          foo:
+            matcher:
+              matcher_list:
+                matchers:
+                - on_match:
+                    keep_matching: true
+                    action:
+                      name: test_action
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: keep matching
+                  predicate:
+                    single_predicate:
+                      input:
+                        name: inner_input
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.BoolValue
+                      value_match:
+                        exact: bar
+          bat:
+            action:
+              name: test_action
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.StringValue
+                value: bat
+      )EOF";
+
+  // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
+  xds::type::matcher::v3::Matcher xds_matcher;
+  envoy::config::common::matcher::v3::Matcher envoy_matcher;
+  MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
+  MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
+  TestUtility::validate(xds_matcher);
+  TestUtility::validate(envoy_matcher);
+
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  validation_visitor_.setSupportKeepMatching(false);
+
+  MatchTreeFactoryCb<TestData> matcher = nullptr;
+  if (GetParam()) {
+    matcher = factory_.create(xds_matcher);
+  } else {
+    matcher = factory_.create(envoy_matcher);
+  }
+  EXPECT_THROW_WITH_MESSAGE(matcher(), EnvoyException,
+                            "keep_matching is not supported in this context");
 }
 
 } // namespace Matcher

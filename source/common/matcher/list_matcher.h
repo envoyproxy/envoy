@@ -55,7 +55,7 @@ private:
 // Referential class to allow for re-entry into a ListMatcher after an initial match.
 template <class DataType> class ListMatcherReentrant : public MatchTree<DataType> {
 public:
-  explicit ListMatcherReentrant(ListMatcher<DataType>* parent_matcher, int starting_index)
+  explicit ListMatcherReentrant(ListMatcher<DataType>& parent_matcher, int starting_index)
       : parent_matcher_(parent_matcher), starting_index_(starting_index) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& matching_data) override {
