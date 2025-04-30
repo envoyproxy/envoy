@@ -5,12 +5,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
 
-NetworkExtProcFilter::NetworkExtProcFilter(ConfigSharedPtr config,
+NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
                                            ExternalProcessorClientPtr&& client)
-    : config_(config), client_(std::move(client)),
-      grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
-                                                      : envoy::config::core::v3::GrpcService()),
-      config_with_hash_key_(grpc_service_), downstream_callbacks_(*this) {}
+    : config_(config), client_(std::move(client)), config_with_hash_key_(config_->grpcService()),
+      downstream_callbacks_(*this) {}
 
 NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
 
@@ -134,7 +132,7 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
 
   auto options = Http::AsyncClient::StreamOptions()
                      .setParentContext(grpc_context)
-                     .setBufferBodyForRetry(grpc_service_.has_retry_policy());
+                     .setBufferBodyForRetry(config_->grpcService().has_retry_policy());
 
   ExternalProcessorStreamPtr stream_object =
       client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);

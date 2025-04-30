@@ -32,22 +32,20 @@ public:
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view credential_uri,
+      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      absl::string_view cluster_name, absl::string_view credential_uri,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
 
@@ -84,7 +82,7 @@ public:
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) PURE;
 };
@@ -126,22 +124,20 @@ private:
 
   CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view credential_uri,
+      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      absl::string_view cluster_name, absl::string_view credential_uri,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view authorization_token) override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) override;
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) override;
 
@@ -174,7 +170,7 @@ public:
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) override;
 

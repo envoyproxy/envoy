@@ -6,9 +6,8 @@ namespace Common {
 namespace Aws {
 
 WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
@@ -40,13 +39,13 @@ void WebIdentityCredentialsProvider::refresh() {
   }
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
-            aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
+            aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
   web_identity_data = web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  auto statusOr = aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_);
+  auto statusOr = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
   message.headers().setHost(Http::Utility::parseAuthority(statusOr.value()).host_);
   message.headers().setPath(
       fmt::format("/?Action=AssumeRoleWithWebIdentity"

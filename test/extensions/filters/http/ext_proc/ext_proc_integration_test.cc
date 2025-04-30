@@ -623,6 +623,7 @@ protected:
     for (int i = 0; i < count; i++) {
       auto* headers = mutation.add_set_headers();
       auto str = absl::StrCat("x-test-header-internal-", std::to_string(i));
+      headers->mutable_append()->set_value(false);
       headers->mutable_header()->set_key(str);
       headers->mutable_header()->set_raw_value(str);
     }
@@ -639,6 +640,7 @@ protected:
         *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
           auto* content_length =
               headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+          content_length->mutable_append()->set_value(false);
           content_length->mutable_header()->set_key("content-length");
           content_length->mutable_header()->set_raw_value("13");
           return true;
@@ -866,7 +868,9 @@ protected:
       header_resp = response_header.mutable_request_headers();
     }
     auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
-    auto* header = header_mutation->add_set_headers()->mutable_header();
+    auto* sh = header_mutation->add_set_headers();
+    auto* header = sh->mutable_header();
+    sh->mutable_append()->set_value(false);
     header->set_key("x-new-header");
     header->set_raw_value("new");
     processor_stream_->sendGrpcMessage(response_header);
@@ -897,7 +901,9 @@ protected:
   void serverSendTrailerRespDuplexStreamed() {
     ProcessingResponse response_trailer;
     auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
-    auto* header = trailer_resp->add_set_headers()->mutable_header();
+    auto* sh = trailer_resp->add_set_headers();
+    sh->mutable_append()->set_value(false);
+    auto* header = sh->mutable_header();
     header->set_key("x-new-trailer");
     header->set_raw_value("new");
     processor_stream_->sendGrpcMessage(response_trailer);
@@ -1207,6 +1213,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersResetOnServerMessage) {
         // The response does not really matter, it just needs to be non-empty.
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         return true;
@@ -1249,6 +1256,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersGracefulClose) {
         // The response does not really matter, it just needs to be non-empty.
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         return true;
@@ -1288,6 +1296,7 @@ TEST_P(ExtProcIntegrationTest, OnlyRequestHeadersServerHalfClosesFirst) {
         // The response does not really matter, it just needs to be non-empty.
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         return true;
@@ -1369,6 +1378,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -1453,6 +1463,7 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
 
         // Set host header to match the domain of virtual host in routing configuration.
         auto* mut = response_header_mutation->add_set_headers();
+        mut->mutable_append()->set_value(false);
         mut->mutable_header()->set_key(":authority");
         mut->mutable_header()->set_raw_value(vhost_domain);
 
@@ -1514,6 +1525,7 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
         // Set host header to the wrong value that doesn't match the domain of virtual host in route
         // configuration.
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key(":authority");
         mut1->mutable_header()->set_raw_value("wrong_host");
 
@@ -1544,18 +1556,22 @@ TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key(":path");
         mut1->mutable_header()->set_raw_value("/mutated_path/bluh");
 
         auto* mut2 = response_header_mutation->add_set_headers();
+        mut2->mutable_append()->set_value(false);
         mut2->mutable_header()->set_key(":scheme");
         mut2->mutable_header()->set_raw_value("https");
 
         auto* mut3 = response_header_mutation->add_set_headers();
+        mut3->mutable_append()->set_value(false);
         mut3->mutable_header()->set_key(":authority");
         mut3->mutable_header()->set_raw_value("new_host");
 
         auto* mut4 = response_header_mutation->add_set_headers();
+        mut4->mutable_append()->set_value(false);
         mut4->mutable_header()->set_key(":method");
         mut4->mutable_header()->set_raw_value("POST");
         return true;
@@ -1598,6 +1614,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersWithLogging) {
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         return true;
@@ -1705,6 +1722,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersNonUtf8WithValueInBytes) {
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         response_header_mutation->add_remove_headers("x-bad-utf8");
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-utf8");
         // Construct a non-utf8 header value and send back to Envoy.
         std::string invalid_unicode("valid_prefix");
@@ -1862,6 +1880,7 @@ TEST_P(ExtProcIntegrationTest, RemoveResponseContentLengthAfterBodyProcessing) {
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_append()->set_value(false);
         content_length->mutable_header()->set_key("content-length");
         content_length->mutable_header()->set_raw_value("13");
         return true;
@@ -1897,6 +1916,7 @@ TEST_P(ExtProcIntegrationTest, MismatchedContentLengthAndBodyLength) {
       *grpc_upstreams_[0], true, [&](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_append()->set_value(false);
         content_length->mutable_header()->set_key("content-length");
         content_length->mutable_header()->set_raw_value(absl::StrCat(set_content_length));
         return true;
@@ -1930,9 +1950,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->mutable_append()->set_value(false);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("201");
         return true;
@@ -1961,9 +1983,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseBadStatus) {
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->mutable_append()->set_value(false);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("100");
         return true;
@@ -1990,9 +2014,11 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->mutable_append()->set_value(false);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("201");
         auto* add3 = response_mutation->add_set_headers();
@@ -2028,6 +2054,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersAndTrailersOnResponse) {
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
+        trailer_add->mutable_append()->set_value(false);
         trailer_add->mutable_header()->set_key("x-modified-trailers");
         trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
@@ -2060,6 +2087,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) 
   processResponseTrailersMessage(
       *grpc_upstreams_[0], false, [](const HttpTrailers&, TrailersResponse& resp) {
         auto* trailer_add = resp.mutable_header_mutation()->add_set_headers();
+        trailer_add->mutable_append()->set_value(false);
         trailer_add->mutable_header()->set_key("x-modified-trailers");
         trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
@@ -2085,6 +2113,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
+        trailer_add->mutable_append()->set_value(false);
         trailer_add->mutable_header()->set_key("x-modified-trailers");
         trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
@@ -2113,6 +2142,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_append()->set_value(false);
         content_length->mutable_header()->set_key("content-length");
         content_length->mutable_header()->set_raw_value("13");
         return true;
@@ -2126,6 +2156,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {
         body_mut->set_body("Hello, World!");
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
+        header_add->mutable_append()->set_value(false);
         header_add->mutable_header()->set_key("x-testing-response-header");
         header_add->mutable_header()->set_raw_value("Yes");
         return true;
@@ -2177,6 +2208,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_append()->set_value(false);
         content_length->mutable_header()->set_key("content-length");
         content_length->mutable_header()->set_raw_value("100");
         return true;
@@ -2187,6 +2219,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponsePartialBuffered)
         EXPECT_TRUE(body.end_of_stream());
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
+        header_add->mutable_append()->set_value(false);
         header_add->mutable_header()->set_key("x-testing-response-header");
         header_add->mutable_header()->set_raw_value("Yes");
         return true;
@@ -2224,6 +2257,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersAndTrailersOnResponse) {
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
+        trailer_add->mutable_append()->set_value(false);
         trailer_add->mutable_header()->set_key("x-modified-trailers");
         trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
@@ -2287,6 +2321,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnBigResponse) {
         EXPECT_TRUE(body.end_of_stream());
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
+        header_add->mutable_append()->set_value(false);
         header_add->mutable_header()->set_key("x-testing-response-header");
         header_add->mutable_header()->set_raw_value("Yes");
         return true;
@@ -2310,6 +2345,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBoth) {
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_append()->set_value(false);
         content_length->mutable_header()->set_key("content-length");
         content_length->mutable_header()->set_raw_value("13");
         return true;
@@ -2356,6 +2392,7 @@ TEST_P(ExtProcIntegrationTest, ProcessingModeResponseOnly) {
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         return true;
@@ -2379,9 +2416,11 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
     immediate.set_body("{\"reason\": \"Not authorized\"}");
     immediate.set_details("Failed because you are not authorized");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
     hdr1->mutable_header()->set_key("x-failure-reason");
     hdr1->mutable_header()->set_raw_value("testing");
     auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
     hdr2->mutable_header()->set_key("content-type");
     hdr2->mutable_header()->set_raw_value("application/json");
   });
@@ -2410,9 +2449,11 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
     immediate.set_body("{\"reason\": \"Not authorized\"}");
     immediate.set_details("Failed because you are not authorized");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
     hdr1->mutable_header()->set_key("x-failure-reason");
     hdr1->mutable_header()->set_raw_value("testing");
     auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
     hdr2->mutable_header()->set_key("content-type");
     hdr2->mutable_header()->set_raw_value("application/json");
   });
@@ -2446,9 +2487,11 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulCloseNoServerTrai
     immediate.set_body("{\"reason\": \"Not authorized\"}");
     immediate.set_details("Failed because you are not authorized");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
     hdr1->mutable_header()->set_key("x-failure-reason");
     hdr1->mutable_header()->set_raw_value("testing");
     auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
     hdr2->mutable_header()->set_key("content-type");
     hdr2->mutable_header()->set_raw_value("application/json");
   });
@@ -2479,9 +2522,11 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithLogging) {
     immediate.set_body("{\"reason\": \"Not authorized\"}");
     immediate.set_details("Failed because you are not authorized");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
     hdr1->mutable_header()->set_key("x-failure-reason");
     hdr1->mutable_header()->set_raw_value("testing");
     auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
     hdr2->mutable_header()->set_key("content-type");
     hdr2->mutable_header()->set_raw_value("application/json");
   });
@@ -2500,6 +2545,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithInvalidCharacter) {
   processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
+    hdr->mutable_append()->set_value(false);
     hdr->mutable_header()->set_key("x-failure-reason\n");
     hdr->mutable_header()->set_raw_value("testing");
   });
@@ -2541,6 +2587,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& resp) {
         auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("foo");
         hdr->mutable_header()->set_raw_value("bar");
         return true;
@@ -2574,6 +2621,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedResponseBody) {
   processResponseHeadersMessage(
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& resp) {
         auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("foo");
         hdr->mutable_header()->set_raw_value("bar");
         return true;
@@ -2742,6 +2790,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithSystemHeaderMutation)
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     // Adding system header in the ext_proc response.
+    hdr->mutable_append()->set_value(false);
     hdr->mutable_header()->set_key(":foo");
     hdr->mutable_header()->set_raw_value("bar");
   });
@@ -2762,6 +2811,7 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyWithEnvoyHeaderMutation) 
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
     // Adding x-envoy header is not allowed.
+    hdr->mutable_append()->set_value(false);
     hdr->mutable_header()->set_key("x-envoy-foo");
     hdr->mutable_header()->set_raw_value("bar");
   });
@@ -2779,9 +2829,11 @@ TEST_P(ExtProcIntegrationTest, GetAndImmediateRespondMutationAllowEnvoy) {
   processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
     immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
     auto* hdr = immediate.mutable_headers()->add_set_headers();
+    hdr->mutable_append()->set_value(false);
     hdr->mutable_header()->set_key("x-envoy-foo");
     hdr->mutable_header()->set_raw_value("bar");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
     hdr1->mutable_header()->set_key("host");
     hdr1->mutable_header()->set_raw_value("test");
   });
@@ -2805,6 +2857,7 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBody) {
       *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& response) {
         EXPECT_TRUE(body.end_of_stream());
         auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
+        mut->mutable_append()->set_value(false);
         mut->mutable_header()->set_key(":scheme");
         mut->mutable_header()->set_raw_value("tcp");
         return true;
@@ -2827,6 +2880,7 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBodyPartialBuffer)
       *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& response) {
         EXPECT_TRUE(body.end_of_stream());
         auto* mut = response.mutable_response()->mutable_header_mutation()->add_set_headers();
+        mut->mutable_append()->set_value(false);
         mut->mutable_header()->set_key(":scheme");
         mut->mutable_header()->set_raw_value("tcp");
         return true;
@@ -2847,9 +2901,11 @@ TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* header_mut = headers_resp.mutable_response()->mutable_header_mutation();
         auto* method = header_mut->add_set_headers();
+        method->mutable_append()->set_value(false);
         method->mutable_header()->set_key(":method");
         method->mutable_header()->set_raw_value("POST");
         auto* content_type = header_mut->add_set_headers();
+        content_type->mutable_append()->set_value(false);
         content_type->mutable_header()->set_key("content-type");
         content_type->mutable_header()->set_raw_value("text/plain");
         headers_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, Server!");
@@ -3491,9 +3547,11 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
       *grpc_upstreams_[1], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->mutable_append()->set_value(false);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("201");
         return true;
@@ -3568,6 +3626,7 @@ TEST_P(ExtProcIntegrationTest, RequestAndResponseMessageNewTimeoutWithHeaderMuta
         // Server sends back response with the header mutation instructions.
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -3932,6 +3991,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
       *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* content_length =
             headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_append()->set_value(false);
         content_length->mutable_header()->set_key("content-length");
         content_length->mutable_header()->set_raw_value("13");
         headers_resp.mutable_response()->set_clear_route_cache(true);
@@ -3964,6 +4024,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetBodyOnBothWithClearRouteCache) {
         EXPECT_TRUE(body.end_of_stream());
         auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
         auto* header_add = header_mut->add_set_headers();
+        header_add->mutable_append()->set_value(false);
         header_add->mutable_header()->set_key("x-testing-response-header");
         header_add->mutable_header()->set_raw_value("Yes");
         body_resp.mutable_response()->set_clear_route_cache(true);
@@ -4513,6 +4574,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -4578,6 +4640,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
                          ->mutable_response()
                          ->mutable_header_mutation()
                          ->add_set_headers();
+  new_header->mutable_append()->set_value(false);
   new_header->mutable_header()->set_key("foo");
   new_header->mutable_header()->set_raw_value("bluh");
   processor_stream_->sendGrpcMessage(processing_response);
@@ -4653,6 +4716,7 @@ TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
                          ->mutable_response()
                          ->mutable_header_mutation()
                          ->add_set_headers();
+  new_header->mutable_append()->set_value(false);
   new_header->mutable_header()->set_key("foo");
   new_header->mutable_header()->set_raw_value("bluh");
   processor_stream_2->sendGrpcMessage(processing_response);
@@ -4689,6 +4753,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithHeader) {
         // Try to mutate the header.
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         return true;
@@ -4802,6 +4867,7 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithTrailer) {
         // Try to mutate the trailer
         auto* trailer_mut = resp.mutable_header_mutation();
         auto* trailer_add = trailer_mut->add_set_headers();
+        trailer_add->mutable_append()->set_value(false);
         trailer_add->mutable_header()->set_key("x-modified-trailers");
         trailer_add->mutable_header()->set_raw_value("xxx");
         return true;
@@ -4980,6 +5046,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstreamObservabilityMode) {
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -5052,6 +5119,7 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetHeadersUpstreamObservabilityMod
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -5236,6 +5304,7 @@ TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedBasicTest) {
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -5346,6 +5415,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespStreamedTes
   auto* header_resp = response_header.mutable_request_headers();
   auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
   auto* mut = header_mutation->add_set_headers();
+  mut->mutable_append()->set_value(false);
   mut->mutable_header()->set_key("x-new-header");
   mut->mutable_header()->set_raw_value("new");
   processor_stream_->sendGrpcMessage(response_header);

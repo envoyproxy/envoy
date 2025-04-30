@@ -34,17 +34,15 @@ public:
     return processing_mode_;
   }
 
-  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
-    return grpc_service_;
-  }
+  const envoy::config::core::v3::GrpcService& grpcService() const { return grpc_service_; }
 
 private:
-  bool failure_mode_allow_;
-  envoy::extensions::filters::network::ext_proc::v3::ProcessingMode processing_mode_;
-  envoy::config::core::v3::GrpcService grpc_service_;
+  const bool failure_mode_allow_;
+  const envoy::extensions::filters::network::ext_proc::v3::ProcessingMode processing_mode_;
+  const envoy::config::core::v3::GrpcService grpc_service_;
 };
 
-using ConfigSharedPtr = std::shared_ptr<Config>;
+using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
 
@@ -64,7 +62,7 @@ public:
     IgnoreError,
   };
 
-  NetworkExtProcFilter(ConfigSharedPtr config, ExternalProcessorClientPtr&& client);
+  NetworkExtProcFilter(ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client);
   ~NetworkExtProcFilter() override;
 
   // Network::ReadFilter
@@ -115,11 +113,10 @@ private:
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
-  ConfigSharedPtr config_;
+  const ConfigConstSharedPtr config_;
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
-  ::envoy::config::core::v3::GrpcService grpc_service_;
-  Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
+  const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
 
