@@ -18,6 +18,13 @@ minor_behavior_changes:
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
+- area: oauth2
+  change: |
+    Reset CSRF token when token validation fails during redirection.
+    If the CSRF token cookie is present during the redirection to the authorization server, it will be validated.
+    Previously, if this validation failed, the oauth flow would fail. Now the CSRF token will simply be reset. This fixes
+    the case where an hmac secret change causes a redirect flow, but the CSRF token cookie hasn't yet expired
+    causing a CSRF token validation failure.
 - area: cel
   change: |
     Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
