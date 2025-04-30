@@ -21,23 +21,43 @@ private:
 
 } // namespace
 
+GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
+    const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig&
+        config,
+    Event::Dispatcher& dispatcher, Api::Api& api)
+    : config_(config), dispatcher_(dispatcher) {
+  uint32_t num_threads =
+      config_.has_num_resolver_threads() ? 1 : config_.num_resolver_threads().value();
+  ENVOY_LOG(debug, "Starting getaddrinfo resolver with {} threads", num_threads);
+  resolver_threads_.reserve(num_threads);
+  for (uint32_t i = 0; i < num_threads; i++) {
+    resolver_threads_.emplace_back(
+        api_.threadFactory().createThread([this] { resolveThreadRoutine(); }));
+  }
+}
+
 GetAddrInfoDnsResolver::~GetAddrInfoDnsResolver() {
   {
     absl::MutexLock guard(&mutex_);
     shutting_down_ = true;
+    // Signal all waiting threads to wake up and check the shutting_down_ flag.
+    mutex_.SignalAll();
     pending_queries_.clear();
   }
 
-  resolver_thread_->join();
+  for (auto& thread : resolver_threads_) {
+    thread->join();
+  }
+  ENVOY_LOG(debug, "All getaddrinfo resolver threads joined");
 }
 
 ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
                                                 DnsLookupFamily dns_lookup_family,
                                                 ResolveCb callback) {
   ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
-  auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
+  auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, std::move(callback));
   new_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
-  ActiveDnsQuery* active_query;
+  ActiveDnsQuery* active_query = new_query.get();
   {
     absl::MutexLock guard(&mutex_);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
@@ -47,7 +67,8 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
     } else {
       pending_queries_.push_back({std::move(new_query), absl::nullopt});
     }
-    active_query = pending_queries_.back().pending_query_.get();
+    // Explicit signal to a waiting thread to wake up and continue resolving.
+    mutex_.Signal();
   }
   return active_query;
 }
@@ -143,7 +164,8 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       }
     }
 
-    ENVOY_LOG(debug, "popped pending query [{}]", next_query->dns_name_);
+    ENVOY_LOG(debug, "Thread ({}) popped pending query [{}]", Thread::Thread::getCurrentThreadId(),
+              next_query->dns_name_);
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
@@ -166,18 +188,17 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
         response = processResponse(*next_query, addrinfo_wrapper.get());
       } else if (rc.return_value_ == EAI_AGAIN) {
-        if (num_retries.has_value()) {
-          (*num_retries)--;
-        }
         if (!num_retries.has_value()) {
           ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
           next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
           {
             absl::MutexLock guard(&mutex_);
             pending_queries_.push_back({std::move(next_query), absl::nullopt});
+            mutex_.Signal();
           }
           continue;
         }
+        (*num_retries)--;
         if (*num_retries > 0) {
           ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
@@ -185,6 +206,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           {
             absl::MutexLock guard(&mutex_);
             pending_queries_.push_back({std::move(next_query), *num_retries});
+            mutex_.Signal();
           }
           continue;
         }
