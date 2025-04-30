@@ -32,7 +32,7 @@ GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
   resolver_threads_.reserve(num_threads);
   for (uint32_t i = 0; i < num_threads; i++) {
     resolver_threads_.emplace_back(
-        api_.threadFactory().createThread([this] { resolveThreadRoutine(); }));
+        api.threadFactory().createThread([this] { resolveThreadRoutine(); }));
   }
 }
 
@@ -41,7 +41,6 @@ GetAddrInfoDnsResolver::~GetAddrInfoDnsResolver() {
     absl::MutexLock guard(&mutex_);
     shutting_down_ = true;
     // Signal all waiting threads to wake up and check the shutting_down_ flag.
-    mutex_.SignalAll();
     pending_queries_.clear();
   }
 
@@ -67,8 +66,6 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
     } else {
       pending_queries_.push_back({std::move(new_query), absl::nullopt});
     }
-    // Explicit signal to a waiting thread to wake up and continue resolving.
-    mutex_.Signal();
   }
   return active_query;
 }
@@ -194,7 +191,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           {
             absl::MutexLock guard(&mutex_);
             pending_queries_.push_back({std::move(next_query), absl::nullopt});
-            mutex_.Signal();
           }
           continue;
         }
@@ -206,7 +202,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           {
             absl::MutexLock guard(&mutex_);
             pending_queries_.push_back({std::move(next_query), *num_retries});
-            mutex_.Signal();
           }
           continue;
         }
