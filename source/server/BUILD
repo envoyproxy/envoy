@@ -525,6 +525,7 @@ envoy_cc_library(
     name = "transport_socket_config_lib",
     hdrs = ["transport_socket_config_impl.h"],
     deps = [
+        ":generic_factory_context_lib",
         "//envoy/server:transport_socket_config_interface",
     ],
 )

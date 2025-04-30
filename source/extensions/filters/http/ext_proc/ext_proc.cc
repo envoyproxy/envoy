@@ -1100,6 +1100,10 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
   if (logging_info_->clusterInfo() == nullptr) {
     logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
   }
+
+  // Response code details should actually be set as many times as possible, since it's
+  // the *final* response code details that will give the most useful information.
+  logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
 }
 
 void Filter::logStreamInfo() {
@@ -1496,10 +1500,7 @@ void Filter::onMessageTimeout() {
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
 
-    errorResponse.mutable_status()->set_code(
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_timeout_error")
-            ? StatusCode::GatewayTimeout
-            : StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }

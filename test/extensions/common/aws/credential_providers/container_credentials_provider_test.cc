@@ -14,7 +14,6 @@
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 
@@ -111,9 +110,6 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
 
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("169.254.170.23:80/v1/credentials"));
@@ -122,7 +118,7 @@ public:
     auto credential_uri = "169.254.170.2:80/path/to/doc";
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, manager_optref_,
+        *api_, context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -172,9 +168,7 @@ public:
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
@@ -381,9 +375,6 @@ public:
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
 
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("169.254.170.23:80/v1/credentials"));
 
@@ -393,7 +384,7 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, manager_optref_,
+        *api_, context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -443,9 +434,7 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {

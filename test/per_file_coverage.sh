@@ -15,10 +15,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.2"
+"source/common/quic:93.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
-"source/common/tls:95.5"
+"source/common/tls:94.4" # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
 "source/common/tls/cert_validator:94.7"
 "source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV

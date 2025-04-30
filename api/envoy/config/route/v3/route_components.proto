@@ -501,6 +501,8 @@ message WeightedCluster {
 // Configuration for a cluster specifier plugin.
 message ClusterSpecifierPlugin {
   // The name of the plugin and its opaque configuration.
+  //
+  // [#extension-category: envoy.router.cluster_specifier_plugin]
   core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
 
   // If is_optional is not set or is set to false and the plugin defined by this message is not a

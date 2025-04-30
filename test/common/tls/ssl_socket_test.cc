@@ -63,6 +63,7 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -5650,11 +5651,11 @@ TEST_P(SslSocketTest, CipherSuites) {
   updateFilterChain(tls_context, *filter_chain);
   // Verify that ECDHE-RSA-CHACHA20-POLY1305 is not offered by default in FIPS builds.
   client_params->add_cipher_suites(common_cipher_suite);
-#ifdef BORINGSSL_FIPS
-  testUtilV2(error_test_options);
-#else
-  testUtilV2(cipher_test_options);
-#endif
+  if (FIPS_mode()) {
+    testUtilV2(error_test_options);
+  } else {
+    testUtilV2(cipher_test_options);
+  }
   client_params->clear_cipher_suites();
 }
 
@@ -5754,11 +5755,11 @@ TEST_P(SslSocketTest, EcdhCurves) {
   client_params->add_ecdh_curves("X25519");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   updateFilterChain(tls_context, *filter_chain);
-#ifdef BORINGSSL_FIPS
-  testUtilV2(error_test_options);
-#else
-  testUtilV2(ecdh_curves_test_options);
-#endif
+  if (FIPS_mode()) {
+    testUtilV2(error_test_options);
+  } else {
+    testUtilV2(ecdh_curves_test_options);
+  }
   client_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
 }
@@ -7878,9 +7879,9 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   // be successful.
   TestUtilOptionsV2 test_options(listener, client_tls_context, true, version_);
   // `was_key_usage_invalid` stats is expected to set to report the mismatched usage.
-#ifndef BORINGSSL_FIPS
-  test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
-#endif
+  if (!FIPS_mode()) {
+    test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
+  }
   testUtilV2(test_options);
 }
 

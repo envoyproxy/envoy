@@ -20,11 +20,13 @@ public:
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(absl::Status, setAdsConfigSource,
               (const envoy::config::core::v3::ApiConfigSource& config_source));
-  MOCK_METHOD(OptRef<XdsConfigTracker>, xdsConfigTracker, ());
-  MOCK_METHOD(XdsResourcesDelegateOptRef, xdsResourcesDelegate, ());
+  MOCK_METHOD(absl::Status, initializeAdsConnections,
+              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
+  MOCK_METHOD(GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(SubscriptionFactory&, subscriptionFactory, ());
 
   testing::NiceMock<MockSubscriptionFactory> subscription_factory_;
+  std::shared_ptr<testing::NiceMock<MockGrpcMux>> ads_mux_;
 };
 
 } // namespace Config
