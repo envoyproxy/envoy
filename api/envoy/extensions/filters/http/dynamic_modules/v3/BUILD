@@ -8,6 +8,5 @@ api_proto_package(
     deps = [
         "//envoy/extensions/dynamic_modules/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@com_github_cncf_xds//xds/annotations/v3:pkg",
     ],
 )

@@ -11,15 +11,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> LuaFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
+    const std::string& stats_prefix, DualInfo info,
+    Server::Configuration::ServerFactoryContext& context) {
 
-  FilterConfigConstSharedPtr filter_config(
-      new FilterConfig{proto_config, server_context.threadLocal(), server_context.clusterManager(),
-                       server_context.api(), context.scope(), stat_prefix});
-  auto& time_source = server_context.mainThreadDispatcher().timeSource();
+  FilterConfigConstSharedPtr filter_config(new FilterConfig{proto_config, context.threadLocal(),
+                                                            context.clusterManager(), context.api(),
+                                                            info.scope, stats_prefix});
+  auto& time_source = context.mainThreadDispatcher().timeSource();
   return [filter_config, &time_source](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, time_source));
   };
@@ -37,6 +37,7 @@ LuaFilterConfig::createRouteSpecificFilterConfigTyped(
  */
 LEGACY_REGISTER_FACTORY(LuaFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
                         "envoy.lua");
+REGISTER_FACTORY(UpstreamLuaFilterConfig, Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Lua
 } // namespace HttpFilters

@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/type/v3/http_status.pb.h"
 #include "envoy/type/v3/ratelimit_strategy.pb.h"
 
 #include "source/common/common/logger.h"
@@ -31,9 +32,10 @@ namespace RateLimitQuota {
 
 const char kBucketMetadataNamespace[] = "envoy.extensions.http_filters.rate_limit_quota.bucket";
 
+using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using envoy::type::v3::RateLimitStrategy;
-using NoAssignmentBehavior = envoy::extensions::filters::http::rate_limit_quota::v3::
-    RateLimitQuotaBucketSettings::NoAssignmentBehavior;
+using NoAssignmentBehavior = RateLimitQuotaBucketSettings::NoAssignmentBehavior;
+using DenyResponseSettings = RateLimitQuotaBucketSettings::DenyResponseSettings;
 
 // Returns whether or not to allow a request based on the no-assignment-behavior
 // & populates an action.
@@ -44,10 +46,31 @@ bool noAssignmentBehaviorShouldAllow(const NoAssignmentBehavior& no_assignment_b
                RateLimitStrategy::DENY_ALL);
 }
 
+// Translate from the HttpStatus Code enum to the Envoy::Http::Code enum.
+inline Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& settings) {
+  if (!settings.has_http_status()) {
+    return Envoy::Http::Code::TooManyRequests;
+  }
+  return static_cast<Envoy::Http::Code>(static_cast<uint64_t>(settings.http_status().code()));
+}
+
+inline std::function<void(Http::ResponseHeaderMap&)>
+addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
+  if (settings.response_headers_to_add().empty())
+    return nullptr;
+  // Headers copied from settings for thread-safety.
+  return [headers_to_add = settings.response_headers_to_add()](Http::ResponseHeaderMap& headers) {
+    for (const envoy::config::core::v3::HeaderValueOption& header : headers_to_add) {
+      headers.addCopy(Http::LowerCaseString(header.header().key()), header.header().value());
+    }
+  };
+}
+
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
-                                           Envoy::Http::Code code,
+                                           const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(code, "", nullptr, absl::nullopt, "");
+  cb->sendLocalReply(getDenyResponseCode(settings), settings.http_body().value(),
+                     addDenyResponseHeadersCb(settings), absl::nullopt, "");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
@@ -94,10 +117,14 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
   callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
 
+  // Settings needed if a cached bucket or default behavior decides to deny.
+  const DenyResponseSettings& deny_response_settings =
+      match_action.bucketSettings().deny_response_settings();
+
   std::shared_ptr<CachedBucket> cached_bucket = client_->getBucket(bucket_id);
   if (cached_bucket != nullptr) {
     // Found the cached bucket entry.
-    return processCachedBucket(*cached_bucket);
+    return processCachedBucket(deny_response_settings, *cached_bucket);
   }
 
   // New buckets should have a configured default action pulled from
@@ -151,7 +178,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  return sendDenyResponse(callbacks_, Envoy::Http::Code::TooManyRequests,
+  return sendDenyResponse(callbacks_, deny_response_settings,
                           StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
 }
 
@@ -237,7 +264,9 @@ bool RateLimitQuotaFilter::shouldAllowRequest(const CachedBucket& cached_bucket)
   return true; // Unreachable.
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(CachedBucket& cached_bucket) {
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::processCachedBucket(const DenyResponseSettings& deny_response_settings,
+                                          CachedBucket& cached_bucket) {
   // The QuotaUsage of a cached bucket should never be null. If it is due to a
   // bug, this will crash.
   std::shared_ptr<QuotaUsage> quota_usage = cached_bucket.quota_usage;
@@ -250,7 +279,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::processCachedBucket(CachedBucket
   incrementAtomic(quota_usage->num_requests_denied);
   // TODO(tyxia) Build the customized response based on
   // `DenyResponseSettings` if it is configured.
-  return sendDenyResponse(callbacks_, Envoy::Http::Code::TooManyRequests,
+  return sendDenyResponse(callbacks_, deny_response_settings,
                           StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
 }
 

@@ -132,9 +132,7 @@ MetadataFormatterCommandParser::parse(absl::string_view command, absl::string_vi
     }
 
     // Return a pointer to formatter provider.
-    return std::make_unique<
-        Envoy::Formatter::StreamInfoFormatterWrapper<Envoy::Formatter::HttpFormatterContext>>(
-        provider->second(filter_namespace, path, max_length));
+    return provider->second(filter_namespace, path, max_length);
   }
   return nullptr;
 }

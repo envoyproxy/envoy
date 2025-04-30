@@ -51,8 +51,8 @@ struct RedisClusterStats {
 
 class DoNothingPoolCallbacks : public PoolCallbacks {
 public:
-  void onResponse(Common::Redis::RespValuePtr&&) override{};
-  void onFailure() override{};
+  void onResponse(Common::Redis::RespValuePtr&&) override {};
+  void onFailure() override {};
 };
 
 class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {

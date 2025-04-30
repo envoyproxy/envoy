@@ -85,6 +85,51 @@ TEST(UUIDRequestIDExtensionTest, SetRequestID) {
   }
 }
 
+TEST(UUIDRequestIDExtensionTest, SetRequestIDWhenEmpty) {
+  testing::StrictMock<Random::MockRandomGenerator> random;
+  UUIDRequestIDExtension uuid_utils(envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(),
+                                    random);
+
+  {
+    // Request ID not set.
+
+    Http::TestRequestHeaderMapImpl request_headers;
+
+    // A new request ID will be set.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
+    uuid_utils.set(request_headers, false, true);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
+
+  {
+    // Request ID is empty.
+
+    Http::TestRequestHeaderMapImpl request_headers{{
+        "x-request-id",
+        "",
+    }};
+
+    // A new request ID will be set.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
+    uuid_utils.set(request_headers, false, true);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
+
+  {
+    // Request ID is not empty.
+
+    Http::TestRequestHeaderMapImpl request_headers{{
+        "x-request-id",
+        "some-request-id",
+    }};
+
+    // The request ID will be kept.
+    EXPECT_CALL(random, uuid()).Times(0);
+    uuid_utils.set(request_headers, false, true);
+    EXPECT_EQ("some-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
+}
+
 TEST(UUIDRequestIDExtensionTest, ClearExternalTraceReason) {
   testing::NiceMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(),

@@ -22,7 +22,7 @@ using FilterFactoryCb = Network::UdpSessionFilterFactoryCb;
  */
 class HttpCapsuleFilterConfigFactory : public FactoryBase<FilterConfig> {
 public:
-  HttpCapsuleFilterConfigFactory() : FactoryBase("envoy.filters.udp.session.http_capsule"){};
+  HttpCapsuleFilterConfigFactory() : FactoryBase("envoy.filters.udp.session.http_capsule") {};
 
 private:
   FilterFactoryCb

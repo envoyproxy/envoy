@@ -348,7 +348,7 @@ public class CronetHttp3Test {
 
     // There should still only be one HTTP/3 connection.
     postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
   }
 
   @Test

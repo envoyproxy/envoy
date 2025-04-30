@@ -27,8 +27,6 @@ secret access key (the session token is optional).
    variable and role arn read from ``AWS_ROLE_ARN`` environment variable. The credentials are extracted from the fields ``AccessKeyId``,
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
    ``Expiration``).
-   This provider is not compatible with :ref:`Grpc Credentials AWS AwsIamConfig <envoy_v3_api_file_envoy/config/grpc_credential/v3/aws_iam.proto>`
-   plugin which can only support deprecated libcurl credentials fetcher (see `issue #30626 <https://github.com/envoyproxy/envoy/pull/30626>`_).
    To fetch the credentials a static cluster is created with the name ``sts_token_service_internal-<region>`` pointing towards regional
    AWS Security Token Service.
 
@@ -36,7 +34,7 @@ secret access key (the session token is optional).
 
       When ``signing_algorithm: AWS_SIGV4A`` is set, the STS cluster host is determined as follows:
 
-      * If your ``region``` (set via profile, environment, or inline) is configured as a SigV4A region set **AND**
+      * If your ``region`` (set via profile, environment, or inline) is configured as a SigV4A region set **AND**
         contains a wildcard in the first region:
 
         - Standard endpoint: ``sts.amazonaws.com``
@@ -90,5 +88,3 @@ The following statistics are output under the ``aws.metadata_credentials_provide
   <provider_cluster>.credential_refreshes_failed, Counter, Total credential refreshes failed by this cluster. For example', this would be incremented if a WebIdentity token was expired
   <provider_cluster>.credential_refreshes_succeeded, Counter, Total successful credential refreshes for this cluster. Successful refresh would indicate credentials are available for signing
   <provider_cluster>.metadata_refresh_state, Gauge, 0 means the cluster is in initial refresh state', ie no successful credential refreshes have been performed. In 0 state the cluster will attempt credential refresh up to a maximum of once every 30 seconds. 1 means the cluster is in normal credential expiration based refresh state
-  <provider_cluster>.clusters_removed_by_cds, Counter, Number of metadata clusters removed during CDS refresh
-  <provider_cluster>.clusters_readded_after_cds, Counter, Number of metadata clusters replaced when CDS deletion occurs

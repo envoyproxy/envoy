@@ -1,0 +1,6 @@
+date: March 25, 2025
+
+bug_fixes:
+- area: docker
+  change: |
+    Distroless container updated and Ubuntu base image corrected.

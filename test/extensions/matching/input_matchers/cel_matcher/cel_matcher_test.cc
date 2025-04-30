@@ -63,19 +63,32 @@ public:
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
   buildMatcherTree(const std::string& cel_expr_config,
-                   ExpressionType expr_type = ExpressionType::CheckedExpression) {
+                   ExpressionType expr_type = ExpressionType::CheckedExpression,
+                   bool use_cel = false) {
     xds::type::matcher::v3::CelMatcher cel_matcher;
     switch (expr_type) {
     case ExpressionType::CheckedExpression: {
-      google::api::expr::v1alpha1::CheckedExpr checked_expr;
-      Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
-      cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+      if (use_cel) {
+        ::cel::expr::CheckedExpr checked_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+        cel_matcher.mutable_expr_match()->mutable_cel_expr_checked()->MergeFrom(checked_expr);
+      } else {
+        google::api::expr::v1alpha1::CheckedExpr checked_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+        cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+      }
       break;
     }
     case ExpressionType::ParsedExpression: {
-      google::api::expr::v1alpha1::ParsedExpr parsed_expr;
-      Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
-      cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
+      if (use_cel) {
+        ::cel::expr::ParsedExpr parsed_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+        cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed()->MergeFrom(parsed_expr);
+      } else {
+        google::api::expr::v1alpha1::ParsedExpr parsed_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+        cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
+      }
       break;
     }
     case ExpressionType::NoExpression:
@@ -311,6 +324,21 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
+TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatchedUseCelExpr) {
+  auto matcher_tree =
+      buildMatcherTree(RequestPathCelExprString, ExpressionType::CheckedExpression, true);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
   auto matcher_tree = buildMatcherTree(RequestPathCelExprString);
 
@@ -495,6 +523,26 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseMatchedWithParsedExpr) {
 TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExpr) {
   auto matcher_tree =
       buildMatcherTree(RequestAndResponseCelString, ExpressionType::ParsedExpression);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
+  data_.onResponseHeaders(response_headers);
+
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  data_.onResponseTrailers(response_trailers);
+
+  const auto result = matcher_tree->match(data_);
+  // The match was completed, no match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExprUseCel) {
+  auto matcher_tree =
+      buildMatcherTree(RequestAndResponseCelString, ExpressionType::ParsedExpression, true);
 
   TestRequestHeaderMapImpl request_headers = default_headers_;
   buildCustomHeader({{"user", "staging"}}, request_headers);

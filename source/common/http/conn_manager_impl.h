@@ -68,7 +68,8 @@ public:
                         Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager& overload_manager, TimeSource& time_system);
+                        Server::OverloadManager& overload_manager, TimeSource& time_system,
+                        envoy::config::core::v3::TrafficDirection direction);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -200,20 +201,10 @@ private:
 
       AccessLog::InstanceSharedPtrVector combined_log_handlers;
       combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
-
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
-                                     filter_log_handlers.end());
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
-                                     config_log_handlers.end());
-
-      } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
-                                     config_log_handlers.end());
-        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
-                                     filter_log_handlers.end());
-      }
+      combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                   config_log_handlers.end());
+      combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                   filter_log_handlers.end());
       return combined_log_handlers;
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
@@ -663,6 +654,7 @@ private:
   uint32_t requests_during_dispatch_count_{0};
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
+  const envoy::config::core::v3::TrafficDirection direction_;
 
   // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
   // protocols the stream is destroyed after both request and response are complete i.e. reach their

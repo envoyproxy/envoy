@@ -116,6 +116,7 @@ envoy_cc_library(
         "//envoy/server:drain_manager_interface",
         "//envoy/server:instance_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:callback_impl_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -524,6 +525,7 @@ envoy_cc_library(
     name = "transport_socket_config_lib",
     hdrs = ["transport_socket_config_impl.h"],
     deps = [
+        ":generic_factory_context_lib",
         "//envoy/server:transport_socket_config_interface",
     ],
 )

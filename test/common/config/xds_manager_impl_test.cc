@@ -1,6 +1,10 @@
 #include "source/common/config/xds_manager_impl.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/status_utility.h"
 
@@ -17,13 +21,21 @@ using testing::Return;
 
 class XdsManagerImplTest : public testing::Test {
 public:
-  XdsManagerImplTest() : xds_manager_impl_(validation_context_) {
+  XdsManagerImplTest()
+      : xds_manager_impl_(dispatcher_, api_, local_info_, validation_context_, server_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
   }
 
-  void initialize() { ASSERT_OK(xds_manager_impl_.initialize(&cm_)); }
+  void initialize() {
+    const envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    ASSERT_OK(xds_manager_impl_.initialize(bootstrap, &cm_));
+  }
 
+  NiceMock<Server::MockInstance> server_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Api::MockApi> api_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
@@ -36,7 +48,8 @@ TEST_F(XdsManagerImplTest, ShutdownSuccessful) {
   xds_manager_impl_.shutdown();
 }
 
-// Validates that setAdsConfigSource invokes the correct method in the cm_.
+// Validates that setAdsConfigSource invokes the correct method in the
+// cluster-manager.
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterSuccess) {
   initialize();
   envoy::config::core::v3::ApiConfigSource config_source;
@@ -46,8 +59,8 @@ TEST_F(XdsManagerImplTest, AdsConfigSourceSetterSuccess) {
   EXPECT_TRUE(res.ok());
 }
 
-// Validates that setAdsConfigSource invokes the correct method in the cm_,
-// and fails if needed.
+// Validates that setAdsConfigSource invokes the correct method in the
+// cluster-manager, and fails if needed.
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterFailure) {
   initialize();
   envoy::config::core::v3::ApiConfigSource config_source;

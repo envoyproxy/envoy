@@ -18,6 +18,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/cert_validator/utility.h"
 #include "source/common/tls/stats.h"

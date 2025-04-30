@@ -149,7 +149,7 @@ public:
    *
    * NOTE: the space character is encoded as %20, NOT as the + character
    */
-  static std::string urlEncodeQueryParameter(absl::string_view value);
+  static std::string urlEncode(absl::string_view value);
 
   /**
    * Exactly the same as above, but returns false when it finds a character that should be %-encoded
@@ -315,6 +315,20 @@ bool isH3UpgradeRequest(const RequestHeaderMap& headers);
  */
 bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
+/**
+ * Removes tokens from `Upgrade` header matching one of the matchers. Removes the `Upgrade`
+ * header if result is empty.
+ */
+void removeUpgrade(RequestOrResponseHeaderMap& headers,
+                   const std::vector<Matchers::StringMatcherPtr>& matchers);
+
+/**
+ * Removes `tokens_to_remove` from the `Connection` header, if present and part of a comma separated
+ * set of values. Removes the `Connection` header if it only contains `tokens_to_remove`.
+ */
+void removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
+                             const StringUtil::CaseUnorderedSet& tokens_to_remove);
+
 struct EncodeFunctions {
   // Function to modify locally generated response headers.
   std::function<void(ResponseHeaderMap& headers)> modify_headers_;
@@ -448,9 +462,22 @@ std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
                              absl::optional<uint32_t> max_path_length);
 
 /**
+ * Extract scheme, host and path from a URI. The host may contain a port.
+ * This function doesn't validate if the URI is valid. It only parses the URI with following
+ * format: scheme://host/path.
+ * If parts of the URI are missing, the corresponding output string may be empty.
+ * @param the input URI string
+ * @param the output scheme string
+ * @param the output host string.
+ * @param the output path string.
+ */
+void extractSchemeHostPathFromUri(const absl::string_view& uri, absl::string_view& scheme,
+                                  absl::string_view& host, absl::string_view& path);
+/**
  * Extract host and path from a URI. The host may contain port.
  * This function doesn't validate if the URI is valid. It only parses the URI with following
  * format: scheme://host/path.
+ * If parts of the URI are missing, the corresponding output string may be empty.
  * @param the input URI string
  * @param the output host string.
  * @param the output path string.
@@ -468,8 +495,12 @@ std::string localPathFromFilePath(const absl::string_view& file_path);
 
 /**
  * Prepare headers for a HttpUri.
+ * @param the input URI
+ * @param flag whether the :scheme header shall be generated according to the input URI
+ * @return RequestMessage with headers set according to the input URI
  */
-RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
+RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
+                                 bool include_scheme = false);
 
 /**
  * Returns string representation of StreamResetReason.

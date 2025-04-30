@@ -30,10 +30,10 @@ public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                Stats::StatNameSetPtr& stat_name_set);
 
-  LcTrieSharedPtr loadTags(const std::string& ip_tags_path);
+  LcTrieSharedPtr loadTags(const std::string& ip_tags_path, absl::Status& creation_status);
 
   LcTrieSharedPtr
-  parseIpTags(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags);
+  parseIpTags(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags, absl::Status& creation_status);
 
 private:
   Api::Api& api_;
@@ -48,14 +48,14 @@ class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner);
+                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
 
   LcTrieSharedPtr ipTags() const ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
   absl::Status onIpTagsFileUpdate();
-  absl::Status ipTagsReload(const LcTrieSharedPtr reloaded_tags);
+  absl::Status ipTagsReload(const LcTrieSharedPtr reloaded_tags, absl::Status& reload_status);
   void updateIpTags(const LcTrieSharedPtr reloaded_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
 private:
@@ -87,7 +87,7 @@ public:
                                       IpTagsReloadSuccessCb reload_success_cb,
                                       IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
                                       Event::Dispatcher& dispatcher,
-                                      std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+                                      std::shared_ptr<IpTagsRegistrySingleton> singleton, absl::Status& creation_status) {
     std::shared_ptr<IpTagsProvider> ip_tags_provider;
     const uint64_t key = std::hash<std::string>()(ip_tags_path);
     absl::MutexLock lock(&mu_);
@@ -98,13 +98,13 @@ public:
       } else {
         ip_tags_provider =
             std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
-                                             reload_error_cb, dispatcher, api, singleton);
+                                             reload_error_cb, dispatcher, api, singleton, creation_status);
         ip_tags_registry_[key] = ip_tags_provider;
       }
     } else {
       ip_tags_provider =
           std::make_shared<IpTagsProvider>(ip_tags_path, tags_loader, reload_success_cb,
-                                           reload_error_cb, dispatcher, api, singleton);
+                                           reload_error_cb, dispatcher, api, singleton, creation_status);
       ip_tags_registry_[key] = ip_tags_provider;
     }
     return ip_tags_provider;
@@ -131,8 +131,9 @@ public:
   using HeaderAction =
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IpTagHeader::HeaderAction;
 
-  IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-                        const std::string& stat_prefix, Singleton::Manager& singleton_manager,
+  static absl::StatusOr<std::shared_ptr<IpTaggingFilterConfig>>
+  create(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+         const std::string& stat_prefix, Singleton::Manager& singleton_manager,
                         Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
                         Event::Dispatcher& dispatcher,
                         ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -170,6 +171,11 @@ public:
   void incTotal() { incCounter(total_); }
 
 private:
+  IpTaggingFilterConfig(    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+    const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
+    Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
+    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status);
+
   static FilterRequestType requestTypeEnum(
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
     switch (request_type) {

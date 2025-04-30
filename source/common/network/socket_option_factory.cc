@@ -181,6 +181,14 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpRecvTosOptions() {
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildBindAddressNoPort() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(
+      std::make_shared<SocketOptionImpl>(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                         ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT, 1));
+  return options;
+}
+
 std::unique_ptr<Socket::Options>
 SocketOptionFactory::buildDoNotFragmentOptions(bool supports_v4_mapped_v6_addresses) {
   auto options = std::make_unique<Socket::Options>();

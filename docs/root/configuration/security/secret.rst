@@ -39,7 +39,7 @@ It follows the same protocol as other :ref:`xDS <xds_protocol>`.
 SDS Configuration
 -----------------
 
-:ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` is used to specify the secret. Its field *name* is a required field. If its *sds_config* field is empty, the *name* field specifies the secret in the bootstrap static_resource :ref:`secrets <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.secrets>`. Otherwise, it specifies the SDS server as :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`. Only gRPC is supported for the SDS service so its *api_config_source* must specify a **grpc_service**.
+:ref:`SdsSecretConfig <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SdsSecretConfig>` is used to specify the secret. Its field *name* is a required field. If its *sds_config* field is empty, the *name* field specifies the secret in the bootstrap static_resource :ref:`secrets <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.secrets>`. Otherwise, it specifies the SDS server as :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>`. When using a remote SDS service, the *api_config_source* must specify a **grpc_service** as only gRPC is supported.
 
 *SdsSecretConfig* is used in two fields in :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CommonTlsContext>`. The first field is *tls_certificate_sds_secret_configs* to use SDS to get :ref:`TlsCertificate <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.TlsCertificate>`. The second field is *validation_context_sds_secret_config* to use SDS to get :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
 
@@ -177,11 +177,13 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
             tls_certificate_sds_secret_configs:
               name: tls_sds
               sds_config:
-                path: /etc/envoy/tls_certificate_sds_secret.yaml
+                path_config_source:
+                  path: /etc/envoy/tls_certificate_sds_secret.yaml
             validation_context_sds_secret_config:
               name: validation_context_sds
               sds_config:
-                path: /etc/envoy/validation_context_sds_secret.yaml
+                path_config_source:
+                  path: /etc/envoy/validation_context_sds_secret.yaml
 
 Paths to client certificate, including client's certificate chain and private key are given in SDS config file ``/etc/envoy/tls_certificate_sds_secret.yaml``:
 

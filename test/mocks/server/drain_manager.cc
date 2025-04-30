@@ -9,10 +9,12 @@ namespace Envoy {
 namespace Server {
 
 using ::testing::_;
+using ::testing::DoAll;
 using ::testing::SaveArg;
 
 MockDrainManager::MockDrainManager() {
-  ON_CALL(*this, startDrainSequence(_)).WillByDefault(SaveArg<0>(&drain_sequence_completion_));
+  ON_CALL(*this, startDrainSequence(_, _))
+      .WillByDefault(DoAll(SaveArg<0>(&drain_direction_), SaveArg<1>(&drain_sequence_completion_)));
 }
 
 MockDrainManager::~MockDrainManager() = default;

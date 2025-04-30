@@ -468,6 +468,8 @@ public:
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
+  static void setHttp2WithMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
+                                               uint32_t max_concurrent_streams);
 
   // Populate and return a Http3ProtocolOptions instance based on http2_options.
   static envoy::config::core::v3::Http3ProtocolOptions

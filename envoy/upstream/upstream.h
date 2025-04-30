@@ -790,8 +790,10 @@ public:
  */
 #define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rq_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rs_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rs_body_size, Bytes)
 
 /**
@@ -1127,7 +1129,7 @@ public:
   virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
+   * @return std::shared_ptr<const UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 

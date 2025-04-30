@@ -15,7 +15,7 @@ namespace {
 
 class MockSecretReader : public Http::InjectedCredentials::Common::SecretReader {
 public:
-  MockSecretReader(const std::string& secret) : secret_(secret){};
+  MockSecretReader(const std::string& secret) : secret_(secret) {};
   const std::string& credential() const override { return secret_; }
 
 private:

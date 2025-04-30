@@ -121,6 +121,7 @@ envoy_extension_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

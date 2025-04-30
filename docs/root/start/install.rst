@@ -63,6 +63,28 @@ You can install Envoy on Mac OSX using the official brew repositories.
       $ brew update
       $ brew install envoy
 
+.. _start_install_kubernetes:
+
+Install Envoy on Kubernetes using Envoy Gateway
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can run Envoy as a Kubernetes Ingress Gateway by installing Envoy Gateway on your Kubernetes cluster.
+
+The following commands will:
+- Install the Gateway API CRDs and Envoy Gateway
+- Wait for Envoy Gateway to become available
+- Install the GatewayClass, Gateway, HTTPRoute and an example app
+
+.. tabs::
+
+   .. code-tab:: console
+
+      $ helm install eg oci://docker.io/envoyproxy/gateway-helm --version v0.0.0-latest -n envoy-gateway-system --create-namespace
+      $ kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
+      $ kubectl apply -f https://github.com/envoyproxy/gateway/releases/download/latest/quickstart.yaml -n default
+
+For more information on how to run Envoy as a Kubernetes Ingress Gateway, check out the Envoy Gateway Docs site on `gateway.envoyproxy.io/docs/ <https://gateway.envoyproxy.io/docs/>`_.
+
 .. _start_install_docker:
 
 Install Envoy using Docker
@@ -110,8 +132,7 @@ The Envoy project currently supports ``amd64`` and ``arm64`` architectures for i
 
 Contrib builds
 ^^^^^^^^^^^^^^
-As described in `this document <https://docs.google.com/document/d/1yl7GOZK1TDm_7vxQvt8UQEAu07UQFru1uEKXM6ZZg_g/edit#>`_,
-the Envoy project allows extensions to enter the repository as "contrib" extensions. The requirements
+Envoy project allows extensions to enter the repository as "contrib" extensions. The requirements
 for such extensions are lower, and as such they are only available by default in special images.
 
 Throughout the documentation, extensions are clearly marked as being a contrib extension or a core extension.

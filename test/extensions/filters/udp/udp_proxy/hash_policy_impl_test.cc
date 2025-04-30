@@ -35,8 +35,8 @@ public:
     hash_policy_ = std::make_unique<HashPolicyImpl>(config_.hash_policies());
   }
 
-  virtual void additionalSetup(){
-      // Nothing to do here.
+  virtual void additionalSetup() {
+    // Nothing to do here.
   };
 
   std::unique_ptr<const HashPolicyImpl> hash_policy_;

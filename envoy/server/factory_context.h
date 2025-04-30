@@ -36,6 +36,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 
@@ -184,6 +185,11 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
@@ -223,7 +229,22 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() const PURE;
+
+  /**
+   * @return Ssl::ContextManager& the SSL context manager.
+   */
+  virtual Ssl::ContextManager& sslContextManager() PURE;
+
+  /**
+   * Return the instance of secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
+
+// ServerFactoryContextInstance is a thread local singleton that provides access to the
+// ServerFactoryContext. This will be initialized once the server is created at the start of the
+// main thread and will be available at the main thread for the lifetime of the server.
+using ServerFactoryContextInstance = ThreadLocalInjectableSingleton<ServerFactoryContext>;
 
 /**
  * Generic factory context for multiple scenarios. This context provides a server factory context
@@ -239,12 +260,12 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server and provides
    *         access to the server's resources.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
@@ -257,6 +278,13 @@ public:
    *         backend implementation.
    */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   * TODO(wbpcode): move all scope() calling to this method.
+   */
+  virtual Stats::Scope& statsScope() { return scope(); }
 };
 
 /**
@@ -340,7 +368,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return the init manager of the particular context. This can be used for extensions that need

@@ -22,4 +22,4 @@ set -eu
 
 
 # Call the C++ compiler
-/opt/llvm/bin/clang-14 "$@"
+/opt/llvm/bin/clang "$@"

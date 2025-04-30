@@ -23,6 +23,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:abi_version_mismatch",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_program_init",
+        "//test/extensions/dynamic_modules/test_data/c:program_init_assert",
         "//test/extensions/dynamic_modules/test_data/c:program_init_fail",
         "//test/extensions/dynamic_modules/test_data/rust:abi_version_mismatch",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",

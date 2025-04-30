@@ -81,6 +81,7 @@ By *default* response compression is enabled, but it will be *skipped* when:
 - A response does **not** contain a ``content-length`` or ``transfer-encoding`` headers.
 - Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).
+- A response code is on the list of uncompressible response codes, which is empty by default.
 
 Please note that in case the filter is configured to use a compression library extension
 other than gzip it looks for content encoding in the ``accept-encoding`` header provided by

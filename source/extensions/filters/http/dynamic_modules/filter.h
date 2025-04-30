@@ -64,6 +64,12 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
+  // These are used to hold the current chunk of the request/response body during the decodeData and
+  // encodeData callbacks. It is only valid during the call and should not be used outside of the
+  // call.
+  Buffer::Instance* current_request_body_ = nullptr;
+  Buffer::Instance* current_response_body_ = nullptr;
+
   /**
    * Helper to get the downstream information of the stream.
    */
@@ -75,6 +81,17 @@ public:
     } else {
       return nullptr;
     }
+  }
+
+  /**
+   * Helper to get the upstream information of the stream.
+   */
+  StreamInfo::UpstreamInfo* upstreamInfo() {
+    auto stream_info = streamInfo();
+    if (stream_info) {
+      return stream_info->upstreamInfo().get();
+    }
+    return nullptr;
   }
 
 private:
@@ -90,6 +107,13 @@ private:
    * no-op.
    */
   void destroy();
+
+  // This helps to avoid reentering the module when sending a local reply. For example, if
+  // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
+  // the stack calling it, which can be problematic. For example, with Rust, that might cause
+  // multiple mutable borrows of the same object. In practice, a module shouldn't need encodeHeaders
+  // and encodeData to be called for local reply contents, so we just skip them with this flag.
+  bool sent_local_reply_ = false;
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;

@@ -1,4 +1,5 @@
 load("@envoy_repo//:version.bzl", "VERSION")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":packages.bzl", "envoy_pkg_distros")
 

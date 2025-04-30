@@ -142,4 +142,4 @@ jobs:
           arch: arm64
           bazel-extra: >-
             --config=remote-cache-envoy-engflow
-          runs-on: github-arm64-2c-8gb
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}

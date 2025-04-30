@@ -11,7 +11,9 @@ void DynamicModuleHttpFilter::initializeInModuleFilter() {
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
 }
 
-void DynamicModuleHttpFilter::onStreamComplete() {}
+void DynamicModuleHttpFilter::onStreamComplete() {
+  config_->on_http_filter_stream_complete_(thisAsVoidPtr(), in_module_filter_);
+}
 
 void DynamicModuleHttpFilter::onDestroy() { destroy(); };
 
@@ -31,9 +33,16 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& hea
   return static_cast<FilterHeadersStatus>(status);
 };
 
-FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance&, bool end_of_stream) {
+FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
+  if (end_of_stream && decoder_callbacks_->decodingBuffer()) {
+    // To make the very last chunk of the body available to the filter when buffering is enabled,
+    // we need to call addDecodedData. See the code comment there for more details.
+    decoder_callbacks_->addDecodedData(chunk, false);
+  }
+  current_request_body_ = &chunk;
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
+  current_request_body_ = nullptr;
   return static_cast<FilterDataStatus>(status);
 };
 
@@ -56,19 +65,35 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap& headers,
                                                            bool end_of_stream) {
+  if (sent_local_reply_) { // See the comment on the flag.
+    return FilterHeadersStatus::Continue;
+  }
   response_headers_ = &headers;
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   return static_cast<FilterHeadersStatus>(status);
 };
 
-FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance&, bool end_of_stream) {
+FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
+  if (sent_local_reply_) { // See the comment on the flag.
+    return FilterDataStatus::Continue;
+  }
+  if (end_of_stream && encoder_callbacks_->encodingBuffer()) {
+    // To make the very last chunk of the body available to the filter when buffering is enabled,
+    // we need to call addEncodedData. See the code comment there for more details.
+    encoder_callbacks_->addEncodedData(chunk, false);
+  }
+  current_response_body_ = &chunk;
   const envoy_dynamic_module_type_on_http_filter_response_body_status status =
       config_->on_http_filter_response_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
+  current_response_body_ = nullptr;
   return static_cast<FilterDataStatus>(status);
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap& trailers) {
+  if (sent_local_reply_) { // See the comment on the flag.
+    return FilterTrailersStatus::Continue;
+  }
   response_trailers_ = &trailers;
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
       config_->on_http_filter_response_trailers_(thisAsVoidPtr(), in_module_filter_);
@@ -84,9 +109,10 @@ void DynamicModuleHttpFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
+  sent_local_reply_ = true;
 }
 
-void DynamicModuleHttpFilter::encodeComplete(){};
+void DynamicModuleHttpFilter::encodeComplete() {};
 
 } // namespace HttpFilters
 } // namespace DynamicModules

@@ -56,22 +56,45 @@ enable_x_ratelimit_headers: {}
 // For instance, fmt::format(config_yaml, "1", "false") substitutes '1' and 'false' for 'max_tokens'
 // and 'local_rate_limit_per_downstream_connection' configurations, respectively.
 
+static constexpr absl::string_view simple_config_yaml_without_enforce = R"(
+  stat_prefix: test
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    runtime_key: test_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+)";
+
 class FilterTest : public testing::Test {
 public:
   FilterTest() = default;
 
   void setupPerRoute(const std::string& yaml, const bool enabled = true, const bool enforced = true,
-                     const bool per_route = false) {
-    EXPECT_CALL(
-        factory_context_.runtime_loader_.snapshot_,
-        featureEnabled(absl::string_view("test_enabled"),
-                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-        .WillRepeatedly(testing::Return(enabled));
-    EXPECT_CALL(
-        factory_context_.runtime_loader_.snapshot_,
-        featureEnabled(absl::string_view("test_enforced"),
-                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
-        .WillRepeatedly(testing::Return(enforced));
+                     const bool per_route = false, const bool has_enabled = true,
+                     const bool has_enforced = true) {
+    if (has_enabled) {
+      EXPECT_CALL(
+          factory_context_.runtime_loader_.snapshot_,
+          featureEnabled(absl::string_view("test_enabled"),
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+          .WillRepeatedly(testing::Return(enabled));
+    } else {
+      ASSERT(!enabled); // No filter_enabled and this should be false always.
+    }
+
+    if (has_enforced) {
+      EXPECT_CALL(
+          factory_context_.runtime_loader_.snapshot_,
+          featureEnabled(absl::string_view("test_enforced"),
+                         testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+          .WillRepeatedly(testing::Return(enforced));
+    } else {
+      ASSERT(!enforced); // No filter_enforced and this should be false always.
+    }
 
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(decoder_callbacks_2_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -124,6 +147,14 @@ TEST_F(FilterTest, Disabled) {
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
+}
+
+TEST_F(FilterTest, NoEnforced) {
+  setupPerRoute(std::string(simple_config_yaml_without_enforce), true, false, false, true, false);
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
 }
 
@@ -306,33 +337,6 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
   EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
   EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
-  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
-}
-
-TEST_F(FilterTest, RequestRateLimitedXRateLimitHeadersWithTimerBasedTokenBucket) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues(
-      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"}});
-
-  setup(fmt::format(config_yaml, "false", "1", "false", "DRAFT_VERSION_03"));
-
-  auto request_headers = Http::TestRequestHeaderMapImpl();
-  auto response_headers = Http::TestResponseHeaderMapImpl();
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
-  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
-  EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_2_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
-  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
-  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
-  EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
@@ -817,34 +821,6 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedWithoutXRateLimitH
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-ratelimit-limit")).empty());
   EXPECT_TRUE(response_headers.get(Http::LowerCaseString("x-ratelimit-remaining")).empty());
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
-}
-
-TEST_F(DescriptorFilterTest,
-       RouteDescriptorRequestRatelimitedXRateLimitHeadersWithTimerTokenBucket) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues(
-      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"}});
-
-  setUpTest(fmt::format(descriptor_config_yaml, "0", "DRAFT_VERSION_03", "0", "0"));
-
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0));
-
-  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
-      .WillOnce(testing::SetArgReferee<0>(descriptor_));
-
-  auto request_headers = Http::TestRequestHeaderMapImpl();
-  auto response_headers = Http::TestResponseHeaderMapImpl();
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_EQ("0", response_headers.get_("x-ratelimit-limit"));
-  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
-  EXPECT_EQ("60", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));

@@ -192,6 +192,21 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
               filter_->decodeHeaders(request_headers_, true));
     EXPECT_EQ("health_check_failed_cluster_empty", callbacks_.details());
   }
+  {
+    // This should fail, because one upstream does not exist.
+    Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
+    MockHealthCheckCluster cluster_www2(1000, 800);
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_, clusterManager());
+    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+        .WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www2")))
+        .WillRepeatedly(Return(&cluster_www2));
+    EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers_, true));
+    EXPECT_EQ("health_check_failed_no_cluster_found", callbacks_.details());
+  }
   // Test the cases where an upstream cluster is empty, or has no healthy servers, but
   // the minimum required percent healthy is zero. The health check should return a 200.
   prepareFilter(false, ClusterMinHealthyPercentagesConstSharedPtr(
