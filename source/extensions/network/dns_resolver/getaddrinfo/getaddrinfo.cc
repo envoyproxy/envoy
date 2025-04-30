@@ -25,14 +25,14 @@ GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
     const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig&
         config,
     Event::Dispatcher& dispatcher, Api::Api& api)
-    : config_(config), dispatcher_(dispatcher) {
+    : config_(config), dispatcher_(dispatcher), api_(api) {
   uint32_t num_threads =
       config_.has_num_resolver_threads() ? 1 : config_.num_resolver_threads().value();
   ENVOY_LOG(debug, "Starting getaddrinfo resolver with {} threads", num_threads);
   resolver_threads_.reserve(num_threads);
   for (uint32_t i = 0; i < num_threads; i++) {
     resolver_threads_.emplace_back(
-        api.threadFactory().createThread([this] { resolveThreadRoutine(); }));
+        api_.threadFactory().createThread([this] { resolveThreadRoutine(); }));
   }
 }
 
@@ -160,8 +160,8 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       }
     }
 
-    ENVOY_LOG(debug, "Thread ({}) popped pending query [{}]", Thread::Thread::getCurrentThreadId(),
-              next_query->dns_name_);
+    ENVOY_LOG(debug, "Thread ({}) popped pending query [{}]",
+              api_.threadFactory().currentThreadId().getId(), next_query->dns_name_);
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;

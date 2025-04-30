@@ -107,6 +107,7 @@ protected:
 
   envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config_;
   Event::Dispatcher& dispatcher_;
+  Api::Api& api_;
   absl::Mutex mutex_;
   std::list<PendingQueryInfo> pending_queries_ ABSL_GUARDED_BY(mutex_);
   bool shutting_down_ ABSL_GUARDED_BY(mutex_){};
