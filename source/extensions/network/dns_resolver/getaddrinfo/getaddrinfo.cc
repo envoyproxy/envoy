@@ -21,6 +21,8 @@ private:
 
 } // namespace
 
+constexpr uint32_t kThreadCap = 10;
+
 GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
     const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig&
         config,
@@ -28,9 +30,7 @@ GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
     : config_(config), dispatcher_(dispatcher), api_(api) {
   uint32_t num_threads =
       config_.has_num_resolver_threads() ? config_.num_resolver_threads().value() : 1;
-  uint32_t hardware_cap = std::thread::hardware_concurrency();
-  uint32_t thread_cap = hardware_cap > 0 ? hardware_cap : 1;
-  num_threads = std::min(num_threads, thread_cap);
+  num_threads = std::min(num_threads, kThreadCap);
   ENVOY_LOG(debug, "Starting getaddrinfo resolver with {} threads", num_threads);
   resolver_threads_.reserve(num_threads);
   for (uint32_t i = 0; i < num_threads; i++) {

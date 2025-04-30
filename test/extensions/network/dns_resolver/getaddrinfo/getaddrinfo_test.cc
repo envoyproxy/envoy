@@ -138,20 +138,6 @@ TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
                            dispatcher_->exit();
                          });
 
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           verifyRealGaiResponse(status, std::move(response));
-                           std::vector<std::string> traces =
-                               absl::StrSplit(active_dns_query_->getTraces(), ',');
-                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
-                                                           HasTrace(GetAddrInfoTrace::Starting),
-                                                           HasTrace(GetAddrInfoTrace::Success),
-                                                           HasTrace(GetAddrInfoTrace::Callback)));
-                           dispatcher_->exit();
-                         });
-
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
