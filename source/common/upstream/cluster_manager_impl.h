@@ -22,6 +22,7 @@
 #include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tcp/async_tcp_client.h"
@@ -294,7 +295,6 @@ public:
     }
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
-    ads_mux_.reset();
     xds_manager_.shutdown();
     active_clusters_.clear();
     warming_clusters_.clear();
@@ -307,8 +307,7 @@ public:
     return bind_config_;
   }
 
-  Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
-  absl::Status replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) override;
+  Config::GrpcMuxSharedPtr adsMux() override { return xds_manager_.adsMux(); }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const absl::optional<std::string>& localClusterName() const override {
@@ -392,8 +391,7 @@ protected:
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
                      Router::Context& router_context, Server::Instance& server,
                      Config::XdsManager& xds_manager, absl::Status& creation_status);
 
@@ -928,7 +926,6 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  Config::GrpcMuxSharedPtr ads_mux_;
   // Temporarily saved resume cds callback from updateClusterCounts invocation.
   Config::ScopedResume resume_cds_;
   LoadStatsReporterPtr load_stats_reporter_;
@@ -940,7 +937,6 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
-  ProtobufMessage::ValidationContext& validation_context_;
   Router::Context& router_context_;
   ClusterTrafficStatNames cluster_stat_names_;
   ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
