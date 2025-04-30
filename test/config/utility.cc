@@ -1210,7 +1210,7 @@ void ConfigHelper::disableDelayClose() {
              hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
 }
 
-void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
+void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint32_t max_requests_per_connection) {
   addConfigModifier(
       [max_requests_per_connection](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
