@@ -1182,5 +1182,21 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
 }
 
+TEST_F(MultiConnectionBaseImplTest, MoveSocket) {
+  setupMultiConnectionImpl(2);
+
+  EXPECT_EQ(impl_->moveSocket(), nullptr);
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetConnectionReused) {
+  setupMultiConnectionImpl(2);
+  impl_->setConnectionReused(true);
+}
+
+TEST_F(MultiConnectionBaseImplTest, IsConnectionReused) {
+  setupMultiConnectionImpl(2);
+  EXPECT_EQ(impl_->isConnectionReused(), false);
+}
+
 } // namespace Network
 } // namespace Envoy

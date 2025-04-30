@@ -143,6 +143,8 @@ public:
    */
   void connect();
 
+  Network::ClientConnectionPtr& connection() { return connection_; }
+
   bool connectCalled() const { return connect_called_; }
 
 protected:
