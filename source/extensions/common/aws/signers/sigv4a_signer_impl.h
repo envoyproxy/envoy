@@ -2,12 +2,8 @@
 
 #include <memory>
 
-#include "source/common/common/logger.h"
-#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
-#include "source/extensions/common/aws/signers/sigv4a_common.h"
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 namespace Envoy {
