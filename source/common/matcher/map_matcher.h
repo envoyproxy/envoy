@@ -19,8 +19,7 @@ public:
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
-protected:
-  typename MatchTree<DataType>::MatchResult doMatch(const DataType& data) override {
+  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
     ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
@@ -32,13 +31,9 @@ protected:
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(absl::get<std::string>(input.data_));
-    if (result) {
-      if (result->matcher_) {
-        return result->matcher_->match(data);
-      } else {
-        return {MatchState::MatchComplete, *result};
-      }
+    const absl::optional<OnMatch<DataType>> result = doMatch(absl::get<std::string>(input.data_));
+    if (result.has_value()) {
+      return {MatchState::MatchComplete, *result};
     } else if (input.data_availability_ ==
                DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       // It's possible that we were attempting a lookup with a partial value, so delay matching

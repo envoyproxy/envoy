@@ -44,9 +44,8 @@ public:
     return {MatchState::MatchComplete, on_no_match, nullptr};
   }
 
-protected:
   // MatchTree interface match logic implementation.
-  typename MatchTree<DataType>::MatchResult doMatch(const DataType& matching_data) override {
+  typename MatchTree<DataType>::MatchResult match(const DataType& matching_data) override {
     return ListMatcher<DataType>::matchImpl(matching_data, matchers_, on_no_match_);
   }
 
@@ -64,8 +63,7 @@ public:
       : parent_matchers_(parent_matchers), on_no_match_(on_no_match),
         starting_index_(starting_index) {}
 
-protected:
-  typename MatchTree<DataType>::MatchResult doMatch(const DataType& matching_data) override {
+  typename MatchTree<DataType>::MatchResult match(const DataType& matching_data) override {
     return ListMatcher<DataType>::matchImpl(matching_data, *parent_matchers_, on_no_match_,
                                             starting_index_);
   }
