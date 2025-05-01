@@ -14,7 +14,7 @@ static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
 static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
 static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
 static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
-static constexpr const char* MMDB_ISP_LOOKUP_ARGS[] = {"isp"};
+static constexpr const char* MMDB_ISP_LOOKUP_ARGS[] = {"isp", "autonomous_system_number"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
                                                         "is_public_proxy"};
@@ -36,6 +36,7 @@ GeoipProviderConfig::GeoipProviderConfig(
                                                    : absl::nullopt),
       asn_db_path_(!config.asn_db_path().empty() ? absl::make_optional(config.asn_db_path())
                                                  : absl::nullopt),
+      read_asn_info_from_isp_db_(config.read_asn_info_from_isp_db()),
       stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
   auto geo_headers_to_add = config.common_provider_config().geo_headers_to_add();
@@ -237,7 +238,7 @@ void GeoipProvider::lookupInCityDb(
 void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+  if (!config_->readAsnInfoFromIspDb() && config_->isLookupEnabledForHeader(config_->asnHeader())) {
     int mmdb_error;
     auto asn_db_ptr = getAsnDb();
     // Used for testing.
@@ -254,7 +255,8 @@ void GeoipProvider::lookupInAsnDb(
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
-        if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+        if (!config_->readAsnInfoFromIspDb() &&
+            config_->isLookupEnabledForHeader(config_->asnHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
                                   MMDB_ASN_LOOKUP_ARGS[0]);
         }
@@ -327,9 +329,10 @@ void GeoipProvider::lookupInAnonDb(
 void GeoipProvider::lookupInIspDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-
   if (config_->isLookupEnabledForHeader(config_->ispHeader()) ||
-      config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader())) {
+      config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader()) ||
+      (config_->readAsnInfoFromIspDb() &&
+       config_->isLookupEnabledForHeader(config_->asnHeader()))) {
     int mmdb_error;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
@@ -338,15 +341,14 @@ void GeoipProvider::lookupInIspDb(
       IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
       return;
     }
+    auto isp_db = isp_db_ptr.get();
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
-        isp_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
-        &mmdb_error);
+        isp_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
     if (!mmdb_error) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
-
         if (config_->isLookupEnabledForHeader(config_->ispHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->ispHeader().value(),
                                   MMDB_ISP_LOOKUP_ARGS[0]);
@@ -363,12 +365,15 @@ void GeoipProvider::lookupInIspDb(
             lookup_result[config_->applePrivateRelayHeader().value()] = "false";
           }
         }
-        MMDB_free_entry_data_list(entry_data_list);
-        std::cout << "lookup_result size: " << lookup_result.size() << "n_prev" << n_prev_hits
-                  << std::endl;
+        if (config_->readAsnInfoFromIspDb() &&
+            config_->isLookupEnabledForHeader(config_->asnHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
+                                  MMDB_ISP_LOOKUP_ARGS[1]);
+        }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(ISP_DB_TYPE);
         }
+        MMDB_free_entry_data_list(entry_data_list);
       } else {
         config_->incLookupError(ISP_DB_TYPE);
       }
