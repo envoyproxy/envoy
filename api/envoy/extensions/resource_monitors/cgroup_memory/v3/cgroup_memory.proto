@@ -14,7 +14,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.resource_monitors.cgroup_memory]
 
 message CgroupMemoryConfig {
-  // Optional maximum memory limit in bytes used for memory pressure calculations.
+  // Optional max memory limit in bytes used for memory pressure calculations.
   // If set, this value is used as an upper bound on the memory limit, taking the minimum
   // between this value and the system's cgroup memory limit. If not set, the system's
   // cgroup memory limit is always used.
