@@ -34,7 +34,7 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: quic
   change: |
-    Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended.
+    Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended, protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
