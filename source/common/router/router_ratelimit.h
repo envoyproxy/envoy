@@ -279,7 +279,7 @@ public:
 
 private:
   const std::string disable_key_;
-  uint64_t stage_;
+  const uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
   const bool apply_on_stream_done_ = false;
@@ -301,7 +301,7 @@ public:
   bool empty() const override { return rate_limit_entries_.empty(); }
 
 private:
-  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
+  std::vector<RateLimitPolicyEntryImpl> rate_limit_entries_;
   std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
   // The maximum stage number supported. This value should match the maximum stage number in

@@ -411,14 +411,16 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : RateLimitPolicyImpl() {
-  creation_status = absl::OkStatus();
+  // The reservation ensures that the references added to the
+  // rate_limit_entries_reference_[stage] vector will always be to a valid entry.
+  rate_limit_entries_.reserve(rate_limits.size());
   for (const auto& rate_limit : rate_limits) {
-    std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, context, creation_status));
-    uint64_t stage = rate_limit_policy_entry->stage();
+    rate_limit_entries_.emplace_back(rate_limit, context, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    const RateLimitPolicyEntryImpl& rate_limit_policy_entry = rate_limit_entries_.back();
+    const uint64_t stage = rate_limit_policy_entry.stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
-    rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
-    rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
+    rate_limit_entries_reference_[stage].emplace_back(std::ref(rate_limit_entries_.back()));
   }
 }
 
