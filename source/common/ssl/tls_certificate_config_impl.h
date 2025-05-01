@@ -16,6 +16,8 @@ public:
   create(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
          Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api);
 
+  TlsCertificateConfigImpl(TlsCertificateConfigImpl&& other) = default;
+
   const std::string& certificateChain() const override { return certificate_chain_; }
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }
   const std::string& privateKey() const override { return private_key_; }
