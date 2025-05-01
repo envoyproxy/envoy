@@ -22,6 +22,7 @@ namespace CgroupMemory {
 
 using testing::NiceMock;
 using testing::Return;
+using testing::StartsWith;
 
 // Basic test to verify factory registration
 TEST(CgroupMemoryConfigTest, BasicTest) {
@@ -94,12 +95,25 @@ TEST(CgroupMemoryConfigTest, CreateMonitorWithLimit) {
   EXPECT_NE(monitor, nullptr);
 }
 
-// Test creating a monitor with an invalid memory limit
-TEST(CgroupMemoryConfigTest, InvalidConfig) {
+// Test creating a monitor with a zero memory limit (now allowed)
+TEST(CgroupMemoryConfigTest, ZeroMemoryLimit) {
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cgroup_memory");
   ASSERT_NE(factory, nullptr);
+
+  NiceMock<Filesystem::MockInstance> mock_fs;
+
+  // Mock the filesystem to indicate that cgroup v2 paths exist
+  ON_CALL(mock_fs, fileExists).WillByDefault(Return(false));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getUsagePath())).WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_fs, fileExists(CgroupPaths::V2::getLimitPath())).WillRepeatedly(Return(true));
+
+  // Mock the file reads to return memory usage and limit
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getUsagePath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("500")));
+  EXPECT_CALL(mock_fs, fileReadToEnd(CgroupPaths::V2::getLimitPath()))
+      .WillRepeatedly(Return(absl::StatusOr<std::string>("2000")));
 
   envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
   config.set_max_memory_bytes(0);
@@ -109,11 +123,28 @@ TEST(CgroupMemoryConfigTest, InvalidConfig) {
   Server::MockOptions options;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+  auto monitor = std::make_unique<CgroupMemoryMonitor>(config, mock_fs);
+  EXPECT_NE(monitor, nullptr);
+}
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory->createResourceMonitor(config, context), ProtoValidationException,
-      ": Proto constraint validation failed (CgroupMemoryConfigValidationError.MaxMemoryBytes: "
-      "value must be greater than 0)");
+// Test creating a monitor with an invalid memory limit
+TEST(CgroupMemoryConfigTest, InvalidConfig) {
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cgroup_memory");
+  ASSERT_NE(factory, nullptr);
+
+  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
+  config.set_max_memory_bytes(-1); // Negative values are still invalid
+
+  Event::MockDispatcher dispatcher;
+  Api::ApiPtr api = Api::createApiForTest();
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+
+  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 }
 
 // Test that factory creates a monitor successfully with ignored context

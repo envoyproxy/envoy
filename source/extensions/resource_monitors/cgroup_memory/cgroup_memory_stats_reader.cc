@@ -20,8 +20,9 @@ uint64_t CgroupMemoryStatsReader::readMemoryStats(const std::string& path) {
     throw EnvoyException(fmt::format("Unable to read memory stats file at {}", path));
   }
 
-  // Use Abseil's StripAsciiWhitespace and StrCat for string handling
-  std::string value_str = absl::StrCat(absl::StripAsciiWhitespace(result.value()));
+  // Strip whitespace in place and get a reference to the modified string
+  absl::StripAsciiWhitespace(&result.value());
+  const std::string& value_str = result.value();
 
   if (value_str.empty()) {
     throw EnvoyException(fmt::format("Empty memory stats file at {}", path));
