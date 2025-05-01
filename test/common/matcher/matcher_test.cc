@@ -740,7 +740,23 @@ TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
 }
 
 // Parameterized to test both xDS and Envoy Matcher APIs for new features.
-class MatcherAmbiguousTest : public MatcherTest, public ::testing::WithParamInterface<bool> {};
+class MatcherAmbiguousTest : public MatcherTest, public ::testing::WithParamInterface<bool> {
+public:
+  // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
+  MatchTreeFactoryCb<TestData> createMatcherFromYaml(const std::string& yaml) {
+    if (GetParam()) {
+      xds::type::matcher::v3::Matcher xds_matcher;
+      MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
+      TestUtility::validate(xds_matcher);
+      return factory_.create(xds_matcher);
+    } else {
+      envoy::config::common::matcher::v3::Matcher envoy_matcher;
+      MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
+      TestUtility::validate(envoy_matcher);
+      return factory_.create(envoy_matcher);
+    }
+  }
+};
 INSTANTIATE_TEST_SUITE_P(UseXdsMatcherType, MatcherAmbiguousTest, ::testing::Bool());
 
 TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
@@ -869,25 +885,11 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
           value: on-no-match
       )EOF";
 
-  // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
-  xds::type::matcher::v3::Matcher xds_matcher;
-  envoy::config::common::matcher::v3::Matcher envoy_matcher;
-  MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
-  MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
-  TestUtility::validate(xds_matcher);
-  TestUtility::validate(envoy_matcher);
-
   auto inner_factory = TestDataInputStringFactory("foo");
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(8);
-
-  std::shared_ptr<MatchTree<TestData>> top_matcher = nullptr;
-  if (GetParam()) {
-    top_matcher = factory_.create(xds_matcher)();
-  } else {
-    top_matcher = factory_.create(envoy_matcher)();
-  }
+  std::shared_ptr<MatchTree<TestData>> top_matcher = createMatcherFromYaml(yaml)();
 
   // Expect to hit each match once via repeated re-entry, including the recursive on-no-match.
   ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher, false);
@@ -1066,26 +1068,12 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
           value: on no match
       )EOF";
 
-  // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
-  xds::type::matcher::v3::Matcher xds_matcher;
-  envoy::config::common::matcher::v3::Matcher envoy_matcher;
-  MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
-  MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
-  TestUtility::validate(xds_matcher);
-  TestUtility::validate(envoy_matcher);
-
   auto inner_factory = TestDataInputStringFactory("foo");
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(8);
   validation_visitor_.setSupportKeepMatching(true);
-
-  std::shared_ptr<MatchTree<TestData>> top_matcher = nullptr;
-  if (GetParam()) {
-    top_matcher = factory_.create(xds_matcher)();
-  } else {
-    top_matcher = factory_.create(envoy_matcher)();
-  }
+  std::shared_ptr<MatchTree<TestData>> top_matcher = createMatcherFromYaml(yaml)();
 
   // Expect the first nested match (`skipped - keep matching 1`) to be skipped and recorded due to
   // its own keep_matching setting, and the second (`skipped - match 2`) to skip due to its parent's
@@ -1141,25 +1129,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
                 value: keep matching
       )EOF";
 
-  // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
-  xds::type::matcher::v3::Matcher xds_matcher;
-  envoy::config::common::matcher::v3::Matcher envoy_matcher;
-  MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
-  MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
-  TestUtility::validate(xds_matcher);
-  TestUtility::validate(envoy_matcher);
-
   auto inner_factory = TestDataInputStringFactory("foo");
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   validation_visitor_.setSupportKeepMatching(true);
-
-  std::shared_ptr<MatchTree<TestData>> matcher = nullptr;
-  if (GetParam()) {
-    matcher = factory_.create(xds_matcher)();
-  } else {
-    matcher = factory_.create(envoy_matcher)();
-  }
+  std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
   ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher, false);
   std::vector<ActionFactoryCb> skipped_results;
@@ -1208,14 +1182,6 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
                 value: bat
       )EOF";
 
-  // Exercise both xDS and Envoy Matcher APIs, based on the test parameter.
-  xds::type::matcher::v3::Matcher xds_matcher;
-  envoy::config::common::matcher::v3::Matcher envoy_matcher;
-  MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
-  MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
-  TestUtility::validate(xds_matcher);
-  TestUtility::validate(envoy_matcher);
-
   auto outer_factory = TestDataInputStringFactory("value");
   auto inner_factory = TestDataInputBoolFactory("foo");
   EXPECT_CALL(validation_visitor_,
@@ -1224,13 +1190,8 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   validation_visitor_.setSupportKeepMatching(false);
 
-  MatchTreeFactoryCb<TestData> matcher = nullptr;
-  if (GetParam()) {
-    matcher = factory_.create(xds_matcher);
-  } else {
-    matcher = factory_.create(envoy_matcher);
-  }
-  EXPECT_THROW_WITH_MESSAGE(matcher(), EnvoyException,
+  MatchTreeFactoryCb<TestData> matcher_creator = createMatcherFromYaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(matcher_creator(), EnvoyException,
                             "keep_matching is not supported in this context");
 }
 
