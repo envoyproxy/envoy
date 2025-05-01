@@ -8,7 +8,7 @@ using std::chrono::seconds;
 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
@@ -37,14 +37,14 @@ void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& 
 
 void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
   stats_->credential_refreshes_failed_.inc();
-  ENVOY_LOG(error, "AWS IAM Roles Anywhere  fetch failure: {}",
+  ENVOY_LOG(error, "AWS IAM Roles Anywhere fetch failure: {}",
             metadata_fetcher_->failureToString(reason));
   credentialsRetrievalError();
 }
 
 void IAMRolesAnywhereCredentialsProvider::refresh() {
 
-  const auto uri = aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_);
+  const auto uri = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
   ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}",
             uri.value());
 

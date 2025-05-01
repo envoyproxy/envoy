@@ -188,7 +188,7 @@ Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName 
 
 } // namespace
 
-const ASN1_TIME& epochASN1Time() {
+const ASN1_TIME& Utility::epochASN1Time() {
   static thread_local CSmartPtr<ASN1_TIME, ASN1_TIME_free> epoch([]() -> ASN1_TIME* {
     ASN1_TIME* epoch_time = ASN1_TIME_new();
     const time_t epoch_time_t = 0;

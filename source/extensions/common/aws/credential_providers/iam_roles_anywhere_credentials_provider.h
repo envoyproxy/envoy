@@ -59,7 +59,7 @@ class IAMRolesAnywhereCredentialsProvider : public MetadataCredentialsProviderBa
 public:
   IAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
@@ -75,6 +75,8 @@ public:
 private:
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
+  // TODO: @nbaws remove the inheritance that requires this needsrefresh from cached_credential_provider
+  bool needsRefresh() override { return true; };
 
   const std::string role_arn_;
   const std::string role_session_name_;

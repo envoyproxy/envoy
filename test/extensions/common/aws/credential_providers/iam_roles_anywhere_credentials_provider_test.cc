@@ -209,9 +209,6 @@ public:
     iam_roles_anywhere_config_.set_profile_arn("arn:profile-arn");
     iam_roles_anywhere_config_.set_trust_anchor_arn("arn:trust-anchor-arn");
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com:443"));
 
@@ -230,7 +227,7 @@ public:
             roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
 
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
-        context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
+        context_, mock_manager_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -443,9 +440,7 @@ public:
   envoy::config::core::v3::DataSource certificate_data_source_, private_key_data_source_,
       cert_chain_data_source_;
   Event::MockTimer* timer_{};
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config_;
 };
 
@@ -936,9 +931,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SignerFails) {
   iam_roles_anywhere_config_.set_trust_anchor_arn("arn:trust-anchor-arn");
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
       .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com:443"));
 
@@ -960,7 +952,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SignerFails) {
   EXPECT_CALL(*mock_ptr, sign(_, true, _)).WillOnce(Return(absl::InvalidArgumentError("error")));
 
   provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
-      context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
+      context_, mock_manager_, "rolesanywhere.ap-southeast-2.amazonaws.com",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
@@ -1026,6 +1018,37 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
   timer_->invokeCallback();
 
   EXPECT_TRUE(provider_friend.needsRefresh());
+  auto creds = provider_->getCredentials();
+  EXPECT_FALSE(creds.accessKeyId().has_value());
+  EXPECT_FALSE(creds.secretAccessKey().has_value());
+  EXPECT_FALSE(creds.sessionToken().has_value());
+
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  expectDocument(503, "", message);
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  EXPECT_TRUE(provider_friend.needsRefresh());
+  auto creds = provider_->getCredentials();
+  EXPECT_FALSE(creds.accessKeyId().has_value());
+  EXPECT_FALSE(creds.secretAccessKey().has_value());
+  EXPECT_FALSE(creds.sessionToken().has_value());
 }
 
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {
