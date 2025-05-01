@@ -1006,6 +1006,28 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, Coverage) {
   EXPECT_TRUE(provider_friend.needsRefresh());
 }
 
+TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  expectDocument(403, "", message);
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  EXPECT_TRUE(provider_friend.needsRefresh());
+}
+
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {
 public:
   IamRolesAnywhereCredentialsProviderBadCredentialsTest() : api_(Api::createApiForTest()) {};
@@ -1052,9 +1074,6 @@ public:
     iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
     iam_roles_anywhere_config_.mutable_certificate()->set_environment_variable("CERT");
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
 
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com/sessions"));
@@ -1073,14 +1092,12 @@ public:
             roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
 
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
-        context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
+        context_, mock_manager_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         MetadataFetcher::create, "ap-southeast-2", refresh_state, initialization_timer,
         std::move(roles_anywhere_signer), iam_roles_anywhere_config_);
   }
 
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config_;
 };
 

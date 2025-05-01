@@ -23,7 +23,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       role_session_name_(iam_roles_anywhere_config.role_session_name()),
       profile_arn_(iam_roles_anywhere_config.profile_arn()),
       trust_anchor_arn_(iam_roles_anywhere_config.trust_anchor_arn()), region_(region),
-      server_factory_context_(context), roles_anywhere_signer_(std::move(roles_anywhere_signer)) {
+      roles_anywhere_signer_(std::move(roles_anywhere_signer)) {
 
   session_duration_ = PROTOBUF_GET_SECONDS_OR_DEFAULT(
       iam_roles_anywhere_config, session_duration,
