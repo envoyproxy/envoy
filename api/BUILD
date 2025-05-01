@@ -336,6 +336,7 @@ proto_library(
         "//envoy/extensions/retry/host/previous_hosts/v3:pkg",
         "//envoy/extensions/retry/priority/previous_priorities/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/lua/v3:pkg",
+        "//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg",
         "//envoy/extensions/stat_sinks/graphite_statsd/v3:pkg",
         "//envoy/extensions/stat_sinks/open_telemetry/v3:pkg",
         "//envoy/extensions/stat_sinks/wasm/v3:pkg",

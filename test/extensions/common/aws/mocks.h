@@ -140,7 +140,7 @@ public:
 
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
+      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr, absl::string_view,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 };
 

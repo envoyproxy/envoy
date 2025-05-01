@@ -61,7 +61,7 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
 class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
-      : api_(Api::createApiForTest()),
+      : api_(Api::createApiForTest()), ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
         cluster_manager_factory_(
             server_context_, server_.stats(), server_.threadLocal(), server_.httpContext(),
             [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
@@ -70,6 +70,7 @@ protected:
     ON_CALL(server_context_.api_, threadFactory())
         .WillByDefault(
             Invoke([this]() -> Thread::ThreadFactory& { return api_->threadFactory(); }));
+    ON_CALL(server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
   }
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
@@ -79,6 +80,7 @@ protected:
   }
 
   Api::ApiPtr api_;
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;

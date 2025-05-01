@@ -145,8 +145,8 @@ void ValidationInstance::initialize(const Options& options,
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, *local_info_,
-                                                          validation_context_, *this);
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
+                                                          *local_info_, validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,

@@ -187,6 +187,7 @@ envoy_cc_mock(
         ":server_factory_context_mocks",
         "//envoy/server:instance_interface",
         "//source/common/secret:secret_manager_impl_lib",
+        "//test/mocks/config:xds_manager_mocks",
     ],
 )
 

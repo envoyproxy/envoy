@@ -630,6 +630,21 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_RequestId: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      auto stream_id_provider = stream_info->getStreamIdProvider();
+      if (stream_id_provider.has_value()) {
+        const absl::optional<absl::string_view> request_id = stream_id_provider->toStringView();
+        if (request_id.has_value()) {
+          *result = const_cast<char*>(request_id->data());
+          *result_length = request_id->size();
+          ok = true;
+        }
+      }
+    }
+    break;
+  }
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as string",

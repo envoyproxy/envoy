@@ -1176,7 +1176,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
  * Scenario: The OAuth filter receives a request with an invalid CSRF token cookie.
  * This scenario simulates an attacker trying to forge a CSRF token.
  *
- * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
+ * Expected behavior: the filter will ignore the invalid CSRF token and generate a new one
  */
 TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
   static const std::string invalid_csrf_token = "00000000075bcd15.invalidhmac";
@@ -1192,11 +1192,29 @@ TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
-  // Unauthorized response is expected instead of 302 redirect.
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256" +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
 }
 
 /**
