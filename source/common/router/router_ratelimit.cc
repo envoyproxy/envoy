@@ -411,8 +411,9 @@ RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : RateLimitPolicyImpl() {
-  // The reservation ensures that the references added to the
-  // rate_limit_entries_reference_[stage] vector will always be to a valid entry.
+  // Pre-reserve space in the vector to prevent reallocations.
+  // This ensures that references stored in rate_limit_entries_reference_[stage] remain valid
+  // throughout the lifetime of the ``RateLimitPolicyImpl`` object.
   rate_limit_entries_.reserve(rate_limits.size());
   for (const auto& rate_limit : rate_limits) {
     rate_limit_entries_.emplace_back(rate_limit, context, creation_status);
