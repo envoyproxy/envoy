@@ -16,7 +16,6 @@ ContainerCredentialsProvider::ContainerCredentialsProvider(
                                       initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
-
 void ContainerCredentialsProvider::refresh() {
 
   absl::string_view host, path;
