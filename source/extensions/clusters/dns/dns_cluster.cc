@@ -11,6 +11,7 @@
 #include "source/common/common/dns_utils.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
+#include "source/extensions/clusters/common/logical_host.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -258,40 +259,58 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
           absl::flat_hash_set<std::string> all_new_hosts;
 
-          for (const auto& resp : response) {
-            const auto& addrinfo = resp.addrInfo();
-            // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
-            // make a new address that has port in it. We need to both support IPv6 as well as
-            // potentially move port handling into the DNS interface itself, which would work better
-            // for SRV.
-            ASSERT(addrinfo.address_ != nullptr);
-            auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
-            if (all_new_hosts.count(address->asString()) > 0) {
-              continue;
-            }
+          if (parent_.all_addresses_in_single_endpoint_ && !response.empty()) {
+            // Here we process Logical DNS first, as it also needs a list of addresses
+            // for the Happy Eyeballs algorithm.
+            const auto& addrinfo = response.front().addrInfo();
 
-            auto host_or_error = HostImpl::create(
-                parent_.info_, hostname_, address,
-                // TODO(zyfjeff): Created through metadata shared pool
-                std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
-                std::make_shared<const envoy::config::core::v3::Metadata>(
-                    locality_lb_endpoints_.metadata()),
-                lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
-                lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
-                lb_endpoint_.health_status(), parent_.time_source_);
-            if (!host_or_error.ok()) {
-              ENVOY_LOG(error, "Failed to create host {} with error: {}", address->asString(),
-                        host_or_error.status().message());
+            Network::Address::InstanceConstSharedPtr new_address =
+            Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
+            auto address_list = DnsUtils::generateAddressList(response, port_);
+            auto logical_host_or_error =
+                LogicalHost::create(parent_.info_, hostname_, new_address,
+                                      address_list, locality_lb_endpoints_, lb_endpoint_, 
+                                      nullptr, parent_.time_source_);
+            if (!logical_host_or_error.ok()) {
+              ENVOY_LOG(error, "Failed to create host {} with error: {}",
+                        new_address->asString(), logical_host_or_error.status().message());
               parent_.info_->configUpdateStats().update_failure_.inc();
               return;
             }
-            new_hosts.emplace_back(std::move(host_or_error.value()));
-            all_new_hosts.emplace(address->asString());
+            new_hosts.emplace_back(std::move(logical_host_or_error.value()));
+            all_new_hosts.emplace(new_address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
+          } else {
+            for (const auto& resp : response) {
+              const auto& addrinfo = resp.addrInfo();
+              // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
+              // make a new address that has port in it. We need to both support IPv6 as well as
+              // potentially move port handling into the DNS interface itself, which would work better
+              // for SRV.
+              ASSERT(addrinfo.address_ != nullptr);
+              auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
+              if (all_new_hosts.count(address->asString()) > 0) {
+                continue;
+              }
 
-            // We only need a single address for logical DNS.
-            if (parent_.all_addresses_in_single_endpoint_) {
-              break;
+              auto host_or_error = HostImpl::create(
+                  parent_.info_, hostname_, address,
+                  // TODO(zyfjeff): Created through metadata shared pool
+                  std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+                  std::make_shared<const envoy::config::core::v3::Metadata>(
+                      locality_lb_endpoints_.metadata()),
+                  lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
+                  lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
+                  lb_endpoint_.health_status(), parent_.time_source_);
+              if (!host_or_error.ok()) {
+                ENVOY_LOG(error, "Failed to create host {} with error: {}", address->asString(),
+                          host_or_error.status().message());
+                parent_.info_->configUpdateStats().update_failure_.inc();
+                return;
+              }
+              new_hosts.emplace_back(std::move(host_or_error.value()));
+              all_new_hosts.emplace(address->asString());
+              ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
             }
           }
 

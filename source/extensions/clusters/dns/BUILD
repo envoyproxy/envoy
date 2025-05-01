@@ -19,6 +19,7 @@ envoy_cc_extension(
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/clusters/common:dns_cluster_backcompat_lib",
+        "//source/extensions/clusters/common:logical_host_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
