@@ -88,7 +88,7 @@ HIGH_COVERAGE_STRING=""
 while read -r DIRECTORY
 do
   get_coverage_target "$DIRECTORY"
-  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
+  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4 | tr -d '\n')
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
   # If the coverage number is 'n' (no data found) there is 0% coverage. This is
   # probably a directory without source code, so we skip checks.
