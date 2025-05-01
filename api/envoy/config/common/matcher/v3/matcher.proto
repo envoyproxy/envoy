@@ -45,6 +45,9 @@ message Matcher {
     // If true and the Matcher matches, the action will be taken but the caller
     // will behave as if the Matcher did not match. A subsequent matcher or
     // on_no_match action will be used instead.
+    // This field is not supported in all contexts in which the matcher API is
+    // used. If this field is set in a context in which it's not supported,
+    // the resource will be rejected.
     bool keep_matching = 3;
   }
 
