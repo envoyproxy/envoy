@@ -143,7 +143,6 @@ TEST(CgroupMemoryConfigTest, InvalidConfig) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
-
   EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
 }
 
