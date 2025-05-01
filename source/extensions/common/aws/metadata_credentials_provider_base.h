@@ -32,6 +32,7 @@ using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 
 class MetadataCredentialsProviderBase : public CredentialsProvider,
+                                        public Logger::Loggable<Logger::Id::aws>,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
