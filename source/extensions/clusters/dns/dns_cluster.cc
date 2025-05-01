@@ -265,15 +265,14 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
             const auto& addrinfo = response.front().addrInfo();
 
             Network::Address::InstanceConstSharedPtr new_address =
-            Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
+                Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
             auto address_list = DnsUtils::generateAddressList(response, port_);
-            auto logical_host_or_error =
-                LogicalHost::create(parent_.info_, hostname_, new_address,
-                                      address_list, locality_lb_endpoints_, lb_endpoint_, 
-                                      nullptr, parent_.time_source_);
+            auto logical_host_or_error = LogicalHost::create(
+                parent_.info_, hostname_, new_address, address_list, locality_lb_endpoints_,
+                lb_endpoint_, nullptr, parent_.time_source_);
             if (!logical_host_or_error.ok()) {
-              ENVOY_LOG(error, "Failed to create host {} with error: {}",
-                        new_address->asString(), logical_host_or_error.status().message());
+              ENVOY_LOG(error, "Failed to create host {} with error: {}", new_address->asString(),
+                        logical_host_or_error.status().message());
               parent_.info_->configUpdateStats().update_failure_.inc();
               return;
             }
@@ -285,8 +284,8 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
               const auto& addrinfo = resp.addrInfo();
               // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
               // make a new address that has port in it. We need to both support IPv6 as well as
-              // potentially move port handling into the DNS interface itself, which would work better
-              // for SRV.
+              // potentially move port handling into the DNS interface itself, which would work
+              // better for SRV.
               ASSERT(addrinfo.address_ != nullptr);
               auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
               if (all_new_hosts.count(address->asString()) > 0) {
@@ -296,7 +295,8 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
               auto host_or_error = HostImpl::create(
                   parent_.info_, hostname_, address,
                   // TODO(zyfjeff): Created through metadata shared pool
-                  std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+                  std::make_shared<const envoy::config::core::v3::Metadata>(
+                      lb_endpoint_.metadata()),
                   std::make_shared<const envoy::config::core::v3::Metadata>(
                       locality_lb_endpoints_.metadata()),
                   lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
