@@ -208,7 +208,6 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
-    _utf8_range()
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
@@ -937,9 +936,6 @@ def _com_github_fdio_vpp_vcl():
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
-
-def _utf8_range():
-    external_http_archive("utf8_range")
 
 def _rules_ruby():
     external_http_archive("rules_ruby")
