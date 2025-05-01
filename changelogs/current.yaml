@@ -32,6 +32,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: quic
+  change: |
+    Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
