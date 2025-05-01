@@ -97,11 +97,16 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  std::string signature = createSignature(x509_credentials, string_to_sign);
+  auto signature = createSignature(x509_credentials, string_to_sign);
+  if(!signature.ok())
+  {
+    return absl::Status{absl::StatusCode::kInvalidArgument, signature.status().message()};
+  }
+
   // Phase 4: Sign request
 
   std::string authorization_header =
-      createAuthorizationHeader(x509_credentials, credential_scope, canonical_headers, signature);
+      createAuthorizationHeader(x509_credentials, credential_scope, canonical_headers, signature.value());
 
   headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 

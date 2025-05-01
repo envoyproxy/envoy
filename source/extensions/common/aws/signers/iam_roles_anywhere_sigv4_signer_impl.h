@@ -1,8 +1,7 @@
 #pragma once
-#include "source/common/singleton/const_singleton.h"
+// #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -37,7 +36,7 @@ private:
   std::string createCredentialScope(const absl::string_view short_date,
                                     const absl::string_view override_region) const override;
 
-  std::string createSignature(const X509Credentials& x509_credentials,
+  absl::StatusOr<std::string> createSignature(const X509Credentials& x509_credentials,
                               const absl::string_view string_to_sign) const override;
 
   std::string createAuthorizationHeader(const X509Credentials& x509_credentials,

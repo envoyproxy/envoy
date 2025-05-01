@@ -72,7 +72,7 @@ protected:
                                          const absl::string_view long_date,
                                          const absl::string_view credential_scope) const PURE;
 
-  virtual std::string createSignature(const X509Credentials& x509_credentials,
+  virtual absl::StatusOr<std::string> createSignature(const X509Credentials& x509_credentials,
                                       const absl::string_view string_to_sign) const PURE;
 
   virtual std::string
