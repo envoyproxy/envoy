@@ -25,8 +25,6 @@ then
   exit 1
 fi
 
-echo "ERROR: TEST ERROR" >&2
-
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
