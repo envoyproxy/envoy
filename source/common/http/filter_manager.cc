@@ -966,6 +966,7 @@ void DownstreamFilterManager::sendLocalReply(
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   const bool is_grpc_request = state_.is_grpc_request_;
+  state_.local_reply_sent_ = true;
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
@@ -1242,7 +1243,6 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
           Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
           absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
                        "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
-      state_.local_reply_sent_ = true;
       should_exit = true;
     }
   });
