@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include "envoy/server/factory_context.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
