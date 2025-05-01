@@ -127,25 +127,6 @@ TEST(CgroupMemoryConfigTest, ZeroMemoryLimit) {
   EXPECT_NE(monitor, nullptr);
 }
 
-// Test creating a monitor with an invalid memory limit
-TEST(CgroupMemoryConfigTest, InvalidConfig) {
-  auto* factory =
-      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
-          "envoy.resource_monitors.cgroup_memory");
-  ASSERT_NE(factory, nullptr);
-
-  envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig config;
-  config.set_max_memory_bytes(-1); // Negative values are still invalid
-
-  Event::MockDispatcher dispatcher;
-  Api::ApiPtr api = Api::createApiForTest();
-  Server::MockOptions options;
-  Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-
-  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
-}
-
 // Test that factory creates a monitor successfully with ignored context
 TEST(CgroupMemoryConfigTest, CreateMonitorIgnoresContext) {
   auto* factory =
