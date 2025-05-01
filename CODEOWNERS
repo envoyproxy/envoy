@@ -149,6 +149,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo @nix1n
+/*/extensions/resource_monitors/cgroup_memory @botengyao @kbaichoo @alesabater
 /*/extensions/retry/priority @ravenblackx @mattklein123
 /*/extensions/retry/priority/previous_priorities @ravenblackx @mattklein123
 /*/extensions/retry/host @ravenblackx @mattklein123
