@@ -7,10 +7,9 @@ namespace Aws {
 using std::chrono::seconds;
 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
-    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    absl::string_view region, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer,
     envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider

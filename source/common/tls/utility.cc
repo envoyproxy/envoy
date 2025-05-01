@@ -195,7 +195,7 @@ const ASN1_TIME& Utility::epochASN1Time() {
     RELEASE_ASSERT(ASN1_TIME_set(epoch_time, epoch_time_t) != nullptr, "");
     return epoch_time;
   }());
-  
+
   return *epoch.get();
 }
 

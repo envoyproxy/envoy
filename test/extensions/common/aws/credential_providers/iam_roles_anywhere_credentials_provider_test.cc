@@ -1022,7 +1022,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
   EXPECT_FALSE(creds.accessKeyId().has_value());
   EXPECT_FALSE(creds.secretAccessKey().has_value());
   EXPECT_FALSE(creds.sessionToken().has_value());
-
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
