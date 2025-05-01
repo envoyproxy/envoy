@@ -9,8 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr std::chrono::hours REFRESH_INTERVAL{1};
-
 class CachedCredentialsProviderBase : public CredentialsProvider,
                                       public Logger::Loggable<Logger::Id::aws> {
 public:
