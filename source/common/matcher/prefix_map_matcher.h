@@ -30,6 +30,8 @@ protected:
                    absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
+  // TODO(ravenblackx): Implement a Reentrant. Re-entry gives access to the
+  // shorter, matching prefixes for callers.
   absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
     const auto result = children_.findLongestPrefix(data);
     if (result) {
