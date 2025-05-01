@@ -8,6 +8,7 @@ import "envoy/type/v3/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -22,7 +23,25 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message LocalityLbConfig {
   // Configuration for :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>`.
+  // [#next-free-field: 6]
   message ZoneAwareLbConfig {
+    // Configures Envoy to always route requests to the local zone regardless of the
+    // upstream zone structure. In Envoy's default configuration, traffic is distributed proportionally
+    // across all upstream hosts while trying to maximize local routing when possible. The approach
+    // with force_local_zone aims to be more predictable and if there are upstream hosts in the local
+    // zone, they will receive all traffic.
+    // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+    // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+    message ForceLocalZone {
+      // Configures the minimum number of upstream hosts in the local zone required when force_local_zone
+      // is enabled. If the number of upstream hosts in the local zone is less than the specified value,
+      // Envoy will fall back to the default proportional-based distribution across localities.
+      // If not specified, the default is 1.
+      // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+      // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+      google.protobuf.UInt32Value min_size = 1;
+    }
+
     // Configures percentage of requests that will be considered for zone aware routing
     // if zone aware routing is configured. If not specified, the default is 100%.
     // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
@@ -43,7 +62,10 @@ message LocalityLbConfig {
     bool fail_traffic_on_panic = 3;
 
     // If set to true, Envoy will force LocalityDirect routing if a local locality exists.
-    bool force_locality_direct_routing = 4;
+    bool force_locality_direct_routing = 4
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    ForceLocalZone force_local_zone = 5;
   }
 
   // Configuration for :ref:`locality weighted load balancing

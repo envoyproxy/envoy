@@ -59,15 +59,19 @@ envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& ya
 class DeferredClusterInitializationTest : public testing::TestWithParam<bool> {
 protected:
   DeferredClusterInitializationTest()
-      : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
+      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
+        http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
         router_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Replace the adsMux to have mocked GrpcMux object that will allow invoking
+    // methods when creating the cluster-manager.
+    ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
+
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
-        xds_manager_);
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -113,6 +117,7 @@ protected:
 
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;

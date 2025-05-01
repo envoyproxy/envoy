@@ -793,7 +793,7 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
 }
 
 namespace {
-// Translate zero to UINT64_MAX so that the zero/unlimited case doesn't
+// Translate zero to UINT32_MAX so that the zero/unlimited case doesn't
 // have to be handled specially.
 uint32_t translateZeroToUnlimited(uint32_t limit) {
   return (limit != 0) ? limit : std::numeric_limits<uint32_t>::max();

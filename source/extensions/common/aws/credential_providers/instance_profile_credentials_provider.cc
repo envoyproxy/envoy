@@ -7,7 +7,7 @@ namespace Aws {
 
 InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
     Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name)
     : MetadataCredentialsProviderBase(api, context, aws_cluster_manager, cluster_name,
