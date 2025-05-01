@@ -8,7 +8,6 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 #include "gmock/gmock.h"
