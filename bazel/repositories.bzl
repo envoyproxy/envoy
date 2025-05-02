@@ -572,6 +572,10 @@ def _com_github_ncopa_suexec():
 def _com_google_googletest():
     external_http_archive(
         "com_google_googletest",
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@re2": "@com_googlesource_code_re2",
+        },
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just

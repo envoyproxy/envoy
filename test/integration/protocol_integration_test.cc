@@ -4946,6 +4946,7 @@ private:
 };
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 

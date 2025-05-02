@@ -93,6 +93,11 @@ protected:
         config_multikill_(1000, 1000, 1000, 500, 0, std::vector<std::string>{}),
         config_multikill_threshold_(1000, 1000, 1000, 500, 60, std::vector<std::string>{}) {}
 
+  void SetUp() override {
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    GuardDogTestBase::SetUp();
+  }
+
   /**
    * This does everything but the final forceCheckForTest() that should cause
    * death for the single kill case.
