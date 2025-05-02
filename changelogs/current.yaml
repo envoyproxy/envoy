@@ -29,6 +29,10 @@ minor_behavior_changes:
   change: |
     Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
     ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
+- area: dns
+  change: |
+    Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
+    <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -80,6 +84,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: resource_monitors
+  change: |
+    added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
+    memory pressure, with configurable max_memory_bytes limit
+    :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`.
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
