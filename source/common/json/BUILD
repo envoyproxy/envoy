@@ -41,7 +41,9 @@ envoy_cc_library(
         ":json_internal_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
-        "@utf8_range//:utf8_validity",
+        "@com_github_nlohmann_json//:json",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_protobuf//third_party/utf8_range:utf8_validity",
     ],
 )
 

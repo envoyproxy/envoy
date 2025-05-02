@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/init:target_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -66,6 +65,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -117,7 +117,6 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib_header",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

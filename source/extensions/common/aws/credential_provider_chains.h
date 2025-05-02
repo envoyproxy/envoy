@@ -3,16 +3,12 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/cached_credentials_provider_base.h"
-#include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/environment_credentials_provider.h"
-#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/webidentity_credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {

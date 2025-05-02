@@ -88,7 +88,7 @@ HIGH_COVERAGE_STRING=""
 while read -r DIRECTORY
 do
   get_coverage_target "$DIRECTORY"
-  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
+  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4 | tr -d '\n')
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
   # If the coverage number is 'n' (no data found) there is 0% coverage. This is
   # probably a directory without source code, so we skip checks.
@@ -102,7 +102,7 @@ do
   fi;
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-    echo "Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})"
+    echo "ERROR: Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})" >&2
     FAILED=1
   fi
   COVERAGE_HIGH=$(echo "${COVERAGE_VALUE}>${DIRECTORY_THRESHOLD}" | bc)
@@ -117,8 +117,8 @@ do
 
 done <<< "$SOURCES"
 
-if [[ ${FAILED} != 1 ]]; then
-  echo -e "Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}"
+if [[ ${FAILED} != 1 && -n "${HIGH_COVERAGE_STRING}" ]]; then
+  echo -e "WARNING: Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}" >&2
 fi
 
 exit $FAILED

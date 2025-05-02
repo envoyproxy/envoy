@@ -19,10 +19,13 @@ int64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clien
 }
 } // namespace
 
+std::string ConnPoolImplBase::dumpState() const { return fmt::format("State: {}", *this); }
+
 void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
   SLOW_ASSERT(static_cast<int64_t>(connecting_stream_capacity_) ==
-              currentUnusedCapacity(connecting_clients_) +
-                  currentUnusedCapacity(early_data_clients_));
+                  currentUnusedCapacity(connecting_clients_) +
+                      currentUnusedCapacity(early_data_clients_),
+              dumpState());
 
   // Note: must include `busy_clients_` because they can have negative current unused capacity,
   // which is included in `connecting_and_connected_stream_capacity_`.
@@ -31,10 +34,18 @@ void ConnPoolImplBase::assertCapacityCountsAreCorrect() {
           (static_cast<int64_t>(connecting_stream_capacity_) +
            currentUnusedCapacity(ready_clients_) + currentUnusedCapacity(busy_clients_)),
       fmt::format(
-          "connecting_and_connected_stream_capacity_ {}, connecting_stream_capacity_ {}, "
-          "currentUnusedCapacity(ready_clients_) {}, currentUnusedCapacity(busy_clients_) {}",
-          connecting_and_connected_stream_capacity_, connecting_stream_capacity_,
-          currentUnusedCapacity(ready_clients_), currentUnusedCapacity(busy_clients_)));
+          "{} currentUnusedCapacity(ready_clients_) {}, currentUnusedCapacity(busy_clients_) {}",
+          *this, currentUnusedCapacity(ready_clients_), currentUnusedCapacity(busy_clients_)));
+
+  SLOW_ASSERT(currentUnusedCapacity(busy_clients_) <= 0, dumpState());
+
+  if (ready_clients_.empty()) {
+    ASSERT((connecting_and_connected_stream_capacity_ - connecting_stream_capacity_) <= 0,
+           dumpState());
+  } else {
+    ASSERT((connecting_and_connected_stream_capacity_ - connecting_stream_capacity_) > 0,
+           dumpState());
+  }
 }
 
 ConnPoolImplBase::ConnPoolImplBase(
@@ -47,16 +58,16 @@ ConnPoolImplBase::ConnPoolImplBase(
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
-  ASSERT(isIdleImpl());
-  ASSERT(connecting_stream_capacity_ == 0);
-  ASSERT(connecting_and_connected_stream_capacity_ == 0);
+  ASSERT(isIdleImpl(), dumpState());
+  ASSERT(connecting_stream_capacity_ == 0, dumpState());
+  ASSERT(connecting_and_connected_stream_capacity_ == 0, dumpState());
 }
 
 void ConnPoolImplBase::deleteIsPendingImpl() {
   deferred_deleting_ = true;
-  ASSERT(isIdleImpl());
-  ASSERT(connecting_stream_capacity_ == 0);
-  ASSERT(connecting_and_connected_stream_capacity_ == 0);
+  ASSERT(isIdleImpl(), dumpState());
+  ASSERT(connecting_stream_capacity_ == 0, dumpState());
+  ASSERT(connecting_and_connected_stream_capacity_ == 0, dumpState());
 }
 
 void ConnPoolImplBase::destructAllConnections() {
@@ -156,7 +167,8 @@ ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
       break;
     }
   }
-  ASSERT(!is_draining_for_deletion_ || result != ConnectionResult::CreatedNewConnection);
+  ASSERT(!is_draining_for_deletion_ || result != ConnectionResult::CreatedNewConnection,
+         dumpState());
   return result;
 }
 
@@ -184,9 +196,10 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
       ENVOY_LOG(trace, "connection creation failed");
       return ConnectionResult::FailedToCreateConnection;
     }
-    ASSERT(client->state() == ActiveClient::State::Connecting);
+    ASSERT(client->state() == ActiveClient::State::Connecting, dumpState());
     ASSERT(std::numeric_limits<uint64_t>::max() - connecting_stream_capacity_ >=
-           static_cast<uint64_t>(client->currentUnusedCapacity()));
+               static_cast<uint64_t>(client->currentUnusedCapacity()),
+           dumpState());
     ASSERT(client->real_host_description_);
     // Increase the connecting capacity to reflect the streams this connection can serve.
     incrConnectingAndConnectedStreamCapacity(client->currentUnusedCapacity(), *client);
@@ -202,7 +215,7 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
 
 void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient& client,
                                             AttachContext& context) {
-  ASSERT(client.readyForStream());
+  ASSERT(client.readyForStream(), dumpState());
 
   Upstream::ClusterTrafficStats& traffic_stats = *host_->cluster().trafficStats();
   if (client.state() == Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData) {
@@ -252,7 +265,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   ENVOY_CONN_LOG(
       debug, "destroying stream: {} active remaining, readyForStream {}, currentUnusedCapacity {}",
       client, client.numActiveStreams(), client.readyForStream(), client.currentUnusedCapacity());
-  ASSERT(num_active_streams_ > 0);
+  ASSERT(num_active_streams_ > 0, dumpState());
   state_.decrActiveStreams(1);
   num_active_streams_--;
   host_->stats().rq_active_.dec();
@@ -265,9 +278,9 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
     bool limited_by_concurrency =
         client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
     // The capacity calculated by concurrency could be negative if a SETTINGS frame lowered the
-    // number of allowed streams. In this case, effective client capacity was still limited by
-    // concurrency, compare client.concurrent_stream_limit_ and client.numActiveStreams() directly
-    // to avoid overflow.
+    // number of allowed streams. In this case, connecting_and_connected_stream_capacity_ can be
+    // negative, and effective client capacity was still limited by concurrency. Compare
+    // client.concurrent_stream_limit_ and client.numActiveStreams() directly to avoid overflow.
     bool negative_capacity = client.concurrent_stream_limit_ < client.numActiveStreams() + 1;
     if (negative_capacity || limited_by_concurrency) {
       incrConnectingAndConnectedStreamCapacity(1, client);
@@ -293,8 +306,8 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context,
                                                              bool can_send_early_data) {
-  ASSERT(!is_draining_for_deletion_);
-  ASSERT(!deferred_deleting_);
+  ASSERT(!is_draining_for_deletion_, dumpState());
+  ASSERT(!deferred_deleting_, dumpState());
   assertCapacityCountsAreCorrect();
 
   if (!ready_clients_.empty()) {
@@ -351,7 +364,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
 }
 
 bool ConnPoolImplBase::maybePreconnectImpl(float global_preconnect_ratio) {
-  ASSERT(!deferred_deleting_);
+  ASSERT(!deferred_deleting_, dumpState());
   return tryCreateNewConnection(global_preconnect_ratio) == ConnectionResult::CreatedNewConnection;
 }
 
@@ -440,7 +453,7 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
 
 void ConnPoolImplBase::drainClients(std::list<ActiveClientPtr>& clients) {
   while (!clients.empty()) {
-    ASSERT(clients.front()->numActiveStreams() > 0u);
+    ASSERT(clients.front()->numActiveStreams() > 0u, dumpState());
     ENVOY_LOG_EVENT(
         debug, "draining_non_idle_client", "draining {} client {} for cluster {}",
         (clients.front()->state() == ActiveClient::State::Ready ? "ready" : "early data"),
@@ -469,7 +482,7 @@ void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
 
   // Changing busy_clients_ to Draining does not move them between lists,
   // so use a for-loop since the list is not mutated.
-  ASSERT(&owningList(ActiveClient::State::Draining) == &busy_clients_);
+  ASSERT(&owningList(ActiveClient::State::Draining) == &busy_clients_, dumpState());
   for (auto& busy_client : busy_clients_) {
     if (busy_client->state() == ActiveClient::State::Draining) {
       continue;
@@ -609,7 +622,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.connect_timer_->disableTimer();
     client.connect_timer_.reset();
 
-    ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
+    ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity(), dumpState());
     connecting_stream_capacity_ -= client.currentUnusedCapacity();
     client.has_handshake_completed_ = true;
     client.conn_connect_ms_->complete();
@@ -690,7 +703,7 @@ void ConnPoolImplBase::purgePendingStreams(
 
 bool ConnPoolImplBase::connectingConnectionIsExcess(const ActiveClient& client) const {
   ASSERT(!client.hasHandshakeCompleted());
-  ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity());
+  ASSERT(connecting_stream_capacity_ >= client.currentUnusedCapacity(), dumpState());
   // If perUpstreamPreconnectRatio is one, this simplifies to checking if there would still be
   // sufficient connecting stream capacity to serve all pending streams if the most recent client
   // were removed from the picture.
@@ -747,7 +760,7 @@ void ConnPoolImplBase::decrConnectingAndConnectedStreamCapacity(uint32_t delta,
   if (!client.hasHandshakeCompleted()) {
     // If still doing handshake, it is contributing to the local connecting stream capacity. Update
     // the capacity as well.
-    ASSERT(connecting_stream_capacity_ >= delta);
+    ASSERT(connecting_stream_capacity_ >= delta, dumpState());
     connecting_stream_capacity_ -= delta;
   }
 }

@@ -84,10 +84,12 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@com_github_jbeder_yaml_cpp//:yaml-cpp",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
+        "@com_google_protobuf//third_party/utf8_range:utf8_validity",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-        "@utf8_range//:utf8_validity",
     ],
 )
 

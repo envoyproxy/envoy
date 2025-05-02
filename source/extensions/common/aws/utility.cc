@@ -1,5 +1,12 @@
 #include "source/extensions/common/aws/utility.h"
 
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
+
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

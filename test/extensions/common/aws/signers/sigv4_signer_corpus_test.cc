@@ -1,11 +1,8 @@
 #include <filesystem>
 #include <fstream>
 
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/http/path_utility.h"
-#include "source/common/http/utility.h"
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 

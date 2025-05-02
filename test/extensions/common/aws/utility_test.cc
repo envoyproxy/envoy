@@ -2,7 +2,6 @@
 
 #include "source/extensions/common/aws/utility.h"
 
-#include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

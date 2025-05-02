@@ -4,7 +4,6 @@
 #include "envoy/common/time.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 
 #include "absl/types/optional.h"
@@ -208,7 +207,7 @@ private:
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
   Thread::MutexBasicLockable mu_;
-  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_) = {};
+  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_);
   std::list<CredentialSubscriberCallbacksHandlePtr> subscriber_handles_;
 };
 

@@ -25,9 +25,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // providing access to raw network data.
 //
 // The filter communicates with an external gRPC service that can:
-// * Inspect network traffic in both directions (client->server and server->client)
-// * Modify the payload data
-// * Control connection lifecycle (continue, close gracefully, or reset)
+//
+// 1. Inspect network traffic in both directions (client->server and server->client)
+// 2. Modify the payload data
+// 3. Control connection lifecycle (continue, close gracefully, or reset)
 //
 // Use cases include:
 // * Custom protocol inspection and modification

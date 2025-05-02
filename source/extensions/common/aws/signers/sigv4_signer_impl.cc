@@ -1,5 +1,9 @@
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

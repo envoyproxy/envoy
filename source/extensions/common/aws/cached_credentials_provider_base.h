@@ -1,7 +1,6 @@
 #pragma once
 #include "envoy/common/time.h"
 
-#include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 
 namespace Envoy {

@@ -1,15 +1,11 @@
 #pragma once
-
-#include <utility>
+#include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
-#include "source/common/http/headers.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {

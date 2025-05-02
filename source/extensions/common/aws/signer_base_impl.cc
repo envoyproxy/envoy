@@ -1,5 +1,10 @@
 #include "source/extensions/common/aws/signer_base_impl.h"
 
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

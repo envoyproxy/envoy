@@ -250,6 +250,7 @@ TEST_F(ConnPoolImplBaseTest, DumpState) {
   std::string state = out.str();
   EXPECT_THAT(state, HasSubstr("ready_clients_.size(): 0, busy_clients_.size(): 0, "
                                "connecting_clients_.size(): 0, connecting_stream_capacity_: 0, "
+                               "connecting_and_connected_stream_capacity_: 0, "
                                "num_active_streams_: 0"));
 }
 

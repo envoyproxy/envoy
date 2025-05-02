@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.cgroup_memory.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.cgroup_memory.v3";
+option java_outer_classname = "CgroupMemoryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/cgroup_memory/v3;cgroup_memoryv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Cgroup Memory]
+// [#extension: envoy.resource_monitors.cgroup_memory]
+
+message CgroupMemoryConfig {
+  // Optional max memory limit in bytes used for memory pressure calculations.
+  // If set, this value is used as an upper bound on the memory limit, taking the minimum
+  // between this value and the system's cgroup memory limit. If not set, the system's
+  // cgroup memory limit is always used.
+  uint64 max_memory_bytes = 1;
+}
