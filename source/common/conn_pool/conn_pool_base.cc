@@ -274,7 +274,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // We don't update the capacity for HTTP/3 as the stream count should only
   // increase when a MAX_STREAMS frame is received.
   if (trackStreamCapacity()) {
-    // If the effective client capacity was limited by concurrency, increase connecting capacity.
+    // If the effective client capacity was limited by concurrency, increase connected capacity.
     bool limited_by_concurrency =
         client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
     // The capacity calculated by concurrency could be negative if a SETTINGS frame lowered the
@@ -891,12 +891,16 @@ void ActiveClient::onConnectionDurationTimeout() {
 }
 
 void ActiveClient::drain() {
-  if (currentUnusedCapacity() <= 0) {
-    return;
-  }
-  parent_.decrConnectingAndConnectedStreamCapacity(currentUnusedCapacity(), *this);
+  const int64_t unused = currentUnusedCapacity();
 
+  // Remove draining client's capacity from the pool. In the case that it currently has
+  // negative capacity, some could be added back in as requests complete, unless this
+  // is set to zero.
   remaining_streams_ = 0;
+
+  if (unused > 0) {
+    parent_.decrConnectingAndConnectedStreamCapacity(unused, *this);
+  }
 }
 
 } // namespace ConnectionPool
