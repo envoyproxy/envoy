@@ -42,7 +42,7 @@ message MaxMindConfig {
   // Database file is expected to have .mmdb extension.
   string isp_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
-  // Indicates that the Maxmind geoip provider should read the autonomous_system_number information 
+  // Indicates that the Maxmind geoip provider should read the autonomous_system_number information
   // from Maxmind ISP database instead of reading it from Maxmind ASN database.
   bool read_asn_info_from_isp_db = 6;
 
