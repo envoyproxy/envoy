@@ -774,6 +774,8 @@ enqueues
 enum
 enums
 environ
+eu
+euprod
 epoll
 errno
 etag
@@ -1103,6 +1105,7 @@ pcall
 pcap
 pchar
 pclose
+pdf
 performant
 pfctl
 pipelined
