@@ -11,6 +11,7 @@
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -29,6 +30,10 @@ namespace {
 using ::Envoy::StatusHelpers::StatusIs;
 
 TEST(InternalParsing, ParsedPathDebugString) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "true"}});
+
   ParsedPathPattern patt1 = {
       {
           "abc",
@@ -49,20 +54,37 @@ TEST(InternalParsing, ParsedPathDebugString) {
   EXPECT_EQ(patt2.debugString(), "/{var}");
 }
 
+TEST(InternalParsing, IsValidLiteralAsteriskDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
+
+  EXPECT_FALSE(isValidLiteral("ab*c"));
+  EXPECT_FALSE(isValidLiteral("a**c"));
+}
+
 TEST(InternalParsing, IsValidLiteralWorks) {
   EXPECT_TRUE(isValidLiteral("123abcABC"));
   EXPECT_TRUE(isValidLiteral("._~-"));
   EXPECT_TRUE(isValidLiteral("-._~%20!$&'()+,;:@"));
   EXPECT_FALSE(isValidLiteral("`~!@#$%^&()-_+;:,<.>'\"\\| "));
   EXPECT_FALSE(isValidLiteral("abc/"));
-  EXPECT_FALSE(isValidLiteral("ab*c"));
-  EXPECT_FALSE(isValidLiteral("a**c"));
+  EXPECT_TRUE(isValidLiteral("ab*c"));
+  EXPECT_TRUE(isValidLiteral("a**c"));
   EXPECT_TRUE(isValidLiteral("a=c"));
   EXPECT_FALSE(isValidLiteral("?abc"));
   EXPECT_FALSE(isValidLiteral("?a=c"));
   EXPECT_FALSE(isValidLiteral("{abc"));
   EXPECT_FALSE(isValidLiteral("abc}"));
   EXPECT_FALSE(isValidLiteral("{abc}"));
+}
+
+TEST(InternalParsing, IsValidRewriteAsteriskDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
+
+  EXPECT_FALSE(isValidRewriteLiteral("a*c"));
 }
 
 TEST(InternalParsing, IsValidRewriteLiteralWorks) {
@@ -76,6 +98,7 @@ TEST(InternalParsing, IsValidRewriteLiteralWorks) {
   EXPECT_FALSE(isValidRewriteLiteral("ab}c"));
   EXPECT_FALSE(isValidRewriteLiteral("ab{c"));
   EXPECT_TRUE(isValidRewriteLiteral("a=c"));
+  EXPECT_TRUE(isValidRewriteLiteral("a*c"));
   EXPECT_FALSE(isValidRewriteLiteral("?a=c"));
 }
 
@@ -151,7 +174,7 @@ class ParseVariableFailure : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(ParseVariableFailureTestSuite, ParseVariableFailure,
                          testing::Values("{var", "{=abc}", "{_var=*}", "{1v}", "{1v=abc}",
-                                         "{var=***}", "{v-a-r}", "{var=*/abc?q=1}", "{var=abc/a*}",
+                                         "{var=***}", "{v-a-r}", "{var=*/abc?q=1}",
                                          "{var=*def/abc}", "{var=}", "{rc=||||(A+yl/}", "/"));
 
 TEST_P(ParseVariableFailure, ParseVariableFailureTest) {
@@ -190,15 +213,13 @@ class ParsePathPatternSyntaxFailure : public testing::TestWithParam<std::string>
 
 INSTANTIATE_TEST_SUITE_P(
     ParsePathPatternSyntaxFailureTestSuite, ParsePathPatternSyntaxFailure,
-    testing::Values("/api/v*/1234", "/api/{version=v*}/1234", "/api/v{versionNum=*}/1234",
-                    "/api/{version=*beta}/1234", "/media/eff456/ll-sd-out.{ext}",
-                    "/media/eff456/ll-sd-out.{ext=*}", "/media/eff456/ll-sd-out.**",
-                    "/media/{country=**}/{lang=*}/**", "/media/**/*/**", "/link/{id=*}/asset*",
-                    "/link/{id=*}/{asset=asset*}", "/media/{id=/*}/*", "/media/{contentId=/**}",
-                    "/api/{version}/{version}", "/api/{version.major}/{version.minor}",
-                    "/media/***", "/media/*{*}*", "/media/{*}/", "/media/*/index?a=2", "media",
-                    "/\001\002\003\004\005\006\007", "/*(/**", "/**/{var}",
-                    "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
+    testing::Values("/api/v{versionNum=*}/1234", "/api/{version=*beta}/1234",
+                    "/media/eff456/ll-sd-out.{ext}", "/media/eff456/ll-sd-out.{ext=*}",
+                    "/media/{country=**}/{lang=*}/**", "/media/**/*/**", "/media/{id=/*}/*",
+                    "/media/{contentId=/**}", "/api/{version}/{version}",
+                    "/api/{version.major}/{version.minor}", "/media/*{*}*", "/media/{*}/",
+                    "/media/*/index?a=2", "media", "/\001\002\003\004\005\006\007", "/*(/**",
+                    "/**/{var}", "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
                     "/{var12345678901234=*}"));
 
 TEST_P(ParsePathPatternSyntaxFailure, ParsePathPatternSyntaxFailureTest) {
@@ -267,34 +288,43 @@ TEST(InternalRegexGen, DollarSignMatchesIfself) {
   EXPECT_FALSE(RE2::FullMatch("abc", toRegexPattern("abc$")));
 }
 
-TEST(InternalRegexGen, OperatorRegexPattern) {
+TEST(InternalRegexGen, OperatorRegexPatternAsteriskDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.uri_template_match_on_asterisk", "false"}});
+
   EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=]+");
   EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*");
+}
+
+TEST(InternalRegexGen, OperatorRegexPattern) {
+  EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=*]+");
+  EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@=*/]*");
 }
 
 TEST(InternalRegexGen, PathGlobRegex) {
   EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::PathGlob)));
   EXPECT_FALSE(RE2::FullMatch("", toRegexPattern(Operator::PathGlob)));
   EXPECT_FALSE(RE2::FullMatch("abc/123", toRegexPattern(Operator::PathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::PathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::PathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::PathGlob)));
+  EXPECT_TRUE(RE2::FullMatch("*", toRegexPattern(Operator::PathGlob)));
+  EXPECT_TRUE(RE2::FullMatch("**", toRegexPattern(Operator::PathGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc*123", toRegexPattern(Operator::PathGlob)));
 }
 
 TEST(InternalRegexGen, TextGlobRegex) {
   EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::TextGlob)));
   EXPECT_TRUE(RE2::FullMatch("", toRegexPattern(Operator::TextGlob)));
   EXPECT_TRUE(RE2::FullMatch("abc/123", toRegexPattern(Operator::TextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::TextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::TextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::TextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("*", toRegexPattern(Operator::TextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("**", toRegexPattern(Operator::TextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc*123", toRegexPattern(Operator::TextGlob)));
 }
 
 TEST(InternalRegexGen, VariableRegexPattern) {
-  EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@=]+)");
+  EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@=*]+)");
   EXPECT_EQ(toRegexPattern(Variable("var2", {Operator::PathGlob, "abc", Operator::TextGlob})),
-            "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@=]+/abc/"
-            "[a-zA-Z0-9-._~%!$&'()+,;:@=/]*)");
+            "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@=*]+/abc/"
+            "[a-zA-Z0-9-._~%!$&'()+,;:@=*/]*)");
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultMatch) {
@@ -456,8 +486,7 @@ INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWi
                               {"/media/eff456/ll-sd-out.js", "/media/*"},
                               {"/api/v1/1234/", "/api/*/v1/*"},
                               {"/api/v1/1234/broadcasts/get", "/api/*/{resource=*}/{method=*}"},
-                              {"/api/v1/1234/", "/api/*/v1/**"},
-                              {"/api/*/1234/", "/api/*/1234/"}})));
+                              {"/api/v1/1234/", "/api/*/v1/**"}})));
 
 TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
   absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(pathPattern());
