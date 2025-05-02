@@ -431,7 +431,7 @@ public:
     return config_with_hash_key_.config();
   }
 
-  const ExtProcFilterStats& stats() { return stats_; }
+  const ExtProcFilterStats& stats() const { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
