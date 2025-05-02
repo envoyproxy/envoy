@@ -239,6 +239,60 @@ bool DnsClusterImpl::ResolveTarget::isSuccessfulResponse(
            !response.empty())); /* logical DNS doesn't */
 }
 
+StatusOr<DnsClusterImpl::ResolveTarget::NewHosts> DnsClusterImpl::ResolveTarget::createLogicalDnsHosts(
+  const std::list<Network::DnsResponse>& response) {
+    NewHosts result;
+    const auto& addrinfo = response.front().addrInfo();
+    Network::Address::InstanceConstSharedPtr new_address =
+        Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
+    auto address_list = DnsUtils::generateAddressList(response, port_);
+    auto logical_host_or_error = LogicalHost::create(
+        parent_.info_, hostname_, new_address, address_list, locality_lb_endpoints_,
+        lb_endpoint_, nullptr, parent_.time_source_);
+
+    RETURN_IF_NOT_OK(logical_host_or_error.status());
+
+    result.hosts.emplace_back(std::move(logical_host_or_error.value()));
+    result.host_addresses.emplace(new_address->asString());
+    result.ttl_refresh_rate = min(result.ttl_refresh_rate, addrinfo.ttl_);
+    return result;
+}
+
+StatusOr<DnsClusterImpl::ResolveTarget::NewHosts> DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
+  const std::list<Network::DnsResponse>& response) {
+    NewHosts result;
+    for (const auto& resp : response) {
+      const auto& addrinfo = resp.addrInfo();
+      // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
+      // make a new address that has port in it. We need to both support IPv6 as well as
+      // potentially move port handling into the DNS interface itself, which would work
+      // better for SRV.
+      ASSERT(addrinfo.address_ != nullptr);
+      auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
+      if (result.host_addresses.count(address->asString()) > 0) {
+        continue;
+      }
+
+      auto host_or_error = HostImpl::create(
+          parent_.info_, hostname_, address,
+          // TODO(zyfjeff): Created through metadata shared pool
+          std::make_shared<const envoy::config::core::v3::Metadata>(
+              lb_endpoint_.metadata()),
+          std::make_shared<const envoy::config::core::v3::Metadata>(
+              locality_lb_endpoints_.metadata()),
+          lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
+          lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
+          lb_endpoint_.health_status(), parent_.time_source_);
+
+      RETURN_IF_NOT_OK(host_or_error.status());
+
+      result.hosts.emplace_back(std::move(host_or_error.value()));
+      result.host_addresses.emplace(address->asString());
+      result.ttl_refresh_rate = min(result.ttl_refresh_rate, addrinfo.ttl_);
+    }
+    return result;
+}
+
 void DnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->configUpdateStats().update_attempt_.inc();
@@ -255,69 +309,27 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
         if (isSuccessfulResponse(response, status)) {
           parent_.info_->configUpdateStats().update_success_.inc();
 
-          HostVector new_hosts;
-          std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
-          absl::flat_hash_set<std::string> all_new_hosts;
+          StatusOr<NewHosts> new_hosts_or_error;
 
           if (parent_.all_addresses_in_single_endpoint_ && !response.empty()) {
-            // Here we process Logical DNS first, as it also needs a list of addresses
-            // for the Happy Eyeballs algorithm.
-            const auto& addrinfo = response.front().addrInfo();
-
-            Network::Address::InstanceConstSharedPtr new_address =
-                Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
-            auto address_list = DnsUtils::generateAddressList(response, port_);
-            auto logical_host_or_error = LogicalHost::create(
-                parent_.info_, hostname_, new_address, address_list, locality_lb_endpoints_,
-                lb_endpoint_, nullptr, parent_.time_source_);
-            if (!logical_host_or_error.ok()) {
-              ENVOY_LOG(error, "Failed to create host {} with error: {}", new_address->asString(),
-                        logical_host_or_error.status().message());
-              parent_.info_->configUpdateStats().update_failure_.inc();
-              return;
-            }
-            new_hosts.emplace_back(std::move(logical_host_or_error.value()));
-            all_new_hosts.emplace(new_address->asString());
-            ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
+            new_hosts_or_error = createLogicalDnsHosts(response);
           } else {
-            for (const auto& resp : response) {
-              const auto& addrinfo = resp.addrInfo();
-              // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
-              // make a new address that has port in it. We need to both support IPv6 as well as
-              // potentially move port handling into the DNS interface itself, which would work
-              // better for SRV.
-              ASSERT(addrinfo.address_ != nullptr);
-              auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
-              if (all_new_hosts.count(address->asString()) > 0) {
-                continue;
-              }
-
-              auto host_or_error = HostImpl::create(
-                  parent_.info_, hostname_, address,
-                  // TODO(zyfjeff): Created through metadata shared pool
-                  std::make_shared<const envoy::config::core::v3::Metadata>(
-                      lb_endpoint_.metadata()),
-                  std::make_shared<const envoy::config::core::v3::Metadata>(
-                      locality_lb_endpoints_.metadata()),
-                  lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
-                  lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
-                  lb_endpoint_.health_status(), parent_.time_source_);
-              if (!host_or_error.ok()) {
-                ENVOY_LOG(error, "Failed to create host {} with error: {}", address->asString(),
-                          host_or_error.status().message());
-                parent_.info_->configUpdateStats().update_failure_.inc();
-                return;
-              }
-              new_hosts.emplace_back(std::move(host_or_error.value()));
-              all_new_hosts.emplace(address->asString());
-              ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
-            }
+            new_hosts_or_error = createStrictDnsHosts(response);
           }
+
+          if (!new_hosts_or_error.ok()) {
+            ENVOY_LOG(error, "Failed to process DNS response for {} with error: {}",
+                      dns_address_, new_hosts_or_error.status().message());
+            parent_.info_->configUpdateStats().update_failure_.inc();
+            return;
+          }
+
+          const auto& new_hosts = new_hosts_or_error.value();
 
           HostVector hosts_added;
           HostVector hosts_removed;
-          if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                            all_hosts_, all_new_hosts)) {
+          if (parent_.updateDynamicHostList(new_hosts.hosts, hosts_, hosts_added, hosts_removed,
+                                            all_hosts_, new_hosts.host_addresses)) {
             ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
             ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
               return host->priority() == locality_lb_endpoints_.priority();
@@ -340,9 +352,9 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
           parent_.failure_backoff_strategy_->reset();
 
           if (!response.empty() && parent_.respect_dns_ttl_ &&
-              ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = ttl_refresh_rate;
-            ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
+          new_hosts.ttl_refresh_rate != std::chrono::seconds(0)) {
+            final_refresh_rate = new_hosts.ttl_refresh_rate;
+            ASSERT(new_hosts.ttl_refresh_rate != std::chrono::seconds::max() &&
                    final_refresh_rate.count() > 0);
           }
           if (parent_.dns_jitter_ms_.count() > 0) {

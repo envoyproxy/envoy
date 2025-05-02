@@ -57,6 +57,14 @@ private:
     bool isSuccessfulResponse(const std::list<Network::DnsResponse>& response,
                               const Network::DnsResolver::ResolutionStatus& status);
 
+    struct NewHosts {
+      HostVector hosts;
+      std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+      absl::flat_hash_set<std::string> host_addresses;
+    };
+    StatusOr<NewHosts> createLogicalDnsHosts(const std::list<Network::DnsResponse>& response);
+    StatusOr<NewHosts> createStrictDnsHosts(const std::list<Network::DnsResponse>& response);
+
     DnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoints_;
