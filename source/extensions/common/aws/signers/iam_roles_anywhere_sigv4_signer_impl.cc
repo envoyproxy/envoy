@@ -1,10 +1,13 @@
 #include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
-#include "openssl/base.h"
+
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/extensions/common/aws/utility.h"
+
+#include "openssl/base.h"
 #include "openssl/bio.h"
 #include "openssl/pem.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -28,7 +31,8 @@ std::string IAMRolesAnywhereSigV4Signer::createStringToSign(
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
-absl::StatusOr<std::string> IAMRolesAnywhereSigV4Signer::createSignature(const X509Credentials& x509_credentials,
+absl::StatusOr<std::string>
+IAMRolesAnywhereSigV4Signer::createSignature(const X509Credentials& x509_credentials,
                                              const absl::string_view string_to_sign) const {
 
   unsigned int sig_len;
@@ -38,8 +42,7 @@ absl::StatusOr<std::string> IAMRolesAnywhereSigV4Signer::createSignature(const X
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.c_str(), keysize));
 
   bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-  if(pkey == nullptr)
-  {
+  if (pkey == nullptr) {
     return absl::InvalidArgumentError("createSignature: Failed to read private key");
   }
 
@@ -50,12 +53,14 @@ absl::StatusOr<std::string> IAMRolesAnywhereSigV4Signer::createSignature(const X
 
   auto evp = EVP_get_digestbyname("sha256");
   RELEASE_ASSERT(evp != nullptr, "createSignature: EVP_get_digestbyname failure");
-  RELEASE_ASSERT(EVP_SignInit_ex(ctx, evp, nullptr) == 1, "createSignature: EVP_SignInit_ex failure");
+  RELEASE_ASSERT(EVP_SignInit_ex(ctx, evp, nullptr) == 1,
+                 "createSignature: EVP_SignInit_ex failure");
 
   EVP_SignUpdate(ctx, string_to_sign.data(), string_to_sign.size());
 
   std::vector<unsigned char> output(pkey_size);
-  RELEASE_ASSERT(EVP_SignFinal(ctx, output.data(), &sig_len, pkey.get()) == 1, "createSignature: EVP_SignFinal failure");
+  RELEASE_ASSERT(EVP_SignFinal(ctx, output.data(), &sig_len, pkey.get()) == 1,
+                 "createSignature: EVP_SignFinal failure");
 
   output.resize(sig_len);
   EVP_MD_CTX_free(ctx);

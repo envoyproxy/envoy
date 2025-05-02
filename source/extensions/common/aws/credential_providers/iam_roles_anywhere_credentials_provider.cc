@@ -1,9 +1,11 @@
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
+
 #include "envoy/server/factory_context.h"
-#include "source/extensions/common/aws/utility.h"
+
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {

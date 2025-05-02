@@ -1,4 +1,5 @@
 #include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
+
 #include "envoy/http/query_params.h"
 
 #include "source/common/common/hex.h"
@@ -98,15 +99,14 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
 
   // Phase 3: Create a signature
   auto signature = createSignature(x509_credentials, string_to_sign);
-  if(!signature.ok())
-  {
+  if (!signature.ok()) {
     return absl::Status{absl::StatusCode::kInvalidArgument, signature.status().message()};
   }
 
   // Phase 4: Sign request
 
-  std::string authorization_header =
-      createAuthorizationHeader(x509_credentials, credential_scope, canonical_headers, signature.value());
+  std::string authorization_header = createAuthorizationHeader(
+      x509_credentials, credential_scope, canonical_headers, signature.value());
 
   headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
