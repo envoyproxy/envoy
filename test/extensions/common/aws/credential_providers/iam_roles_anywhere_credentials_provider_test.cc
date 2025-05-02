@@ -3,9 +3,9 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
+#include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"

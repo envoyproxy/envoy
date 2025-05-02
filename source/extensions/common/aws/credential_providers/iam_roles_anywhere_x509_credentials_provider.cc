@@ -1,5 +1,8 @@
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 
+#include "source/common/common/base64.h"
+#include "source/common/tls/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
