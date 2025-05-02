@@ -10,9 +10,39 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
+constexpr double MAX_HITS_ADDEND = 1000000000;
+
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
-                                 absl::Status& creation_status, bool no_limit) {
+                                 absl::Status& creation_status, bool no_limit)
+    : apply_on_stream_done_(config.apply_on_stream_done()) {
+  if (config.has_hits_addend()) {
+    if (!config.hits_addend().format().empty()) {
+      // Ensure only format or number is set.
+      if (config.hits_addend().has_number()) {
+        creation_status =
+            absl::InvalidArgumentError("hits_addend must contain either a format or a number");
+        return;
+      }
+
+      auto providers_or_error =
+          Formatter::SubstitutionFormatParser::parse(config.hits_addend().format());
+      SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+      if (providers_or_error->size() != 1) {
+        creation_status =
+            absl::InvalidArgumentError("hits_addend format must contain exactly one substitution");
+        return;
+      }
+      hits_addend_provider_ = std::move(providers_or_error.value()[0]);
+    } else if (config.hits_addend().has_number()) {
+      hits_addend_ = config.hits_addend().number().value();
+    } else {
+      creation_status =
+          absl::InvalidArgumentError("hits_addend must contain either a format or a number");
+      return;
+    }
+  }
+
   if (config.has_stage() || !config.disable_key().empty()) {
     creation_status =
         absl::InvalidArgumentError("'stage' field and 'disable_key' field are not supported");
@@ -33,6 +63,9 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
       break;
     case ProtoRateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new Envoy::Router::DestinationClusterAction());
+      break;
+    case ProtoRateLimit::Action::ActionSpecifierCase::kQueryParameters:
+      actions_.emplace_back(new Envoy::Router::QueryParametersAction(action.query_parameters()));
       break;
     case ProtoRateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new Envoy::Router::RequestHeadersAction(action.request_headers()));
@@ -101,7 +134,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
                                           RateLimitDescriptors& descriptors) const {
-  Envoy::RateLimit::LocalDescriptor descriptor;
+  Envoy::RateLimit::Descriptor descriptor;
   for (const Envoy::RateLimit::DescriptorProducerPtr& action : actions_) {
     Envoy::RateLimit::DescriptorEntry entry;
     if (!action->populateDescriptor(entry, local_service_cluster, headers, stream_info)) {
@@ -111,28 +144,64 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
       descriptor.entries_.emplace_back(std::move(entry));
     }
   }
+
+  // Populate hits_addend if set.
+  if (hits_addend_provider_ != nullptr) {
+    const ProtobufWkt::Value hits_addend_value =
+        hits_addend_provider_->formatValueWithContext({&headers}, stream_info);
+
+    double hits_addend = 0;
+    bool success = true;
+
+    if (hits_addend_value.has_number_value()) {
+      hits_addend = hits_addend_value.number_value();
+    } else if (hits_addend_value.has_string_value()) {
+      // Attempt to parse the string as a double.
+      success = absl::SimpleAtod(hits_addend_value.string_value(), &hits_addend);
+    } else {
+      // Only number and string values are allowed.
+      success = false;
+    }
+
+    // Check value range.
+    if (hits_addend < 0 || hits_addend > MAX_HITS_ADDEND) {
+      success = false;
+    }
+
+    if (success) {
+      descriptor.hits_addend_ = static_cast<uint64_t>(hits_addend);
+    } else {
+      ENVOY_LOG_EVERY_POW_2(warn, "Invalid hits_addend: {}", hits_addend_value.DebugString());
+      return;
+    }
+
+  } else if (hits_addend_.has_value()) {
+    descriptor.hits_addend_ = hits_addend_.value();
+  }
+
   descriptors.emplace_back(std::move(descriptor));
 }
 
 RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit>& configs,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit) {
+  rate_limit_policies_.reserve(configs.size());
   for (const ProtoRateLimit& config : configs) {
-    auto descriptor_generator =
-        std::make_unique<RateLimitPolicy>(config, context, creation_status, no_limit);
-    if (!creation_status.ok()) {
-      return;
-    }
-    rate_limit_policies_.emplace_back(std::move(descriptor_generator));
+    rate_limit_policies_.emplace_back(config, context, creation_status, no_limit);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 }
 
 void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
-                                          RateLimitDescriptors& descriptors) const {
-  for (const auto& generator : rate_limit_policies_) {
-    generator->populateDescriptors(headers, stream_info, local_service_cluster, descriptors);
+                                          RateLimitDescriptors& descriptors,
+                                          bool on_stream_done) const {
+  for (const RateLimitPolicy& generator : rate_limit_policies_) {
+    if (generator.applyOnStreamDone() != on_stream_done) {
+      continue;
+    }
+    generator.populateDescriptors(headers, stream_info, local_service_cluster, descriptors);
   }
 }
 

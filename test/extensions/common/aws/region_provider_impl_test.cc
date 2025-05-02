@@ -39,8 +39,6 @@ public:
 class AWSCredentialsFileRegionProviderTest : public testing::Test {
 public:
   void SetUp() override { setupEnvironment(); }
-
-  AWSCredentialsFileRegionProvider provider_;
 };
 
 class AWSConfigFileRegionProviderTest : public testing::Test {
@@ -203,6 +201,7 @@ TEST_F(AWSConfigFileRegionProviderTest, NoRegionSet) {
 
   EXPECT_EQ(false, provider_.getRegionSet().has_value());
 }
+
 TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFile) {
   auto temp = TestEnvironment::temporaryDirectory();
   TestEnvironment::setEnvVar("HOME", temp, 1);
@@ -213,8 +212,23 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFile) {
       credentials_file, CREDENTIALS_FILE_CONTENTS, true, false);
 
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", credentials_file, 1);
+  auto provider = AWSCredentialsFileRegionProvider({});
+  EXPECT_EQ("credentialsdefaultregion", provider.getRegion().value());
+}
 
-  EXPECT_EQ("credentialsdefaultregion", provider_.getRegion().value());
+TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFileViaCredentialProviderConfig) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credentials_file(temp + "/.aws/customfile");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credentials_file, CREDENTIALS_FILE_CONTENTS, true, false);
+
+  envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config;
+  credential_file_config.mutable_credentials_data_source()->set_filename(credentials_file);
+  auto provider = AWSCredentialsFileRegionProvider(credential_file_config);
+  EXPECT_EQ("credentialsdefaultregion", provider.getRegion().value());
 }
 
 TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFileRegionSet) {
@@ -227,8 +241,26 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomCredentialsFileRegionSet) {
       credentials_file, CREDENTIALS_FILE_CONTENTS_REGION_SET, true, false);
 
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", credentials_file, 1);
+  auto provider = AWSCredentialsFileRegionProvider({});
 
-  EXPECT_EQ("*", provider_.getRegionSet().value());
+  EXPECT_EQ("*", provider.getRegionSet().value());
+}
+
+TEST_F(AWSCredentialsFileRegionProviderTest,
+       CustomCredentialsFileRegionSetViaCredentialProviderConfig) {
+  auto temp = TestEnvironment::temporaryDirectory();
+  TestEnvironment::setEnvVar("HOME", temp, 1);
+  std::filesystem::create_directory(temp + "/.aws");
+  std::string credentials_file(temp + "/.aws/customfile");
+
+  auto file_path = TestEnvironment::writeStringToFileForTest(
+      credentials_file, CREDENTIALS_FILE_CONTENTS_REGION_SET, true, false);
+
+  envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config;
+  credential_file_config.mutable_credentials_data_source()->set_filename(credentials_file);
+  auto provider = AWSCredentialsFileRegionProvider(credential_file_config);
+
+  EXPECT_EQ("*", provider.getRegionSet().value());
 }
 
 TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfileSharedCredentialsFile) {
@@ -242,8 +274,8 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfileSharedCredentialsFile)
 
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", credentials_file, 1);
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
-
-  EXPECT_EQ("profile1region", provider_.getRegion().value());
+  auto provider = AWSCredentialsFileRegionProvider({});
+  EXPECT_EQ("profile1region", provider.getRegion().value());
 }
 
 TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfileSharedCredentialsFileRegionSet) {
@@ -257,8 +289,9 @@ TEST_F(AWSCredentialsFileRegionProviderTest, CustomProfileSharedCredentialsFileR
 
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", credentials_file, 1);
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
+  auto provider = AWSCredentialsFileRegionProvider({});
 
-  EXPECT_EQ("us-east-1,us-east-2", provider_.getRegionSet().value());
+  EXPECT_EQ("us-east-1,us-east-2", provider.getRegionSet().value());
 }
 
 TEST_F(AWSCredentialsFileRegionProviderTest, NoRegion) {
@@ -269,8 +302,8 @@ TEST_F(AWSCredentialsFileRegionProviderTest, NoRegion) {
 
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credentials_file, CREDENTIALS_FILE_NO_REGION, true, false);
-
-  EXPECT_EQ(false, provider_.getRegion().has_value());
+  auto provider = AWSCredentialsFileRegionProvider({});
+  EXPECT_EQ(false, provider.getRegion().has_value());
 }
 
 TEST_F(AWSCredentialsFileRegionProviderTest, NoRegionSet) {
@@ -281,8 +314,8 @@ TEST_F(AWSCredentialsFileRegionProviderTest, NoRegionSet) {
 
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credentials_file, CREDENTIALS_FILE_NO_REGION, true, false);
-
-  EXPECT_EQ(false, provider_.getRegionSet().has_value());
+  auto provider = AWSCredentialsFileRegionProvider({});
+  EXPECT_EQ(false, provider.getRegionSet().has_value());
 }
 
 TEST_F(RegionProviderChainTest, EnvironmentBeforeCredentialsFile) {

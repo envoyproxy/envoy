@@ -132,6 +132,8 @@ class IpList {
 public:
   static absl::StatusOr<std::unique_ptr<IpList>>
   create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  static absl::StatusOr<std::unique_ptr<IpList>>
+  create(const Protobuf::RepeatedPtrField<xds::core::v3::CidrRange>& cidrs);
 
   IpList() = default;
 
@@ -140,7 +142,8 @@ public:
   const std::string& error() const { return error_; }
 
 private:
-  explicit IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  IpList(const Protobuf::RepeatedPtrField<xds::core::v3::CidrRange>& cidrs);
   std::vector<CidrRange> ip_list_;
   std::string error_;
 };

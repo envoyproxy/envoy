@@ -164,6 +164,25 @@ private:
 };
 
 /**
+ * Action for query parameters rate limiting.
+ */
+class QueryParametersAction : public RateLimit::DescriptorProducer {
+public:
+  QueryParametersAction(const envoy::config::route::v3::RateLimit::Action::QueryParameters& action);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::string query_param_name_;
+  const std::string descriptor_key_;
+  const bool skip_if_absent_;
+};
+
+/**
  * Action for header value match rate limiting.
  */
 class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
@@ -256,12 +275,14 @@ public:
                                 const std::string& local_service_cluster,
                                 const Http::RequestHeaderMap&,
                                 const StreamInfo::StreamInfo& info) const override;
+  bool applyOnStreamDone() const override { return apply_on_stream_done_; }
 
 private:
   const std::string disable_key_;
   uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  const bool apply_on_stream_done_ = false;
 };
 
 /**

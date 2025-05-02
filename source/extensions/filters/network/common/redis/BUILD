@@ -37,9 +37,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "supported_commands_lib",
+    srcs = ["supported_commands.cc"],
     hdrs = ["supported_commands.h"],
     deps = [
         "//source/common/common:macros",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )
 

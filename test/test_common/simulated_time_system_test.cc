@@ -27,8 +27,7 @@ protected:
   }
 
   void addTask(int64_t delay_ms, char marker, bool expect_monotonic = true) {
-    addCustomTask(
-        delay_ms, marker, []() {}, expect_monotonic);
+    addCustomTask(delay_ms, marker, []() {}, expect_monotonic);
   }
 
   void addCustomTask(int64_t delay_ms, char marker, std::function<void()> cb,

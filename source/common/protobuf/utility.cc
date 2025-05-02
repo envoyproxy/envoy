@@ -29,9 +29,7 @@ namespace {
 
 // Validates that the max value of nanoseconds and seconds doesn't cause an
 // overflow in the protobuf time-util computations.
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be renamed to validateDurationNoThrow.
-absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duration) {
+absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration) {
   // Apply a strict max boundary to the `seconds` value to avoid overflow when
   // both seconds and nanoseconds are at their highest values.
   // Note that protobuf internally converts to the input's seconds and
@@ -56,61 +54,12 @@ absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duratio
   return absl::OkStatus();
 }
 
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
-                                     int64_t max_seconds_value) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-    return validateDurationUnifiedNoThrow(duration);
-  }
-  if (duration.seconds() < 0 || duration.nanos() < 0) {
-    return absl::OutOfRangeError(
-        fmt::format("Expected positive duration: {}", duration.DebugString()));
-  }
-  if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
-    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
-  }
-  return absl::OkStatus();
-}
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should call validateDurationUnifiedNoThrow instead
-// of validateDurationNoThrow.
-void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
-  const auto result = validateDurationNoThrow(duration, max_seconds_value);
+void validateDuration(const ProtobufWkt::Duration& duration) {
+  const absl::Status result = validateDurationNoThrow(duration);
   if (!result.ok()) {
     throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
 }
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-void validateDuration(const ProtobufWkt::Duration& duration) {
-  validateDuration(duration, Protobuf::util::TimeUtil::kDurationMaxSeconds);
-}
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-void validateDurationAsMilliseconds(const ProtobufWkt::Duration& duration) {
-  // Apply stricter max boundary to the `seconds` value to avoid overflow.
-  // Note that protobuf internally converts to nanoseconds.
-  // The kMaxInt64Nanoseconds = 9223372036, which is about 300 years.
-  constexpr int64_t kMaxInt64Nanoseconds =
-      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-  validateDuration(duration, kMaxInt64Nanoseconds);
-}
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-absl::Status validateDurationAsMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
-  constexpr int64_t kMaxInt64Nanoseconds =
-      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-  return validateDurationNoThrow(duration, kMaxInt64Nanoseconds);
-}
-
-} // namespace
-
-namespace {
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind('/');
@@ -209,8 +158,8 @@ void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_nam
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
-  std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                  message.DebugString());
+  std::string error = fmt::format("{}: Proto constraint validation failed ({})",
+                                  message.DebugString(), validation_error);
   throwEnvoyExceptionOrPanic(error);
 }
 
@@ -399,7 +348,7 @@ public:
       duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
-      RETURN_IF_NOT_OK(validateDurationUnifiedNoThrow(duration_message));
+      RETURN_IF_NOT_OK(validateDurationNoThrow(duration_message));
     }
     return absl::OkStatus();
   }
@@ -408,11 +357,9 @@ public:
 } // namespace
 
 void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool recurse_into_any) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-    DurationFieldProtoVisitor duration_field_visitor;
-    THROW_IF_NOT_OK(
-        ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
-  }
+  DurationFieldProtoVisitor duration_field_visitor;
+  THROW_IF_NOT_OK(
+      ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
 }
 
 namespace {
@@ -429,8 +376,8 @@ public:
     // at which PGV would have stopped because it does not itself check within Any messages.
     if (was_any_or_top_level &&
         !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      std::string error = fmt::format("Proto constraint validation failed ({}): {}", err,
-                                      reflectable_message->DebugString());
+      std::string error = fmt::format("{}: Proto constraint validation failed ({})",
+                                      reflectable_message->DebugString(), err);
       return absl::InvalidArgumentError(error);
     }
     return absl::OkStatus();
@@ -789,7 +736,7 @@ const ProtobufWkt::Value& ValueUtil::nullValue() {
   return *v;
 }
 
-ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+ProtobufWkt::Value ValueUtil::stringValue(absl::string_view str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);
   return val;
@@ -825,13 +772,13 @@ ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& v
 }
 
 uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
-  validateDurationAsMilliseconds(duration);
+  validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
 absl::StatusOr<uint64_t>
 DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
-  const auto result = validateDurationAsMillisecondsNoThrow(duration);
+  const absl::Status result = validateDurationNoThrow(duration);
   if (!result.ok()) {
     return result;
   }
@@ -943,8 +890,8 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  return absl::InvalidArgumentError("Unable to parse file \"" + path + "\" (type " +
-                                    message.GetTypeName() + ")");
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unable to parse file \"", path, "\" (type ", message.GetTypeName(), ")"));
 #endif
   return absl::OkStatus();
 }

@@ -24,7 +24,7 @@ TEST_P(RandomLoadBalancerTest, NoHosts) {
   init();
 
   EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RandomLoadBalancerTest, Normal) {
@@ -41,8 +41,8 @@ TEST_P(RandomLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
 
   EXPECT_CALL(random_, random()).Times(0);
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
@@ -53,7 +53,7 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                       makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, RandomLoadBalancerTest,

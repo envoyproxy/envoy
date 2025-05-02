@@ -27,6 +27,7 @@ constexpr absl::string_view kTranscoderConfig =
 class TranscoderAsyncBodyInjectionIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void SetUp() override {
+    async_lb_ = false; // This test does weird things with filters - don't add more complexity.
     HttpProtocolIntegrationTest::SetUp();
 
     config_helper_.prependFilter(R"EOF(

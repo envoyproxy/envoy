@@ -21,7 +21,7 @@ public:
   MOCK_METHOD(ClusterInfoConstSharedPtr, info, (), (const));
   MOCK_METHOD(Outlier::Detector*, outlierDetector, ());
   MOCK_METHOD(const Outlier::Detector*, outlierDetector, (), (const));
-  MOCK_METHOD(void, initialize, (std::function<void()> callback));
+  MOCK_METHOD(void, initialize, (std::function<absl::Status()> callback));
   MOCK_METHOD(InitializePhase, initializePhase, (), (const));
   MOCK_METHOD(PrioritySet&, prioritySet, ());
   MOCK_METHOD(const PrioritySet&, prioritySet, (), (const));

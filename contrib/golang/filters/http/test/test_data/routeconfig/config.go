@@ -1,4 +1,4 @@
-package main
+package routeconfig
 
 import (
 	"errors"
@@ -68,7 +68,4 @@ func (p *parser) Merge(parent interface{}, child interface{}) interface{} {
 		newConfig.setHeader = childConfig.setHeader
 	}
 	return &newConfig
-}
-
-func main() {
 }

@@ -171,6 +171,8 @@ public:
     };
 
     std::vector<luaL_Reg> to_register;
+    // Reserve slots to avoid reallocation, otherwise clang-tidy will complain about it.
+    to_register.reserve(log_functions.size() + T::exportedFunctions().size() + 2);
 
     for (auto& function : log_functions) {
       to_register.push_back({function.first, function.second});
@@ -331,7 +333,7 @@ public:
 
   LuaRef(const LuaRef&) = delete;
 
-  LuaRef(LuaRef&& that) {
+  LuaRef(LuaRef&& that) noexcept {
     object_ = that.object_;
     ref_ = that.ref_;
     that.object_ = std::pair<T*, lua_State*>{};
@@ -394,7 +396,7 @@ public:
   using LuaRef<T>::LuaRef;
 
   LuaDeathRef(const LuaDeathRef&) = delete;
-  LuaDeathRef(LuaDeathRef&&) = default;
+  LuaDeathRef(LuaDeathRef&&) noexcept = default;
 
   ~LuaDeathRef() { markDead(); }
 

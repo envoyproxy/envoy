@@ -95,7 +95,7 @@ public:
           host_map_(parent->cluster_->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
     // Pool selection not implemented for OriginalDstCluster

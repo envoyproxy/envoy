@@ -365,8 +365,9 @@ private:
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CustomStatsSink>(server.scope());
   }
 
@@ -702,18 +703,20 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
   // infinite drainClose spin-loop (mimicing high traffic) is running before we
   // initiate the drain sequence.
   auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
-    bool closed = drain_manager.drainClose();
+    bool closed = drain_manager.drainClose(Network::DrainDirection::All);
     drain_closes_started.Notify();
     while (!closed) {
-      closed = drain_manager.drainClose();
+      closed = drain_manager.drainClose(Network::DrainDirection::All);
     }
   });
   drain_closes_started.WaitForNotification();
 
   // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
   // wait for that to complete.
-  server_->dispatcher().post(
-      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+  server_->dispatcher().post([&] {
+    drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                     [&drain_complete]() { drain_complete.Notify(); });
+  });
 
   drain_complete.WaitForNotification();
   drain_thread->join();
@@ -1356,6 +1359,20 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       "non-empty");
 }
 
+TEST_P(ServerInstanceImplTest, ServerContextSingleton) {
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+
+  EXPECT_EQ(&server_->serverFactoryContext(),
+            Configuration::ServerFactoryContextInstance::getExisting());
+  server_ = nullptr;
+  EXPECT_EQ(nullptr, Configuration::ServerFactoryContextInstance::getExisting());
+}
+
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
 // This is a regression test for when we used to crash.
 TEST_P(ServerInstanceImplTest, StdExceptionThrowInConstructor) {
@@ -1456,6 +1473,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));
+            EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
             return mock_extension;
           }));
 
@@ -1642,8 +1660,9 @@ private:
 class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CallbacksStatsSink>(server);
   }
 

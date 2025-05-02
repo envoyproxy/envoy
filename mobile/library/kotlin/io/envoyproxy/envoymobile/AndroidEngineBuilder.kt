@@ -12,7 +12,8 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
         onEngineRunning,
         { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
         eventTracker,
-        enableProxying
+        enableProxying,
+        false
       )
     }
   }

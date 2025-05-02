@@ -87,6 +87,11 @@ public:
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         locality())
         .WillByDefault(ReturnRef(upstream_locality_));
+    ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
+        }));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_

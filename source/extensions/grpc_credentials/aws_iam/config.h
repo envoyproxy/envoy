@@ -6,6 +6,7 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/http/message_impl.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/signer.h"
 
 namespace Envoy {

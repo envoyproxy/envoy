@@ -8,6 +8,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
@@ -40,8 +41,9 @@ using Http::LowerCaseString;
 struct ConfigOptions {
   bool downstream_filter = true;
   bool failure_mode_allow = false;
-  int64_t timeout = 900000000;
+  int64_t timeout_ms = 900;
   std::string cluster = "ext_proc_server_0";
+  bool add_log_filter = false;
 };
 
 struct ExtProcHttpTestParams {
@@ -107,7 +109,7 @@ public:
           proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
       http_uri->set_uri("ext_proc_server_0:9000");
       http_uri->set_cluster(config_option.cluster);
-      http_uri->mutable_timeout()->set_nanos(config_option.timeout);
+      http_uri->mutable_timeout()->set_nanos(config_option.timeout_ms * 1000000);
 
       if (config_option.failure_mode_allow) {
         proto_config_.set_failure_mode_allow(true);
@@ -121,6 +123,18 @@ public:
         ext_proc_filter.set_name(ext_proc_filter_name);
         ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+      }
+
+      if (config_option.add_log_filter) {
+        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        logging_filter_config.set_logging_id(ext_proc_filter_name);
+        logging_filter_config.set_upstream_cluster_name(config_option.cluster);
+        logging_filter_config.set_check_received_bytes(true);
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
+        logging_filter.set_name("logging-test-filter");
+        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
       }
     });
 
@@ -352,7 +366,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Side stream server does not send response trigger timeout.
+// Ext_proc filter timeout is set to default value which is 200ms. HTTP Async client timeout
+// is set to a much larger number 900ms. Test the case that the side stream server does not
+// send response in time which triggers ext_proc filter timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
@@ -361,7 +377,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 400 ms exceeding 200ms filter timeout.
+                                 // Travel forward 400ms exceeding 200ms filter timeout.
                                  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
                                  return false;
                                });
@@ -369,10 +385,12 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   verifyDownstreamResponse(*response, 504);
 }
 
-// Http timeout value set to 10ms. Test HTTP timeout.
+// Ext_proc filter timeout is set to default value which is 200ms. HTTP Async client timeout
+// is set to a smaller number 100ms. Test the case that the side stream server does not
+// send response in time which triggers HTTP async client timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
   ConfigOptions config_option = {};
-  config_option.timeout = 10000000;
+  config_option.timeout_ms = 100;
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig(config_option);
@@ -381,8 +399,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 50 ms exceeding 10ms HTTP URI timeout setting.
-                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
+                                 // Travel forward 120 ms exceeding 100ms HTTP URI timeout
+                                 // setting.
+                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(120));
                                  return true;
                                });
 
@@ -484,6 +503,43 @@ TEST_P(ExtProcHttpClientIntegrationTest, WrongClusterConfigWithFailOpen) {
   handleUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
+}
+
+// Using logging filter to test stats in onSuccess case.
+TEST_P(ExtProcHttpClientIntegrationTest, StatsTestOnSuccess) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.add_log_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("foo"), "yes"); });
+
+  // The side stream get the request and sends back the response.
+  processRequestHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
+
+  // The request is sent to the upstream.
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Using logging filter to test stats in onFailure case.
+TEST_P(ExtProcHttpClientIntegrationTest, StatsTestOnFailure) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.add_log_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      http_side_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse&) { return true; },
+      true);
+
+  verifyDownstreamResponse(*response, 500);
 }
 
 } // namespace

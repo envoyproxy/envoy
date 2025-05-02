@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -35,6 +36,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 
@@ -122,6 +124,11 @@ public:
   virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
+   * @return Config::XdsManager& singleton for use by the entire server.
+   */
+  virtual Config::XdsManager& xdsManager() PURE;
+
+  /**
    * @return const Http::HttpServerPropertiesCacheManager& instance for use by the entire server.
    */
   virtual Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() PURE;
@@ -178,6 +185,11 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
@@ -217,7 +229,22 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() const PURE;
+
+  /**
+   * @return Ssl::ContextManager& the SSL context manager.
+   */
+  virtual Ssl::ContextManager& sslContextManager() PURE;
+
+  /**
+   * Return the instance of secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
+
+// ServerFactoryContextInstance is a thread local singleton that provides access to the
+// ServerFactoryContext. This will be initialized once the server is created at the start of the
+// main thread and will be available at the main thread for the lifetime of the server.
+using ServerFactoryContextInstance = ThreadLocalInjectableSingleton<ServerFactoryContext>;
 
 /**
  * Generic factory context for multiple scenarios. This context provides a server factory context

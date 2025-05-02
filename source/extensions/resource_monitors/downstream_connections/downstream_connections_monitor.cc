@@ -12,7 +12,7 @@ namespace DownstreamConnections {
 ActiveDownstreamConnectionsResourceMonitor::ActiveDownstreamConnectionsResourceMonitor(
     const envoy::extensions::resource_monitors::downstream_connections::v3::
         DownstreamConnectionsConfig& config)
-    : max_(config.max_active_downstream_connections()), current_(0){};
+    : max_(config.max_active_downstream_connections()), current_(0) {};
 
 bool ActiveDownstreamConnectionsResourceMonitor::tryAllocateResource(int64_t increment) {
   // No synchronization is imposed on other reads or writes.

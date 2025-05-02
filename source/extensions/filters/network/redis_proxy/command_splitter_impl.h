@@ -285,6 +285,26 @@ private:
 };
 
 /**
+ * KeysRequest sends the command to all Redis server. The response from each Redis (which
+ * must be an array) is merged and returned to the user. If there is any error or failure in
+ * processing the fragmented commands, an error will be returned.
+ */
+class KeysRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  KeysRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
  * SplitKeysSumResultRequest takes each key from the command and sends the same incoming command
  * with each key to the appropriate Redis server. The response from each Redis (which must be an
  * integer) is summed and returned to the user. If there is any error or failure in processing the
@@ -364,7 +384,8 @@ class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
-               Common::Redis::FaultManagerPtr&& fault_manager);
+               Common::Redis::FaultManagerPtr&& fault_manager,
+               absl::flat_hash_set<std::string>&& custom_commands);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
@@ -390,12 +411,14 @@ private:
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
+  CommandHandlerFactory<KeysRequest> keys_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
+  absl::flat_hash_set<std::string> custom_commands_;
 };
 
 } // namespace CommandSplitter

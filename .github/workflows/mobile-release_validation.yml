@@ -53,7 +53,7 @@ jobs:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       # revert this to non-large once updated
-      runs-on: macos-12-large
+      runs-on: macos-14
       source: |
         source ./ci/mac_ci_setup.sh
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
@@ -67,7 +67,8 @@ jobs:
         - run: |
             xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
                        -scheme EnvoySwiftPMExample \
-                       -destination platform="iOS Simulator,name=iPhone 14 Pro Max,OS=16.1"
+                       -destination platform="iOS Simulator,name=iPhone 15 Pro Max,OS=17.4" \
+                       -allowProvisioningUpdates
           shell: bash
           name: Build app
         # TODO(jpsim): Run app and inspect logs to validate

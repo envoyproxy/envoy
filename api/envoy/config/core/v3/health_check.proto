@@ -375,13 +375,13 @@ message HealthCheck {
   // The default value for "healthy edge interval" is the same as the default interval.
   google.protobuf.Duration healthy_edge_interval = 16 [(validate.rules).duration = {gt {}}];
 
-  // .. attention::
-  // This field is deprecated in favor of the extension
-  // :ref:`event_logger <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>` and
-  // :ref:`event_log_path <envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>`
-  // in the file sink extension.
-  //
   // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
+  //
+  // .. attention::
+  //   This field is deprecated in favor of the extension
+  //   :ref:`event_logger <envoy_v3_api_field_config.core.v3.HealthCheck.event_logger>` and
+  //   :ref:`event_log_path <envoy_v3_api_field_extensions.health_check.event_sinks.file.v3.HealthCheckEventFileSink.event_log_path>`
+  //   in the file sink extension.
   string event_log_path = 17
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

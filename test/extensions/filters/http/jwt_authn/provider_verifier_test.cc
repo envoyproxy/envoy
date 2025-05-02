@@ -271,7 +271,7 @@ INSTANTIATE_TEST_SUITE_P(ProviderVerifiersJwtCache, ProviderVerifiersJwtCacheTes
 // This test verifies that two JWT requirements with different audiences behave the same with
 // jwt_cache and without. The first requirement is checking audiences specified in the provider
 // which is "example_service". The second requirement is type "provider_and_audiences" and its
-// specified audiences is "other_service". The audience in the JWT token is "example_service". The
+// specified audiences is "other_service". The audience in the JWT is "example_service". The
 // first requirement should work and the second one should fail.
 TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);

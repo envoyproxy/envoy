@@ -52,11 +52,13 @@ public:
               std::make_shared<Envoy::Config::OpaqueResourceDecoderImpl<RouteConfiguration>>(
                   factory_context.messageValidationContext().dynamicValidationVisitor(),
                   getNameFieldName());
-          auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-              std::move(config_update), std::move(resource_decoder), rds.config_source(),
-              rds.route_config_name(), manager_identifier, factory_context,
-              stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
-              absl::AsciiStrToUpper(getRdsName()), manager_);
+          auto subscription = THROW_OR_RETURN_VALUE(
+              RdsRouteConfigSubscription::create(
+                  std::move(config_update), std::move(resource_decoder), rds.config_source(),
+                  rds.route_config_name(), manager_identifier, factory_context,
+                  stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
+                  absl::AsciiStrToUpper(getRdsName()), manager_),
+              std::unique_ptr<RdsRouteConfigSubscription>);
           auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
                                                                        factory_context);
           return std::make_pair(provider, &provider->subscription().initTarget());

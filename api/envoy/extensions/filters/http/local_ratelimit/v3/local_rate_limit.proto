@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -167,4 +167,13 @@ message LocalRateLimit {
   //   3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
   //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
   repeated config.route.v3.RateLimit rate_limits = 17;
+
+  // Specifies the max dynamic descriptors kept in the cache for a particular wildcard descriptor
+  // configured in the global :ref:`descriptors<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.descriptors>`.
+  // Wildcard descriptor means descriptor has one or more entries with just key and value omitted. For example if user has configured two descriptors
+  // with blank value entries, then max dynamic descriptors stored in the LRU cache will be 2 * max_dynamic_descriptors.
+  // Actual number of dynamic descriptors will depend on the cardinality of unique values received from the http request for the omitted
+  // values.
+  // Minimum is 1. Default is 20.
+  google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(validate.rules).uint32 = {gte: 1}];
 }

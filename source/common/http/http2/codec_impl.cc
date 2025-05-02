@@ -86,11 +86,11 @@ public:
     }
   }
 };
-const char* codec_strerror(int error_code) { return nghttp2_strerror(error_code); }
+const char* codecStrError(int error_code) { return nghttp2_strerror(error_code); }
 #else
   const absl::string_view errorDetails(int) const { return oghttp2_err_unknown_; }
 };
-const char* codec_strerror(int) { return "unknown_error"; }
+const char* codecStrError(int) { return "unknown_error"; }
 #endif
 
 int reasonToReset(StreamResetReason reason) {
@@ -650,7 +650,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), nullptr, end_stream, base());
+  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), end_stream, base());
   ASSERT(stream_id_ > 0);
 }
 
@@ -670,7 +670,7 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), nullptr, end_stream);
+  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), end_stream);
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
@@ -816,7 +816,7 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
       this->onMetadataDecoded(std::move(metadata_map_ptr));
     };
-    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
+    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb, parent_.max_metadata_size_);
   }
   return *metadata_decoder_;
 }
@@ -967,7 +967,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     }
 #endif
     if (rc != static_cast<ssize_t>(slice.len_)) {
-      return codecProtocolError(codec_strerror(rc));
+      return codecProtocolError(codecStrError(rc));
     }
 
     current_slice_ = nullptr;
@@ -1226,6 +1226,13 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   case OGHTTP2_RST_STREAM_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events") &&
+        stream != nullptr && !stream->local_end_stream_sent_) {
+      // The RST_STREAM may preempt further DATA frames, and serves as the
+      // notification of the end of the stream.
+      stream->onResetEncoded(error_code);
+      stream->local_end_stream_sent_ = true;
+    }
     break;
   }
 
@@ -1254,7 +1261,7 @@ int ConnectionImpl::onError(absl::string_view error) {
 }
 
 int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
-  ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, codec_strerror(error_code),
+  ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, codecStrError(error_code),
                  stream_id);
 
   // Set details of error_code in the stream whenever we have one.
@@ -1528,7 +1535,7 @@ Status ConnectionImpl::sendPendingFrames() {
   const int rc = adapter_->Send();
   if (rc != 0) {
     ASSERT(rc == ERR_CALLBACK_FAILURE);
-    return codecProtocolError(codec_strerror(rc));
+    return codecProtocolError(codecStrError(rc));
   }
 
   // See ConnectionImpl::StreamImpl::resetStream() for why we do this. This is an uncommon event,
@@ -1793,8 +1800,8 @@ bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
 }
@@ -1810,8 +1817,8 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
 }
@@ -1829,8 +1836,8 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return result == 0;
 }
@@ -1857,7 +1864,7 @@ bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
   Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   if (stream_close_listener_) {
-    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for {}",
+    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for stream {}",
                    connection_->connection_, stream_id);
     stream_close_listener_(stream_id);
   }
@@ -2132,6 +2139,8 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
+  max_metadata_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, max_metadata_size, 1024 * 1024);
   idle_session_requires_ping_interval_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
       http2_options.connection_keepalive(), connection_idle_interval, 0));
 }
@@ -2216,6 +2225,8 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
   sendSettings(http2_options, false);
   allow_metadata_ = http2_options.allow_metadata();
+  max_metadata_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, max_metadata_size, 1024 * 1024);
 }
 
 Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {

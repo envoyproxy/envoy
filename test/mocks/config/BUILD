@@ -48,8 +48,10 @@ envoy_cc_mock(
 
 envoy_cc_mock(
     name = "xds_manager_mocks",
-    hdrs = ["custom_config_validators.h"],
+    srcs = ["xds_manager.cc"],
+    hdrs = ["xds_manager.h"],
     deps = [
+        ":config_mocks",
         "//envoy/config:xds_manager_interface",
     ],
 )

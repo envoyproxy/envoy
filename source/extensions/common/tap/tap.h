@@ -92,9 +92,18 @@ public:
   /**
    * Create a Sink that can be used for writing out data produced by the tap filter.
    * @param config supplies the protobuf configuration for the sink factory
-   * @param cluster_manager is a ClusterManager from the HTTP/transport socket context
+   * @param  http_context supplies HTTP context
    */
-  virtual SinkPtr createSinkPtr(const Protobuf::Message& config, SinkContext context) PURE;
+  virtual SinkPtr createHttpSinkPtr(const Protobuf::Message& config,
+                                    Server::Configuration::FactoryContext& http_context) PURE;
+  /**
+   * Create a Sink that can be used for writing out data produced by the tap filter.
+   * @param config supplies the protobuf configuration for the sink factory
+   * @param tsf_context supplies the transport socket context
+   */
+  virtual SinkPtr
+  createTransportSinkPtr(const Protobuf::Message& config,
+                         Server::Configuration::TransportSocketFactoryContext& tsf_context) PURE;
 };
 
 using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;

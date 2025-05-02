@@ -20,7 +20,7 @@ public:
              Server::Configuration::CommonFactoryContext& context,
              const EnforcementMode mode = EnforcementMode::Enforced)
       : RoleBasedAccessControlEngineImpl(rules, ProtobufMessage::getStrictValidationVisitor(),
-                                         context, mode){};
+                                         context, mode) {};
 
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
@@ -40,7 +40,7 @@ public:
                     ActionValidationVisitor& validation_visitor,
                     const EnforcementMode mode = EnforcementMode::Enforced)
       : RoleBasedAccessControlMatcherEngineImpl(matcher, factory_context, validation_visitor,
-                                                mode){};
+                                                mode) {};
 
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,

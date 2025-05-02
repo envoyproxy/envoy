@@ -139,7 +139,7 @@ public:
 
   // Http::FilterChainFactory
   bool createFilterChain(
-      Http::FilterChainManager& manager, bool = false,
+      Http::FilterChainManager& manager,
       const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
   using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
@@ -351,7 +351,7 @@ private:
   Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-  const LocalReply::LocalReplyPtr local_reply_;
+  LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
 
@@ -377,7 +377,7 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+  static absl::StatusOr<std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>>
   createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,

@@ -28,6 +28,7 @@
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -114,12 +115,13 @@ public:
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&,
-                      const xds::core::v3::ResourceLocator*, ClusterManager&) override {
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource&,
+                                      const xds::core::v3::ResourceLocator*,
+                                      ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr
+  absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override {
     return ClusterManagerPtr{clusterManagerFromProto_(bootstrap)};
   }
@@ -172,11 +174,13 @@ public:
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server) {
-    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{
-        new TestClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
-                                   log_manager, main_thread_dispatcher, admin, validation_context,
-                                   api, http_context, grpc_context, router_context, server)};
+      Server::Instance& server, Config::XdsManager& xds_manager) {
+    absl::Status creation_status = absl::OkStatus();
+    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
+        bootstrap, factory, context, stats, tls, runtime, local_info, log_manager,
+        main_thread_dispatcher, admin, validation_context, api, http_context, grpc_context,
+        router_context, server, xds_manager, creation_status)};
+    THROW_IF_NOT_OK(creation_status);
     THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
   }
@@ -208,19 +212,18 @@ public:
 protected:
   using ClusterManagerImpl::ClusterManagerImpl;
 
-  TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         ClusterManagerFactory& factory,
-                         Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager,
-                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context, Grpc::Context& grpc_context,
-                         Router::Context& router_context, Server::Instance& server)
+  TestClusterManagerImpl(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      Server::Instance& server, Config::XdsManager& xds_manager, absl::Status& creation_status)
       : ClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
                            log_manager, main_thread_dispatcher, admin, validation_context, api,
-                           http_context, grpc_context, router_context, server) {}
+                           http_context, grpc_context, router_context, server, xds_manager,
+                           creation_status) {}
 };
 
 } // namespace Upstream

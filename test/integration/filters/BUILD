@@ -20,6 +20,11 @@ envoy_proto_library(
 )
 
 envoy_proto_library(
+    name = "async_upstream_filter_proto",
+    srcs = ["async_upstream_filter.proto"],
+)
+
+envoy_proto_library(
     name = "test_listener_filter_proto",
     srcs = ["test_listener_filter.proto"],
 )
@@ -73,6 +78,20 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
     alwayslink = 1,
+)
+
+envoy_cc_test_library(
+    name = "async_upstream_filter_lib",
+    srcs = ["async_upstream_filter.cc"],
+    deps = [
+        ":async_upstream_filter_proto_cc_proto",
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
 )
 
 envoy_cc_test_library(

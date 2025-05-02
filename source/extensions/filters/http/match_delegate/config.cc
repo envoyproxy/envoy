@@ -346,7 +346,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 MatchDelegateConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& server_context,

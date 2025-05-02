@@ -20,12 +20,12 @@ build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
 build --host_force_python=PY3
-build --macos_minimum_os=10.15
-build --ios_minimum_os=13.0
-build --ios_simulator_version=16.1
+build --macos_minimum_os=13.3
+build --ios_minimum_os=16.3
+build --ios_simulator_version=17.4
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
-build --xcode_version=14.1
+build --xcode_version=15.3
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
@@ -83,6 +83,8 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
+build:mobile-android --android_crosstool_top=@androidndk//:toolchain
+build:mobile-android --noincompatible_enable_android_toolchain_resolution
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -108,13 +110,16 @@ build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
 
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
-build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
+build:mobile-remote-release-clang-android --android_platforms=//:android_x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
+build:mobile-remote-release-clang-android --config=mobile-android
+build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
 
 build:mobile-remote-release-clang-android-publish --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
-build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
+build:mobile-remote-release-clang-android-publish --android_platforms=//:android_x86_32,//:android_x86_64,//:android_armv7,//:android_arm64
 build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
+build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
 # Compile releases optimizing for size (eg -Os, etc).
 build:mobile-release-common --config=sizeopt
@@ -134,6 +139,7 @@ build:mobile-release-ios --compilation_mode=opt
 # Release does not use the option --define=logger=android
 build:mobile-release-android --config=mobile-release-common
 build:mobile-release-android --compilation_mode=opt
+build:mobile-release-android --config=mobile-android
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"
@@ -199,10 +205,13 @@ test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 # Coverage environment variables (keep in sync with //third_party/rbe_configs)
 build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
 build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:mobile-ci-linux-coverage --repo_env=GCOV=/opt/llvm/bin/llvm-profdata
 build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llm/bin/llvm-cov
+build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+build:mobile-ci-linux-coverage --repo_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
 build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:mobile-ci-linux-coverage --repo_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
 
 #############################################################################
@@ -241,6 +250,7 @@ build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
 test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --config=mobile-test-android
+test:mobile-remote-ci-android --config=mobile-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH

@@ -22,7 +22,7 @@ public:
   /*
    * Clean up resources that are referenced on the Golang side.
    */
-  virtual void cleanup(){};
+  virtual void cleanup() {};
 
 protected:
   const std::string dso_name_;
@@ -32,7 +32,7 @@ protected:
 
 class HttpFilterDso : public Dso {
 public:
-  HttpFilterDso(const std::string dso_name) : Dso(dso_name){};
+  HttpFilterDso(const std::string dso_name) : Dso(dso_name) {};
   ~HttpFilterDso() override = default;
 
   virtual GoUint64 envoyGoFilterNewHttpPluginConfig(httpConfig* p0) PURE;
@@ -93,7 +93,7 @@ private:
 
 class ClusterSpecifierDso : public Dso {
 public:
-  ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name){};
+  ClusterSpecifierDso(const std::string dso_name) : Dso(dso_name) {};
   ~ClusterSpecifierDso() override = default;
 
   virtual GoInt64 envoyGoOnClusterSpecify(GoUint64 plugin_ptr, GoUint64 header_ptr,
@@ -125,7 +125,7 @@ using ClusterSpecifierDsoPtr = std::shared_ptr<ClusterSpecifierDso>;
 class NetworkFilterDso : public Dso {
 public:
   NetworkFilterDso() = default;
-  NetworkFilterDso(const std::string dso_name) : Dso(dso_name){};
+  NetworkFilterDso(const std::string dso_name) : Dso(dso_name) {};
   ~NetworkFilterDso() override = default;
 
   virtual GoUint64 envoyGoFilterOnNetworkFilterConfig(GoUint64 library_id_ptr,
@@ -200,6 +200,76 @@ private:
 };
 
 using NetworkFilterDsoPtr = std::shared_ptr<NetworkFilterDso>;
+
+class HttpTcpBridgeDso : public Dso {
+public:
+  HttpTcpBridgeDso() = default;
+  HttpTcpBridgeDso(const std::string dso_name) : Dso(dso_name) {};
+  ~HttpTcpBridgeDso() override = default;
+
+  virtual GoUint64 envoyGoHttpTcpBridgeOnConfig(httpConfig* p0) PURE;
+
+  virtual void envoyGoHttpTcpBridgeDestroyPluginConfig(GoUint64 p0) PURE;
+
+  virtual GoUint64 envoyGoHttpTcpBridgeOnEncodeHeader(processState* state, GoUint64 end_stream,
+                                                      GoUint64 header_num, GoUint64 header_bytes,
+                                                      GoUint64 buf_ptr, GoUint64 buf_len) PURE;
+
+  virtual GoUint64 envoyGoHttpTcpBridgeOnEncodeData(processState* state, GoUint64 end_stream,
+                                                    GoUint64 buf_ptr, GoUint64 buf_len) PURE;
+
+  virtual GoUint64 envoyGoHttpTcpBridgeOnUpstreamData(processState* state, GoUint64 end_stream,
+                                                      GoUint64 header_num, GoUint64 header_bytes,
+                                                      GoUint64 buf_ptr, GoUint64 buf_len) PURE;
+
+  virtual void envoyGoHttpTcpBridgeOnDestroy(httpRequest* p0) PURE;
+};
+
+class HttpTcpBridgeDsoImpl : public HttpTcpBridgeDso {
+public:
+  HttpTcpBridgeDsoImpl(const std::string dso_name);
+  ~HttpTcpBridgeDsoImpl() override = default;
+
+  GoUint64 envoyGoHttpTcpBridgeOnConfig(httpConfig* p0) override;
+
+  void envoyGoHttpTcpBridgeDestroyPluginConfig(GoUint64 p0) override;
+
+  GoUint64 envoyGoHttpTcpBridgeOnEncodeHeader(processState* state, GoUint64 end_stream,
+                                              GoUint64 header_num, GoUint64 header_bytes,
+                                              GoUint64 buf_ptr, GoUint64 buf_len) override;
+
+  GoUint64 envoyGoHttpTcpBridgeOnEncodeData(processState* state, GoUint64 end_stream,
+                                            GoUint64 buf_ptr, GoUint64 buf_len) override;
+
+  GoUint64 envoyGoHttpTcpBridgeOnUpstreamData(processState* state, GoUint64 end_stream,
+                                              GoUint64 header_num, GoUint64 header_bytes,
+                                              GoUint64 buf_ptr, GoUint64 buf_len) override;
+
+  void envoyGoHttpTcpBridgeOnDestroy(httpRequest* p0) override;
+
+private:
+  GoUint64 (*envoy_go_http_tcp_bridge_on_config_)(httpConfig* p0) = {nullptr};
+
+  void (*envoy_go_http_tcp_bridge_destroy_plugin_config_)(GoUint64 p0) = {nullptr};
+
+  GoUint64 (*envoy_go_http_tcp_bridge_on_encode_header_)(processState* p0, GoUint64 p1, GoUint64 p2,
+                                                         GoUint64 p3, GoUint64 buf_ptr,
+                                                         GoUint64 buf_len) = {nullptr};
+
+  GoUint64 (*envoy_go_http_tcp_bridge_on_encode_data_)(processState* state, GoUint64 end_stream,
+                                                       GoUint64 buf_ptr,
+                                                       GoUint64 buf_len) = {nullptr};
+
+  GoUint64 (*envoy_go_http_tcp_bridge_on_upstream_data_)(processState* state, GoUint64 end_stream,
+                                                         GoUint64 header_size,
+                                                         GoUint64 header_byte_size,
+                                                         GoUint64 buf_ptr,
+                                                         GoUint64 buf_len) = {nullptr};
+
+  void (*envoy_go_http_tcp_bridge_on_destroy_)(httpRequest* p0) = {nullptr};
+};
+
+using HttpTcpBridgeDsoPtr = std::shared_ptr<HttpTcpBridgeDso>;
 
 /*
  * We do not unload a dynamic library once it is loaded. This is because

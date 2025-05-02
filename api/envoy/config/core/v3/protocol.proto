@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -305,7 +306,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -417,6 +418,14 @@ message Http1ProtocolOptions {
   // <envoy_v3_api_field_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.restrict_http_methods>`
   // to reject custom methods.
   bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Ignore HTTP/1.1 upgrade values matching any of the supplied matchers.
+  //
+  // .. note::
+  //
+  //   ``h2c`` upgrades are always removed for backwards compatibility, regardless of the
+  //   value in this setting.
+  repeated type.matcher.v3.StringMatcher ignore_http_11_upgrade = 11;
 }
 
 message KeepaliveSettings {
@@ -449,7 +458,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -633,6 +642,9 @@ message Http2ProtocolOptions {
   // If unset, HTTP/2 codec is selected based on envoy.reloadable_features.http2_use_oghttp2.
   google.protobuf.BoolValue use_oghttp2_codec = 16
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
+  google.protobuf.UInt64Value max_metadata_size = 17;
 }
 
 // [#not-implemented-hide:]
@@ -644,7 +656,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -671,6 +683,14 @@ message Http3ProtocolOptions {
   // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
+
+  // [#not-implemented-hide:] Hiding until Envoy has full HTTP/3 upstream support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Disables QPACK compression related features for HTTP/3 including:
+  // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
+  // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
+  bool disable_qpack = 7;
 }
 
 // A message to control transformations to the :scheme header

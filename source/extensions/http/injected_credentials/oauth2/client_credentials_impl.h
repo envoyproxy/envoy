@@ -18,7 +18,7 @@ class OAuth2ClientCredentialTokenInjector
       public Logger::Loggable<Logger::Id::credential_injector> {
 public:
   OAuth2ClientCredentialTokenInjector(Common::SecretReaderConstSharedPtr token_reader)
-      : token_reader_(token_reader){};
+      : token_reader_(token_reader) {};
 
   absl::Status inject(Envoy::Http::RequestHeaderMap& headers, bool overwrite) override;
 

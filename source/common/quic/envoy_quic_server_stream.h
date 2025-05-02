@@ -65,6 +65,7 @@ public:
 
   // quic::QuicStream
   void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
+  void OnSoonToBeDestroyed() override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   bool OnStopSending(quic::QuicResetStreamError error) override;

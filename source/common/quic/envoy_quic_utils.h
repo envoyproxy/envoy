@@ -190,11 +190,6 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config);
 
-// Modify new_connection_id according to given old_connection_id to make sure packets with the new
-// one can be routed to the same listener.
-void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
-                                     const quic::QuicConnectionId& old_connection_id);
-
 // Extract the two ECN bits from the TOS byte in the IP header.
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
 

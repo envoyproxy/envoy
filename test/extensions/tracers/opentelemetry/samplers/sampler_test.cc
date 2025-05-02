@@ -27,9 +27,9 @@ using ::testing::StrictMock;
 class TestSampler : public Sampler {
 public:
   MOCK_METHOD(SamplingResult, shouldSample,
-              ((const absl::optional<SpanContext>), (const std::string&), (const std::string&),
-               (OTelSpanKind), (OptRef<const Tracing::TraceContext>),
-               (const std::vector<SpanContext>&)),
+              ((const StreamInfo::StreamInfo&), (const absl::optional<SpanContext>),
+               (const std::string&), (const std::string&), (OTelSpanKind),
+               (OptRef<const Tracing::TraceContext>), (const std::vector<SpanContext>&)),
               (override));
   MOCK_METHOD(std::string, getDescription, (), (const, override));
 };
@@ -139,10 +139,10 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   auto driver = std::make_unique<Driver>(opentelemetry_config, context);
 
   // shouldSample returns a result without additional attributes and Decision::RecordAndSample
-  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
-      .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
-                   OTelSpanKind, OptRef<const Tracing::TraceContext>,
-                   const std::vector<SpanContext>&) {
+  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
+      .WillOnce([](const StreamInfo::StreamInfo&, const absl::optional<SpanContext>,
+                   const std::string&, const std::string&, OTelSpanKind,
+                   OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::RecordAndSample;
         res.tracestate = "this_is=tracesate";
@@ -159,10 +159,10 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   EXPECT_STREQ(span->tracestate().c_str(), "this_is=tracesate");
 
   // shouldSamples return a result containing additional attributes and Decision::Drop
-  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _))
-      .WillOnce([](const absl::optional<SpanContext>, const std::string&, const std::string&,
-                   OTelSpanKind, OptRef<const Tracing::TraceContext>,
-                   const std::vector<SpanContext>&) {
+  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
+      .WillOnce([](const StreamInfo::StreamInfo&, const absl::optional<SpanContext>,
+                   const std::string&, const std::string&, OTelSpanKind,
+                   OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::Drop;
         OtelAttributes attributes;
@@ -248,7 +248,7 @@ TEST_F(SamplerFactoryTest, TestInitialAttributes) {
   auto driver = std::make_unique<Driver>(opentelemetry_config, context);
 
   auto expected = makeOptRef<const Tracing::TraceContext>(trace_context);
-  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, expected, _));
+  EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, expected, _));
   driver->startSpan(config, trace_context, stream_info, "operation_name",
                     {Tracing::Reason::Sampling, true});
 }

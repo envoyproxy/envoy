@@ -23,7 +23,7 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& response_matchers)
       : builder_(builder), local_info_(local_info),
         request_expr_(initExpressions(request_matchers)),
-        response_expr_(initExpressions(response_matchers)){};
+        response_expr_(initExpressions(response_matchers)) {};
 
   bool hasRequestExpr() const { return !request_expr_.empty(); };
 

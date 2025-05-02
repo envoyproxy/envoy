@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.lua.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -19,6 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
+// [#next-free-field: 6]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
@@ -78,6 +81,12 @@ message Lua {
   //         stat_prefix: bar_script # This emits lua.bar_script.errors etc.
   //
   string stat_prefix = 4;
+
+  // If set to true, the Lua filter will clear the route cache automatically if the request
+  // headers are modified by the Lua script. If set to false, the Lua filter will not clear the
+  // route cache automatically.
+  // Default is true for backward compatibility.
+  google.protobuf.BoolValue clear_route_cache = 5;
 }
 
 message LuaPerRoute {

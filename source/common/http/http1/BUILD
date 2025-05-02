@@ -94,6 +94,7 @@ envoy_cc_library(
     deps = [
         "//envoy/http:codec_interface",
         "//envoy/protobuf:message_validator_interface",
+        "//source/common/common:matchers_lib",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_google_absl//absl/types:optional",

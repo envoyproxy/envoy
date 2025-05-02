@@ -153,7 +153,8 @@ public:
     }
     EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _, _));
-    EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_CALL(*old_listener_handle->drain_manager_,
+                startDrainSequence(Network::DrainDirection::All, _));
 
     EXPECT_TRUE(addOrUpdateListener(new_listener_proto));
 
@@ -170,7 +171,8 @@ public:
 
     EXPECT_CALL(*worker_, stopListener(_, _, _));
     EXPECT_CALL(socket, close());
-    EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
+    EXPECT_CALL(*listener_handle->drain_manager_,
+                startDrainSequence(Network::DrainDirection::All, _));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
 
     EXPECT_CALL(*worker_, removeListener(_, _));
@@ -249,7 +251,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener, "
+      "to check if the listener has duplicated addresses with other listeners or "
+      "'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, DuplicateNonIPAddressNotAllowed) {
@@ -276,7 +280,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '/path' as existing listener");
+      "error adding listener: 'bar' has duplicate address '/path' as existing listener, to check "
+      "if the listener has duplicated addresses with other listeners or 'enable_reuse_port' is set "
+      "to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, MultipleAddressesDuplicatePortNotAllowed) {
@@ -316,7 +322,9 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
                             "error adding listener: 'bar' has duplicate address "
-                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener");
+                            "'127.0.0.1:1234,127.0.0.3:1234' as existing listener, to check if the "
+                            "listener has duplicated addresses with other listeners or "
+                            "'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -356,9 +364,11 @@ filter_chains:
   )EOF";
 
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
-                            "error adding listener: 'bar' has duplicate address "
-                            "'127.0.0.1:0,127.0.0.3:0' as existing listener");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+      "error adding listener: 'bar' has duplicate address "
+      "'127.0.0.1:0,127.0.0.3:0' as existing listener, to check if the listener has duplicated "
+      "addresses with other listeners or 'enable_reuse_port' is set to 'false' for the listener");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AllowCreateListenerWithMutipleZeroPorts) {
@@ -397,6 +407,98 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, AllowAddressesUpdatePartially) {
+  // Update one of the addresses from '127.0.0.2:1000' to '127.0.0.3:2000'.
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1000
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 2000
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       AllowUpdateSocketOptionsIfNotDuplicatedEvenReusePortIsDisabled) {
+  // All addresses are different, so it should be allowed to update socket options even
+  // reuse port is disabled.
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1000
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.4
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 2000
+enable_reuse_port: false
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
 }
 
@@ -1735,7 +1837,8 @@ dynamic_listeners:
   EXPECT_CALL(*duplicated_socket, duplicate());
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
@@ -2295,7 +2398,9 @@ filter_chains:
   )EOF";
 
   const std::string expected_error_message =
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener, "
+      "to check if the listener has duplicated addresses with other listeners or "
+      "'enable_reuse_port' is set to 'false' for the listener";
   testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
                                                     expected_error_message);
 }
@@ -2409,7 +2514,7 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2471,7 +2576,7 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2526,7 +2631,7 @@ filter_chains:
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2580,7 +2685,7 @@ filter_chains:
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(2);
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -2681,12 +2786,14 @@ filter_chains:
 
   worker_->callAddCompletion();
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
 
   EXPECT_TRUE(manager_->removeListener("foo"));
 
@@ -2943,26 +3050,31 @@ filter_chains:
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
@@ -3038,7 +3150,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 2, 1, 2, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -3333,7 +3445,9 @@ filter_chains:
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener, to "
+      "check if the listener has duplicated addresses with other listeners or 'enable_reuse_port' "
+      "is set to 'false' for the listener");
 
   // Move foo to active and then try to add again. This should still fail.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
@@ -3344,7 +3458,9 @@ filter_chains:
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener");
+      "error adding listener: 'bar' has duplicate address '0.0.0.0:1234' as existing listener, to "
+      "check if the listener has duplicated addresses with other listeners or 'enable_reuse_port' "
+      "is set to 'false' for the listener");
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -6401,6 +6517,52 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithSocketOptOnAdditionalAddressOnly) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [
+          # The socket goes through socket() and bind() but never listen(), so if we
+          # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+          { level: 11, name: 12, int_value: 13, state: STATE_PREBIND },
+          { level: 14, name: 15, int_value: 16, state: STATE_BOUND },
+          { level: 17, name: 18, int_value: 19, state: STATE_LISTENING },
+        ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // Second address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 11,
+      /* expected_sockopt_name */ 12,
+      /* expected_value */ 13);
+  // Second address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 14,
+      /* expected_sockopt_name */ 15,
+      /* expected_value */ 16);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 // This test relies on linux-only code, and a linux-only name IPPROTO_MPTCP
 #if defined(__linux__)
 TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {
@@ -6958,7 +7120,8 @@ per_connection_buffer_limit_bytes: 10
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, stopListener(_, _, _));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 2, 0, 0, 1, 1, 0);
@@ -7237,7 +7400,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -7599,7 +7762,8 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -7704,7 +7868,8 @@ filter_chains:
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
       }));
-  EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
+  EXPECT_CALL(*listener_foo_update1->drain_manager_,
+              startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
   EXPECT_CALL(*worker_, removeListener(_, _));

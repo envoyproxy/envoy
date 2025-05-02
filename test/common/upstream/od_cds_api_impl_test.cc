@@ -24,8 +24,8 @@ public:
   void SetUp() override {
     envoy::config::core::v3::ConfigSource odcds_config;
     OptRef<xds::core::v3::ResourceLocator> null_locator;
-    odcds_ = OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, *store_.rootScope(),
-                                  validation_visitor_);
+    odcds_ = *OdCdsApiImpl::create(odcds_config, null_locator, cm_, notifier_, *store_.rootScope(),
+                                   validation_visitor_);
     odcds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
 
@@ -71,7 +71,9 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
   EXPECT_CALL(
       *cm_.subscription_factory_.subscription_,
       requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
-  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0").ok());
+  auto result = odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0");
+  ASSERT_TRUE(result.ok()) << result.message();
+  //  ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0").ok());
 }
 
 // Check that the awaiting list is processed when we receive a failure response for the initial

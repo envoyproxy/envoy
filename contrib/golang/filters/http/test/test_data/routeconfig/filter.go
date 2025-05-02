@@ -1,4 +1,4 @@
-package main
+package routeconfig
 
 import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"

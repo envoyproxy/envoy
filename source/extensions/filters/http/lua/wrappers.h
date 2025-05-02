@@ -274,7 +274,9 @@ public:
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
             {"downstreamRemoteAddress", static_luaDownstreamRemoteAddress},
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
-            {"requestedServerName", static_luaRequestedServerName}};
+            {"requestedServerName", static_luaRequestedServerName},
+            {"routeName", static_luaRouteName},
+            {"virtualClusterName", static_luaVirtualClusterName}};
   }
 
 private:
@@ -327,6 +329,18 @@ private:
    * @return requested server name (e.g. SNI in TLS), if any.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
+  /**
+   * Get the name of the route matched by the filter chain
+   * @return matched route name or an empty string if no route was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRouteName);
+
+  /**
+   * Get the name of the virtual cluster that gets matched (if any)
+   * @return matched virtual cluster or an empty string if no virtual cluster was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaVirtualClusterName);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {

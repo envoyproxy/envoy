@@ -81,6 +81,7 @@ By *default* response compression is enabled, but it will be *skipped* when:
 - A response does **not** contain a ``content-length`` or ``transfer-encoding`` headers.
 - Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).
+- A response code is on the list of uncompressible response codes, which is empty by default.
 
 Please note that in case the filter is configured to use a compression library extension
 other than gzip it looks for content encoding in the ``accept-encoding`` header provided by
@@ -165,7 +166,7 @@ specific to responses only:
   header_not_valid, Counter, Number of requests sent with a not valid ``accept-encoding`` header (aka ``q=0`` or an unsupported encoding type).
   not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. ``disable_on_etag_header`` must be turned on for this to happen.
 
-.. attention:
+.. attention::
 
    In case the compressor is not configured to compress responses with the field
    ``response_direction_config`` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`

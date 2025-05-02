@@ -101,7 +101,6 @@ public:
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   void setHasNoBody(bool b) { no_body_ = b; }
-  void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
   bool bodyReceived() const { return body_received_; }
   void setBodyReceived(bool b) { body_received_ = b; }
@@ -248,8 +247,6 @@ protected:
   bool no_body_ : 1 = false;
   // If true, then the filter received the complete body
   bool complete_body_available_ : 1 = false;
-  // If true, then the filter received the trailers
-  bool trailers_available_ : 1 = false;
   // If true, the trailers is already sent to the server.
   bool trailers_sent_to_server_ : 1 = false;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
@@ -301,6 +298,58 @@ private:
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
+
+  /**
+   * Handle the header response with CONTINUE_AND_REPLACE action from external processor.
+   *
+   * @param response HeadersResponse with replace directives
+   * @return Status of the operation
+   */
+  absl::Status
+  handleHeaderContinueAndReplace(const envoy::service::ext_proc::v3::HeadersResponse& response);
+
+  /**
+   * Handle the header response with CONTINUE action from external processor.
+   * Routes to appropriate handler based on body state and processing mode
+   * (none, buffered, streamed, partial, or full-duplex).
+   *
+   * @param response HeadersResponse with continue action
+   * @return Status of the operation
+   */
+  absl::Status handleHeaderContinue(const envoy::service::ext_proc::v3::HeadersResponse& response);
+
+  /**
+   * Handle the body when the complete body is already available.
+   * Sends buffered body to processor based on callback state,
+   * manages streamed data, and continues filter chain when appropriate.
+   *
+   * @param response HeadersResponse from processor
+   * @return Status of the operation
+   */
+  absl::Status
+  handleCompleteBodyAvailable(const envoy::service::ext_proc::v3::HeadersResponse& response);
+
+  /**
+   * Handle partial body buffering with watermark control when geting a header response.
+   * Enqueues buffered data, sends chunks when high watermark is reached,
+   * and holds headers during buffering phase.
+   *
+   * @param response HeadersResponse from processor
+   * @return Status of the operation
+   */
+  absl::Status
+  handleBufferedPartialMode(const envoy::service::ext_proc::v3::HeadersResponse& response);
+
+  /**
+   * Finalizes processing by handling trailers and cleanup.
+   * Either sends available trailers to processor or cleans up resources
+   * by clearing headers, notifying filter, and continuing the chain.
+   *
+   * @param response HeadersResponse from processor
+   * @return Status of the operation
+   */
+  absl::Status
+  handleTrailersAndCleanup(const envoy::service::ext_proc::v3::HeadersResponse& response);
 
   /**
    * Validates if the current callback state is valid for processing body responses.

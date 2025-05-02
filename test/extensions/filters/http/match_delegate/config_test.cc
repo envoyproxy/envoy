@@ -128,8 +128,10 @@ xds_matcher:
   envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
   TestUtility::loadFromYamlAndValidate(yaml, config);
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(config, server_factory_context,
-                                              ProtobufMessage::getNullValidationVisitor());
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   EXPECT_TRUE(route_config.get());
 }
 

@@ -156,7 +156,13 @@ public:
   MockTapSinkFactory() = default;
   ~MockTapSinkFactory() override = default;
 
-  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, SinkContext), (override));
+  MOCK_METHOD(SinkPtr, createHttpSinkPtr,
+              (const Protobuf::Message& config, Server::Configuration::FactoryContext&),
+              (override));
+  MOCK_METHOD(SinkPtr, createTransportSinkPtr,
+              (const Protobuf::Message& config,
+               Server::Configuration::TransportSocketFactoryContext&),
+              (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
@@ -168,7 +174,6 @@ public:
                  Extensions::Common::Tap::Sink* admin_streamer, SinkContext context)
       : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
 };
-
 TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
   const std::string tap_config_yaml =
       R"EOF(
@@ -191,11 +196,8 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
       }));
-  EXPECT_CALL(
-      factory_impl,
-      createSinkPtr(
-          _,
-          testing::VariantWith<std::reference_wrapper<Server::Configuration::FactoryContext>>(_)));
+  EXPECT_CALL(factory_impl, createHttpSinkPtr(_, _));
+
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -224,11 +226,8 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return std::make_unique<ProtobufWkt::StringValue>();
       }));
-  EXPECT_CALL(
-      factory_impl,
-      createSinkPtr(
-          _, testing::VariantWith<
-                 std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(_)));
+  EXPECT_CALL(factory_impl, createTransportSinkPtr(_, _));
+
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;

@@ -295,10 +295,6 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 }
 
 void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_te")) {
-    return;
-  }
-
   absl::string_view te_header = request_headers.getTEValue();
   if (te_header.empty()) {
     return;

@@ -200,7 +200,7 @@ void AuthenticatorImpl::startVerify() {
     }
   }
 
-  ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
+  ENVOY_LOG(debug, "{}: Verifying JWT of issuer {}", name(), jwt_->iss_);
   // Check if `iss` is allowed.
   if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
     doneWithStatus(Status::JwtUnknownIssuer);
@@ -444,7 +444,7 @@ void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payloa
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
-  ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
+  ENVOY_LOG(debug, "{}: JWT verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
   if (Status::Ok != status) {

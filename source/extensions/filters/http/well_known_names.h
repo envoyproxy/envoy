@@ -44,6 +44,8 @@ public:
   const std::string GcpAuthn = "envoy.filters.http.gcp_authn";
   // GRPC http1 bridge filter
   const std::string GrpcHttp1Bridge = "envoy.filters.http.grpc_http1_bridge";
+  // GRPC json reverse transcoder filter
+  const std::string GrpcJsonReverseTranscoder = "envoy.filters.http.grpc_json_reverse_transcoder";
   // GRPC json transcoder filter
   const std::string GrpcJsonTranscoder = "envoy.filters.http.grpc_json_transcoder";
   // GRPC web filter

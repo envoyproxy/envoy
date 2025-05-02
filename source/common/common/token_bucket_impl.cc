@@ -60,11 +60,16 @@ void TokenBucketImpl::maybeReset(uint64_t num_tokens) {
 
 AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
                                              double fill_rate, bool init_fill)
+    : AtomicTokenBucketImpl::AtomicTokenBucketImpl(max_tokens, time_source, fill_rate,
+                                                   (init_fill) ? max_tokens : 0) {}
+
+AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
+                                             double fill_rate, uint64_t initial_tokens)
     : max_tokens_(max_tokens), fill_rate_(std::max(std::abs(fill_rate), kMinFillRate)),
       time_source_(time_source) {
   auto time_in_seconds = timeNowInSeconds();
-  if (init_fill) {
-    time_in_seconds -= max_tokens_ / fill_rate_;
+  if (initial_tokens) {
+    time_in_seconds -= initial_tokens / fill_rate_;
   }
   time_in_seconds_.store(time_in_seconds, std::memory_order_relaxed);
 }

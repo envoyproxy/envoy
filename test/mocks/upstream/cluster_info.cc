@@ -158,19 +158,9 @@ MockClusterInfo::MockClusterInfo()
           }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
-  ON_CALL(*this, createFilterChain(_, _, _))
-      .WillByDefault(Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured,
-                                const Http::FilterChainOptions&) -> bool {
-        if (only_create_if_configured) {
-          return false;
-        }
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-        return true;
-      }));
+  ON_CALL(*this, createFilterChain(_, _))
+      .WillByDefault(Invoke([&](Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) -> bool { return false; }));
   ON_CALL(*this, loadBalancerConfig())
       .WillByDefault(Return(makeOptRefFromPtr<const LoadBalancerConfig>(nullptr)));
   ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {

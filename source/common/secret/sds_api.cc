@@ -27,9 +27,8 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
       sds_config_name_(sds_config_name), clean_up_(std::move(destructor_cb)),
-      subscription_factory_(subscription_factory),
-      time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
-                                              time_source_.systemTime()} {
+      subscription_factory_(subscription_factory), time_source_(time_source),
+      secret_data_{sds_config_name_, "uninitialized", time_source_.systemTime()} {
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
   subscription_ = THROW_OR_RETURN_VALUE(
@@ -234,7 +233,7 @@ TlsCertificateSdsApiSharedPtr TlsCertificateSdsApi::create(
   THROW_IF_NOT_OK(
       Config::Utility::checkLocalInfo("TlsCertificateSdsApi", server_context.localInfo()));
   return std::make_shared<TlsCertificateSdsApi>(
-      sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+      sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(),
       secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
       destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
@@ -270,8 +269,9 @@ void TlsCertificateSdsApi::setSecret(
           secret.tls_certificate());
   resolved_tls_certificate_secrets_ = nullptr;
   if (secret.tls_certificate().has_watched_directory()) {
-    watched_directory_ = std::make_unique<Config::WatchedDirectory>(
-        secret.tls_certificate().watched_directory(), dispatcher_);
+    watched_directory_ = THROW_OR_RETURN_VALUE(
+        Config::WatchedDirectory::create(secret.tls_certificate().watched_directory(), dispatcher_),
+        std::unique_ptr<Config::WatchedDirectory>);
   } else {
     watched_directory_.reset();
   }
@@ -298,7 +298,7 @@ CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
                                                   server_context.localInfo()));
   return std::make_shared<CertificateValidationContextSdsApi>(
-      sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+      sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(),
       secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
       destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
@@ -324,8 +324,10 @@ void CertificateValidationContextSdsApi::setSecret(
           secret.validation_context());
   resolved_certificate_validation_context_secrets_ = nullptr;
   if (secret.validation_context().has_watched_directory()) {
-    watched_directory_ = std::make_unique<Config::WatchedDirectory>(
-        secret.validation_context().watched_directory(), dispatcher_);
+    watched_directory_ =
+        THROW_OR_RETURN_VALUE(Config::WatchedDirectory::create(
+                                  secret.validation_context().watched_directory(), dispatcher_),
+                              std::unique_ptr<Config::WatchedDirectory>);
   } else {
     watched_directory_.reset();
   }
@@ -370,7 +372,7 @@ TlsSessionTicketKeysSdsApiSharedPtr TlsSessionTicketKeysSdsApi::create(
   THROW_IF_NOT_OK(
       Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi", server_context.localInfo()));
   return std::make_shared<TlsSessionTicketKeysSdsApi>(
-      sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+      sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(),
       secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
       destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
@@ -408,7 +410,7 @@ GenericSecretSdsApiSharedPtr GenericSecretSdsApi::create(
   THROW_IF_NOT_OK(
       Config::Utility::checkLocalInfo("GenericSecretSdsApi", server_context.localInfo()));
   return std::make_shared<GenericSecretSdsApi>(
-      sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+      sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(),
       secret_provider_context.messageValidationVisitor(), server_context.serverScope().store(),
       destructor_cb, server_context.mainThreadDispatcher(), server_context.api());
@@ -419,7 +421,22 @@ void GenericSecretSdsApi::validateConfig(
   THROW_IF_NOT_OK(validation_callback_manager_.runCallbacks(secret.generic_secret()));
 }
 
-std::vector<std::string> GenericSecretSdsApi::getDataSourceFilenames() { return {}; }
+std::vector<std::string> GenericSecretSdsApi::getDataSourceFilenames() {
+  std::vector<std::string> files;
+
+  ASSERT(generic_secret_ != nullptr);
+
+  if (generic_secret_->secret().has_filename()) {
+    files.push_back(generic_secret_->secret().filename());
+  } else {
+    for (const auto& entry : generic_secret_->secrets()) {
+      if (entry.second.has_filename()) {
+        files.push_back(entry.second.filename());
+      }
+    }
+  }
+  return files;
+}
 
 } // namespace Secret
 } // namespace Envoy

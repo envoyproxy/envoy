@@ -5,7 +5,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
@@ -189,20 +188,32 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                             const std::string& prefix)
+                             absl::Status& creation_status, const std::string& prefix)
     : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
       cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
-  THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("tcp statsd", local_info));
-  const auto cluster_or_error =
+  SET_AND_RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo("tcp statsd", local_info),
+                           creation_status);
+  auto cluster_or_error =
       Config::Utility::checkCluster("tcp statsd", cluster_name, cluster_manager);
-  THROW_IF_NOT_OK_REF(cluster_or_error.status());
+  SET_AND_RETURN_IF_NOT_OK(cluster_or_error.status(), creation_status);
   const auto cluster = cluster_or_error.value();
   cluster_info_ = cluster->get().info();
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
+}
+
+absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
+TcpStatsdSink::create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                      ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                      Stats::Scope& scope, const std::string& prefix) {
+  absl::Status creation_status;
+  auto sink = std::unique_ptr<TcpStatsdSink>(new TcpStatsdSink(
+      local_info, cluster_name, tls, cluster_manager, scope, creation_status, prefix));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return sink;
 }
 
 void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {

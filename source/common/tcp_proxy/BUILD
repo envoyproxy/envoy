@@ -58,6 +58,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/stats:timespan_interface",
+        "//envoy/stream_info:bool_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tcp:upstream_interface",

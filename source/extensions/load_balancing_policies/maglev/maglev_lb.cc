@@ -250,9 +250,9 @@ void CompactMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
 MaglevTable::MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats)
     : table_size_(table_size), stats_(stats) {}
 
-HostConstSharedPtr OriginalMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
+HostSelectionResponse OriginalMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
   if (table_.empty()) {
-    return nullptr;
+    return {nullptr};
   }
 
   if (attempt > 0) {
@@ -262,12 +262,12 @@ HostConstSharedPtr OriginalMaglevTable::chooseHost(uint64_t hash, uint32_t attem
     hash ^= ~0ULL - attempt + 1;
   }
 
-  return table_[hash % table_size_];
+  return {table_[hash % table_size_]};
 }
 
-HostConstSharedPtr CompactMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
+HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
   if (host_table_.empty()) {
-    return nullptr;
+    return {nullptr};
   }
 
   if (attempt > 0) {
@@ -279,7 +279,7 @@ HostConstSharedPtr CompactMaglevTable::chooseHost(uint64_t hash, uint32_t attemp
 
   const uint32_t index = table_.get(hash % table_size_);
   ASSERT(index < host_table_.size(), "Compact MaglevTable index into host table out of range");
-  return host_table_[index];
+  return {host_table_[index]};
 }
 
 uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {

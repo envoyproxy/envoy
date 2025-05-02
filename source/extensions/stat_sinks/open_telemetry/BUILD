@@ -18,7 +18,8 @@ envoy_cc_library(
         "//envoy/singleton:instance_interface",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:metrics_cc_proto",
+        "@opentelemetry_proto//:metrics_proto_cc",
+        "@opentelemetry_proto//:metrics_service_proto_cc",
     ],
 )
 

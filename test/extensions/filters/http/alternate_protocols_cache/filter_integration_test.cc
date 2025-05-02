@@ -530,9 +530,10 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
     if (getSrtt(alt_svc, timeSystem()) != 0) {
       break;
     }
-    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(15));
   }
-  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << alt_svc;
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << "Alt-svc entry :'" << alt_svc << "'";
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

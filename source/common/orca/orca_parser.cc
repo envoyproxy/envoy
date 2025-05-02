@@ -84,6 +84,24 @@ absl::Status tryCopyMetricToOrcaLoadReport(absl::string_view metric_name,
         fmt::format("custom backend load metric value({}) cannot be infinity.", metric_name));
   }
 
+  // Check for negative values for all metrics.
+  if (value < 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("custom backend load metric value({}) cannot be negative.", metric_name));
+  }
+
+  if (absl::StartsWith(metric_name, kUtilizationPrefix)) {
+    absl::string_view metric_name_without_prefix =
+        absl::StripPrefix(metric_name, kUtilizationPrefix);
+    if (metric_name_without_prefix.empty()) {
+      return absl::InvalidArgumentError("utilization metric key is empty.");
+    }
+
+    orca_load_report.mutable_utilization()->insert(
+        {std::string(metric_name_without_prefix), value});
+    return absl::OkStatus();
+  }
+
   if (absl::StartsWith(metric_name, kNamedMetricsFieldPrefix)) {
     auto metric_name_without_prefix = absl::StripPrefix(metric_name, kNamedMetricsFieldPrefix);
     return tryCopyNamedMetricToOrcaLoadReport(metric_name_without_prefix, value, orca_load_report);
@@ -115,7 +133,7 @@ absl::Status tryParseNativeHttpEncoded(const absl::string_view header,
   absl::flat_hash_set<absl::string_view> metric_names;
   for (const auto value : values) {
     std::pair<absl::string_view, absl::string_view> entry =
-        absl::StrSplit(value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
+        absl::StrSplit(value, absl::MaxSplits(absl::ByAnyChar("=:"), 1), absl::SkipWhitespace());
     if (metric_names.contains(entry.first)) {
       return absl::AlreadyExistsError(
           absl::StrCat(kEndpointLoadMetricsHeader, " contains duplicate metric: ", entry.first));

@@ -41,7 +41,6 @@ message Tracing {
     // - *envoy.tracers.zipkin*
     // - *envoy.tracers.dynamic_ot*
     // - *envoy.tracers.datadog*
-    // - *envoy.tracers.opencensus*
     // - *envoy.tracers.xray*
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -52,7 +51,6 @@ message Tracing {
     // - :ref:`ZipkinConfig <envoy_api_msg_config.trace.v2.ZipkinConfig>`
     // - :ref:`DynamicOtConfig <envoy_api_msg_config.trace.v2.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v2.DatadogConfig>`
-    // - :ref:`OpenCensusConfig <envoy_api_msg_config.trace.v2.OpenCensusConfig>`
     // - :ref:`AWS X-Ray <envoy_api_msg_config.trace.v2alpha.XRayConfig>`
     oneof config_type {
       google.protobuf.Struct config = 2 [deprecated = true];

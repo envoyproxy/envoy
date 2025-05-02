@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -360,6 +361,7 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
+  absl::flat_hash_set<uint64_t> stopped_listener_tags_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

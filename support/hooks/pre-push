@@ -64,6 +64,7 @@ do
     # directory, independent of whether we're in a submodule, so no need to use
     # our `relpath` helper.
     SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
+    CI_DIR="$(dirname "$(realpath "$0")")/../../ci"
 
     _CHANGES=$(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')
     IFS=' ' read -ra CHANGES <<< "$_CHANGES"
@@ -77,7 +78,7 @@ do
     # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "${CHANGES[@]}" || exit 1
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
+    "$CI_DIR"/do_ci.sh check_proto_format || exit 1
 
     bazel run //tools/code:check -- \
           -s main \

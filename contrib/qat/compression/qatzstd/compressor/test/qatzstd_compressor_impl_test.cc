@@ -70,7 +70,7 @@ class QatzstdConfigTest : public QatzstdCompressorImplTest,
                           public ::testing::WithParamInterface<std::tuple<int, int, bool, int>> {};
 
 // These tests should pass even if required hardware or setup steps required for qatzstd are
-// missing. Qatzstd uses a sofware fallback in this case.
+// missing. Qatzstd uses a software fallback in this case.
 INSTANTIATE_TEST_SUITE_P(
     QatzstdConfigTestInstantiation, QatzstdConfigTest,
     // First tuple has all default values.

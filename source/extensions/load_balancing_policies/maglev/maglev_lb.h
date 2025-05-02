@@ -135,7 +135,7 @@ public:
   ~OriginalMaglevTable() override = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
@@ -159,7 +159,7 @@ public:
   ~CompactMaglevTable() override = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,

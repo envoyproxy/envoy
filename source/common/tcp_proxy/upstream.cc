@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -217,12 +218,14 @@ void HttpUpstream::doneWriting() {
   }
 }
 
-TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+TcpConnPool::TcpConnPool(Upstream::HostConstSharedPtr host,
+                         Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                          StreamInfo::StreamInfo& downstream_info)
     : upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
-  conn_pool_data_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
+  conn_pool_data_ =
+      thread_local_cluster.tcpConnPool(host, Upstream::ResourcePriority::Default, context);
 }
 
 TcpConnPool::~TcpConnPool() {
@@ -271,7 +274,8 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
       latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
 }
 
-HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+HttpConnPool::HttpConnPool(Upstream::HostConstSharedPtr host,
+                           Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context,
                            const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
@@ -288,17 +292,16 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
   if (Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     absl::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
-    generic_conn_pool_ = createConnPool(thread_local_cluster, context, upstream_protocol);
+    generic_conn_pool_ = createConnPool(host, thread_local_cluster, context, upstream_protocol);
     return;
   }
-  conn_pool_data_ =
-      thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
+  conn_pool_data_ = thread_local_cluster.httpConnPool(host, Upstream::ResourcePriority::Default,
+                                                      protocol, context);
 }
 
-std::unique_ptr<Router::GenericConnPool>
-HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
-                             Upstream::LoadBalancerContext* context,
-                             absl::optional<Http::Protocol> protocol) {
+std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
+    Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& cluster,
+    Upstream::LoadBalancerContext* context, absl::optional<Http::Protocol> protocol) {
   Router::GenericConnPoolFactory* factory = nullptr;
   factory = Envoy::Config::Utility::getFactoryByName<Router::GenericConnPoolFactory>(
       "envoy.filters.connection_pools.http.generic");
@@ -306,9 +309,13 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
     return nullptr;
   }
 
+  ProtobufWkt::Any message;
+  if (cluster.info()->upstreamConfig()) {
+    message = cluster.info()->upstreamConfig()->typed_config();
+  }
   return factory->createGenericConnPool(
-      cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context);
+      host, cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context, message);
 }
 
 HttpConnPool::~HttpConnPool() {
@@ -360,6 +367,7 @@ void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPt
   }
   combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
       *this, host, downstream_info_.downstreamAddressProvider().sslConnection()));
+  combined_upstream_->recordUpstreamSslConnection();
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -404,17 +412,14 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
       decoder_filter_callbacks_(decoder_callbacks), response_decoder_(*this),
       upstream_callbacks_(callbacks) {
-  auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
+  type_ = parent_.codecType();
   downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
 
   if (config_.usePost()) {
-    const std::string& scheme =
-        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
-    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
 
   config_.headerEvaluator().evaluateHeaders(
@@ -463,7 +468,7 @@ CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
-  switch (parent_.codecType()) {
+  switch (type_) {
   case Http::CodecType::HTTP1:
     // According to RFC7231 any 2xx response indicates that the connection is
     // established.
@@ -520,6 +525,18 @@ void CombinedUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers
 }
 
 Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() { return downstream_headers_.get(); }
+
+void CombinedUpstream::recordUpstreamSslConnection() {
+  if ((type_ != Http::CodecType::HTTP1) && (config_.usePost())) {
+    auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
+    const std::string& scheme =
+        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+    if (downstream_headers_->Scheme()) {
+      downstream_headers_->removeScheme();
+    }
+    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
+  }
+}
 
 void CombinedUpstream::doneReading() {
   read_half_closed_ = true;

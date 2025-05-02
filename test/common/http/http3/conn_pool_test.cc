@@ -9,7 +9,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -41,7 +41,7 @@ class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testi
 public:
   Http3ConnPoolImplTest() {
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
@@ -78,6 +78,7 @@ public:
 
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Quic::PersistentQuicInfoImpl quic_info_{dispatcher_, 45};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
@@ -99,7 +100,6 @@ public:
   std::unique_ptr<Http3ConnPoolImpl> pool_;
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   absl::Status creation_status_;
   bool happy_eyeballs_ = false;
 };

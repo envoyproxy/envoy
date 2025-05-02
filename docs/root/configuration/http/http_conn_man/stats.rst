@@ -83,8 +83,9 @@ the following statistics:
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   ``downstream_cx_total``, Counter, Total connections
    ``downstream_cx_destroy_remote_active_rq``, Counter, Total connections destroyed remotely with 1+ active requests
+   ``downstream_cx_length_ms``, Histogram, Connection length milliseconds
+   ``downstream_cx_total``, Counter, Total connections
    ``downstream_rq_total``, Counter, Total requests
 
 .. _config_http_conn_man_stats_per_listener:

@@ -504,9 +504,9 @@ public:
 
   void setup() {
     tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
-    conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
-                                                decoder_callbacks_, Http::CodecType::HTTP2,
-                                                downstream_stream_info_);
+    conn_pool_ = std::make_unique<HttpConnPool>(nullptr, cluster_, &lb_context_, *tunnel_config_,
+                                                callbacks_, decoder_callbacks_,
+                                                Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_,
                                                    *tunnel_config_, downstream_stream_info_);
     auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();

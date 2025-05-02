@@ -22,9 +22,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ProcessingMode {
   // Control how headers and trailers are handled
   enum HeaderSendMode {
-    // The default HeaderSendMode depends on which part of the message is being
-    // processed. By default, request and response headers are sent,
-    // while trailers are skipped.
+    // When used to configure the ext_proc filter :ref:`processing_mode
+    // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`,
+    // the default HeaderSendMode depends on which part of the message is being processed. By
+    // default, request and response headers are sent, while trailers are skipped.
+    //
+    // When used in :ref:`mode_override
+    // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>` or
+    // :ref:`allowed_override_modes
+    // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`,
+    // a value of DEFAULT indicates that there is no change from the behavior that is configured for
+    // the filter in :ref:`processing_mode
+    // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
     DEFAULT = 0;
 
     // Send the header or trailer.
@@ -70,7 +79,6 @@ message ProcessingMode {
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
 
-    // [#not-implemented-hide:]
     // Envoy streams the body to the server in pieces as they arrive.
     //
     // 1) The server may choose to buffer any number chunks of data before processing them.
@@ -99,10 +107,14 @@ message ProcessingMode {
     //   :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
     //   to Envoy in the body response.
     // * Envoy will stream the body chunks in the responses from the server to the upstream/downstream as they arrive.
+
     FULL_DUPLEX_STREAMED = 4;
   }
 
   // How to handle the request header. Default is "SEND".
+  // Note this field is ignored in :ref:`mode_override
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`, since mode
+  // overrides can only affect messages exchanged after the request header is processed.
   HeaderSendMode request_header_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
   // How to handle the response header. Default is "SEND".

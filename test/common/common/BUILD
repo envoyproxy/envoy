@@ -63,6 +63,7 @@ envoy_cc_test(
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/base",
     ],
 )
 
@@ -558,6 +559,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 

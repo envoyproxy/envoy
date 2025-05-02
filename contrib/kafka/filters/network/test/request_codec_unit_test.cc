@@ -28,7 +28,7 @@ using MockParserSharedPtr = std::shared_ptr<MockParser>;
 
 class MockRequestParserResolver : public RequestParserResolver {
 public:
-  MockRequestParserResolver() : RequestParserResolver({}){};
+  MockRequestParserResolver() : RequestParserResolver({}) {};
   MOCK_METHOD(RequestParserSharedPtr, createParser, (int16_t, int16_t, RequestContextSharedPtr),
               (const));
 };

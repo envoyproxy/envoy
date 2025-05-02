@@ -86,14 +86,25 @@ public:
   MockInstance();
   ~MockInstance() override;
 
+  uint16_t shardSize() override { return shardSize_(); }
+
   Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
                                                   RespVariant&& request, PoolCallbacks& callbacks,
                                                   Common::Redis::Client::Transaction&) override {
     return makeRequest_(hash_key, request, callbacks);
   }
 
+  Common::Redis::Client::PoolRequest*
+  makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                     Common::Redis::Client::Transaction&) override {
+    return makeRequestToShard_(shard_index, request, callbacks);
+  }
+
+  MOCK_METHOD(uint16_t, shardSize_, ());
   MOCK_METHOD(Common::Redis::Client::PoolRequest*, makeRequest_,
               (const std::string& hash_key, RespVariant& request, PoolCallbacks& callbacks));
+  MOCK_METHOD(Common::Redis::Client::PoolRequest*, makeRequestToShard_,
+              (uint16_t shard_index, RespVariant& request, PoolCallbacks& callbacks));
   MOCK_METHOD(bool, onRedirection, ());
 };
 } // namespace ConnPool

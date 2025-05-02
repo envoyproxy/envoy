@@ -337,13 +337,9 @@ TEST_F(MutationUtilsTest, TestAllowHeadersExactCaseSensitive) {
   std::vector<Matchers::StringMatcherPtr> disallow_headers;
   envoy::type::matcher::v3::StringMatcher string_matcher;
   string_matcher.set_exact(":method");
-  allow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
   string_matcher.set_exact(":Path");
-  allow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
@@ -364,14 +360,10 @@ TEST_F(MutationUtilsTest, TestAllowHeadersExactIgnoreCase) {
   std::vector<Matchers::StringMatcherPtr> disallow_headers;
   envoy::type::matcher::v3::StringMatcher string_matcher;
   string_matcher.set_exact(":method");
-  allow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
   string_matcher.set_exact(":Path");
   string_matcher.set_ignore_case(true);
-  allow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
@@ -394,19 +386,14 @@ TEST_F(MutationUtilsTest, TestBothAllowAndDisallowHeadersSet) {
 
   // Set allow_headers.
   string_matcher.set_exact(":method");
-  allow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
   string_matcher.set_exact(":path");
-  allow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
 
   // Set disallow_headers
   string_matcher.set_exact(":method");
   disallow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+      std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
 
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{":path", "/foo/the/bar?size=123"}};
@@ -431,12 +418,10 @@ TEST_F(MutationUtilsTest, TestDisallowHeaderSetNotAllowHeader) {
   // Set disallow_headers.
   string_matcher.set_exact(":method");
   disallow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+      std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
   string_matcher.set_exact(":path");
   disallow_headers.push_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          string_matcher, context));
+      std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
 
   MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
   Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},

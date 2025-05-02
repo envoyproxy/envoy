@@ -6,13 +6,13 @@ a `BUILD` file covering the source files contained immediately in the directory.
 
 Some guidelines for defining new targets using the [custom Envoy build
 rules](../bazel/envoy_build_system.bzl) are provided below. The [Bazel BUILD
-Encyclopedia](https://bazel.build/versions/master/docs/be/overview.html)
+Encyclopedia](https://bazel.build/reference/be/overview)
 provides further details regarding the underlying rules.
 
 ## Style guide
 
 The [BUILD file style
-guide](https://bazel.build/versions/master/docs/skylark/build-style.html) is the
+guide](https://bazel.build/build/style-guide) is the
 canonical style reference. The
 [buildifier](https://github.com/bazelbuild/buildifier) tool automatically
 enforces these guidelines. In addition, within the `BUILD` file, targets should
@@ -190,7 +190,7 @@ envoy_cc_test(
 ```
 
 A [glob
-function](https://bazel.build/versions/master/docs/be/functions.html#glob) is
+function](https://bazel.build/reference/be/functions#glob) is
 available for simple pattern matching. Within a test, the read-only data dependencies
 can be accessed via the
 [`TestEnvironment::runfilesPath()`](../test/test_common/environment.h) method.
@@ -219,6 +219,6 @@ envoy_cc_test_with_json(
 
 In general, the `setup_cmds` attribute can be used to declare a setup shell
 script that executes in the [test
-environment](https://bazel.build/versions/master/docs/test-encyclopedia.html#initial-conditions)
+environment](https://bazel.build/reference/test-encyclopedia#initial-conditions)
 prior to the test, see [`bazel/envoy_build_system.bzl`](envoy_build_system.bzl)
 for further details.

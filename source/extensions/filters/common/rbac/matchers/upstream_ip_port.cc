@@ -47,7 +47,7 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
   }
 
   if (cidr_) {
-    if (cidr_->isInRange(*address_obj->address_)) {
+    if (cidr_->isInRange(*address_obj->getIp())) {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: true",
                 cidr_->asString());
 
@@ -59,7 +59,7 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
   }
 
   if (port_) {
-    const auto port = address_obj->address_->ip()->port();
+    const auto port = address_obj->getIp()->ip()->port();
     if (port >= port_->start() && port <= port_->end()) {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: [{}, {}] evaluated to: true",
                 port_->start(), port_->end());

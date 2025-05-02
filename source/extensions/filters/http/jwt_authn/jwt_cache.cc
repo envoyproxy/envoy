@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 
+#include <limits>
+
 #include "source/common/common/assert.h"
 
 #include "simple_lru_cache/simple_lru_cache_inl.h"
@@ -27,6 +29,8 @@ public:
           config.jwt_cache_size() == 0 ? kJwtCacheDefaultSize : config.jwt_cache_size();
       jwt_lru_cache_ =
           std::make_unique<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>>(cache_size);
+      max_jwt_size_for_cache_ =
+          config.jwt_max_token_size() == 0 ? kMaxJwtSizeForCache : config.jwt_max_token_size();
     }
   }
 
@@ -56,7 +60,10 @@ public:
   }
 
   void insert(const std::string& token, std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) override {
-    if (jwt_lru_cache_ && token.size() <= kMaxJwtSizeForCache) {
+    if (!jwt_lru_cache_ || token.size() > std::numeric_limits<uint32_t>::max()) {
+      return;
+    }
+    if (static_cast<uint32_t>(token.size()) <= max_jwt_size_for_cache_) {
       // pass the ownership of jwt to cache
       jwt_lru_cache_->insert(token, jwt.release(), 1);
     }
@@ -65,6 +72,7 @@ public:
 private:
   std::unique_ptr<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>> jwt_lru_cache_;
   TimeSource& time_source_;
+  uint32_t max_jwt_size_for_cache_;
 };
 } // namespace
 

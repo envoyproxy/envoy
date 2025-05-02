@@ -59,7 +59,7 @@ public:
   ClusterInfoConstSharedPtr info() const override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
-  void initialize(std::function<void()> callback) override;
+  void initialize(std::function<absl::Status()> callback) override;
   // Compare changes in the cluster proto, and update parts of the cluster as needed.
   absl::Status update(envoy::config::cluster::v3::Cluster cluster,
                       const envoy::config::core::v3::BindConfig& bind_config,
@@ -80,7 +80,7 @@ protected:
   Outlier::DetectorSharedPtr outlier_detector_;
 
 private:
-  std::function<void()> initialization_complete_callback_;
+  std::function<absl::Status()> initialization_complete_callback_;
 
   Server::Configuration::ServerFactoryContext& server_context_;
   envoy::config::cluster::v3::Cluster cluster_;
