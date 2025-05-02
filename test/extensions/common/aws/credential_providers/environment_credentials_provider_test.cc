@@ -2,7 +2,6 @@
 
 #include "test/test_common/environment.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
