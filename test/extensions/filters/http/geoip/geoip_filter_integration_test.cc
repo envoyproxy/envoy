@@ -1,5 +1,3 @@
-#include <__config>
-
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 
 #include "test/integration/http_integration.h"
