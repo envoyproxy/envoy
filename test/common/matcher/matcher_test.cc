@@ -47,20 +47,6 @@ MATCHER_P(IsStringAction, m, "") {
   return ::testing::ExplainMatchResult(m, string_action.string_, result_listener);
 }
 
-MATCHER_P(AreStringActions, m, "") {
-  std::vector<std::string> expected = m;
-  if (arg.size() != expected.size()) {
-    *result_listener << "sizes do not match, expected: " << expected.size();
-    return false;
-  }
-  for (size_t i = 0; i < expected.size(); ++i) {
-    if (!ExplainMatchResult(IsStringAction(expected[i]), arg[i], result_listener)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 MATCHER_P(HasStringAction, m, "") {
   // Accepts a MatchResult argument.
   if (arg.match_state_ != MatchState::MatchComplete) {
@@ -146,6 +132,7 @@ MATCHER(HasFailureResult, "") {
   return true;
 }
 
+using ::testing::ElementsAre;
 using ::testing::IsEmpty;
 
 TEST_F(MatcherTest, TestMatcher) {
@@ -1087,14 +1074,14 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
   };
   MaybeMatchResult result_1 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
   EXPECT_THAT(result_1, HasResult(IsStringAction("match 3")));
-  EXPECT_THAT(skipped_results, AreStringActions(std::vector<std::string>{
-                                   "skipped - keep matching 1", "skipped - match 2"}));
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("skipped - keep matching 1"),
+                                           IsStringAction("skipped - match 2")));
   skipped_results.clear();
 
   // Expect only the keep_matching nested matcher to be skipped from the second parent.
   MaybeMatchResult result_2 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
   EXPECT_THAT(result_2, HasResult(IsStringAction("match 4")));
-  EXPECT_THAT(skipped_results, AreStringActions(std::vector<std::string>{"keep matching 2"}));
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep matching 2")));
   skipped_results.clear();
 
   MaybeMatchResult result_3 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
@@ -1142,7 +1129,7 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   };
   MaybeMatchResult result = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasNoMatchResult());
-  EXPECT_THAT(skipped_results, AreStringActions(std::vector<std::string>{"keep matching"}));
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep matching")));
 }
 
 TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
