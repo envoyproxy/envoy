@@ -7,12 +7,6 @@
 
 namespace Envoy {
 
-void TestListener::OnTestStart(const ::testing::TestInfo&) {
-  // Set this flag before every test, since it is going to be reset to its default value
-  // in the OnTestEnd by the absl::FlagSaver
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
-}
-
 void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
   if (validate_singletons_) {
     // Check that all singletons have been destroyed.
