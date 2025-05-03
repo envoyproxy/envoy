@@ -1,13 +1,44 @@
+From b217f1131adb21e2c1193782d2659ae03840659a Mon Sep 17 00:00:00 2001
+From: Rohit Agrawal <rohit.agrawal@databricks.com>
+Date: Sat, 3 May 2025 00:29:17 +0900
+Subject: [PATCH] Bazel Fixes
+
+---
+ BUILD.bazel | 17 -----------------
+ 1 file changed, 17 deletions(-)
+
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 8099642a85..3598661079 100644
+index 53501454ce..fff6e491e7 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -40,7 +40,7 @@ exports_files(["LICENSE"])
-
+@@ -56,12 +56,6 @@ config_setting(
+     constraint_values = ["@platforms//os:openbsd"],
+ )
+ 
+-# NOTE: Fuchsia is not an officially supported platform.
+-config_setting(
+-    name = "fuchsia",
+-    constraint_values = ["@platforms//os:fuchsia"],
+-)
+-
  config_setting(
-     name = "windows",
--    constraint_values = ["@bazel_tools//platforms:windows"],
-+    constraint_values = ["@platforms//os:windows"],
+     name = "msvc_compiler",
+     flag_values = {
+@@ -157,17 +151,6 @@ cc_library(
+             "@re2//:re2",
+         ],
+         "//conditions:default": [],
+-    }) + select({
+-        # `gtest-death-test.cc` has `EXPECT_DEATH` that spawns a process,
+-        # expects it to crash and inspects its logs with the given matcher,
+-        # so that's why these libraries are needed.
+-        # Otherwise, builds targeting Fuchsia would fail to compile.
+-        ":fuchsia": [
+-            "@fuchsia_sdk//pkg/fdio",
+-            "@fuchsia_sdk//pkg/syslog",
+-            "@fuchsia_sdk//pkg/zx",
+-        ],
+-        "//conditions:default": [],
+     }),
  )
 
- config_setting(

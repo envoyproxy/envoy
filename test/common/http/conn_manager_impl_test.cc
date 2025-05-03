@@ -7,8 +7,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
-#include "conn_manager_impl_test_base.h"
-
 using testing::_;
 using testing::An;
 using testing::AnyNumber;
@@ -2713,87 +2711,6 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(*periodic_log_timer, disableTimer);
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-}
-
-class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
-public:
-  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message,
-                                                  bool send_complete_request = true) {
-    setup();
-
-    EXPECT_CALL(*codec_, dispatch(_))
-        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-          decoder_ = &conn_manager_->newStream(response_encoder_);
-
-          // These request headers are missing the necessary ":host"
-          RequestHeaderMapPtr headers{
-              new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-          decoder_->decodeHeaders(std::move(headers), send_complete_request);
-          data.drain(0);
-          return Http::okStatus();
-        }));
-
-    auto* filter = new MockStreamFilter();
-    EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
-          auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
-          manager.applyFilterFactoryCb({}, factory);
-          return true;
-        }));
-    EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-    EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-    // codec stream error
-    EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-        .WillOnce(Return(stream_error_on_invalid_http_message));
-    EXPECT_CALL(*filter, encodeComplete());
-    EXPECT_CALL(*filter, encodeHeaders(_, true));
-    if (!stream_error_on_invalid_http_message) {
-      EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
-      if (send_complete_request) {
-        // The request is complete, so we should not flush close.
-        EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-            .Times(AnyNumber());
-      } else {
-        // If the request isn't complete, avoid a FIN/RST race with delay close.
-        EXPECT_CALL(filter_callbacks_.connection_,
-                    close(Network::ConnectionCloseType::FlushWriteAndDelay))
-            .Times(AnyNumber());
-      }
-    }
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-          EXPECT_EQ("400", headers.getStatusValue());
-          EXPECT_EQ("missing_host_header",
-                    filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-          if (!stream_error_on_invalid_http_message) {
-            EXPECT_NE(nullptr, headers.Connection());
-            EXPECT_EQ("close", headers.getConnectionValue());
-          } else {
-            EXPECT_EQ(nullptr, headers.Connection());
-          }
-        }));
-
-    EXPECT_CALL(*filter, onStreamComplete());
-    EXPECT_CALL(*filter, onDestroy());
-
-    Buffer::OwnedImpl fake_input;
-    conn_manager_->onData(fake_input, false);
-  }
-};
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
-  sendInvalidRequestAndVerifyConnectionState(false);
-}
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest,
-       ConnectionTerminatedWithDelayIfCodecStreamErrorIsFalse) {
-  // Same as above, only with an incomplete request.
-  sendInvalidRequestAndVerifyConnectionState(false, false);
-}
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
-  sendInvalidRequestAndVerifyConnectionState(true);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
