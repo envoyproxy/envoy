@@ -104,7 +104,6 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
 }
 
 TEST(SignalsDeathTest, BusDeathTest) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   SignalAction actions;
   EXPECT_DEATH(
       []() -> void {
@@ -121,7 +120,6 @@ TEST(SignalsDeathTest, BusDeathTest) {
 }
 
 TEST(SignalsDeathTest, BadMathDeathTest) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   SignalAction actions;
   EXPECT_DEATH(
       []() -> void {
@@ -135,7 +133,6 @@ TEST(SignalsDeathTest, BadMathDeathTest) {
 #if defined(__x86_64__) || defined(__i386__)
 // Unfortunately we don't have a reliable way to do this on other platforms
 TEST(SignalsDeathTest, IllegalInstructionDeathTest) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   SignalAction actions;
   EXPECT_DEATH(
       []() -> void {
@@ -147,13 +144,11 @@ TEST(SignalsDeathTest, IllegalInstructionDeathTest) {
 #endif
 
 TEST(SignalsDeathTest, AbortDeathTest) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   SignalAction actions;
   EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
 TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   SignalAction action;
   {
     SignalAction inner_action;

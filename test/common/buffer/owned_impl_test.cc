@@ -864,11 +864,8 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
   expectSlices({{8001, 4287, 12288}}, buffer);
 }
 
-using OwnedImplTestDeathTest = OwnedImplTest;
-
 // Test behavior when the size to commit() is larger than the reservation.
-TEST_F(OwnedImplTestDeathTest, ReserveOverCommit) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
+TEST_F(OwnedImplTest, ReserveOverCommit) {
   Buffer::OwnedImpl buffer;
   auto reservation = buffer.reserveForRead();
   const auto reservation_length = reservation.length();
@@ -882,8 +879,7 @@ TEST_F(OwnedImplTestDeathTest, ReserveOverCommit) {
 }
 
 // Test behavior when the size to commit() is larger than the reservation.
-TEST_F(OwnedImplTestDeathTest, ReserveSingleOverCommit) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
+TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
   Buffer::OwnedImpl buffer;
   auto reservation = buffer.reserveSingleSlice(10);
   const auto reservation_length = reservation.length();
@@ -1094,8 +1090,7 @@ TEST_F(OwnedImplTest, PrependEmpty) {
   EXPECT_EQ(0, buf.length());
 }
 
-TEST(OverflowDetectingUInt64DeathTest, Arithmetic) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
+TEST(OverflowDetectingUInt64, Arithmetic) {
   OverflowDetectingUInt64 length;
   length += 1;
   length -= 1;

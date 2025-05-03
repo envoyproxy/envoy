@@ -498,7 +498,6 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
 }
 
 TEST(AddressFromSockAddrDeathTest, IPv4) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   sockaddr_storage ss;
   memset(&ss, 0, sizeof(ss));
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
@@ -519,7 +518,6 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
 }
 
 TEST(AddressFromSockAddrDeathTest, IPv6) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   sockaddr_storage ss;
   memset(&ss, 0, sizeof(ss));
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
@@ -556,7 +554,6 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
 }
 
 TEST(AddressFromSockAddrDeathTest, Pipe) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
   sockaddr_storage ss;
   memset(&ss, 0, sizeof(ss));
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);

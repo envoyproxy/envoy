@@ -11,11 +11,6 @@ namespace {
 class KillRequestFilterIntegrationTest : public Event::TestUsingSimulatedTime,
                                          public HttpProtocolIntegrationTest {
 protected:
-  void SetUp() {
-    GTEST_FLAG_SET(death_test_style, "threadsafe");
-    HttpProtocolIntegrationTest::SetUp();
-  }
-
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();

@@ -12,7 +12,6 @@ namespace {
 
 class TestTimeSystemTest : public testing::Test {
 protected:
-  void SetUp() override { GTEST_FLAG_SET(death_test_style, "threadsafe"); }
 };
 
 TEST_F(TestTimeSystemTest, TwoSimsSameReference) {
