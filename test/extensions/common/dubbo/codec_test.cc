@@ -209,6 +209,7 @@ TEST(DubboCodecTest, DecodeHeaderTest) {
 }
 
 TEST(DubboCodecTest, DecodeDataTest) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   DubboCodec codec;
 
   auto serializer = std::make_unique<MockSerializer>();
@@ -340,6 +341,7 @@ TEST(DubboCodecTest, DecodeDataTest) {
 }
 
 TEST(DubboCodecTest, EncodeTest) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   DubboCodec codec;
 
   auto serializer = std::make_unique<MockSerializer>();
@@ -614,6 +616,7 @@ TEST(DubboCodecTest, EncodeTest) {
 }
 
 TEST(DubboCodecTest, EncodeHeaderForTestTest) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   DubboCodec codec;
 
   // Encode unexpected message type will cause exit.

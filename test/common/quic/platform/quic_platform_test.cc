@@ -108,6 +108,7 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicExpectBug) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   auto bug = [](const char* error_message) { QUIC_BUG(bug_id) << error_message; };
   auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG(bug_id) << error_message; };
   EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
@@ -311,6 +312,7 @@ TEST_F(QuicPlatformTest, QuicDLog) {
 #undef VALUE_BY_COMPILE_MODE
 
 TEST_F(QuicPlatformTest, QuicheCheck) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   QUICHE_CHECK(1 == 1);
   QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
@@ -335,6 +337,7 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
 //
 //   {QUIC_LOG, QUIC_DLOG} x {FATAL, DFATAL} x {debug, release}
 TEST_F(QuicPlatformTest, QuicFatalLog) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
 #ifdef NDEBUG
   // Release build
   EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
@@ -351,6 +354,7 @@ TEST_F(QuicPlatformTest, QuicFatalLog) {
 }
 
 TEST_F(QuicPlatformTest, QuicNotReached) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
 #ifdef NDEBUG
   QUICHE_NOTREACHED(); // Expect no-op.
 #else

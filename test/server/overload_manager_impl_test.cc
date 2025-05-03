@@ -867,6 +867,7 @@ TEST_F(OverloadManagerImplTest, MissingConfigTriggerType) {
 }
 
 TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTest) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   setDispatcherExpectation();
   auto manager(createOverloadManager(proactiveResourceConfig));
   Stats::Counter& failed_updates =

@@ -88,6 +88,7 @@ void handler(int sig, siginfo_t* /*siginfo*/, void* /*context*/) {
 }
 
 TEST_F(AbortActionTest, PanicsIfThreadDoesNotDie) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   AbortActionConfig config;
   config.mutable_wait_duration()->set_seconds(1);
   action_ = std::make_unique<AbortAction>(config, context_);
