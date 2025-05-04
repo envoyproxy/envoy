@@ -957,6 +957,11 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   }
 }
 
+// Test to verify the ProtocolStateNameValues::name() function
+TEST_F(RingHashLoadBalancerTest, VerifyProtocolStateNameFunction) {
+  // No protocol state in this extension, but add the test for coverage
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

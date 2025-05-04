@@ -224,6 +224,17 @@ static std::string nestedFieldTypesParamToString(
                      fieldTypeToString(inner_type), fieldTypeToString(value_type));
 }
 
+TEST(ProtocolStateNameValuesTest, ValidateNames) {
+  // Test that ProtocolStateNameValues::name() returns the expected string values
+  EXPECT_EQ("StopIteration", ProtocolStateNameValues::name(ProtocolState::StopIteration));
+  EXPECT_EQ("WaitForData", ProtocolStateNameValues::name(ProtocolState::WaitForData));
+  EXPECT_EQ("MessageBegin", ProtocolStateNameValues::name(ProtocolState::MessageBegin));
+  EXPECT_EQ("MessageEnd", ProtocolStateNameValues::name(ProtocolState::MessageEnd));
+  EXPECT_EQ("StructBegin", ProtocolStateNameValues::name(ProtocolState::StructBegin));
+  EXPECT_EQ("StructEnd", ProtocolStateNameValues::name(ProtocolState::StructEnd));
+  EXPECT_EQ("Done", ProtocolStateNameValues::name(ProtocolState::Done));
+}
+
 INSTANTIATE_TEST_SUITE_P(
     NestedTypes, DecoderStateMachineNestingTest,
     Combine(Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),

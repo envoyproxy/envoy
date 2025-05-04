@@ -172,6 +172,16 @@ TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::OnDecodeStreamHeader);
 }
 
+TEST_F(DubboDecoderStateMachineTest, ProtocolStateNameTest) {
+  // Test that ProtocolStateNameValues::name() returns the expected string value
+  EXPECT_EQ("StopIteration", ProtocolStateNameValues::name(ProtocolState::StopIteration));
+  EXPECT_EQ("WaitForData", ProtocolStateNameValues::name(ProtocolState::WaitForData));
+  EXPECT_EQ("OnDecodeStreamHeader",
+            ProtocolStateNameValues::name(ProtocolState::OnDecodeStreamHeader));
+  EXPECT_EQ("OnDecodeStreamData", ProtocolStateNameValues::name(ProtocolState::OnDecodeStreamData));
+  EXPECT_EQ("Done", ProtocolStateNameValues::name(ProtocolState::Done));
+}
+
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_CALL(request_callbacks_, newStream()).Times(0);
   EXPECT_CALL(protocol_, decodeHeader(_, _))

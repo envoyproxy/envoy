@@ -75,6 +75,12 @@ TEST_F(PreviousRoutesTest, RoutesAreIndependent) {
   }
 }
 
+TEST_F(PreviousRoutesTest, VerifyPredicateNameFunction) {
+  auto predicate = factory_->createInternalRedirectPredicate(*config_, "route_0");
+  ASSERT(predicate);
+  EXPECT_EQ("envoy.internal_redirect_predicates.previous_routes", predicate->name());
+}
+
 } // namespace
 } // namespace InternalRedirect
 } // namespace Extensions

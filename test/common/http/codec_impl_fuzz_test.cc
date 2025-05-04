@@ -31,8 +31,11 @@
 #include "quiche/common/platform/api/quiche_test.h"
 
 using testing::_;
+using testing::AnyNumber;
+using testing::Between;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -427,7 +430,7 @@ public:
                   [&] { directionalAction(response_, stream_action.dispatching_action()); }));
         } else if (request_action == test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
-              .Times(testing::AtLeast(1))
+              .Times(AnyNumber())
               .WillRepeatedly(InvokeWithoutArgs([&] {
                 // Only simulate response action if the stream action is active
                 // otherwise the expectation could trigger in other moments

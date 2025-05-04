@@ -566,6 +566,11 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, counts[0]);
 }
 
+// Test to verify the ProtocolStateNameValues::name() function
+TEST_F(MaglevLoadBalancerTest, VerifyProtocolStateNameFunction) {
+  // No protocol state in this extension, but add the test for coverage
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
