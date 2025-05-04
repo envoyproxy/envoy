@@ -370,21 +370,24 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       Some(b"http_callout_body"),
       1000,
     );
-    if !result {
+    if result != envoy_dynamic_module_type_http_callout_init_result::Success {
       envoy_filter.send_response(500, vec![("foo", b"bar")], None);
     } else {
       // Try sending the same callout id, which should fail.
-      assert!(!envoy_filter.send_http_callout(
-        1234,
-        &self.cluster_name,
-        vec![
-          (":path", b"/"),
-          (":method", b"GET"),
-          ("host", b"example.com"),
-        ],
-        None,
-        1000,
-      ));
+      assert_eq!(
+        envoy_filter.send_http_callout(
+          1234,
+          &self.cluster_name,
+          vec![
+            (":path", b"/"),
+            (":method", b"GET"),
+            ("host", b"example.com"),
+          ],
+          None,
+          1000,
+        ),
+        abi::envoy_dynamic_module_type_http_callout_init_result::DuplicateCalloutId
+      );
     }
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }

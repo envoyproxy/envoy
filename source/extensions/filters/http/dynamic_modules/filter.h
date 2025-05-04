@@ -98,8 +98,9 @@ public:
   /**
    * Sends an HTTP callout to the specified cluster with the given message.
    */
-  bool sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
-                       Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
 private:
   /**

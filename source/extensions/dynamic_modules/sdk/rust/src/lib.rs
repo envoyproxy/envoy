@@ -557,8 +557,15 @@ pub trait EnvoyHttpFilter {
   ///
   /// Headers must contain the `:method`, ":path", and `host` headers.
   ///
-  /// This returns true if the callout is sent successfully. For example, if callout_id is
-  /// duplicated, this returns false.
+  /// This returns the status of the callout. The meaning of the status is
+  ///
+  ///   * Success: The callout was sent successfully.
+  ///   * MissingRequiredHeaders: One of the required headers is missing: `:method`, `:path`, or
+  ///     `host`.
+  ///   * ClusterNotFound: The cluster with the given name was not found.
+  ///   * DuplicateCalloutId: The callout ID is already in use.
+  ///   * CouldNotCreateRequest: The request could not be created. This happens when, for example,
+  ///     there's no healthy upstream host in the cluster.
   ///
   /// The callout result will be delivered to the [`HttpFilter::on_http_callout_done`] method.
   fn send_http_callout<'a>(
@@ -568,7 +575,7 @@ pub trait EnvoyHttpFilter {
     _headers: Vec<(&'a str, &'a [u8])>,
     _body: Option<&'a [u8]>,
     _timeout_milliseconds: u64,
-  ) -> bool;
+  ) -> abi::envoy_dynamic_module_type_http_callout_init_result;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1060,7 +1067,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     headers: Vec<(&'a str, &'a [u8])>,
     body: Option<&'a [u8]>,
     timeout_milliseconds: u64,
-  ) -> bool {
+  ) -> abi::envoy_dynamic_module_type_http_callout_init_result {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
     let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;

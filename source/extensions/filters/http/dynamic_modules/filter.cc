@@ -124,14 +124,14 @@ void DynamicModuleHttpFilter::sendLocalReply(
 
 void DynamicModuleHttpFilter::encodeComplete() {};
 
-bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
-                                              Http::RequestMessagePtr&& message,
-                                              uint64_t timeout_milliseconds) {
+envoy_dynamic_module_type_http_callout_init_result
+DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+                                         Http::RequestMessagePtr&& message,
+                                         uint64_t timeout_milliseconds) {
   Upstream::ThreadLocalCluster* cluster =
       config_->cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
-    ENVOY_LOG(error, "Cluster {} not found", cluster_name);
-    return false;
+    return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
   }
   Http::AsyncClient::RequestOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
@@ -139,17 +139,15 @@ bool DynamicModuleHttpFilter::sendHttpCallout(uint32_t callout_id, absl::string_
       callout_id, std::make_unique<DynamicModuleHttpFilter::HttpCalloutCallback>(shared_from_this(),
                                                                                  callout_id));
   if (!inserted) {
-    ENVOY_LOG(error, "Duplicate callout id {}", callout_id);
-    return false;
+    return envoy_dynamic_module_type_http_callout_init_result_DuplicateCalloutId;
   }
   DynamicModuleHttpFilter::HttpCalloutCallback& callback = *iterator->second;
   auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
   if (!request) {
-    ENVOY_LOG(error, "Failed to send HTTP callout");
-    return false;
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
   }
   callback.request_ = request;
-  return true;
+  return envoy_dynamic_module_type_http_callout_init_result_Success;
 }
 
 void DynamicModuleHttpFilter::HttpCalloutCallback::onSuccess(const AsyncClient::Request&,

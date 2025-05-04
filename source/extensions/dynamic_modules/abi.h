@@ -372,6 +372,24 @@ typedef enum {
 } envoy_dynamic_module_type_attribute_id;
 
 /**
+ * envoy_dynamic_module_type_http_callout_init_result represents the result of the HTTP callout
+ * initialization after envoy_dynamic_module_callback_http_filter_http_callout is called.
+ * Success means the callout is successfully initialized and ready to be used.
+ * MissingRequiredHeaders means the callout is missing one of the required headers, :path, :method,
+ * or host header. DuplicateCalloutId means the callout id is already used by another callout.
+ * ClusterNotFound means the cluster is not found in the configuration. CannotCreateRequest means
+ * the request cannot be created. That happens when, for example, there's no healthy upstream host
+ * in the cluster.
+ */
+typedef enum {
+  envoy_dynamic_module_type_http_callout_init_result_Success,
+  envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders,
+  envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound,
+  envoy_dynamic_module_type_http_callout_init_result_DuplicateCalloutId,
+  envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+} envoy_dynamic_module_type_http_callout_init_result;
+
+/**
  * envoy_dynamic_module_type_http_callout_result represents the result of the HTTP callout.
  * This corresponds to `AsyncClient::FailureReason::*` in envoy/http/async_client.h plus Success.
  */
@@ -1130,14 +1148,15 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
  * differentiate between multiple calls from the same filter.
  * @param cluster_name is the name of the cluster to which the callout is sent.
  * @param cluster_name_length is the length of the cluster name.
- * @param headers is the headers of the request.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
  * @param headers_size is the size of the headers.
  * @param body is the pointer to the buffer of the body of the request.
  * @param body_size is the length of the body.
  * @param timeout_milliseconds is the timeout for the callout in milliseconds.
- * @return true if the operation is successful, false otherwise.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
  */
-bool envoy_dynamic_module_callback_http_filter_http_callout(
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
     envoy_dynamic_module_type_http_header* headers, size_t headers_size,

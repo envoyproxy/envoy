@@ -716,7 +716,8 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
   return ok;
 }
 
-bool envoy_dynamic_module_callback_http_filter_http_callout(
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
     envoy_dynamic_module_type_http_header* headers, size_t headers_size,
@@ -740,9 +741,7 @@ bool envoy_dynamic_module_callback_http_filter_http_callout(
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
       message->headers().Host() == nullptr) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "Missing required headers. :path, :method, and host are required");
-    return false;
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
   }
   if (body_size > 0) {
     message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
