@@ -15,10 +15,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.2"
+"source/common/quic:93.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
-"source/common/tls:95.5"
+"source/common/tls:94.4" # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
 "source/common/tls/cert_validator:94.7"
 "source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
@@ -88,7 +88,7 @@ HIGH_COVERAGE_STRING=""
 while read -r DIRECTORY
 do
   get_coverage_target "$DIRECTORY"
-  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
+  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4 | tr -d '\n')
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
   # If the coverage number is 'n' (no data found) there is 0% coverage. This is
   # probably a directory without source code, so we skip checks.
@@ -102,7 +102,7 @@ do
   fi;
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-    echo "Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})"
+    echo "ERROR: Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})" >&2
     FAILED=1
   fi
   COVERAGE_HIGH=$(echo "${COVERAGE_VALUE}>${DIRECTORY_THRESHOLD}" | bc)
@@ -117,8 +117,8 @@ do
 
 done <<< "$SOURCES"
 
-if [[ ${FAILED} != 1 ]]; then
-  echo -e "Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}"
+if [[ ${FAILED} != 1 && -n "${HIGH_COVERAGE_STRING}" ]]; then
+  echo -e "WARNING: Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}" >&2
 fi
 
 exit $FAILED

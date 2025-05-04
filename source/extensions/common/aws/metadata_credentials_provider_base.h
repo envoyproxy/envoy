@@ -40,7 +40,7 @@ public:
 
   MetadataCredentialsProviderBase(Api::Api& api,
                                   Server::Configuration::ServerFactoryContext& context,
-                                  AwsClusterManagerOptRef aws_cluster_manager,
+                                  AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -119,7 +119,7 @@ protected:
   // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
   // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
-  AwsClusterManagerOptRef aws_cluster_manager_;
+  AwsClusterManagerPtr aws_cluster_manager_;
   // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
   // Are credentials pending?

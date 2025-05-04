@@ -208,7 +208,6 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
-    _utf8_range()
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
@@ -535,7 +534,11 @@ def _io_vectorscan():
     )
 
 def _io_opentelemetry_api_cpp():
-    external_http_archive(name = "io_opentelemetry_cpp")
+    external_http_archive(
+        name = "io_opentelemetry_cpp",
+        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _com_github_datadog_dd_trace_cpp():
     external_http_archive("com_github_datadog_dd_trace_cpp")
@@ -582,6 +585,7 @@ def _com_google_absl():
         name = "com_google_absl",
         patches = ["@envoy//bazel:abseil.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@googletest": "@com_google_googletest"},
     )
 
     # keep these until jwt_verify_lib is updated.
@@ -932,9 +936,6 @@ def _com_github_fdio_vpp_vcl():
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
-
-def _utf8_range():
-    external_http_archive("utf8_range")
 
 def _rules_ruby():
     external_http_archive("rules_ruby")

@@ -11,6 +11,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "openssl/crypto.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -306,19 +308,20 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     // Since we checked the key type above, this should be valid.
     ASSERT(rsa_public_key != nullptr);
     const unsigned rsa_key_length = RSA_size(rsa_public_key);
-#ifdef BORINGSSL_FIPS
-    if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 && rsa_key_length != 4096 / 8) {
-      *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit, 3072-bit or "
-                       "4096-bit keys are supported in FIPS mode";
-      break;
+    const bool fips_mode = FIPS_mode();
+    if (fips_mode) {
+      if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 && rsa_key_length != 4096 / 8) {
+        *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit, 3072-bit or "
+                         "4096-bit keys are supported in FIPS mode";
+        break;
+      }
+    } else {
+      if (rsa_key_length < 2048 / 8) {
+        *error_details =
+            "Invalid leaf cert, only RSA certificates with 2048-bit or larger keys are supported";
+        break;
+      }
     }
-#else
-    if (rsa_key_length < 2048 / 8) {
-      *error_details =
-          "Invalid leaf cert, only RSA certificates with 2048-bit or larger keys are supported";
-      break;
-    }
-#endif
     sign_alg = SSL_SIGN_RSA_PSS_RSAE_SHA256;
   } break;
   default:

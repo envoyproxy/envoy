@@ -40,6 +40,9 @@ public:
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
         .WillByDefault(Return(true));
+    EXPECT_CALL(runtime_.snapshot_,
+                getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+        .WillRepeatedly(Return(0));
     ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
         .WillByDefault(Return(6));
   }
