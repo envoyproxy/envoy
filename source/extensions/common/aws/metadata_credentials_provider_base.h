@@ -35,8 +35,7 @@ public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(Api::Api& api,
-                                  Server::Configuration::ServerFactoryContext& context,
+  MetadataCredentialsProviderBase(Server::Configuration::ServerFactoryContext& context,
                                   AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
@@ -81,8 +80,6 @@ protected:
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
 
-  Api::Api& api_;
-  // The optional server factory context.
   Server::Configuration::ServerFactoryContext& context_;
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;

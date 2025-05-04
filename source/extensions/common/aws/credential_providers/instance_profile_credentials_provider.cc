@@ -12,16 +12,16 @@ namespace Common {
 namespace Aws {
 
 InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
+     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name)
-    : MetadataCredentialsProviderBase(api, context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer) {}
 
 bool InstanceProfileCredentialsProvider::needsRefresh() {
-  return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
+  return context_.api().timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
 void InstanceProfileCredentialsProvider::refresh() {
@@ -159,7 +159,7 @@ void InstanceProfileCredentialsProvider::extractCredentialsAsync(
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context->api()).timeSource().systemTime();
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   stats_->credential_refreshes_succeeded_.inc();

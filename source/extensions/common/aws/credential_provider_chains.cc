@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
+#include "aws_cluster_manager.h"
+#include "credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "source/extensions/common/aws/utility.h"
@@ -14,7 +16,7 @@ SINGLETON_MANAGER_REGISTRATION(aws_cluster_manager);
 CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
-    CustomCredentialsProviderChainFactories& factories) {
+    CredentialsProviderChainFactories& factories) {
 
   aws_cluster_manager_ =
       context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
@@ -24,7 +26,9 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
           },
           true);
 
-  // Custom chain currently only supports file based and web identity credentials
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+        
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
     std::string role_session_name = web_identity.role_session_name();
@@ -35,10 +39,27 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
                                                        web_identity));
   }
 
-  if (credential_provider_config.has_credentials_file_provider()) {
+  if (credential_provider_config.has_environment_credential_provider()) {
+    ENVOY_LOG(debug, "Using environment credentials provider");
+    add(factories.createEnvironmentCredentialsProvider());
+  }
+
+  if (credential_provider_config.has_config_credential_provider()) {
     add(factories.createCredentialsFileCredentialsProvider(
         context, credential_provider_config.credentials_file_provider()));
   }
+
+  if(credential_provider_config.has_container_credential_provider()) {
+    commonCreateContainerCredentialsProvider(context, aws_cluster_manager_, factories,  refresh_state, initialization_timer);
+  }
+
+  if (credential_provider_config.has_instance_profile_credential_provider()) {
+    ENVOY_LOG(debug, "Using instance profile credentials provider");
+    add(factories.createInstanceProfileCredentialsProvider(
+      context, aws_cluster_manager_, MetadataFetcher::create, refresh_state,
+      initialization_timer, EC2_METADATA_CLUSTER));
+}
+
 }
 
 CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCredentialsProvider(
@@ -70,7 +91,7 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
 };
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
     CredentialsProviderChainFactories& factories) {
 
@@ -107,7 +128,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   }
 
   if (web_identity.role_session_name().empty()) {
-    web_identity.set_role_session_name(sessionName(api));
+    web_identity.set_role_session_name(sessionName(context));
   }
 
   if ((!web_identity.web_identity_token_data_source().filename().empty() ||
@@ -126,8 +147,6 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                                                        web_identity));
   }
 
-  // Even if WebIdentity is supported keep the fallback option open so that
-  // Envoy can use other credentials provider if available.
   const auto relative_uri =
       absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
   const auto full_uri = absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_FULL_URI));
@@ -137,7 +156,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
     add(factories.createContainerCredentialsProvider(
-        api, context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+        context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
         uri, refresh_state, initialization_timer));
   } else if (!full_uri.empty()) {
     auto authorization_token =
@@ -148,19 +167,54 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                 "{} and authorization token",
                 full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+          context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
           full_uri, refresh_state, initialization_timer, authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+          context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
           full_uri, refresh_state, initialization_timer));
     }
   } else if (metadata_disabled != "true") {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
-        api, context, aws_cluster_manager_, MetadataFetcher::create, refresh_state,
+        context, aws_cluster_manager_, MetadataFetcher::create, refresh_state,
         initialization_timer, EC2_METADATA_CLUSTER));
+  }
+}
+
+void CredentialsProviderChainFactories::commonCreateContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context, 
+  AwsClusterManagerPtr& aws_cluster_manager,
+  CredentialsProviderChainFactories &factories, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+  std::chrono::seconds initialization_timer) 
+{
+  const auto relative_uri =
+  absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
+  const auto full_uri = absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_FULL_URI));
+
+  if (!relative_uri.empty()) {
+    const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
+    ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
+    add(factories.createContainerCredentialsProvider(
+         context, aws_cluster_manager, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+        uri, refresh_state, initialization_timer));
+  } else if (!full_uri.empty()) {
+    auto authorization_token =
+        absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
+    if (!authorization_token.empty()) {
+      ENVOY_LOG(debug,
+                "Using container role credentials provider with URI: "
+                "{} and authorization token",
+                full_uri);
+      add(factories.createContainerCredentialsProvider(
+           context, aws_cluster_manager, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+          full_uri, refresh_state, initialization_timer, authorization_token));
+    } else {
+      ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
+      add(factories.createContainerCredentialsProvider(
+          context, aws_cluster_manager, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+          full_uri, refresh_state, initialization_timer));
+    }
   }
 }
 
@@ -168,7 +222,7 @@ SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     absl::string_view cluster_name, absl::string_view credential_uri,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -181,11 +235,11 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
       context.singletonManager()
           .getTyped<Envoy::Extensions::Common::Aws::ContainerCredentialsProvider>(
               SINGLETON_MANAGER_REGISTERED_NAME(container_credentials_provider),
-              [&context, &api, &aws_cluster_manager, create_metadata_fetcher_cb, &credential_uri,
+              [&context, &aws_cluster_manager, create_metadata_fetcher_cb, &credential_uri,
                &refresh_state, &initialization_timer, &authorization_token, &cluster_name] {
                 return std::make_shared<
                     Envoy::Extensions::Common::Aws::ContainerCredentialsProvider>(
-                    api, context, aws_cluster_manager, create_metadata_fetcher_cb, credential_uri,
+                    context, aws_cluster_manager, create_metadata_fetcher_cb, credential_uri,
                     refresh_state, initialization_timer, authorization_token, cluster_name);
               });
 
@@ -203,7 +257,7 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
 
 CredentialsProviderSharedPtr
 DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name) {
@@ -214,11 +268,11 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
       context.singletonManager()
           .getTyped<Envoy::Extensions::Common::Aws::InstanceProfileCredentialsProvider>(
               SINGLETON_MANAGER_REGISTERED_NAME(instance_profile_credentials_provider),
-              [&context, &api, &aws_cluster_manager, create_metadata_fetcher_cb, &refresh_state,
+              [&context, &aws_cluster_manager, create_metadata_fetcher_cb, &refresh_state,
                &initialization_timer, &cluster_name] {
                 return std::make_shared<
                     Envoy::Extensions::Common::Aws::InstanceProfileCredentialsProvider>(
-                    api, context, aws_cluster_manager, create_metadata_fetcher_cb, refresh_state,
+                    context, aws_cluster_manager, create_metadata_fetcher_cb, refresh_state,
                     initialization_timer, cluster_name);
               });
 
