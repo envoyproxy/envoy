@@ -3,6 +3,7 @@
 #include "test/common/http/common.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/common/http/http2/frame_replay.h"
+#include "test/common/http/http2/http2_frame.h"
 
 #include "gtest/gtest.h"
 
@@ -346,6 +347,97 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = original;
     }
   }
+}
+
+// Test basic request/response replay
+TEST(FrameReplayTest, BasicRequestResponse) {
+  FrameReplay replay;
+
+  // Add request frames
+  replay.addFrame(Http2Frame::makeHeadersFrameWithStatus(
+      "200", 1,
+      static_cast<Http2Frame::HeadersFlags>(
+          orFlags(Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders))));
+
+  // Add response frames
+  replay.addFrame(Http2Frame::makeDataFrame(1, "Hello, World!", Http2Frame::DataFlags::EndStream));
+
+  ASSERT_EQ(replay.frameCount(), 2);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Headers);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Data);
+}
+
+// Test frame replay with window updates
+TEST(FrameReplayTest, WindowUpdates) {
+  FrameReplay replay;
+
+  // Add window update frames
+  replay.addFrame(Http2Frame::makeWindowUpdateFrame(0, 1024)); // Connection-level
+  replay.addFrame(Http2Frame::makeWindowUpdateFrame(1, 512));  // Stream-level
+
+  ASSERT_EQ(replay.frameCount(), 2);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::WindowUpdate);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::WindowUpdate);
+}
+
+// Test frame replay with settings
+TEST(FrameReplayTest, Settings) {
+  FrameReplay replay;
+
+  std::list<std::pair<uint16_t, uint32_t>> settings = {
+      {0x1, 0x1000}, // SETTINGS_HEADER_TABLE_SIZE
+      {0x2, 0x1}     // SETTINGS_ENABLE_PUSH
+  };
+
+  replay.addFrame(Http2Frame::makeSettingsFrame(Http2Frame::SettingsFlags::None, settings));
+  replay.addFrame(Http2Frame::makeSettingsFrame(Http2Frame::SettingsFlags::Ack, {}));
+
+  ASSERT_EQ(replay.frameCount(), 2);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Settings);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Settings);
+}
+
+// Test frame replay with reset stream
+TEST(FrameReplayTest, ResetStream) {
+  FrameReplay replay;
+
+  replay.addFrame(Http2Frame::makeResetStreamFrame(1, Http2Frame::ErrorCode::Cancel));
+
+  ASSERT_EQ(replay.frameCount(), 1);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::RstStream);
+}
+
+// Test frame replay with ping
+TEST(FrameReplayTest, Ping) {
+  FrameReplay replay;
+
+  std::string pingData = "12345678";
+  replay.addFrame(Http2Frame::makePingFrame(pingData));
+  replay.addFrame(Http2Frame::makePingFrame(pingData));
+
+  ASSERT_EQ(replay.frameCount(), 2);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Ping);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Ping);
+}
+
+// Test frame replay with goaway
+TEST(FrameReplayTest, GoAway) {
+  FrameReplay replay;
+
+  replay.addFrame(Http2Frame::makeEmptyGoAwayFrame(1, Http2Frame::ErrorCode::NoError));
+
+  ASSERT_EQ(replay.frameCount(), 1);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::GoAway);
+}
+
+// Test frame replay with priority
+TEST(FrameReplayTest, Priority) {
+  FrameReplay replay;
+
+  replay.addFrame(Http2Frame::makePriorityFrame(1, 0));
+
+  ASSERT_EQ(replay.frameCount(), 1);
+  ASSERT_EQ(replay.nextFrame().type(), Http2Frame::Type::Priority);
 }
 
 } // namespace
