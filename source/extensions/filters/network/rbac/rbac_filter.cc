@@ -71,10 +71,11 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     return Network::FilterStatus::StopIteration;
   }
 
-  ENVOY_LOG(
+  ENVOY_CONN_LOG(
       debug,
       "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
       "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
+      callbacks_->connection(),
       callbacks_->connection().requestedServerName(),
       callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
       callbacks_->connection()
@@ -126,7 +127,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
 
     std::chrono::milliseconds duration = config_->delayDenyMs();
     if (duration > std::chrono::milliseconds(0)) {
-      ENVOY_LOG(debug, "connection will be delay denied in {}ms", duration.count());
+      ENVOY_CONN_LOG(debug, "connection will be delay denied in {}ms", callbacks_->connection(), duration.count());
       delay_timer_ = callbacks_->connection().dispatcher().createTimer(
           [this]() -> void { closeConnection(); });
       ASSERT(!is_delay_denied_);
@@ -139,7 +140,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     return Network::FilterStatus::StopIteration;
   }
 
-  ENVOY_LOG(debug, "no engine, allowed by default");
+  ENVOY_CONN_LOG(debug, "no engine, allowed by default", callbacks_->connection());
   return Network::FilterStatus::Continue;
 }
 
@@ -182,25 +183,25 @@ Result RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::Enforcem
     const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
     if (allowed) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);
+        ENVOY_CONN_LOG(debug, "shadow allowed, matched policy {}", callbacks_->connection(), log_policy_id);
         config_->stats().shadow_allowed_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
+        ENVOY_CONN_LOG(debug, "enforced allowed, matched policy {}", callbacks_->connection(), log_policy_id);
         config_->stats().allowed_.inc();
       }
       return Result{Allow, effective_policy_id};
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
+        ENVOY_CONN_LOG(debug, "shadow denied, matched policy {}", callbacks_->connection(), log_policy_id);
         config_->stats().shadow_denied_.inc();
         setDynamicMetadata(
             Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
             effective_policy_id);
       } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
+        ENVOY_CONN_LOG(debug, "enforced denied, matched policy {}", callbacks_->connection(), log_policy_id);
         config_->stats().denied_.inc();
       }
       return Result{Deny, log_policy_id};
