@@ -78,5 +78,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

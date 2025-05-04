@@ -14,7 +14,39 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
   (*on_http_filter_config_destroy_)(in_module_config_);
-};
+}
+
+DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() {
+  (*destroy_)(config_);
+}
+
+absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
+newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
+                                   const absl::string_view filter_config,
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
+  auto constructor =
+      dynamic_module
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_per_route_config_new)>(
+              "envoy_dynamic_module_on_http_filter_per_route_config_new");
+  if (!constructor.ok()) {
+    return constructor.status();
+  }
+
+  auto destroy = dynamic_module->getFunctionPointer<OnHttpPerRouteConfigDestoryType>(
+      "envoy_dynamic_module_on_http_filter_per_route_config_destroy");
+  if (!destroy.ok()) {
+    return destroy.status();
+  }
+  const void* filter_config_envoy_ptr = (*constructor.value())(
+      filter_name.data(), filter_name.size(), filter_config.data(), filter_config.size());
+  if (filter_config_envoy_ptr == nullptr) {
+    return absl::InvalidArgumentError("Failed to initialize dynamic module");
+  }
+
+  OnHttpPerRouteConfigDestoryType destroy_fn = destroy.value();
+  return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(filter_config_envoy_ptr,
+                                                                       destroy_fn);
+}
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
 newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
