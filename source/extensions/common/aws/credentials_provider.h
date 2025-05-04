@@ -16,6 +16,12 @@ namespace Aws {
 constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
 constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
+constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
+constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+constexpr char TOKEN[] = "Token";
+constexpr char SESSION_TOKEN[] = "SessionToken";
+constexpr char EXPIRATION[] = "Expiration";
+constexpr char CREDENTIALS[] = "Credentials";
 
 /**
  * AWS credentials containers
