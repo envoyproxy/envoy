@@ -1,5 +1,20 @@
 #include "source/extensions/common/aws/credential_providers/assume_role_credentials_provider.h"
 
+#include "source/common/common/logger.h"
+#include "source/extensions/common/aws/aws_cluster_manager.h"
+#include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/metadata_fetcher.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/aws/metadata_fetcher.h"
+#include "source/extensions/common/aws/utility.h"
+
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -8,7 +23,7 @@ using std::chrono::seconds;
 
 AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
@@ -17,7 +32,7 @@ AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
         assume_role_config)
 
     : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
-                                      nullptr, create_metadata_fetcher_cb, refresh_state,
+                                      create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(assume_role_config.role_arn()),
       role_session_name_(assume_role_config.role_session_name()),

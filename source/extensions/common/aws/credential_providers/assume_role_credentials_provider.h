@@ -1,31 +1,12 @@
 #pragma once
 
-#include "source/common/common/logger.h"
-#include "source/common/config/datasource.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/sigv4_signer_impl.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
-
-#include "envoy/common/exception.h"
-
-#include "source/common/common/base64.h"
-#include "source/common/common/lock_guard.h"
-#include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/common/protobuf/protobuf.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/str_format.h"
-#include "absl/strings/str_split.h"
-#include "fmt/chrono.h"
 
 namespace Envoy {
 namespace Extensions {
