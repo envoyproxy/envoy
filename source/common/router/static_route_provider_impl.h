@@ -31,7 +31,8 @@ namespace Router {
 /**
  * Implementation of RouteConfigProvider that holds a static route configuration.
  */
-class StaticRouteConfigProviderImpl : public RouteConfigProvider {
+class StaticRouteConfigProviderImpl : public RouteConfigProvider,
+                                      Logger::Loggable<Logger::Id::matcher> {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                 Rds::ConfigTraits& config_traits,
@@ -46,7 +47,9 @@ public:
   absl::Status onConfigUpdate() override { return base_.onConfigUpdate(); }
   ConfigConstSharedPtr configCast() const override;
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
+                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
+    ENVOY_LOG(debug, "VirtualHost cannot be updated in static config");
+  }
 
 private:
   Rds::StaticRouteConfigProviderImpl base_;
