@@ -7,7 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-
+#include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -22,7 +22,7 @@ constexpr char EXPIRATION_LOWER[] = "expiration";
 constexpr char SESSION_TOKEN_LOWER[] = "sessionToken";
 
 constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
-constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
+
 /**
  *
  * AssumeRoleCredentialsProvider purpose is to Exchange X509 Credentials for Temporary AWS
@@ -60,7 +60,7 @@ class AssumeRoleCredentialsProvider : public MetadataCredentialsProviderBase,
 public:
   AssumeRoleCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
