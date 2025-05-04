@@ -100,7 +100,7 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/config:datasource_lib",
         "//source/extensions/common/aws:aws_cluster_manager_lib",
-        "//source/extensions/common/aws:credentials_provider_impl_lib",
+        "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:utility_lib",

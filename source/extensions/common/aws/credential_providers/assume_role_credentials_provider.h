@@ -1,13 +1,12 @@
 #pragma once
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
-#include "envoy/config/core/v3/base.pb.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -84,7 +83,6 @@ private:
   const std::string role_session_name_;
   const std::string region_;
   absl::optional<uint16_t> session_duration_;
-  ServerFactoryContextOptRef server_factory_context_;
   std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer_;
 };
 

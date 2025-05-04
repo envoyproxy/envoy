@@ -3,16 +3,15 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
-#include "envoy/config/core/v3/base.pb.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/utility.h"
+#include "source/common/json/json_loader.h"
 
 
 namespace Envoy {
@@ -36,8 +35,7 @@ AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
                                       initialization_timer),
       role_arn_(assume_role_config.role_arn()),
       role_session_name_(assume_role_config.role_session_name()),
-      region_(region),
-      server_factory_context_(context), assume_role_signer_(std::move(assume_role_signer)) {
+      region_(region), assume_role_signer_(std::move(assume_role_signer)) {
 
       if(assume_role_config.has_session_duration())
       {
@@ -62,7 +60,7 @@ bool AssumeRoleCredentialsProvider::needsRefresh() { return true; }
 
 void AssumeRoleCredentialsProvider::refresh() {
 
-  const auto uri = aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_);
+  const auto uri = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
   ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}",
             uri.value());
 
@@ -98,7 +96,7 @@ void AssumeRoleCredentialsProvider::refresh() {
   }
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
-    metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
+    metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
   } else {
     metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
   }
