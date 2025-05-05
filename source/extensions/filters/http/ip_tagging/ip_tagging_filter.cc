@@ -23,18 +23,21 @@ IpTagsProvider::IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& ta
       tags_(tags_loader_.loadTags(ip_tags_path_, creation_status)),
       ip_tags_reload_dispatcher_(api.allocateDispatcher("ip_tags_reload_routine")),
       ip_tags_file_watcher_(dispatcher.createFilesystemWatcher()), owner_(owner) {
-  if (ip_tags_path.empty()) {
-    creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
-  }
-  ip_tags_reload_thread_ = api.threadFactory().createThread(
-      [this]() -> void {
-        ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
-        THROW_IF_NOT_OK(
-            ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
-                                            [this](uint32_t) { return onIpTagsFileUpdate(); }));
-        ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-      },
-      Thread::Options{std::string("ip_tags_reload_routine")});
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    if (ip_tags_path.empty()) {
+      creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
+      return;
+    }
+    ip_tags_reload_thread_ = api.threadFactory().createThread(
+        [this, &creation_status]() -> void {
+          ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
+          SET_AND_RETURN_IF_NOT_OK(ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
+                                              [this](uint32_t) { return onIpTagsFileUpdate(); }),
+                                  creation_status);
+          ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+        },
+        Thread::Options{std::string("ip_tags_reload_routine")});
+
 }
 
 IpTagsProvider::~IpTagsProvider() {
@@ -94,18 +97,20 @@ LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path,
         try {
           MessageUtil::loadFromYaml(file_or_error.value(), ip_tags_proto, validation_visitor_);
         } catch (const EnvoyException& e) {
-          ENVOY_LOG_MISC(warn, "failed to parse ip tags file: {}", e.what());
+          creation_status =
+              absl::InvalidArgumentError(fmt::format("failed to parse ip tags file: {}", e.what()));
           return nullptr;
         }
       } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
         try {
           MessageUtil::loadFromJson(file_or_error.value(), ip_tags_proto, validation_visitor_);
         } catch (const EnvoyException& e) {
-          ENVOY_LOG_MISC(warn, "failed to parse ip tags file: {}", e.what());
+          creation_status =
+              absl::InvalidArgumentError(fmt::format("failed to parse ip tags file: {}", e.what()));
           return nullptr;
         }
       }
-      return parseIpTags(ip_tags_proto.ip_tags(), creation_status);
+      return parseIpTagsAsProto(ip_tags_proto.ip_tags(), creation_status);
     } else {
       return nullptr;
     }
@@ -113,7 +118,7 @@ LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path,
   return nullptr;
 }
 
-LcTrieSharedPtr IpTagsLoader::parseIpTags(
+LcTrieSharedPtr IpTagsLoader::parseIpTagsAsProto(
     const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
     absl::Status& creation_status) {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
@@ -189,25 +194,23 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         absl::InvalidArgumentError("Only one of ip_tags or ip_tags_path can be configured.");
   }
 
-  if (creation_status.ok()) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     if (!config.ip_tags().empty()) {
-      trie_ = tags_loader_.parseIpTags(config.ip_tags(), creation_status);
+      trie_ = tags_loader_.parseIpTagsAsProto(config.ip_tags(), creation_status);
     } else {
       provider_ = ip_tags_registry_->get(
           ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
           [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_,
           creation_status);
+      RETURN_ONLY_IF_NOT_OK_REF(creation_status);
       if (provider_ && provider_->ipTags()) {
         trie_ = provider_->ipTags();
       } else {
-        if (creation_status.ok()) {
           creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
-        }
       }
       stat_name_set_->rememberBuiltin("ip_tags_reload_success");
       stat_name_set_->rememberBuiltin("ip_tags_reload_error");
     }
-  }
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {

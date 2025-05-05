@@ -33,7 +33,7 @@ public:
   LcTrieSharedPtr loadTags(const std::string& ip_tags_path, absl::Status& creation_status);
 
   LcTrieSharedPtr
-  parseIpTags(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
+  parseIpTagsAsProto(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
               absl::Status& creation_status);
 
 private:
