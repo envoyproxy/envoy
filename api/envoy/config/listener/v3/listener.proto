@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
@@ -53,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -115,6 +116,20 @@ message Listener {
   message InternalListenerConfig {
   }
 
+  // Configuration for filter chains discovery.
+  // [#not-implemented-hide:]
+  message FcdsConfig {
+    // Optional name to present to the filter chain discovery service. This may be an arbitrary name with arbitrary
+    // length. If a name is not provided, the listener's name is used. Refer to :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.name>`.
+    // for details on how listener name is determined if unspecified. In addition, this may be a xdstp:// URL.
+    string name = 1;
+
+    // Configuration for the source of FCDS updates for this listener.
+    // .. note::
+    //   This discovery service only supports ``AGGREGATED_GRPC`` API type.
+    core.v3.ConfigSource config_source = 2;
+  }
+
   reserved 14, 23;
 
   // The unique name by which this listener is known. If no name is provided,
@@ -146,6 +161,12 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
+
+  // Discover filter chains configurations by external service. Dynamic discovery of filter chains is allowed
+  // while having statically configured filter chains, however, a filter chain name must be unique within a
+  // listener. If a discovered filter chain matches a name of an existing filter chain, it is discarded.
+  // [#not-implemented-hide:]
+  FcdsConfig fcds_config = 36;
 
   // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
   // network properties. This matcher is used as a replacement for the filter chain match condition

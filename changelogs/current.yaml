@@ -18,6 +18,21 @@ minor_behavior_changes:
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
+- area: oauth2
+  change: |
+    Reset CSRF token when token validation fails during redirection.
+    If the CSRF token cookie is present during the redirection to the authorization server, it will be validated.
+    Previously, if this validation failed, the oauth flow would fail. Now the CSRF token will simply be reset. This fixes
+    the case where an hmac secret change causes a redirect flow, but the CSRF token cookie hasn't yet expired
+    causing a CSRF token validation failure.
+- area: cel
+  change: |
+    Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
+    ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
+- area: dns
+  change: |
+    Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
+    <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -41,6 +56,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.quic_support_certificate_compression`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy_reloadable_features_filter_access_loggers_first`` and legacy code paths.
 - area: tcp_proxy
   change: |
@@ -51,15 +69,33 @@ removed_config_or_runtime:
 - area: sni
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san`` and legacy code paths.
-
+- area: ext_proc
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.ext_proc_timeout_error`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.extend_h3_accept_untrusted`` and legacy code paths.
+- area: lua
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
+- area: resource_monitors
+  change: |
+    added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
+    memory pressure, with configurable max_memory_bytes limit
+    :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`.
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+- area: url_template
+  change: |
+    Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
 
 deprecated:

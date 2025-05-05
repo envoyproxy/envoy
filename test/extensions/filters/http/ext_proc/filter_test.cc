@@ -797,6 +797,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
 
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_append()->set_value(false);
     resp_add1->mutable_header()->set_key("x-new-header");
     resp_add1->mutable_header()->set_raw_value("new");
   });
@@ -848,6 +849,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
@@ -903,6 +905,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -2924,6 +2927,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2941,6 +2945,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2974,6 +2979,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2991,6 +2997,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -3096,6 +3103,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
   });
@@ -3175,6 +3183,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainWithHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -3203,6 +3212,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainResponseNotWithHeaderMut
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
   });
@@ -3234,6 +3244,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key(":method");
         hdr->mutable_header()->set_raw_value("POST");
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
@@ -3295,6 +3306,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("x-test-header");
         hdr->mutable_header()->set_raw_value("true");
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
@@ -3498,6 +3510,7 @@ TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
         auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
         auto add1 = headers_mut->add_set_headers();
         // Not allowed to change the "host" header by default
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("Host");
         add1->mutable_header()->set_raw_value("wrong:1234");
         // Not allowed to remove x-envoy headers by default.
@@ -3546,6 +3559,7 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
       resp1->mutable_request_headers()->mutable_response()->mutable_header_mutation();
   auto add1 = headers_mut->add_set_headers();
   // Not allowed to change the "host" header by default
+  add1->mutable_append()->set_value(false);
   add1->mutable_header()->set_key("Host");
   add1->mutable_header()->set_raw_value("wrong:1234");
   // Not allowed to remove x-envoy headers by default.
@@ -3590,9 +3604,11 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
         // The trailer mutation in the response does not exceed the count limit 100 or the
         // size limit 2kb. But the result header map size exceeds the count limit 2kb.
         auto add1 = headers_mut->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-new-header-0123456789");
         add1->mutable_header()->set_raw_value("new-header-0123456789");
         auto add2 = headers_mut->add_set_headers();
+        add2->mutable_append()->set_value(false);
         add2->mutable_header()->set_key("x-some-other-header-0123456789");
         add2->mutable_header()->set_raw_value("some-new-header-0123456789");
       },
@@ -4753,6 +4769,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -4796,6 +4813,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -5090,9 +5108,11 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
         auto* headers_response = response->mutable_request_headers();
         auto* hdr =
             headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("foo");
         hdr->mutable_header()->set_raw_value("gift-from-external-server");
         hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key(":path");
         hdr->mutable_header()->set_raw_value("/mutated_path/bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
@@ -5195,9 +5215,11 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         auto* headers_response = response->mutable_response_headers();
         auto* hdr =
             headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("foo");
         hdr->mutable_header()->set_raw_value("gift-from-external-server");
         hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("new_response_header");
         hdr->mutable_header()->set_raw_value("bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
@@ -5296,6 +5318,7 @@ TEST_F(HttpFilterTest, ResponseHeaderMutationErrors) {
     auto* header_mut =
         resp.mutable_response_headers()->mutable_response()->mutable_header_mutation();
     auto* header = header_mut->add_set_headers();
+    header->mutable_append()->set_value(false);
     header->mutable_header()->set_key(":scheme");
     header->mutable_header()->set_raw_value("invalid");
   });
@@ -5400,6 +5423,7 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
 
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_append()->set_value(false);
     resp_add1->mutable_header()->set_key("x-new-header");
     resp_add1->mutable_header()->set_raw_value("new");
   });
@@ -5537,6 +5561,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
 
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_append()->set_value(false);
     resp_add1->mutable_header()->set_key("x-new-header");
     resp_add1->mutable_header()->set_raw_value("new");
   });
@@ -5717,6 +5742,7 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
@@ -5828,6 +5854,7 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponse) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -5886,6 +5913,7 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponseOnError) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -6008,6 +6036,7 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
       [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailers_resp) {
         auto headers_mut = trailers_resp.mutable_header_mutation();
         auto* resp_add1 = headers_mut->add_set_headers();
+        resp_add1->mutable_append()->set_value(false);
         resp_add1->mutable_header()->set_key("x-new-header1");
         resp_add1->mutable_header()->set_raw_value("new");
       },

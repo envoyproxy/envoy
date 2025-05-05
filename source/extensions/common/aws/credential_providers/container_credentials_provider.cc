@@ -1,5 +1,11 @@
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -7,7 +13,7 @@ namespace Aws {
 
 ContainerCredentialsProvider::ContainerCredentialsProvider(
     Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token,
     absl::string_view cluster_name)
@@ -32,9 +38,9 @@ void ContainerCredentialsProvider::refresh() {
   absl::string_view host, path;
 
   ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}",
-            aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
+            aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
   Http::Utility::extractHostPathFromUri(
-      aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value(), host, path);
+      aws_cluster_manager_->getUriFromClusterName(cluster_name_).value(), host, path);
 
   // ECS Task role: use const authorization_token set during initialization
   absl::string_view authorization_header = authorization_token_;

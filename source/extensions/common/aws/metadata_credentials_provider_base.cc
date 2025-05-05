@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include "envoy/server/factory_context.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -7,7 +9,7 @@ namespace Aws {
 
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer)

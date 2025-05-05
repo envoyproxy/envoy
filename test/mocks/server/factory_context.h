@@ -21,10 +21,10 @@ public:
   ~MockFactoryContext() override;
 
   // Server::Configuration::GenericFactoryContext
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   // Server::Configuration::FactoryContext
   MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
@@ -46,7 +46,7 @@ class MockUpstreamFactoryContext : public UpstreamFactoryContext {
 public:
   MockUpstreamFactoryContext();
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
   testing::NiceMock<Init::MockManager> init_manager_;

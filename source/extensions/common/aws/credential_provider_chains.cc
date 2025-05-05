@@ -1,5 +1,9 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
+#include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -38,8 +42,8 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
 }
 
 CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
         web_identity_config) {
 
@@ -49,13 +53,13 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
   auto cluster_name = stsClusterName(region);
   auto uri = Utility::getSTSEndpoint(region) + ":443";
 
-  auto status = aws_cluster_manager.ref()->addManagedCluster(
+  auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
   auto credential_provider = std::make_shared<WebIdentityCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, refresh_state,
       initialization_timer, web_identity_config);
-  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
 
@@ -133,8 +137,8 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
     add(factories.createContainerCredentialsProvider(
-        api, context, makeOptRef(aws_cluster_manager_), MetadataFetcher::create,
-        CONTAINER_METADATA_CLUSTER, uri, refresh_state, initialization_timer));
+        api, context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+        uri, refresh_state, initialization_timer));
   } else if (!full_uri.empty()) {
     auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
@@ -144,19 +148,18 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                 "{} and authorization token",
                 full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, makeOptRef(aws_cluster_manager_), MetadataFetcher::create,
-          CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer,
-          authorization_token));
+          api, context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+          full_uri, refresh_state, initialization_timer, authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, makeOptRef(aws_cluster_manager_), MetadataFetcher::create,
-          CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
+          api, context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
+          full_uri, refresh_state, initialization_timer));
     }
   } else if (metadata_disabled != "true") {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
-        api, context, makeOptRef(aws_cluster_manager_), MetadataFetcher::create, refresh_state,
+        api, context, aws_cluster_manager_, MetadataFetcher::create, refresh_state,
         initialization_timer, EC2_METADATA_CLUSTER));
   }
 }
@@ -166,12 +169,12 @@ SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
     Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     absl::string_view cluster_name, absl::string_view credential_uri,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) {
 
-  auto status = aws_cluster_manager.ref()->addManagedCluster(
+  auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::STATIC, credential_uri);
 
   auto credential_provider =
@@ -186,7 +189,7 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
                     refresh_state, initialization_timer, authorization_token, cluster_name);
               });
 
-  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
   if (handleOr.ok()) {
@@ -201,11 +204,11 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
 CredentialsProviderSharedPtr
 DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
     Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name) {
 
-  auto status = aws_cluster_manager.ref()->addManagedCluster(
+  auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::STATIC, EC2_METADATA_HOST);
   auto credential_provider =
       context.singletonManager()
@@ -219,7 +222,7 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
                     initialization_timer, cluster_name);
               });
 
-  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
   if (handleOr.ok()) {
@@ -233,8 +236,8 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
 }
 
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
         web_identity_config) {
 
@@ -244,13 +247,13 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
   auto cluster_name = stsClusterName(region);
   auto uri = Utility::getSTSEndpoint(region) + ":443";
 
-  auto status = aws_cluster_manager.ref()->addManagedCluster(
+  auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
   auto credential_provider = std::make_shared<WebIdentityCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, refresh_state,
       initialization_timer, web_identity_config);
-  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
 
