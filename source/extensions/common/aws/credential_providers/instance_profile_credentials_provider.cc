@@ -1,5 +1,11 @@
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
+#include "envoy/server/factory_context.h"
+
+#include "source/common/http/message_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -13,10 +19,6 @@ InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
     : MetadataCredentialsProviderBase(api, context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer) {}
-
-bool InstanceProfileCredentialsProvider::needsRefresh() {
-  return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
-}
 
 void InstanceProfileCredentialsProvider::refresh() {
 

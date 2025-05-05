@@ -1,9 +1,7 @@
 #pragma once
 
-#include "source/common/common/logger.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
-#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
 
 namespace Envoy {

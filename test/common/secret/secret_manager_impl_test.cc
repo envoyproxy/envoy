@@ -83,17 +83,17 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
       Ssl::TlsCertificateConfigImpl::create(
           *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_)
-          .value();
+          .value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config->certificateChain());
+            tls_config.certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config->privateKey());
+            tls_config.privateKey());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static TLS certificate
@@ -384,14 +384,14 @@ tls_certificate:
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config->certificateChain());
+            tls_config.certificateChain());
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config->privateKey());
+            tls_config.privateKey());
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
@@ -483,11 +483,11 @@ tls_certificate:
                   ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
-  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config->certificateChain());
-  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config->privateKey());
-  EXPECT_EQ("DUMMY_PASSWORD", tls_config->password());
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value());
+  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
+  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
+  EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
 
   // Private key and password are removed.
   const std::string expected_secrets_config_dump = R"EOF(

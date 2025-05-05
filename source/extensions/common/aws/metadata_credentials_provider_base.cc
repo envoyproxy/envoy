@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include "envoy/server/factory_context.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -51,10 +53,8 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   handleFetchDone();
 }
 
-// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
 
-// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
 
   if (tls_slot_) {
