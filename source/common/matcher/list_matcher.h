@@ -32,13 +32,14 @@ public:
       if (maybe_match.match_state_ == MatchState::UnableToMatch) {
         return {MatchState::UnableToMatch, {}, nullptr};
       }
-      // No match.
-      if (!maybe_match.result())
-        continue;
-      // Provide a reentrant ListMatcher to continue traversal from the next index.
-      return {MatchState::MatchComplete, matcher.second,
-              std::make_unique<ListMatcherReentrant<DataType>>(*this, i + 1)};
+      // Check for a match.
+      if (maybe_match.result()) {
+        // Provide a reentrant ListMatcher to continue traversal from the next index.
+        return {MatchState::MatchComplete, matcher.second,
+                std::make_unique<ListMatcherReentrant<DataType>>(*this, i + 1)};
+      }
     }
+    // No matches found.
     return {MatchState::MatchComplete, on_no_match_, nullptr};
   }
 
