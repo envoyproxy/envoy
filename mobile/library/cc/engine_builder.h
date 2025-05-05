@@ -44,6 +44,7 @@ public:
   EngineBuilder& setDisableDnsRefreshOnNetworkChange(bool disable_dns_refresh_on_network_change);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& setDnsNumRetries(uint32_t dns_num_retries);
+  EngineBuilder& setGetaddrinfoNumThreads(uint32_t num_threads);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
@@ -157,6 +158,7 @@ private:
   bool disable_dns_refresh_on_failure_{false};
   bool disable_dns_refresh_on_network_change_{false};
   absl::optional<uint32_t> dns_num_retries_ = 3;
+  uint32_t getaddrinfo_num_threads_ = 1;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 15;
   std::string app_version_ = "unspecified";

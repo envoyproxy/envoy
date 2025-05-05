@@ -40,6 +40,7 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:http",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
     ],
     # http_mocks needs this.
@@ -50,6 +51,9 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
     ],
 )
 
