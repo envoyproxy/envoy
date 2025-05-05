@@ -79,7 +79,19 @@ ExprDescriptorFactory::createDescriptorProducerFromProto(
       return absl::InvalidArgumentError(absl::StrCat("Unable to parse descriptor expression: ",
                                                      parse_status.status().ToString()));
     }
-    return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr());
+
+    // Convert to proper Expr type for the old API
+    std::string serialized_expr;
+    if (!parse_status.value().expr().SerializeToString(&serialized_expr)) {
+      return absl::InvalidArgumentError("Failed to serialize expression");
+    }
+
+    google::api::expr::v1alpha1::Expr v1alpha1_expr;
+    if (!v1alpha1_expr.ParseFromString(serialized_expr)) {
+      return absl::InvalidArgumentError("Failed to parse expression into v1alpha1 format");
+    }
+
+    return std::make_unique<ExpressionDescriptor>(config, builder, v1alpha1_expr);
   }
 #endif
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:

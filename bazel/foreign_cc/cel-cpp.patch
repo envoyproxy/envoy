@@ -1,0 +1,47 @@
+From 6e93e8ca24b24642444a51b09d9343a9b9a3b775 Mon Sep 17 00:00:00 2001
+From: Rohit Agrawal <rohit.agrawal@databricks.com>
+Date: Tue, 6 May 2025 17:30:08 +0900
+Subject: [PATCH 1/2] Patches
+
+---
+ common/value.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/common/value.h b/common/value.h
+index 06a03c13d..9f5d77980 100644
+--- a/common/value.h
++++ b/common/value.h
+@@ -2733,7 +2733,7 @@ absl::StatusOr<std::pair<Value, int>> StructValueMixin<Base>::Qualify(
+     absl::Nonnull<const google::protobuf::DescriptorPool*> descriptor_pool,
+     absl::Nonnull<google::protobuf::MessageFactory*> message_factory,
+     absl::Nonnull<google::protobuf::Arena*> arena) const {
+-  ABSL_DCHECK_GT(qualifiers.size(), 0);
++  ABSL_DCHECK_GT(static_cast<int>(qualifiers.size()), 0);
+   ABSL_DCHECK(descriptor_pool != nullptr);
+   ABSL_DCHECK(message_factory != nullptr);
+   ABSL_DCHECK(arena != nullptr);
+
+From 553448099a76b5ad0e488fb491c62dd1759c45fe Mon Sep 17 00:00:00 2001
+From: Rohit Agrawal <rohit.agrawal@databricks.com>
+Date: Tue, 6 May 2025 17:36:08 +0900
+Subject: [PATCH 2/2] Patches
+
+---
+ runtime/type_registry.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/runtime/type_registry.h b/runtime/type_registry.h
+index 2b247946c..3e5ad423b 100644
+--- a/runtime/type_registry.h
++++ b/runtime/type_registry.h
+@@ -77,8 +77,8 @@ class TypeRegistry {
+   // Move-only
+   TypeRegistry(const TypeRegistry& other) = delete;
+   TypeRegistry& operator=(TypeRegistry& other) = delete;
+-  TypeRegistry(TypeRegistry&& other) = default;
+-  TypeRegistry& operator=(TypeRegistry&& other) = default;
++  TypeRegistry(TypeRegistry&& other) = delete;
++  TypeRegistry& operator=(TypeRegistry&& other) = delete;
+
+   // Registers a type such that it can be accessed by name, i.e. `type(foo) ==
+   // my_type`. Where `my_type` is the type being registered.
