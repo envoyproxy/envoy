@@ -71,7 +71,7 @@ class AdminImpl : public Admin,
                   Logger::Loggable<Logger::Id::admin> {
 public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
-            bool ignore_global_conn_limit);
+            bool ignore_global_conn_limit, absl::flat_hash_set<std::string> allow_listed_routes);
 
   Http::Code runCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
@@ -128,6 +128,9 @@ public:
     return request_id_extension_;
   }
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
+  bool acceptTargetRoute(absl::string_view route_name) {
+    return allow_listed_route_.contains(route_name);
+  }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
@@ -451,6 +454,7 @@ private:
   AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
+  absl::flat_hash_set<std::string> allow_listed_route_;
   const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
