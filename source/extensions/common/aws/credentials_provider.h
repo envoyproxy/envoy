@@ -17,6 +17,7 @@ constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
 constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
+constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 
 /**
  * AWS credentials containers

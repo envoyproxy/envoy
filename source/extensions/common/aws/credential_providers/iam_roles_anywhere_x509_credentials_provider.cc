@@ -10,8 +10,6 @@ namespace Aws {
 
 using std::chrono::seconds;
 
-constexpr std::chrono::hours REFRESH_INTERVAL{1};
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
