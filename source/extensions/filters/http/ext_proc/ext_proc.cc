@@ -743,7 +743,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // StopIterationAndWatermark as well to stop the ActiveStream from returning error when the
       // last chunk added to stream buffer exceeds the buffer limit.
       state.setPaused(true);
-      if (state.bodyMode()  == ProcessingMode::BUFFERED) {
+      if (state.bodyMode() == ProcessingMode::BUFFERED) {
         return FilterDataStatus::StopIterationAndBuffer;
       }
       return FilterDataStatus::StopIterationAndWatermark;

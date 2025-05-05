@@ -5740,7 +5740,7 @@ TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   // Sending a request with 4MiB bytes body.
   const std::string body_sent(4096 * 1024, 's');
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
-    codec_client_->startRequest(default_headers);
+      codec_client_->startRequest(default_headers);
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, body_sent, true);
