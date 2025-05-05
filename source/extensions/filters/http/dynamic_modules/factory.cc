@@ -71,7 +71,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
               proto_config.filter_name(), config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
-    return absl::InvalidArgumentError("Failed to create filter config: " +
+    return absl::InvalidArgumentError("Failed to create pre-route filter config: " +
                                       std::string(filter_config.status().message()));
   }
   return filter_config.value();

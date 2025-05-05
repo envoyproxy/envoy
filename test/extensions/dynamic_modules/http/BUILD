@@ -16,6 +16,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_new",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_per_route_config_destroy",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_per_route_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_body",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_headers",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_trailers",

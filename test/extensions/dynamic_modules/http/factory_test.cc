@@ -175,6 +175,39 @@ filter_config:
         result.status().message(),
         testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
   }
+
+  std::vector<std::pair<std::string, std::string>> per_route_test_cases = {
+      {"no_http_filter_per_route_config_new",
+       "envoy_dynamic_module_on_http_filter_per_route_config_new"},
+      {"no_http_filter_per_route_config_destroy",
+       "envoy_dynamic_module_on_http_filter_per_route_config_destroy"},
+  };
+
+  for (const auto& test_case : per_route_test_cases) {
+    const std::string& module_name = test_case.first;
+    const std::string& missing_symbol_name = test_case.second;
+
+    const std::string yaml = fmt::format(R"EOF(
+dynamic_module_config:
+    name: {}
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF",
+                                         module_name);
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+    auto result = factory.createRouteSpecificFilterConfig(
+        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        result.status().message(),
+        testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
+  }
 }
 
 } // namespace HttpFilters
