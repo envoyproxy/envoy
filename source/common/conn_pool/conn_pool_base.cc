@@ -273,7 +273,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   host_->cluster().resourceManager(priority_).requests().dec();
   // We don't update the capacity for HTTP/3 as the stream count should only
   // increase when a MAX_STREAMS frame is received.
-  if (trackStreamCapacity()) {
+  if (trackStreamCapacity() && client.state() != ActiveClient::State::Draining) {
     // If the effective client capacity was limited by concurrency, increase connected capacity.
     bool limited_by_concurrency =
         client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
@@ -900,6 +900,8 @@ void ActiveClient::drain() {
 
   if (unused > 0) {
     parent_.decrConnectingAndConnectedStreamCapacity(unused, *this);
+  } else if (unused < 0) {
+    parent_.incrConnectingAndConnectedStreamCapacity(-unused, *this);
   }
 }
 

@@ -113,7 +113,7 @@ public:
   }
 
   // Sets the remaining streams to 0, and updates pool and cluster capacity.
-  virtual void drain();
+  void drain();
 
   virtual bool hasHandshakeCompleted() const {
     ASSERT(!supportsEarlyData());
