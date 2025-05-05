@@ -1,0 +1,118 @@
+diff --git a/configure.ac b/configure.ac
+index 1234567..abcdef0 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -57,8 +57,14 @@ AC_CHECK_HEADERS([stddef.h])
+ AC_CHECK_HEADERS([stdlib.h])
+ AC_CHECK_HEADERS([string.h])
+ AC_CHECK_HEADERS([sys/time.h unistd.h utime.h locale.h])
+-AC_CHECK_HEADERS([numa.h],,AC_MSG_ERROR([numa.h not found]))
++
++dnl Make NUMA optional
++AC_CHECK_HEADERS([numa.h], [have_numa_headers=yes], [have_numa_headers=no])
++if test "x$have_numa_headers" = "xyes"; then
++    AC_DEFINE([HAVE_NUMA_H], [1], [Define if you have numa.h])
++fi
+ 
+ dnl Checks for typedefs, structures, and compiler characteristics.
+ AC_C_CONST
+ 
+ dnl Checks for library functions.
+@@ -70,7 +76,12 @@ AC_FUNC_VPRINTF
+ 
+ dnl Checks for libraries.
+ AC_CHECK_LIB([pthread], [pthread_create])
+-AC_CHECK_LIB([numa], [numa_available])
++
++dnl Make NUMA library optional
++if test "x$have_numa_headers" = "xyes"; then
++    AC_CHECK_LIB([numa], [numa_available], [have_numa_lib=yes], [have_numa_lib=no])
++    test "x$have_numa_lib" = "xyes" && AC_DEFINE([HAVE_NUMA_LIB], [1], [Define if you have libnuma])
++fi
+
+diff --git a/src/qatzip.c b/src/qatzip.c
+index 1234567..abcdef0 100644
+--- a/src/qatzip.c
++++ b/src/qatzip.c
+@@ -34,7 +34,9 @@
+ #include <string.h>
+ #include <pthread.h>
+ #include <sched.h>
++#ifdef HAVE_NUMA_H
+ #include <numa.h>
++#endif
+ #include <sys/wait.h>
+ #include <sys/mman.h>
+ #include <sys/time.h>
+@@ -876,6 +878,7 @@ CpaStatus qzGrabBanks(unsigned int inf_srv,
+                       unsigned int *bank_id,
+                       unsigned int num_banksH)
+ {
++#if defined(HAVE_NUMA_H) && defined(HAVE_NUMA_LIB)
+     unsigned int i = 0;
+     unsigned int j = 0;
+     int bank = 0;
+@@ -951,6 +954,9 @@ CpaStatus qzGrabBanks(unsigned int inf_srv,
+     }
+ 
+     return CPA_STATUS_SUCCESS;
++#else
++    return CPA_STATUS_UNSUPPORTED;
++#endif
+ }
+ 
+ static inline CpaStatus qzSetupBanks(void)
+@@ -963,6 +969,7 @@ static inline CpaStatus qzSetupBanks(void)
+         goto end;
+     }
+ 
++#if defined(HAVE_NUMA_H) && defined(HAVE_NUMA_LIB)
+     if (max_inf_num > 1) {
+         for (i = 0; i < max_inf_num; i++) {
+             if (numa_available() != -1) {
+@@ -981,6 +988,7 @@ static inline CpaStatus qzSetupBanks(void)
+             }
+         }
+     }
++#endif
+ 
+     status = CPA_STATUS_SUCCESS;
+ end:
+@@ -988,7 +996,7 @@ end:
+ }
+ 
+ int checkInsufficientResources(void) {
+-    
++
+     int ret;
+     int cpuCnt = 0;
+ 
+@@ -996,6 +1004,7 @@ int checkInsufficientResources(void) {
+         return 0;
+     }
+ 
++#if defined(HAVE_NUMA_H) && defined(HAVE_NUMA_LIB)
+     if (numa_available() != -1) {
+         struct bitmask *cpus = numa_allocate_cpumask();
+         if (!cpus) {
+@@ -1009,6 +1018,9 @@ int checkInsufficientResources(void) {
+     } else {
+         return 0;
+     }
++#else
++    return 0;
++#endif
+ }
+ 
+ 
+@@ -1019,10 +1031,12 @@ void qzDeviceFreeBanks(void) {
+         return;
+     }
+ 
++#if defined(HAVE_NUMA_H) && defined(HAVE_NUMA_LIB)
+     if (numa_available() != -1) {
+         FreeCoreMap();
+         free(g_numa_nodes_ptr);
+     }
++#endif
+ } 
