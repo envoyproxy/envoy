@@ -183,7 +183,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   }
 }
 
-void CredentialsProviderChainFactories::commonCreateContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context, 
+absl::StatusOr<CredentialsProviderSharedPtr> CredentialsProviderChainFactoriesCommon::commonCreateContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context, 
   AwsClusterManagerPtr& aws_cluster_manager,
   CredentialsProviderChainFactories &factories, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
   std::chrono::seconds initialization_timer) 
@@ -195,9 +195,9 @@ void CredentialsProviderChainFactories::commonCreateContainerCredentialsProvider
   if (!relative_uri.empty()) {
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
-    add(factories.createContainerCredentialsProvider(
+    return factories.createContainerCredentialsProvider(
          context, aws_cluster_manager, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
-        uri, refresh_state, initialization_timer));
+        uri, refresh_state, initialization_timer);
   } else if (!full_uri.empty()) {
     auto authorization_token =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
@@ -211,9 +211,9 @@ void CredentialsProviderChainFactories::commonCreateContainerCredentialsProvider
           full_uri, refresh_state, initialization_timer, authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
-      add(factories.createContainerCredentialsProvider(
+      return factories.createContainerCredentialsProvider(
           context, aws_cluster_manager, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
-          full_uri, refresh_state, initialization_timer));
+          full_uri, refresh_state, initialization_timer);
     }
   }
 }

@@ -15,10 +15,11 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class CredentialsProviderChainFactories {
+class CredentialsProviderChainFactories: public Logger::Loggable<Logger::Id::aws> {
 public:
   virtual ~CredentialsProviderChainFactories() = default;
 
+private:
   virtual CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const PURE;
 
   virtual CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
@@ -44,12 +45,7 @@ public:
       AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
-   
-  void commonCreateContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context, 
-    AwsClusterManagerPtr& aws_cluster_manager,
-    CredentialsProviderChainFactories &factories, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-    std::chrono::seconds initialization_timer);
-    
+
 protected:
   std::string stsClusterName(absl::string_view region) {
     return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
@@ -70,6 +66,15 @@ protected:
     }
     return actual_session_name;
   }
+
+};
+
+class CredentialsProviderChainFactoriesCommon {
+  private:
+    void commonCreateContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context, 
+      AwsClusterManagerPtr& aws_cluster_manager,
+      CredentialsProviderChainFactories &factories, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer);
 
 };
 
@@ -96,6 +101,7 @@ protected:
  * https://github.com/aws/aws-sdk-cpp/blob/master/aws-cpp-sdk-core/source/auth/AWSCredentialsProviderChain.cpp#L44
  */
 class DefaultCredentialsProviderChain : public CredentialsProviderChain,
+public CredentialsProviderChainFactoriesCommon,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(Server::Configuration::ServerFactoryContext& context,
@@ -146,6 +152,7 @@ private:
 };
 
 class CustomCredentialsProviderChain : public CredentialsProviderChain,
+public CredentialsProviderChainFactoriesCommon,
                                        public CredentialsProviderChainFactories {
 public:
   CustomCredentialsProviderChain(
