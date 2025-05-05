@@ -13,10 +13,9 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 CELSampler::CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
-                       Expr::BuilderInstanceSharedPtr builder,
-                       const google::api::expr::v1alpha1::Expr& expr)
-    : local_info_(local_info), builder_(builder), parsed_expr_(expr) {
-  compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
+                       Expr::BuilderInstanceSharedPtr builder, const cel::expr::Expr& expr)
+    : local_info_(local_info), builder_(builder) {
+  compiled_expr_ = Expr::createExpression(builder_->builder(), expr);
 }
 
 SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_info,
