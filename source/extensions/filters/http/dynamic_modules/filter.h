@@ -15,7 +15,8 @@ using namespace Envoy::Http;
  * A filter that uses a dynamic module and corresponds to a single HTTP stream.
  */
 class DynamicModuleHttpFilter : public Http::StreamFilter,
-                                public std::enable_shared_from_this<DynamicModuleHttpFilter> {
+                                public std::enable_shared_from_this<DynamicModuleHttpFilter>,
+                                public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
   ~DynamicModuleHttpFilter() override;
@@ -94,6 +95,13 @@ public:
     return nullptr;
   }
 
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+
 private:
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the
@@ -117,7 +125,36 @@ private:
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
+
+  /**
+   * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
+   * callout from the parent HTTP filter.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
+        : filter_(std::move(filter)), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const AsyncClient::Request& request, ResponseMessagePtr&& response) override;
+    void onFailure(const AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+    // This is the request object that is used to send the HTTP callout. It is used to cancel the
+    // callout if the filter is destroyed before the callout is completed.
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    uint32_t callout_id_;
+  };
+
+  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
+      http_callouts_;
 };
+
+using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;
 
 } // namespace HttpFilters
 } // namespace DynamicModules
