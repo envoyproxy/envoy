@@ -399,7 +399,7 @@ class FieldSpec:
         """
         Whether the field is nullable in given version.
         Fields can be non-nullable in earlier versions.
-        See https://github.com/apache/kafka/tree/3.8.0/clients/src/main/resources/common/message#nullable-fields
+        See https://github.com/apache/kafka/tree/4.0.0/clients/src/main/resources/common/message#nullable-fields
         """
         return version in self.version_usage_as_nullable
 
