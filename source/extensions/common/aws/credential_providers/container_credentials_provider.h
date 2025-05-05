@@ -41,7 +41,6 @@ private:
   const std::string credential_uri_;
   const std::string authorization_token_;
 
-  bool needsRefresh() override;
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };

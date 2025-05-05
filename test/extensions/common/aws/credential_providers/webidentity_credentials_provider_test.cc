@@ -616,32 +616,6 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-TEST_F(WebIdentityCredentialsProviderTest, Coverage) {
-
-  // Setup timer.
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  expectDocument(200, std::move(R"EOF(
-{
-  "AssumeRoleWithWebIdentityResponse": {
-    "UnexpectedResponse": ""
-  }
-}
-)EOF"));
-
-  setupProvider(MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh,
-                std::chrono::seconds(2));
-  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
-
-  // Kick off a refresh
-  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
-  provider_friend.onClusterAddOrUpdate();
-  timer_->invokeCallback();
-
-  EXPECT_TRUE(provider_friend.needsRefresh());
-}
-
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

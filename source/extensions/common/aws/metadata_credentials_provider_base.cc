@@ -53,10 +53,8 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   handleFetchDone();
 }
 
-// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
 
-// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
 
   if (tls_slot_) {
