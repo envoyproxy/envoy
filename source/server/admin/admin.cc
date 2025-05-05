@@ -510,6 +510,11 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
+  
+  if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
+    return Http::Code::Unauthorized;
+  }
+
   AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
