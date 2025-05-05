@@ -114,6 +114,14 @@ TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimit) {
   testAlpnHandshake({});
 }
 
+// Test that increasing the limit upon connect, versus what was in the cache before connection,
+// works correctly.
+TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimitAndEffectiveIncrease) {
+  expected_capacity_ = 1;
+  EXPECT_CALL(mock_cache_, getConcurrentStreams(_)).WillOnce(Return(1));
+  testAlpnHandshake(Protocol::Http2);
+}
+
 TEST_F(MixedConnPoolImplTest, HandshakeWithCachedLimitCapped) {
   EXPECT_CALL(mock_cache_, getConcurrentStreams(_))
       .WillOnce(Return(std::numeric_limits<uint32_t>::max()));
