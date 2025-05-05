@@ -229,6 +229,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   response_translate_options_.json_print_options.preserve_proto_field_names =
       print_config.preserve_proto_field_names();
   response_translate_options_.stream_newline_delimited = print_config.stream_newline_delimited();
+  response_translate_options_.stream_sse_style_delimited =
+      print_config.stream_sse_style_delimited();
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
@@ -683,9 +685,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
   if (end_stream) {
     if (method_->descriptor_->server_streaming()) {
-      // When there is no body in a streaming response, a empty JSON array is
-      // returned by default. Set the content type correctly.
-      headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+      if (per_route_config_->isStreamSSEStyleDelimited()) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+      } else {
+        headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+      }
     }
 
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
@@ -695,7 +699,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  if (per_route_config_->isStreamSSEStyleDelimited()) {
+    headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+  } else {
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  }
 
   // In case of HttpBody in response - content type is unknown at this moment.
   // So "Continue" only for regular streaming use case and StopIteration for
