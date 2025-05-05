@@ -660,6 +660,13 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
                              {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+using LdsIntegrationDeathTest = HttpProtocolIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationDeathTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
   config_helper_.disableDelayClose();
@@ -724,7 +731,7 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
 }
 
 // Sample test making sure our config framework informs on listener failure.
-TEST_P(LdsIntegrationTest, FailConfigLoad) {
+TEST_P(LdsIntegrationDeathTest, FailConfigLoad) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);

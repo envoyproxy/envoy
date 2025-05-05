@@ -251,6 +251,8 @@ protected:
   Server::MockOptions options_;
 };
 
+using OverloadManagerImplDeathTest = OverloadManagerImplTest;
+
 constexpr char kRegularStateConfig[] = R"YAML(
   refresh_interval:
     seconds: 1
@@ -866,7 +868,7 @@ TEST_F(OverloadManagerImplTest, MissingConfigTriggerType) {
                           "action not set for trigger.*");
 }
 
-TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTest) {
+TEST_F(OverloadManagerImplDeathTest, ProactiveResourceAllocateAndDeallocateResourceTest) {
   setDispatcherExpectation();
   auto manager(createOverloadManager(proactiveResourceConfig));
   Stats::Counter& failed_updates =
@@ -890,9 +892,10 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   bool resource_deallocated = manager->getThreadLocalOverloadState().tryDeallocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_TRUE(resource_deallocated);
-  EXPECT_DEATH(manager->getThreadLocalOverloadState().tryDeallocateResource(
-                   Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
-               ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
+  EXPECT_DEATH(
+      manager->getThreadLocalOverloadState().tryDeallocateResource(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
+      "(?s).*Cannot deallocate resource, current resource usage is lower than decrement.*");
   manager->stop();
 }
 
