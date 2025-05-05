@@ -21,14 +21,36 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
   }
 
   switch (input_expr.expr_specifier_case()) {
-  case CelExpression::ExprSpecifierCase::kParsedExpr:
-    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
-                                                             input_expr.parsed_expr().expr());
+  case CelExpression::ExprSpecifierCase::kParsedExpr: {
+    // Convert to proper Expr type for the new API
+    std::string serialized_expr;
+    if (!input_expr.parsed_expr().expr().SerializeToString(&serialized_expr)) {
+      throw EnvoyException("Failed to serialize expression");
+    }
+
+    google::api::expr::v1alpha1::Expr v1alpha1_expr;
+    if (!v1alpha1_expr.ParseFromString(serialized_expr)) {
+      throw EnvoyException("Failed to parse expression into v1alpha1 format");
+    }
+
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), v1alpha1_expr);
     return;
-  case CelExpression::ExprSpecifierCase::kCheckedExpr:
-    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
-                                                             input_expr.checked_expr().expr());
+  }
+  case CelExpression::ExprSpecifierCase::kCheckedExpr: {
+    // Convert to proper Expr type for the new API
+    std::string serialized_expr;
+    if (!input_expr.checked_expr().expr().SerializeToString(&serialized_expr)) {
+      throw EnvoyException("Failed to serialize expression");
+    }
+
+    google::api::expr::v1alpha1::Expr v1alpha1_expr;
+    if (!v1alpha1_expr.ParseFromString(serialized_expr)) {
+      throw EnvoyException("Failed to parse expression into v1alpha1 format");
+    }
+
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), v1alpha1_expr);
     return;
+  }
   case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }

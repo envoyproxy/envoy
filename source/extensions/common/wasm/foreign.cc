@@ -203,9 +203,53 @@ public:
       auto token = expr_context.createToken();
       auto& handler = expr_context.getExpression(token);
 
-      handler.parsed_expr_ = parse_status.value();
-      auto cel_expression_status = expr_context.builder()->CreateExpression(
-          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info());
+      // Convert cel::expr::ParsedExpr to google::api::expr::v1alpha1::ParsedExpr
+      std::string serialized_parsed_expr;
+      if (!parse_status.value().SerializeToString(&serialized_parsed_expr)) {
+        ENVOY_LOG(info, "expr_create serialization error");
+        expr_context.deleteExpression(token);
+        return WasmResult::BadArgument;
+      }
+
+      if (!handler.parsed_expr_.ParseFromString(serialized_parsed_expr)) {
+        ENVOY_LOG(info, "expr_create parse error during conversion");
+        expr_context.deleteExpression(token);
+        return WasmResult::BadArgument;
+      }
+
+      // Convert to cel::expr types for the new API
+      std::string serialized_expr;
+      if (!handler.parsed_expr_.expr().SerializeToString(&serialized_expr)) {
+        ENVOY_LOG(info, "expr_create expr serialization error");
+        expr_context.deleteExpression(token);
+        return WasmResult::BadArgument;
+      }
+
+      cel::expr::Expr cel_expr;
+      if (!cel_expr.ParseFromString(serialized_expr)) {
+        ENVOY_LOG(info, "expr_create expr conversion error");
+        expr_context.deleteExpression(token);
+        return WasmResult::BadArgument;
+      }
+
+      // Create source info object in the new format
+      cel::expr::SourceInfo cel_source_info;
+
+      // Convert source info as needed
+      std::string serialized_source_info;
+      handler.parsed_expr_.source_info().SerializeToString(&serialized_source_info);
+      if (!cel_source_info.ParseFromString(serialized_source_info)) {
+        // Create an empty source info if conversion fails
+        cel_source_info.Clear();
+      }
+
+      // Create warnings vector for the new API
+      std::vector<absl::Status> warnings;
+
+      // Call the new API with the proper types
+      auto cel_expression_status =
+          expr_context.builder()->CreateExpression(&cel_expr, &cel_source_info, &warnings);
+
       if (!cel_expression_status.ok()) {
         ENVOY_LOG(info, "expr_create compile error: {}", cel_expression_status.status().message());
         expr_context.deleteExpression(token);
