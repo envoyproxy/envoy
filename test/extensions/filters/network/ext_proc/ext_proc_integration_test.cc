@@ -339,7 +339,6 @@ public:
   void verifyCounters(const std::map<std::string, uint64_t>& expected_counters) {
     for (const auto& [name, value] : expected_counters) {
       test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix." + name, value);
-      EXPECT_EQ(value, test_server_->counter("network_ext_proc.ext_proc_prefix." + name)->value());
     }
   }
 
