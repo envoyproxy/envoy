@@ -123,6 +123,7 @@ TEST(NetworkExtProcConfigTest, ConfigWithOptions) {
 // Test the config without a gRPC service.
 TEST(NetworkExtProcConfigFactoryTest, MissingGrpcService) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  proto_config.set_stat_prefix("test_ext_proc");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NetworkExtProcConfigFactory factory;
@@ -135,6 +136,7 @@ TEST(NetworkExtProcConfigFactoryTest, MissingGrpcService) {
 TEST(NetworkExtProcConfigFactoryTest, BothModesSkipped) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
   proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  proto_config.set_stat_prefix("test_ext_proc");
 
   auto* processing_mode = proto_config.mutable_processing_mode();
   processing_mode->set_process_read(
@@ -154,6 +156,7 @@ TEST(NetworkExtProcConfigFactoryTest, BothModesSkipped) {
 TEST(NetworkExtProcConfigFactoryTest, DefaultProcessingMode) {
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
   proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  proto_config.set_stat_prefix("test_ext_proc");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   NetworkExtProcConfigFactory factory;
