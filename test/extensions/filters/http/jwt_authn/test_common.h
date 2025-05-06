@@ -109,7 +109,7 @@ providers:
         cluster: pubkey_cluster
         timeout:
           seconds: 5
-
+stat_prefix: "fooprefix"
 )";
 
 // Provider config with various subject constraints
@@ -143,6 +143,7 @@ providers:
         cluster: pubkey_cluster
         timeout:
           seconds: 5
+stat_prefix: "fooprefix"
 )";
 
 // A good config.
@@ -184,6 +185,7 @@ rules:
   requires:
     provider_name: "example_provider"
 bypass_cors_preflight: true
+stat_prefix: "fooprefix"
 )";
 
 // Config with claim_to_headers and clear_route_cache.
@@ -213,6 +215,7 @@ rules:
   requires:
     provider_name: "example_provider"
 bypass_cors_preflight: true
+stat_prefix: "fooprefix"
 )";
 
 // Config with payload_in_metadata and clear_route_cache.
@@ -240,6 +243,7 @@ rules:
   requires:
     provider_name: "example_provider"
 bypass_cors_preflight: true
+stat_prefix: "fooprefix"
 )";
 
 const char ExampleConfigWithRegEx[] = R"(
@@ -270,6 +274,7 @@ rules:
   requires:
     provider_name: "example_provider"
 bypass_cors_preflight: true
+stat_prefix: "fooprefix"
 )";
 
 // The name of provider for above config.

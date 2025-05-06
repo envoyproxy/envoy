@@ -27,7 +27,8 @@ public:
 };
 
 JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
-  return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, ""))};
+  const std::string final_prefix = absl::StrCat("test.", "jwt_authn.", "foo");
+  return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
 class MockFilterConfig : public FilterConfig {
@@ -92,7 +93,7 @@ TEST_F(FilterTest, InlineOK) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
-  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+  EXPECT_EQ(1U, mock_config_->stats_store_.counter("test.jwt_authn.foo.allowed").value());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
