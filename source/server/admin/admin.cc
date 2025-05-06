@@ -106,7 +106,8 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
-                     bool ignore_global_conn_limit, absl::flat_hash_set<std::string> allow_listed_routes)
+                     bool ignore_global_conn_limit,
+                     absl::flat_hash_set<std::string> allow_listed_routes)
     : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
@@ -510,9 +511,8 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  
   if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
-    return Http::Code::Unauthorized;
+    return Http::Code::Forbidden;
   }
 
   AdminFilter filter(*this);
