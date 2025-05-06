@@ -893,9 +893,13 @@ void ActiveClient::onConnectionDurationTimeout() {
 void ActiveClient::drain() {
   const int64_t unused = currentUnusedCapacity();
 
-  // Remove draining client's capacity from the pool. In the case that it currently has
-  // negative capacity, some could be added back in as requests complete, unless this
-  // is set to zero.
+  // Remove draining client's capacity from the pool.
+  //
+  // The code that adds capacity back to the pool in `onStreamClosed` will only add it back if
+  // it sees the connection as currently limited by concurrent capacity, not total lifetime streams.
+  // Setting this to zero ensures that the `limited_by_concurrency` check does not detect this
+  // connection as limited for that reason, because it is now being marked as having zero remaining
+  // lifetime requests.
   remaining_streams_ = 0;
 
   if (unused > 0) {
