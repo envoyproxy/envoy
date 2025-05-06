@@ -117,10 +117,17 @@ pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
   NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 > = OnceLock::new();
 
+/// The function signature for the new HTTP filter per-route configuration function.
+///
+/// This is called when a new HTTP filter per-route configuration is created.It must return an
+/// object representing the filter's per-route configuration. Returning `None` will cause the HTTP
+/// filter configuration to be rejected.
+/// This config can be later retried by the filter via
+/// [`EnvoyHttpFilter::get_most_specific_route_config`] method.
 pub type NewHttpFilterPerRouteConfigFunction =
   fn(name: &str, config: &[u8]) -> Option<Box<dyn Any>>;
 
-/// The global init function for HTTP filter configurations. This is set via the
+/// The global init function for HTTP filter per-route configurations. This is set via the
 /// `declare_init_functions` macro, and is not intended to be set directly.
 pub static NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION: OnceLock<
   NewHttpFilterPerRouteConfigFunction,
@@ -602,7 +609,12 @@ pub trait EnvoyHttpFilter {
     _timeout_milliseconds: u64,
   ) -> abi::envoy_dynamic_module_type_http_callout_init_result;
 
-  fn get_most_specific_route_config(&self) -> Option<&'static dyn Any>;
+  /// Get the most specific route configuration for the current route.
+  ///
+  /// Returns None if no per-route configuration is present on this route. Otherwise,
+  /// returns the most specific per-route configuration (i.e. the one most up along the config
+  /// hierarchy) created by the filter.
+  fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1113,18 +1125,20 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_most_specific_route_config(&self) -> Option<&'static dyn Any> {
+  fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>> {
     unsafe {
       let filter_config_ptr =
         abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr);
       if filter_config_ptr.is_null() {
         return None;
       }
-      let filter_config = {
-        let raw = filter_config_ptr as *mut *mut dyn Any;
-        &mut **raw
-      };
-      Some(filter_config)
+
+      let ptr = filter_config_ptr as *mut std::sync::Arc<dyn Any>;
+      let boxed = Box::from_raw(ptr);
+      let cloned_filter_config = *boxed.clone();
+      std::mem::forget(boxed);
+
+      Some(cloned_filter_config)
     }
   }
 }
@@ -1381,7 +1395,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_new(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr, Any);
+  let ptr = config_ptr as *mut std::sync::Arc<dyn Any>;
+  let _arc = Box::from_raw(ptr);
 }
 
 fn envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
@@ -1390,7 +1405,9 @@ fn envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
   new_fn: &NewHttpFilterPerRouteConfigFunction,
 ) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
   if let Some(config) = new_fn(name, config) {
-    wrap_into_c_void_ptr!(config)
+    let arc: std::sync::Arc<dyn Any> = std::sync::Arc::from(config);
+    let ptr = Box::into_raw(Box::new(arc));
+    ptr as abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
   } else {
     std::ptr::null()
   }
