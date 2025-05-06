@@ -34,6 +34,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // By using the filter's processing mode, you can selectively choose which data
 // directions to process (read, write or both), allowing for efficient processing.
+// [#next-free-field: 6]
 message NetworkExternalProcessor {
   // The gRPC service that will process network traffic.
   // This service must implement the NetworkExternalProcessor service
@@ -61,6 +62,8 @@ message NetworkExternalProcessor {
     lte {seconds: 3600}
     gte {}
   }];
+
+  string stat_prefix = 5 [(validate.rules).string = {min_len: 1}];
 }
 
 // Options for controlling processing behavior.
