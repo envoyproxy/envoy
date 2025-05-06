@@ -120,7 +120,7 @@ public:
   void recreateFilterWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
                                          const std::vector<std::string>& typed_namespaces) {
     auto filter_config = std::make_shared<Config>(
-        createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces));
+        createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
     filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));

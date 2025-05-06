@@ -54,7 +54,7 @@ public:
             config.metadata_options().forwarding_namespaces().untyped().end()),
         typed_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
-            config.metadata_options().forwarding_namespaces().typed().end()) {};
+            config.metadata_options().forwarding_namespaces().typed().end()),
         stats_(generateStats(config.stat_prefix(), scope)) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
