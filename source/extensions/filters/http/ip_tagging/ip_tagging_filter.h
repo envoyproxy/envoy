@@ -116,8 +116,7 @@ public:
 private:
   absl::Mutex mu_;
   // Each provider stores shared_ptrs to this singleton, which keeps the singleton
-  //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
-  //  shared_ptr is *only* held by driver instances.)
+  // from being destroyed unless it's no longer keeping track of any providers.
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
 };
 
