@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/cached_credentials_provider_base.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -32,7 +31,8 @@ struct MetadataCredentialsProviderStats {
 using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 
-class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
+class MetadataCredentialsProviderBase : public CredentialsProvider,
+                                        public Logger::Loggable<Logger::Id::aws>,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
@@ -40,7 +40,7 @@ public:
 
   MetadataCredentialsProviderBase(Api::Api& api,
                                   Server::Configuration::ServerFactoryContext& context,
-                                  AwsClusterManagerOptRef aws_cluster_manager,
+                                  AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -84,6 +84,8 @@ protected:
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
 
+  virtual void refresh() PURE;
+
   Api::Api& api_;
   // The optional server factory context.
   Server::Configuration::ServerFactoryContext& context_;
@@ -119,7 +121,7 @@ protected:
   // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
   // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
-  AwsClusterManagerOptRef aws_cluster_manager_;
+  AwsClusterManagerPtr aws_cluster_manager_;
   // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
   // Are credentials pending?

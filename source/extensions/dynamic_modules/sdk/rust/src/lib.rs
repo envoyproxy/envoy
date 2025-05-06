@@ -207,6 +207,23 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   ///
   /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
   fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {}
+
+  /// This is called when the HTTP callout is done.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `callout_id` is the ID of the callout that was done.
+  /// * `result` indicates the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
+  fn on_http_callout_done(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _callout_id: u32,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+  }
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
@@ -533,6 +550,32 @@ pub trait EnvoyHttpFilter {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<i64>;
+
+  /// Send an HTTP callout to the given cluster with the given headers and body.
+  /// Multiple callouts can be made from the same filter. Different callouts can be
+  /// distinguished by the `callout_id` parameter.
+  ///
+  /// Headers must contain the `:method`, ":path", and `host` headers.
+  ///
+  /// This returns the status of the callout. The meaning of the status is
+  ///
+  ///   * Success: The callout was sent successfully.
+  ///   * MissingRequiredHeaders: One of the required headers is missing: `:method`, `:path`, or
+  ///     `host`.
+  ///   * ClusterNotFound: The cluster with the given name was not found.
+  ///   * DuplicateCalloutId: The callout ID is already in use.
+  ///   * CouldNotCreateRequest: The request could not be created. This happens when, for example,
+  ///     there's no healthy upstream host in the cluster.
+  ///
+  /// The callout result will be delivered to the [`HttpFilter::on_http_callout_done`] method.
+  fn send_http_callout<'a>(
+    &mut self,
+    _callout_id: u32,
+    _cluster_name: &'a str,
+    _headers: Vec<(&'a str, &'a [u8])>,
+    _body: Option<&'a [u8]>,
+    _timeout_milliseconds: u64,
+  ) -> abi::envoy_dynamic_module_type_http_callout_init_result;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1016,6 +1059,32 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       None
     }
   }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    callout_id: u32,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> abi::envoy_dynamic_module_type_http_callout_init_result {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let headers_ptr = headers.as_ptr() as *const abi::envoy_dynamic_module_type_module_http_header;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_http_callout(
+        self.raw_ptr,
+        callout_id,
+        cluster_name.as_ptr() as *const _ as *mut _,
+        cluster_name.len(),
+        headers_ptr as *const _ as *mut _,
+        headers.len(),
+        body_ptr as *const _ as *mut _,
+        body_length,
+        timeout_milliseconds,
+      )
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1340,4 +1409,38 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
   filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  callout_id: u32,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_http_header,
+  headers_size: usize,
+  body_vector: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_vector_size: usize,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  let headers = if headers_size > 0 {
+    Some(unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    })
+  } else {
+    None
+  };
+  let body = if body_vector_size > 0 {
+    Some(unsafe { std::slice::from_raw_parts(body_vector as *const EnvoyBuffer, body_vector_size) })
+  } else {
+    None
+  };
+  filter.on_http_callout_done(
+    &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+    callout_id,
+    result,
+    headers,
+    body,
+  )
 }

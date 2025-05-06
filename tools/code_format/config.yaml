@@ -192,6 +192,7 @@ paths:
     - source/extensions/filters/network/redis_proxy
     - source/extensions/filters/network/zookeeper_proxy
     - source/extensions/filters/network/ext_authz
+    - source/extensions/filters/network/ext_proc
     - source/extensions/filters/network/mongo_proxy
     - source/extensions/filters/network/thrift_proxy
     - source/extensions/filters/network/generic_proxy

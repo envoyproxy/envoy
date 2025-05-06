@@ -235,7 +235,7 @@ public:
   const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
     return early_header_mutations_;
   }
-  uint64_t maxRequestsPerConnection() const override { return 0; }
+  uint32_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
