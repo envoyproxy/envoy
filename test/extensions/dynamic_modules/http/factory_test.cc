@@ -176,16 +176,21 @@ filter_config:
         testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
   }
 
+  auto symbol_err = [](const std::string& symbol) {
+    return fmt::format("Failed to resolve symbol {}", symbol);
+  };
+
   std::vector<std::pair<std::string, std::string>> per_route_test_cases = {
       {"no_http_filter_per_route_config_new",
-       "envoy_dynamic_module_on_http_filter_per_route_config_new"},
+       symbol_err("envoy_dynamic_module_on_http_filter_per_route_config_new")},
       {"no_http_filter_per_route_config_destroy",
-       "envoy_dynamic_module_on_http_filter_per_route_config_destroy"},
+       symbol_err("envoy_dynamic_module_on_http_filter_per_route_config_destroy")},
+      {"http_filter_per_route_config_new_fail", "Failed to initialize per-route dynamic module"},
   };
 
   for (const auto& test_case : per_route_test_cases) {
     const std::string& module_name = test_case.first;
-    const std::string& missing_symbol_name = test_case.second;
+    const std::string& expected_error = test_case.second;
 
     const std::string yaml = fmt::format(R"EOF(
 dynamic_module_config:
@@ -204,9 +209,7 @@ filter_config:
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(
-        result.status().message(),
-        testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
+    EXPECT_THAT(result.status().message(), testing::HasSubstr(expected_error));
   }
 }
 
