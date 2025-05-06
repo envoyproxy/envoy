@@ -147,12 +147,12 @@ TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
 
 TEST_F(QuicFilterManagerConnectionImplTest, MoveSocket) { EXPECT_EQ(impl_.moveSocket(), nullptr); }
 
-TEST_F(QuicFilterManagerConnectionImplTest, SetConnectionReused) {
-  impl_.setConnectionReused(true);
+TEST_F(QuicFilterManagerConnectionImplTest, setSocketReused) {
+  impl_.setSocketReused(true);
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, IsConnectionReused) {
-  EXPECT_EQ(impl_.isConnectionReused(), false);
+TEST_F(QuicFilterManagerConnectionImplTest, isSocketReused) {
+  EXPECT_EQ(impl_.isSocketReused(), false);
 }
 
 } // namespace Quic

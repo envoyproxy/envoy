@@ -63,8 +63,8 @@ public:
   bool initializeReadFilters() override;
 
   ConnectionSocketPtr moveSocket() override;
-  void setConnectionReused(bool value) override { reuse_connection_ = value; }
-  bool isConnectionReused() override { return reuse_connection_; }
+  void setSocketReused(bool value) override { reuse_socket_ = value; }
+  bool isSocketReused() override { return reuse_socket_; }
 
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
@@ -272,7 +272,7 @@ private:
   // Used on the responder envoy to mark an active connection accepted by a listener which will
   // be used as a reverse connection. The socket for such a connection is closed upon draining
   // of the owning listener.
-  bool reuse_connection_ : 1;
+  bool reuse_socket_ : 1;
   bool enable_close_through_filter_manager_ : 1;
 };
 

@@ -134,8 +134,8 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
   Network::ConnectionSocketPtr moveSocket() override { return nullptr; }
-  void setConnectionReused(bool) override {}
-  bool isConnectionReused() override { return false; }
+  void setSocketReused(bool) override {}
+  bool isSocketReused() override { return false; }
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which

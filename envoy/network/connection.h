@@ -355,12 +355,12 @@ public:
    *  Mark a connection as a reverse connection. The socket
    *  is cached and re-used for serving downstream requests.
    */
-  virtual void setConnectionReused(bool value) PURE;
+  virtual void setSocketReused(bool value) PURE;
 
   /**
    *  return true if active connection (listener) is reused.
    */
-  virtual bool isConnectionReused() PURE;
+  virtual bool isSocketReused() PURE;
 
   /**
    * Get the socket options set on this connection.

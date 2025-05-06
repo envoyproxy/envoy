@@ -1188,14 +1188,14 @@ TEST_F(MultiConnectionBaseImplTest, MoveSocket) {
   EXPECT_EQ(impl_->moveSocket(), nullptr);
 }
 
-TEST_F(MultiConnectionBaseImplTest, SetConnectionReused) {
+TEST_F(MultiConnectionBaseImplTest, setSocketReused) {
   setupMultiConnectionImpl(2);
-  impl_->setConnectionReused(true);
+  impl_->setSocketReused(true);
 }
 
-TEST_F(MultiConnectionBaseImplTest, IsConnectionReused) {
+TEST_F(MultiConnectionBaseImplTest, isSocketReused) {
   setupMultiConnectionImpl(2);
-  EXPECT_EQ(impl_->isConnectionReused(), false);
+  EXPECT_EQ(impl_->isSocketReused(), false);
 }
 
 } // namespace Network

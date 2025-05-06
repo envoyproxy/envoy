@@ -57,7 +57,7 @@ ActiveTcpListener::~ActiveTcpListener() {
     while (!connections.empty()) {
       // Reset the reuse_connection_ flag for reverse connections so that
       // the close() call closes the socket.
-      connections.front()->connection_->setConnectionReused(false);
+      connections.front()->connection_->setSocketReused(false);
       connections.front()->connection_->close(
           Network::ConnectionCloseType::NoFlush,
           "purging_socket_that_have_not_progressed_to_connections");
