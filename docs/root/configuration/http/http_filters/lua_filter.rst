@@ -594,7 +594,17 @@ Example:
 Returns the filter context that configured in the the
 :ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`.
 
-Example:
+For example, given the following filter context in the route entry:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    "lua-filter-name":
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      filter_context:
+        key: xxxxxx
+
+The filter context can be accessed in the related Lua script as follows:
 
 .. code-block:: lua
 
