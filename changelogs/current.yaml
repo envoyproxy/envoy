@@ -330,6 +330,11 @@ new_features:
     TLVs added in the PROXY protocol state will be added to the PROXY protocol v2 header sent upstream.
 - area: sockets
   change: |
+    Added a new field, :ref:`network_namespace_filepath
+    <envoy_api_field_core.SocketAddress.network_namespace_filepath>`, which specifies which Linux
+    network namespace to create the socket in. Network namespaces are only configurable on Linux.
+- area: sockets
+  change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
 

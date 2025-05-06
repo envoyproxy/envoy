@@ -33,7 +33,6 @@ void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
   }
 }
 
-// @tallen
 IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
     int socket_fd, bool socket_v6only, absl::optional<int> domain,
     const SocketCreationOptions& options,
@@ -54,7 +53,6 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
                                               options.max_addresses_cache_size_);
 }
 
-// @tallen
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
                                             Socket::Type socket_type, absl::optional<int> domain,
                                             const SocketCreationOptions& options) const {
@@ -65,7 +63,6 @@ IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
                                     io_uring_worker_factory_.lock().get());
 }
 
-// @tallen
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version, bool socket_v6only,
                                         const SocketCreationOptions& options) const {

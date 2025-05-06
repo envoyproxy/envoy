@@ -72,7 +72,6 @@ bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
 }
 } // namespace
 
-//@tallen
 absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
     Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
@@ -1162,15 +1161,18 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
     return false;
   }
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
-  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
-  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
-  // different listeners receiving connections destined for the same port.
+  // sure we are not duplicating the address in the same network namespace. This avoids ambiguity
+  // about which non-binding listener is used or even worse for the binding to port != 0 and reuse
+  // port case multiple different listeners receiving connections destined for the same port.
   for (auto& other_addr : other.addresses()) {
     if (other_addr->ip() == nullptr ||
         (other_addr->ip() != nullptr && (other_addr->ip()->port() != 0 || !bindToPort()))) {
       if (find_if(addresses_.begin(), addresses_.end(),
                   [&other_addr](const Network::Address::InstanceConstSharedPtr& addr) {
-                    return *other_addr == *addr;
+                    // TODO @tallen --- test this
+                    const bool same_netns = addr->networkNamespace().value_or("") ==
+                                            other_addr->networkNamespace().value_or("");
+                    return same_netns && *other_addr == *addr;
                   }) != addresses_.end()) {
         return true;
       }
