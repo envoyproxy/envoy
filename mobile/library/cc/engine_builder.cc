@@ -152,10 +152,7 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
 
 EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
     const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
-  socket_options_.clear();
-  for (const auto& socket_option : socket_options) {
-    socket_options_.push_back(socket_option);
-  }
+  socket_options_ = socket_options;
   return *this;
 }
 
