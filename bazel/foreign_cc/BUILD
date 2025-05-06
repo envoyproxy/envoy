@@ -203,6 +203,8 @@ configure_make(
         "CFLAGS": "-fPIC",
         "LIBS": "-l:libstdc++.a",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
+        "ARFLAGS": "r",
+        "MAKEFLAGS": "ARFLAGS=r",
     },
     lib_source = "@com_github_unicode_org_icu//:all",
     out_static_libs = [

@@ -109,6 +109,47 @@ TEST(NetworkExtProcConfigTest, ConfigWithOptions) {
   cb(filter_manager);
 }
 
+// Test the config without a gRPC service.
+TEST(NetworkExtProcConfigFactoryTest, MissingGrpcService) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NetworkExtProcConfigFactory factory;
+
+  EXPECT_THROW_WITH_MESSAGE(auto cb = factory.createFilterFactoryFromProto(proto_config, context),
+                            EnvoyException, "A grpc_service must be configured");
+}
+
+// Test the config with both SKIP modes.
+TEST(NetworkExtProcConfigFactoryTest, BothModesSkipped) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+
+  auto* processing_mode = proto_config.mutable_processing_mode();
+  processing_mode->set_process_read(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+  processing_mode->set_process_write(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NetworkExtProcConfigFactory factory;
+
+  EXPECT_THROW_WITH_MESSAGE(auto cb = factory.createFilterFactoryFromProto(proto_config, context),
+                            EnvoyException,
+                            "both read and write paths are skipped, at least one must be enabled.");
+}
+
+// Test the configs with default processing modes.
+TEST(NetworkExtProcConfigFactoryTest, DefaultProcessingMode) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor proto_config;
+  proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NetworkExtProcConfigFactory factory;
+
+  EXPECT_NO_THROW(auto cb = factory.createFilterFactoryFromProto(proto_config, context));
+}
+
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters

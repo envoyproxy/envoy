@@ -1,5 +1,11 @@
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -15,17 +21,6 @@ ContainerCredentialsProvider::ContainerCredentialsProvider(
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
-
-bool ContainerCredentialsProvider::needsRefresh() {
-  const auto now = api_.timeSource().systemTime();
-  auto expired = (now - last_updated_ > REFRESH_INTERVAL);
-
-  if (expiration_time_.has_value()) {
-    return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
-  } else {
-    return expired;
-  }
-}
 
 void ContainerCredentialsProvider::refresh() {
 

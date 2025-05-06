@@ -265,6 +265,7 @@ proto_library(
         "//envoy/extensions/rbac/principals/mtls_authenticated/v3:pkg",
         "//envoy/extensions/regex_engines/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",
+        "//envoy/extensions/resource_monitors/cgroup_memory/v3:pkg",
         "//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg",
         "//envoy/extensions/resource_monitors/downstream_connections/v3:pkg",
         "//envoy/extensions/resource_monitors/fixed_heap/v3:pkg",
