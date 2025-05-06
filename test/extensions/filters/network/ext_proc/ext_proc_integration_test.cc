@@ -119,6 +119,7 @@ public:
             grpc_service:
               envoy_grpc:
                 cluster_name: "cluster_1"
+            stat_prefix: "ext_proc_prefix"
         - name: envoy.filters.network.tcp_proxy
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
@@ -335,6 +336,13 @@ public:
     }
   }
 
+  void verifyCounters(const std::map<std::string, uint64_t>& expected_counters) {
+    for (const auto& [name, value] : expected_counters) {
+      test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix." + name, value);
+      EXPECT_EQ(value, test_server_->counter("network_ext_proc.ext_proc_prefix." + name)->value());
+    }
+  }
+
   void TearDown() override {
     if (processor_connection_) {
       ASSERT_TRUE(processor_connection_->close());
@@ -373,6 +381,13 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamClose) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
   // The server should see the half-close
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+
+  // Verify counters
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 1},
+                  {"stream_msgs_received", 1},
+                  {"read_data_sent", 1},
+                  {"read_data_injected", 1}});
 
   tcp_client->close();
 }
@@ -427,6 +442,13 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleClientConnections) {
   sendReadGrpcMessageWithStream(processor_stream_3, "client_data_3_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection_3->waitForData(23));
 
+  // Verify counters - we should have processed 3 streams
+  verifyCounters({{"streams_started", 3},
+                  {"stream_msgs_sent", 3},
+                  {"stream_msgs_received", 3},
+                  {"read_data_sent", 3},
+                  {"read_data_injected", 3}});
+
   tcp_client_1->close();
   tcp_client_2->close();
   ASSERT_TRUE(processor_connection_->close());
@@ -476,6 +498,15 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyUpstreamHalfCloseBothWays) {
   // Close everything
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
+
+  // Verify bidirectional data counters
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 2},     // One for read, one for write
+                  {"stream_msgs_received", 2}, // One for read, one for write
+                  {"read_data_sent", 1},
+                  {"read_data_injected", 1},
+                  {"write_data_sent", 1},
+                  {"write_data_injected", 1}});
   tcp_client->close();
 }
 
@@ -514,6 +545,16 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays)
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Verify bidirectional data counters
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 2},     // One for read, one for write
+                  {"stream_msgs_received", 2}, // One for read, one for write
+                  {"read_data_sent", 1},
+                  {"read_data_injected", 1},
+                  {"write_data_sent", 1},
+                  {"write_data_injected", 1}});
+
   tcp_client->close();
 }
 
@@ -532,8 +573,16 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // Close gRPC stream with an error status instead of Ok
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
-  ASSERT_TRUE(tcp_client->write("data", true));
+  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.streams_grpc_error", 1);
+  ASSERT_FALSE(tcp_client->write("", true));
   tcp_client->waitForDisconnect();
+
+  // Verify failure counters
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 1},
+                  {"streams_grpc_error", 1},
+                  {"connections_closed", 1},
+                  {"read_data_sent", 1}});
 }
 
 // Test behavior when failure_mode_allow is set to true and gRPC stream fails
@@ -551,7 +600,14 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailureWithFailureModeAllo
   // Close gRPC stream without sending a response - with failure_mode_allow=true
   // the connection should not be closed
   closeGrpcStream();
-  // TODO(botengyao) wait for the counter stats
+
+  // Wait for the failure_mode_allowed counter to increment
+  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.failure_mode_allowed", 1);
+
+  // Should be able to continue using the connection after stream failure
+  ASSERT_TRUE(tcp_client->write("more_data", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(9));
+
   tcp_client->close();
 }
 

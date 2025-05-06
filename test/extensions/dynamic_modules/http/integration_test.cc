@@ -265,4 +265,36 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
+TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
+  initializeFilter("http_callouts", "missing");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HttpCalloutsOK) {
+  initializeFilter("http_callouts", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+
+  Http::TestRequestHeaderMapImpl response_headers{{"some_header", "some_value"},
+                                                  {":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData("response_body_from_callout", true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("local_response_body", response->body());
+}
+
 } // namespace Envoy

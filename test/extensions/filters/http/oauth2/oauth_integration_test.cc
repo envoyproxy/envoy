@@ -447,11 +447,11 @@ typed_config:
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;
-  FakeStreamPtr lds_stream_{};
+  FakeStreamPtr lds_stream_;
   const uint64_t response_size_ = 512;
 
-  FakeHttpConnectionPtr fake_oauth2_connection_{};
-  FakeStreamPtr oauth2_request_{};
+  FakeHttpConnectionPtr fake_oauth2_connection_;
+  FakeStreamPtr oauth2_request_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthIntegrationTest,
@@ -759,6 +759,92 @@ TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
   test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
   // 3. Do one refresh token flow. This should fail.
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1", /* expect_failure */ true);
+}
+
+// After an hmac secret change, a request should cause a re-authorization, but not an auth failure
+TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+
+  initialize();
+
+  // 1. First perform a complete OAuth flow to get valid cookies
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"authority", "Bearer token"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)},
+      {"cookie",
+       absl::StrCat(default_cookie_names_.code_verifier_, "=", TEST_ENCRYPTED_CODE_VERIFIER)}};
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  waitForOAuth2Response("token_secret");
+
+  // Get the redirect response with the cookies
+  response->waitForHeaders();
+
+  // Save all the cookies for later use
+  std::string hmac =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
+  std::string oauth_expires =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_expires_);
+  std::string bearer_token =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.bearer_token_);
+  std::string refresh_token =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.refresh_token_);
+
+  EXPECT_FALSE(hmac.empty());
+  EXPECT_FALSE(oauth_expires.empty());
+  EXPECT_FALSE(bearer_token.empty());
+  EXPECT_FALSE(refresh_token.empty());
+
+  // Verify cookies work with current HMAC secret
+  EXPECT_TRUE(validateHmac(response->headers(), "authority", "hmac_secret"));
+
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+  cleanup();
+
+  // 2. Reload only the HMAC secret
+  EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("hmac_secret.yaml"));
+  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+
+  // 3. Make another request with the saved cookies after HMAC secret was changed
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers_with_cookies{
+      {":method", "GET"},
+      {":path", "/request1"},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+      {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
+      {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)}};
+
+  auto encoder_decoder2 = codec_client_->startRequest(headers_with_cookies);
+  request_encoder_ = &encoder_decoder2.first;
+  auto response2 = std::move(encoder_decoder2.second);
+
+  // Should get a 302 back since the HMAC secret was changed
+  response2->waitForHeaders();
+  EXPECT_EQ("302", response2->headers().getStatusValue());
+
+  RELEASE_ASSERT(response2->waitForEndStream(), "unexpected timeout");
+  cleanup();
 }
 
 } // namespace

@@ -129,7 +129,7 @@ public:
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(absl::optional<uint16_t>, maxResponseHeadersKb, (), (const));
-  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
@@ -186,7 +186,7 @@ public:
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
-  uint64_t max_requests_per_connection_{};
+  uint32_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterTrafficStatNames traffic_stat_names_;

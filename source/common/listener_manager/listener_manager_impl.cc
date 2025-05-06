@@ -441,7 +441,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
 
   // Dump errors not associated with named listeners.
   for (const auto& error : overall_error_state_) {
-    config_dump->add_dynamic_listeners()->mutable_error_state()->CopyFrom(*error);
+    config_dump->add_dynamic_listeners()->mutable_error_state()->CopyFrom(error);
   }
 
   return config_dump;
