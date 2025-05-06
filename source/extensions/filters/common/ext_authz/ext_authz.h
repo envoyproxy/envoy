@@ -86,9 +86,12 @@ using UnsafeHeaderVector = std::vector<UnsafeHeader>;
 struct Response {
   // Call status.
   CheckStatus status;
-  // A set of HTTP headers returned by the authorization server, that will be optionally appended
-  // to the request to the upstream server.
-  UnsafeHeaderVector headers_to_append{};
+  // A set of HTTP headers returned by the authorization server, will be optionally set
+  // (using "addCopy") to the request to the upstream server.
+  UnsafeHeaderVector headers_to_add_if_absent{};
+  // A set of HTTP headers returned by the authorization server, will be optionally set (using
+  // "setCopy") to the request to the upstream server.
+  UnsafeHeaderVector headers_to_overwrite_if_exists{};
   // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
   UnsafeHeaderVector headers_to_set{};

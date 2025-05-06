@@ -507,7 +507,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // routed. If we are changing the headers we also need to clear the route
     // cache.
     if (config_->clearRouteCache() &&
-        (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
+        (!response->headers_to_set.empty() || !response->headers_to_add.empty() ||
          !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
          !response->query_parameters_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
@@ -516,25 +516,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     ENVOY_STREAM_LOG(trace,
                      "ext_authz filter added header(s) to the request:", *decoder_callbacks_);
-    for (const auto& [key, value] : response->headers_to_set) {
-      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
-          Filters::Common::MutationRules::CheckOperation::SET, key, value);
-      switch (check_result) {
-      case CheckResult::OK:
-        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        request_headers_->setCopy(Http::LowerCaseString(key), value);
-        break;
-      case CheckResult::IGNORE:
-        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to set '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        break;
-      case CheckResult::FAIL:
-        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to set '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        rejectResponse();
-        return;
-      }
-    }
     for (const auto& [key, value] : response->headers_to_add) {
       CheckResult check_result = validateAndCheckDecoderHeaderMutation(
           Filters::Common::MutationRules::CheckOperation::SET, key, value);
@@ -554,39 +535,59 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         return;
       }
     }
-    for (const auto& [key, value] : response->headers_to_append) {
+    for (const auto& [key, value] : response->headers_to_set) {
       CheckResult check_result = validateAndCheckDecoderHeaderMutation(
-          Filters::Common::MutationRules::CheckOperation::APPEND, key, value);
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
       switch (check_result) {
-      case CheckResult::OK: {
+      case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        Http::LowerCaseString lowercase_key(key);
-        const auto header_to_modify = request_headers_->get(lowercase_key);
-        // TODO(dio): Add a flag to allow appending non-existent headers, without setting it
-        // first (via `headers_to_add`). For example, given:
-        // 1. Original headers {"original": "true"}
-        // 2. Response headers from the authorization servers {{"append": "1"}, {"append":
-        // "2"}}
-        //
-        // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the
-        // intended combined headers: {{"original": "true"}, {"append": "1"}, {"append":
-        // "2"}}) to the request to upstream server by only sets `headers_to_append`.
-        if (!header_to_modify.empty()) {
-          ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-          // The current behavior of appending is by combining entries with the same key,
-          // into one entry. The value of that combined entry is separated by ",".
-          // TODO(dio): Consider to use addCopy instead.
-          request_headers_->appendCopy(lowercase_key, value);
-        }
+        request_headers_->setCopy(Http::LowerCaseString(key), value);
         break;
-      }
       case CheckResult::IGNORE:
-        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to append '{}':'{}'.", *decoder_callbacks_,
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to set '{}':'{}'.", *decoder_callbacks_,
                          key, value);
         break;
       case CheckResult::FAIL:
-        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.",
-                         *decoder_callbacks_, key, value);
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to set '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
+        return;
+      }
+    }
+    for (const auto& [key, value] : response->headers_to_add_if_absent) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        request_headers_->addCopy(Http::LowerCaseString(key), value);
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
+        return;
+      }
+    }
+    for (const auto& [key, value] : response->headers_to_overwrite_if_exists) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        request_headers_->setCopy(Http::LowerCaseString(key), value);
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
         rejectResponse();
         return;
       }
