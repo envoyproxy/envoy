@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/cached_credentials_provider_base.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -32,7 +31,8 @@ struct MetadataCredentialsProviderStats {
 using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 
-class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
+class MetadataCredentialsProviderBase : public CredentialsProvider,
+                                        public Logger::Loggable<Logger::Id::aws>,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
@@ -83,6 +83,8 @@ protected:
 
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
+
+  virtual void refresh() PURE;
 
   Api::Api& api_;
   // The optional server factory context.

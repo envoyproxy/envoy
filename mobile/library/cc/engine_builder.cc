@@ -135,6 +135,11 @@ EngineBuilder& EngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setGetaddrinfoNumThreads(uint32_t num_threads) {
+  getaddrinfo_num_threads_ = num_threads;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
   // Add a default port of 443 for all hosts. We'll eventually change this API so it takes a single
   // {host, pair} and it can be called multiple times.
@@ -532,6 +537,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     if (dns_num_retries_.has_value()) {
       resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
     }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.getaddrinfo");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(

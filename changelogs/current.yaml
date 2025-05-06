@@ -29,6 +29,10 @@ minor_behavior_changes:
   change: |
     Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
     ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
+- area: dns
+  change: |
+    Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
+    <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -84,5 +88,10 @@ new_features:
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+- area: url_template
+  change: |
+    Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
 
 deprecated:

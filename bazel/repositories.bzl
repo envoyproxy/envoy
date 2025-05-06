@@ -441,8 +441,6 @@ def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
 # Boost in general is not approved for Envoy use, and the header-only
