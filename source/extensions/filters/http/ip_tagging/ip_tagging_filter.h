@@ -34,7 +34,7 @@ public:
 
   LcTrieSharedPtr
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
-              absl::Status& creation_status);
+                     absl::Status& creation_status);
 
 private:
   Api::Api& api_;

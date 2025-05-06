@@ -260,6 +260,7 @@ public:
 
   std::unique_ptr<Singleton::ManagerImpl> singleton_manager_ =
       std::make_unique<Singleton::ManagerImpl>();
+  Api::ApiPtr api_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
@@ -267,11 +268,9 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Buffer::OwnedImpl data_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Api::ApiPtr api_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
-// TODO nezdolik split config tests into separate test file
 TEST_F(IpTaggingFilterTest, NoIpTagsConfigured) {
   const std::string config_yaml = R"EOF(
 request_type: internal
@@ -873,6 +872,7 @@ public:
 
   std::unique_ptr<Singleton::ManagerImpl> singleton_manager_ =
       std::make_unique<Singleton::ManagerImpl>();
+  Api::ApiPtr api_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
@@ -880,7 +880,6 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Buffer::OwnedImpl data_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Api::ApiPtr api_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   absl::Mutex mutex_;
   std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_ ABSL_GUARDED_BY(mutex_);

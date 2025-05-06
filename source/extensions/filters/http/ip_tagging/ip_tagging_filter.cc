@@ -23,26 +23,28 @@ IpTagsProvider::IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& ta
       tags_(tags_loader_.loadTags(ip_tags_path_, creation_status)),
       ip_tags_reload_dispatcher_(api.allocateDispatcher("ip_tags_reload_routine")),
       ip_tags_file_watcher_(dispatcher.createFilesystemWatcher()), owner_(owner) {
-    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
-    if (ip_tags_path.empty()) {
-      creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
-      return;
-    }
-    ip_tags_reload_thread_ = api.threadFactory().createThread(
-        [this, &creation_status]() -> void {
-          ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
-          SET_AND_RETURN_IF_NOT_OK(ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
-                                              [this](uint32_t) { return onIpTagsFileUpdate(); }),
-                                  creation_status);
-          ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-        },
-        Thread::Options{std::string("ip_tags_reload_routine")});
-
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+  if (ip_tags_path.empty()) {
+    creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
+    return;
+  }
+  ip_tags_reload_thread_ = api.threadFactory().createThread(
+      [this, &creation_status]() -> void {
+        ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
+        SET_AND_RETURN_IF_NOT_OK(
+            ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
+                                            [this](uint32_t) { return onIpTagsFileUpdate(); }),
+            creation_status);
+        ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      },
+      Thread::Options{std::string("ip_tags_reload_routine")});
 }
 
 IpTagsProvider::~IpTagsProvider() {
   ENVOY_LOG(debug, "Shutting down ip tags provider");
-  ip_tags_reload_dispatcher_->exit();
+  if (ip_tags_reload_dispatcher_) {
+    ip_tags_reload_dispatcher_->exit();
+  }
   if (ip_tags_reload_thread_) {
     ip_tags_reload_thread_->join();
     ip_tags_reload_thread_.reset();
@@ -195,22 +197,21 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
-    if (!config.ip_tags().empty()) {
-      trie_ = tags_loader_.parseIpTagsAsProto(config.ip_tags(), creation_status);
+  if (!config.ip_tags().empty()) {
+    trie_ = tags_loader_.parseIpTagsAsProto(config.ip_tags(), creation_status);
+  } else {
+    provider_ = ip_tags_registry_->get(
+        ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
+        [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+    if (provider_ && provider_->ipTags()) {
+      trie_ = provider_->ipTags();
     } else {
-      provider_ = ip_tags_registry_->get(
-          ip_tags_path_, tags_loader_, [this]() { incIpTagsReloadSuccess(); },
-          [this]() { incIpTagsReloadError(); }, api, dispatcher, ip_tags_registry_,
-          creation_status);
-      RETURN_ONLY_IF_NOT_OK_REF(creation_status);
-      if (provider_ && provider_->ipTags()) {
-        trie_ = provider_->ipTags();
-      } else {
-          creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
-      }
-      stat_name_set_->rememberBuiltin("ip_tags_reload_success");
-      stat_name_set_->rememberBuiltin("ip_tags_reload_error");
+      creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
     }
+    stat_name_set_->rememberBuiltin("ip_tags_reload_success");
+    stat_name_set_->rememberBuiltin("ip_tags_reload_error");
+  }
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
@@ -237,10 +238,6 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   std::vector<std::string> tags =
       config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
-  std::cerr << "***Tags from decodeHeaders: " << std::endl;
-  for (auto t : tags)
-    std::cerr << t << ' ';
-  std::cerr << std::endl;
   applyTags(headers, tags);
   if (!tags.empty()) {
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
