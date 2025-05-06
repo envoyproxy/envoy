@@ -140,11 +140,9 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
-    if (!grid_.isPoolHttp3(attempt->pool())) {
-      // TCP pool failed before HTTP/3 pool.
-      prev_tcp_pool_failure_reason_ = reason;
-      prev_tcp_pool_transport_failure_reason_ = transport_failure_reason;
-    }
+    prev_pool_failure_reason_ = reason;
+    prev_pool_transport_failure_reason_ = fmt::format(
+        "{}: {}", grid_.isPoolHttp3(attempt->pool()) ? "QUIC" : "TCP", transport_failure_reason);
     return;
   }
 
@@ -167,12 +165,12 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
   if (callbacks != nullptr) {
     ENVOY_LOG(trace, "Passing pool failure up to caller.");
     std::string failure_str;
-    if (prev_tcp_pool_failure_reason_.has_value()) {
-      // TCP pool failed early on, log its error details as well.
-      failure_str = fmt::format("{} (with earlier TCP attempt failure reason {}, {})",
-                                transport_failure_reason,
-                                static_cast<int>(prev_tcp_pool_failure_reason_.value()),
-                                prev_tcp_pool_transport_failure_reason_);
+    if (prev_pool_failure_reason_.has_value()) {
+      // The other pool (either TCP or QUIC depending on which failed first) also failed, log its
+      // error details as well.
+      failure_str = fmt::format(
+          "{} (with earlier attempt failure reason {}, {})", transport_failure_reason,
+          static_cast<int>(prev_pool_failure_reason_.value()), prev_pool_transport_failure_reason_);
       transport_failure_reason = failure_str;
     }
     callbacks->onPoolFailure(reason, transport_failure_reason, host);

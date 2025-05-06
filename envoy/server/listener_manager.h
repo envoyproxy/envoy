@@ -257,7 +257,7 @@ public:
    * Inform the listener manager that the update has completed, and informs the listener of any
    * errors handled by the reload source.
    */
-  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v3::UpdateFailureState>>;
+  using FailureStates = std::vector<envoy::admin::v3::UpdateFailureState>;
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 
   // TODO(junr03): once ApiListeners support warming and draining, this function should return a

@@ -2,7 +2,6 @@
 
 #include "envoy/http/message.h"
 
-#include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/credentials_provider.h"
@@ -159,7 +158,6 @@ public:
 
   void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-  bool needsRefresh() { return provider_->needsRefresh(); };
 };
 
 } // namespace Aws

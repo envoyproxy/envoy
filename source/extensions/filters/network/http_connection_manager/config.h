@@ -255,7 +255,7 @@ public:
     return early_header_mutation_extensions_;
   }
 
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }

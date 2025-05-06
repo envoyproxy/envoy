@@ -85,12 +85,6 @@ public:
     return state_ == State::Ready;
   }
 
-  // This function is called onStreamClosed to see if there was a negative delta
-  // and (if necessary) update associated bookkeeping.
-  // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
-  // false. The HTTP/2 connection pool can have this state, so overrides this function.
-  virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
-
   enum class State {
     Connecting,        // Connection is not yet established.
     ReadyForEarlyData, // Any additional early data stream can be immediately dispatched to this
@@ -296,7 +290,8 @@ public:
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
-       << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
+       << DUMP_MEMBER(connecting_stream_capacity_)
+       << DUMP_MEMBER(connecting_and_connected_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
        << DUMP_MEMBER(pending_streams_.size())
        << " per upstream preconnect ratio: " << perUpstreamPreconnectRatio();
   }
@@ -305,6 +300,10 @@ public:
     s.dumpState(os);
     return os;
   }
+
+  // Helper for use as the 2nd argument to ASSERT.
+  std::string dumpState() const;
+
   Upstream::ClusterConnectivityState& state() { return state_; }
 
   void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);

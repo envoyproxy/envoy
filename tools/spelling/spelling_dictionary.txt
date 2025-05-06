@@ -623,6 +623,7 @@ cacert
 cacheable
 cacheability
 callee
+callout
 callsite
 callsites
 callstack
@@ -774,6 +775,8 @@ enqueues
 enum
 enums
 environ
+eu
+euprod
 epoll
 errno
 etag
@@ -1103,6 +1106,7 @@ pcall
 pcap
 pchar
 pclose
+pdf
 performant
 pfctl
 pipelined
