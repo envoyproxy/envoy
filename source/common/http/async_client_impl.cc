@@ -131,20 +131,30 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   if (!creation_status.ok()) {
     return;
   }
+
+  const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
+  if (options.parent_context.stream_info != nullptr) {
+    stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
+    const auto route = options.parent_context.stream_info->route();
+    if (route != nullptr) {
+      const auto* route_entry = route->routeEntry();
+      if (route_entry != nullptr) {
+        metadata_matching_criteria = route_entry->metadataMatchCriteria();
+      }
+    }
+  }
+
   auto route_or_error = NullRouteImpl::create(
       parent_.cluster_->name(),
       retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
-      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy);
+      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy,
+      metadata_matching_criteria);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
   stream_info_.route_ = route_;
-
-  if (options.parent_context.stream_info != nullptr) {
-    stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-  }
 
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
@@ -158,6 +168,7 @@ void AsyncStreamImpl::sendLocalReply(Code code, absl::string_view body,
                                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
                                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                      absl::string_view details) {
+  stream_info_.setResponseCodeDetails(details);
   if (encoded_response_headers_) {
     resetStream();
     return;

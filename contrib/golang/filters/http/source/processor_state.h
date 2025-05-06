@@ -78,7 +78,9 @@ enum class GolangStatus {
   StopNoBuffer,
 };
 
-class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
+class ProcessorState : public processState,
+                       public Logger::Loggable<Logger::Id::golang>,
+                       NonCopyable {
 public:
   explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
     req = r;

@@ -112,7 +112,12 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   const auto& metadata = callbacks->route()->metadata();
 
   {
-    const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
+    auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+    // TODO(wbpcode): deprecate this in favor of the above.
+    filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
     }
@@ -280,10 +285,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   }
 
   if (state_ == State::HttpCall) {
-    return (Runtime::runtimeFeatureEnabled(
-               "envoy.reloadable_features.lua_flow_control_while_http_call"))
-               ? Http::FilterDataStatus::StopIterationAndWatermark
-               : Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationAndWatermark;
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
@@ -790,6 +792,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
                            Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_manager_(cluster_manager),
+      clear_route_cache_(
+          proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
@@ -921,6 +925,11 @@ int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
   // Set the upstream override host
   callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
 
+  return 0;
+}
+
+int StreamHandleWrapper::luaClearRouteCache(lua_State*) {
+  callbacks_.clearRouteCache();
   return 0;
 }
 

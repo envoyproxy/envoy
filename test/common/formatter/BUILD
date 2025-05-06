@@ -110,6 +110,17 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+envoy_cc_test(
+    "formatter_context_test",
+    srcs = [
+        "formatter_context_test.cc",
+    ],
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/formatter:substitution_formatter_lib",
+    ],
+)
+
 envoy_benchmark_test(
     name = "substitution_formatter_speed_test_benchmark_test",
     benchmark_binary = "substitution_formatter_speed_test",

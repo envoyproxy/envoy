@@ -121,6 +121,7 @@ categories:
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
+- envoy.rbac.principals
 - envoy.rbac.audit_loggers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
@@ -140,6 +141,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.http.ext_proc.response_processors
 - envoy.router.cluster_specifier_plugin
 - envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors

@@ -26,7 +26,7 @@ public:
   MOCK_METHOD(Network::TransportSocketOptionsConstSharedPtr, upstreamTransportSocketOptions, (),
               (const));
   MOCK_METHOD(absl::optional<OverrideHost>, overrideHostToSelect, (), (const));
-  MOCK_METHOD(void, onAsyncHostSelection, (HostConstSharedPtr && host));
+  MOCK_METHOD(void, onAsyncHostSelection, (HostConstSharedPtr && host, std::string&& details));
 
 private:
   HealthyAndDegradedLoad priority_load_;

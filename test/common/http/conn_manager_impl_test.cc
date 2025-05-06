@@ -4069,7 +4069,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 
   // Store the basic request encoder during filter chain setup.
   auto* filter = new MockStreamFilter();
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
       .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
@@ -4201,7 +4201,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   conn_manager_->onData(fake_input, false);
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -4305,7 +4305,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "300"}}};
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
@@ -4530,45 +4530,6 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLog) 
           // On the first call it is expected that there is no response code.
           EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
           EXPECT_TRUE(stream_info.responseCode());
-        }));
-  }
-
-  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-}
-
-TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLogFeatureFalse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.filter_access_loggers_first", "false"}});
-  log_handler_ = std::make_shared<NiceMock<AccessLog::MockInstance>>(); // filter log handler
-  std::shared_ptr<AccessLog::MockInstance> handler(
-      new NiceMock<AccessLog::MockInstance>()); // config log handler
-  access_logs_ = {handler};
-  setup();
-  setupFilterChain(1, 0);
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
-  startRequest();
-
-  {
-    InSequence s; // Create an InSequence object to enforce order
-
-    EXPECT_CALL(*handler, log(_, _))
-        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                            const StreamInfo::StreamInfo& stream_info) {
-          // First call to log() is made when a new HTTP request has been received
-          // On the first call it is expected that there is no response code.
-          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-          EXPECT_TRUE(stream_info.responseCode());
-        }));
-
-    EXPECT_CALL(*log_handler_, log(_, _))
-        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                            const StreamInfo::StreamInfo& stream_info) {
-          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-          EXPECT_FALSE(stream_info.hasAnyResponseFlag());
         }));
   }
 

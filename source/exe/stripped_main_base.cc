@@ -33,7 +33,7 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
   return std::make_unique<Server::DrainManagerImpl>(
-      server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+      server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
@@ -41,18 +41,15 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSystem& time_system,
-                                   ListenerHooks& listener_hooks,
+StrippedMainBase::StrippedMainBase(const Server::Options& options,
                                    Server::ComponentFactory& component_factory,
                                    std::unique_ptr<Server::Platform> platform_impl,
-                                   std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                                   std::unique_ptr<ProcessContext> process_context,
-                                   CreateInstanceFunction create_instance, bool set_new_handler)
+                                   Random::RandomGenerator& random_generator)
     : platform_impl_(std::move(platform_impl)), options_(options),
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
-  OptionsImplBase::disableExtensions(options.disabledExtensions());
+  OptionsImplBase::disableExtensions(options_.disabledExtensions());
 
   // Enable core dumps as early as possible.
   if (options_.coreDumpEnabled()) {
@@ -66,37 +63,33 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
-  case Server::Mode::Serve: {
-    configureHotRestarter(*random_generator);
-
+  case Server::Mode::Serve:
+    configureHotRestarter(random_generator);
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-    Thread::BasicLockable& log_lock = restarter_->logLock();
-    Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped(),
-                                                         options_.enableFineGrainLogging());
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
+    break;
+  case Server::Mode::Validate:
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
+    break;
+  }
+}
 
+void StrippedMainBase::init(Event::TimeSystem& time_system, ListenerHooks& listener_hooks,
+                            std::unique_ptr<Random::RandomGenerator>&& random_generator,
+                            std::unique_ptr<ProcessContext> process_context,
+                            CreateInstanceFunction create_instance) {
+  switch (options_.mode()) {
+  case Server::Mode::InitOnly:
+  case Server::Mode::Serve: {
     configureComponentLogLevels();
 
-    if (set_new_handler) {
-      // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
-      // try/catch block or not.
-      std::set_new_handler([]() { PANIC("out of memory"); });
-    }
-
-    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
-
     server_ = create_instance(*init_manager_, options_, time_system, listener_hooks, *restarter_,
-                              *stats_store_, access_log_lock, component_factory,
+                              *stats_store_, restarter_->accessLogLock(), component_factory_,
                               std::move(random_generator), *tls_, platform_impl_->threadFactory(),
                               platform_impl_->fileSystem(), std::move(process_context), nullptr);
     break;
   }
   case Server::Mode::Validate:
-    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                          restarter_->logLock(), options_.logFormatEscaped());
     process_context_ = std::move(process_context);
     break;
   }

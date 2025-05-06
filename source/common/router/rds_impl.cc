@@ -74,13 +74,13 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
   return absl::OkStatus();
 }
 
-void RdsRouteConfigSubscription::afterProviderUpdate() {
+absl::Status RdsRouteConfigSubscription::afterProviderUpdate() {
   // RDS update removed VHDS configuration
   if (!config_update_info_->protobufConfigurationCast().has_vhds()) {
     vhds_subscription_.release();
   }
 
-  THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
+  return update_callback_manager_.runCallbacks();
 }
 
 // Initialize a no-op InitManager in case the one in the factory_context has completed
@@ -180,16 +180,15 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RdsRouteConfigProviderImpl instance is still valid.
-  factory_context_.mainThreadDispatcher().post([this,
-                                                maybe_still_alive =
-                                                    std::weak_ptr<bool>(still_alive_),
-                                                alias, &thread_local_dispatcher,
-                                                route_config_updated_cb]() -> void {
-    if (maybe_still_alive.lock()) {
-      subscription().updateOnDemand(alias);
-      config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
-    }
-  });
+  factory_context_.mainThreadDispatcher().post(
+      [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
+       route_config_updated_cb]() -> void {
+        if (maybe_still_alive.lock()) {
+          subscription().updateOnDemand(alias);
+          config_update_callbacks_.push_back(
+              {alias, thread_local_dispatcher, route_config_updated_cb});
+        }
+      });
 }
 RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,

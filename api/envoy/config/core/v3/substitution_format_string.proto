@@ -22,7 +22,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Optional configuration options to be used with json_format.
 message JsonFormatOptions {
   // The output JSON string properties will be sorted.
-  bool sort_properties = 1;
+  //
+  // .. note::
+  //   As the properties are always sorted, this option has no effect and is deprecated.
+  //
+  bool sort_properties = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Configuration to use multiple :ref:`command operators <config_access_log_command_operators>`
@@ -101,6 +106,12 @@ message SubstitutionFormatString {
   // * for ``text_format``, the output of the empty operator is changed from ``-`` to an
   //   empty string, so that empty values are omitted entirely.
   // * for ``json_format`` the keys with null values are omitted in the output structure.
+  //
+  // .. note::
+  //   This option does not work perfectly with ``json_format`` as keys with ``null`` values
+  //   will still be included in the output. See https://github.com/envoyproxy/envoy/issues/37941
+  //   for more details.
+  //
   bool omit_empty_values = 3;
 
   // Specify a ``content_type`` field.

@@ -13,6 +13,8 @@ envoy_cc_test(
     srcs = ["upstream_request_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/http:protocol_interface",
+        "//envoy/router:router_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
         "//source/common/router:router_lib",

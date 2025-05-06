@@ -307,12 +307,11 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
-
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource());
+        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -368,8 +367,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
-          config.http_protocol_options(), context.messageValidationVisitor(),
-          config.stream_error_on_invalid_http_message(),
+          config.http_protocol_options(), context.serverFactoryContext(),
+          context.messageValidationVisitor(), config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
@@ -417,7 +416,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -434,6 +432,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!creation_status.ok()) {
     return;
   }
+  auto local_reply_or_error = LocalReply::Factory::create(config.local_reply_config(), context);
+  SET_AND_RETURN_IF_NOT_OK(local_reply_or_error.status(), creation_status);
+  local_reply_ = std::move(*local_reply_or_error);
 
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(
       config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
@@ -895,7 +896,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource());
+        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

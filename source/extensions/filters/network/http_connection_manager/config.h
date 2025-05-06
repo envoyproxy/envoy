@@ -255,7 +255,7 @@ public:
     return early_header_mutation_extensions_;
   }
 
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
@@ -351,7 +351,7 @@ private:
   Http::StripPortType strip_port_type_;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-  const LocalReply::LocalReplyPtr local_reply_;
+  LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
 

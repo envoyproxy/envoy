@@ -394,15 +394,6 @@ public:
   virtual Config::GrpcMuxSharedPtr adsMux() PURE;
 
   /**
-   * Replaces the current ADS mux with a new one based on the given config.
-   * Assumes that the given ads_config is syntactically valid (according to the PGV constraints).
-   * @param ads_config an ADS config source to use.
-   * @return the status of the operation.
-   */
-  virtual absl::Status
-  replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) PURE;
-
-  /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
    */
   virtual Grpc::AsyncClientManager& grpcAsyncClientManager() PURE;
@@ -500,13 +491,13 @@ public:
    * @return OdCdsApiHandlePtr the ODCDS handle.
    */
 
-  using OdCdsCreationFunction = std::function<std::shared_ptr<OdCdsApi>(
+  using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
       OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
       MissingClusterNotifier& notifier, Stats::Scope& scope,
       ProtobufMessage::ValidationVisitor& validation_visitor)>;
 
-  virtual OdCdsApiHandlePtr
+  virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
                    const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -615,9 +606,9 @@ public:
   /**
    * Create a CDS API provider from configuration proto.
    */
-  virtual CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                              const xds::core::v3::ResourceLocator* cds_resources_locator,
-                              ClusterManager& cm) PURE;
+  virtual absl::StatusOr<CdsApiPtr>
+  createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
 
   /**
    * Returns the secret manager.

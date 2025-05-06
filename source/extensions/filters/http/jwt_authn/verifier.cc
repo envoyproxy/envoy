@@ -295,7 +295,7 @@ public:
     if (++completion_state.number_completed_children_ == verifiers_.size()) {
       // Aggregate all children status into a final status.
       // JwtMissed and JwtUnknownIssuer should be treated differently than other errors.
-      // JwtMissed means not Jwt token for the required provider.
+      // JwtMissed means not JWT for the required provider.
       // JwtUnknownIssuer means wrong issuer for the required provider.
       Status final_status = Status::JwtMissed;
       for (const auto& it : verifiers_) {

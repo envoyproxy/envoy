@@ -6,12 +6,10 @@ Note that this crate references the local ABI header files, so this is intended 
 ```
 [dependencies]
 envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", tag = "vX.Y.Z" }
-
-[dev-dependencies.envoy-proxy-dynamic-modules-rust-sdk]
-git = "https://github.com/envoyproxy/envoy"
-tag = "vX.Y.Z"
-# Enable testing features to use the mock Envoy objects.
-features = ["testing"]
+# Or, you can use a specific commit instead of a tag:
+# envoy-proxy-dynamic-modules-rust-sdk = {  git = "https://github.com/envoyproxy/envoy", rev = "abcdef" }
 ```
 
 instead of `envoy-proxy-dynamic-modules-rust-sdk = "X.Y.Z"`.
+
+See [Examples](https://github.com/envoyproxy/dynamic-modules-examples) for more details on how to use this SDK.

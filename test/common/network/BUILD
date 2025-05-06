@@ -472,7 +472,6 @@ envoy_cc_test(
     }),
     rbe_pool = "6gig",
     deps = [
-        "//source/common/network:io_uring_socket_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",

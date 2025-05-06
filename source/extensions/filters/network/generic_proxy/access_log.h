@@ -1,6 +1,9 @@
 #pragma once
 
-#include "source/extensions/filters/network/generic_proxy/file_access_log.h"
+#include "envoy/access_log/access_log_config.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
+
 #include "source/extensions/filters/network/generic_proxy/interface/stream.h"
 
 namespace Envoy {
@@ -8,34 +11,24 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-struct FormatterContext {
+struct FormatterContextExtension : public Formatter::Context::Extension {
+  FormatterContextExtension(const RequestHeaderFrame* request, const ResponseHeaderFrame* response)
+      : request_(request), response_(response) {}
+  FormatterContextExtension() = default;
+
   const RequestHeaderFrame* request_{};
   const ResponseHeaderFrame* response_{};
-
-  static constexpr absl::string_view category() { return "generic_proxy"; }
 };
 
-// Formatter for generic proxy.
-using Formatter = Formatter::FormatterBase<FormatterContext>;
-using FormatterProvider = Envoy::Formatter::FormatterProviderBase<FormatterContext>;
+#define CHECK_DATA_OR_RETURN(context, field, return_value)                                         \
+  const auto checked_data = context.typedExtension<FormatterContextExtension>();                   \
+  if (!checked_data.has_value() || checked_data->field == nullptr) {                               \
+    return return_value;                                                                           \
+  }
+
+using FormatterProvider = Formatter::FormatterProvider;
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
-using CommandParser = Envoy::Formatter::CommandParserBase<FormatterContext>;
-using CommandParserPtr = Envoy::Formatter::CommandParserBasePtr<FormatterContext>;
-using CommandParserFactory = Envoy::Formatter::CommandParserFactoryBase<FormatterContext>;
-using BuiltInCommandParserFactory =
-    Envoy::Formatter::BuiltInCommandParserFactoryBase<FormatterContext>;
-
-// Access log for generic proxy.
-using AccessLogFilter = AccessLog::FilterBase<FormatterContext>;
-using AccessLogFilterPtr = std::unique_ptr<AccessLogFilter>;
-using AccessLogFilterFactory = AccessLog::ExtensionFilterFactoryBase<FormatterContext>;
-using AccessLogInstance = AccessLog::InstanceBase<FormatterContext>;
-using AccessLogInstanceSharedPtr = std::shared_ptr<AccessLogInstance>;
-using AccessLogInstanceFactory = AccessLog::AccessLogInstanceFactoryBase<FormatterContext>;
-
-// File access log for generic proxy.
-using FileAccessLog = FileAccessLogBase<FormatterContext>;
-using FileAccessLogFactory = FileAccessLogFactoryBase<FormatterContext>;
+using FormatterContext = Formatter::Context;
 
 class StringValueFormatterProvider : public FormatterProvider {
 public:
@@ -68,6 +61,8 @@ public:
   ProtobufWkt::Value formatValueWithContext(const FormatterContext& context,
                                             const StreamInfo::StreamInfo&) const override;
 };
+
+Formatter::CommandParserPtr createGenericProxyCommandParser();
 
 } // namespace GenericProxy
 } // namespace NetworkFilters

@@ -51,15 +51,20 @@ public:
                                             Init::Manager& init_manager);
 
   // DrainDecision
-  bool drainClose() const override;
+  bool drainClose(Network::DrainDirection) const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected function call");
+    return nullptr;
+  }
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 

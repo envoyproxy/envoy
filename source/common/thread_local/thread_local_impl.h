@@ -48,7 +48,9 @@ private:
     void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
-    bool isShutdown() const override { return parent_.shutdown_; }
+    bool isShutdown() const override { return isShutdownImpl(); }
+    // We need to call isShutdown inside the destructor, so it must be non-virtual.
+    bool isShutdownImpl() const { return parent_.shutdown_; }
 
     InstanceImpl& parent_;
     const uint32_t index_;

@@ -47,7 +47,7 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
 InstanceImpl::SlotImpl::~SlotImpl() {
   // Do nothing if the parent is already shutdown. Return early here to avoid accessing the main
   // thread dispatcher because it may have been destroyed.
-  if (isShutdown()) {
+  if (isShutdownImpl()) {
     return;
   }
 

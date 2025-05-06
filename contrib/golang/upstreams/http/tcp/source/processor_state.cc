@@ -99,7 +99,7 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
 
   switch (status) {
   case HttpTcpBridgeStatus::HttpTcpBridgeContinue:
-    // streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+    // streaming send data to upstream, go side get each_data_piece, may be called multiple times.
 
     if (end_stream) {
       setFilterState(FilterState::Done);

@@ -8,6 +8,7 @@
 # leave room for compiler/linker.
 # The number 3G is chosen heuristically to both support large VM and small VM with RBE.
 # Startup options cannot be selected via config.
+# TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
 
 common --noenable_bzlmod
@@ -28,6 +29,8 @@ build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 build --incompatible_merge_fixed_and_default_shell_env
+# A workaround for slow ICU download.
+build --http_timeout_scaling=6.0
 
 # Pass CC, CXX and LLVM_CONFIG variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
@@ -221,6 +224,7 @@ build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 build:clang-libc++ --config=libc++
 build:clang-libc++ --action_env=ARFLAGS=r
+build:arm64-clang-libc++ --config=clang-libc++
 
 build:libc++20 --config=libc++
 # gRPC has a lot of deprecated-enum-enum-conversion warning. Remove once it is addressed
@@ -291,12 +295,22 @@ build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
+build:rbe-toolchain-arm64-clang-libc++ --config=rbe-toolchain
+build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
+build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
+build:rbe-toolchain-arm64-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
+build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64
+build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
+build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
+
 build:rbe-toolchain-asan --config=clang-asan
 build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/14.0.0/lib/x86_64-unknown-linux-gnu'
+build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
@@ -334,6 +348,9 @@ build:remote-clang --config=rbe-toolchain-clang
 
 build:remote-clang-libc++ --config=remote
 build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:remote-arm64-clang-libc++ --config=remote
+build:remote-arm64-clang-libc++ --config=rbe-toolchain-arm64-clang-libc++
 
 build:remote-gcc --config=remote
 build:remote-gcc --config=gcc
@@ -380,7 +397,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:d2be0c198feda0c607fa33209da01bf737ef373f@sha256:026fb6710a3e55716cc1aba129f613f9834212d2deb4ea875ac9d2c37ca19aa3
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:cb86d91cf406995012e330ab58830e6ee10240cb@sha256:d38457962937370aa867620a5cc7d01c568621fc0d1a57e044847599372a8571
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -441,6 +458,7 @@ build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
+build:asan-fuzzer --linkopt=-lc++
 
 build:oss-fuzz --config=fuzzing
 build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
@@ -543,13 +561,14 @@ common:common-envoy-engflow --grpc_keepalive_timeout=30s
 
 common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
 common:cache-envoy-engflow --remote_timeout=3600s
+# common:cache-envoy-engflow --remote_instance_name=llvm-18
 common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
 common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
 common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:6e494ff9bcfa96868cb43f1200f2126cdab39d62db52a5dda80c8ec1694a93ee
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:56b66cc84065c88a141963cedbbe4198850ffae0dacad769f516d0e9081439da
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 

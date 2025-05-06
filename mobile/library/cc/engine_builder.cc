@@ -119,8 +119,24 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setDisableDnsRefreshOnFailure(bool disable_dns_refresh_on_failure) {
+  disable_dns_refresh_on_failure_ = disable_dns_refresh_on_failure;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setDisableDnsRefreshOnNetworkChange(bool disable_dns_refresh_on_network_change) {
+  disable_dns_refresh_on_network_change_ = disable_dns_refresh_on_network_change;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
   dns_num_retries_ = dns_num_retries;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setGetaddrinfoNumThreads(uint32_t num_threads) {
+  getaddrinfo_num_threads_ = num_threads;
   return *this;
 }
 
@@ -480,6 +496,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(
       dns_failure_refresh_seconds_max_);
   dns_cache_config->mutable_dns_query_timeout()->set_seconds(dns_query_timeout_seconds_);
+  dns_cache_config->set_disable_dns_refresh_on_failure(disable_dns_refresh_on_failure_);
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
@@ -520,6 +537,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     if (dns_num_retries_.has_value()) {
       resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
     }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.getaddrinfo");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
@@ -887,7 +905,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
       new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_);
+                         network_thread_priority_, disable_dns_refresh_on_network_change_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.

@@ -255,12 +255,8 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers")) {
-        Buffer::OwnedImpl data;
-        parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
-      }
-
+      Buffer::OwnedImpl data;
+      parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
@@ -302,6 +298,7 @@ public:
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
   }
+  void recordUpstreamSslConnection();
   void addBytesSentCallback(Network::Connection::BytesSentCb) override{};
   // HTTP upstream must not implement converting upstream transport
   // socket from non-secure to secure mode.
@@ -379,11 +376,8 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers")) {
-        Buffer::OwnedImpl data;
-        parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
-      }
+      Buffer::OwnedImpl data;
+      parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
@@ -402,6 +396,7 @@ private:
   // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
   UpstreamRequestPtr upstream_request_;
+  Http::CodecType type_;
 };
 
 } // namespace TcpProxy

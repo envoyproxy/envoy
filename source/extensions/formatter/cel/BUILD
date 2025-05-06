@@ -43,6 +43,10 @@ envoy_cc_extension(
             "-DUSE_CEL_PARSER",
         ],
     }),
+    # Ensure this could be used in tests.
+    extra_visibility = [
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/extensions/formatter/cel:cel_lib",

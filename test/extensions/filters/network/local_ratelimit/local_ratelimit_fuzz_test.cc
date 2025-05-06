@@ -63,7 +63,6 @@ DEFINE_PROTO_FUZZER(
   Stats::IsolatedStoreImpl stats_store;
   Singleton::ManagerImpl singleton_manager;
   static NiceMock<Runtime::MockLoader> runtime;
-  Event::MockTimer* fill_timer = new Event::MockTimer(&dispatcher);
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
       input.config();
   ConfigSharedPtr config = nullptr;
@@ -93,8 +92,6 @@ DEFINE_PROTO_FUZZER(
       break;
     }
     case envoy::extensions::filters::network::local_ratelimit::Action::kRefill: {
-      EXPECT_CALL(*fill_timer, enableTimer(fill_interval, nullptr));
-      fill_timer->invokeCallback();
       break;
     }
     default:

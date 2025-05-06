@@ -21,6 +21,7 @@ envoy_cc_library(
         ":utility_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:utility_lib",
     ],
 )
 
@@ -245,7 +246,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "aws_lc_compat.h",
+        "utility.h",
+    ],
     external_deps = ["ssl"],
     deps = [
         "//source/common/common:assert_lib",

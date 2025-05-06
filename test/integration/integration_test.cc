@@ -2142,6 +2142,45 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
   EXPECT_NE(response->trailers(), nullptr);
 }
 
+// With the default configuration, an upgrade request is rejected.
+TEST_P(IntegrationTest, TestUpgradeRequestRejected) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/test/long/url"},
+      {":scheme", "http"}, {"connection", "Upgrade"},       {"upgrade", "TLS/1.3"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "403");
+}
+
+// With the default configuration, an upgrade request is rejected.
+TEST_P(IntegrationTest, TestUpgradeRequestStripped) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* matcher = hcm.mutable_http_protocol_options()->add_ignore_http_11_upgrade();
+        matcher->set_prefix("TLS/");
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/test/long/url"},
+      {":scheme", "http"}, {"connection", "Upgrade"},       {"upgrade", "TLS/1.3"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(nullptr, upstream_request_->headers().Upgrade());
+  EXPECT_EQ(nullptr, upstream_request_->headers().Connection());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+}
+
 TEST_P(IntegrationTest, ConnectWithNoBody) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

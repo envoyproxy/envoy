@@ -1,5 +1,5 @@
 #include <filesystem>
-#include <memory>
+#include <string>
 
 #include "source/extensions/common/aws/region_provider_impl.h"
 

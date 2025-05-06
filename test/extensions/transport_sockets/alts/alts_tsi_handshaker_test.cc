@@ -184,7 +184,7 @@ void onNextDoneImpl(absl::Status status, void* handshaker, const unsigned char* 
 
 class AltsTsiHandshakerTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  AltsTsiHandshakerTest() : version_(GetParam()){};
+  AltsTsiHandshakerTest() : version_(GetParam()) {};
   void startFakeHandshakerService() {
     server_address_ = absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":0");
     absl::Notification notification;

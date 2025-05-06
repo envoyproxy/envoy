@@ -744,6 +744,8 @@ class RequestTrailerMap
     : public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+using RequestTrailerMapSharedPtr = std::shared_ptr<RequestTrailerMap>;
+using RequestTrailerMapConstSharedPtr = std::shared_ptr<const RequestTrailerMap>;
 using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
 using RequestTrailerMapOptConstRef = OptRef<const RequestTrailerMap>;
 

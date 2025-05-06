@@ -37,7 +37,7 @@ public:
   GrpcServiceConfigWithHashKey() = default;
 
   explicit GrpcServiceConfigWithHashKey(const envoy::config::core::v3::GrpcService& config)
-      : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)){};
+      : config_(config), pre_computed_hash_(Envoy::MessageUtil::hash(config)) {};
 
   template <typename H> friend H AbslHashValue(H h, const GrpcServiceConfigWithHashKey& wrapper) {
     return H::combine(std::move(h), wrapper.pre_computed_hash_);

@@ -1,5 +1,7 @@
 #include "source/extensions/filters/common/expr/context.h"
 
+#include "envoy/upstream/host_description.h"
+
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
@@ -358,6 +360,19 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
                return CelValue::CreateStringView(upstream_local_address->asStringView());
              }
              return {};
+           }},
+          {UpstreamLocality,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+             const Upstream::HostDescriptionConstSharedPtr upstream_host =
+                 wrapper.info_.upstreamInfo().value().get().upstreamHost();
+             if (upstream_host == nullptr) {
+               return {};
+             }
+             return CelProtoWrapper::CreateMessage(&upstream_host.get()->locality(),
+                                                   &wrapper.arena_);
            }},
           {UpstreamTransportFailureReason,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {

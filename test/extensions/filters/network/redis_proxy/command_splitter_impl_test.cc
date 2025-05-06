@@ -63,6 +63,16 @@ public:
     return static_cast<MockFaultManager*>(fault_manager_ptr);
   }
 
+  InstanceImpl getSplitter(absl::flat_hash_set<std::string>&& custom_commands) {
+    return InstanceImpl{std::make_unique<NiceMock<MockRouter>>(route_),
+                        *store_.rootScope(),
+                        "redis.foo.",
+                        time_system_,
+                        latency_in_micros_,
+                        std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+                        std::move(custom_commands)};
+  }
+
   const bool latency_in_micros_;
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   ConnPool::MockInstance* mirror_conn_pool_{new ConnPool::MockInstance()};
@@ -75,12 +85,14 @@ public:
   NiceMock<MockFaultManager> fault_manager_;
 
   Event::SimulatedTimeSystem time_system_;
+  absl::flat_hash_set<std::string> custom_commands_;
   InstanceImpl splitter_{std::make_unique<NiceMock<MockRouter>>(route_),
                          *store_.rootScope(),
                          "redis.foo.",
                          time_system_,
                          latency_in_micros_,
-                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
+                         std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+                         std::move(custom_commands_)};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -606,6 +618,23 @@ TEST_F(RedisSingleServerRequestTest, Hello) {
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
 };
+
+TEST_F(RedisSingleServerRequestTest, CustomCommand) {
+  absl::flat_hash_set<std::string> cmds = {"example"};
+  auto splitter = getSplitter(std::move(cmds));
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"example", "test"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, makeRequest_("test", RespVariantEq(*request), _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+
+  handle_ = splitter.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  respond();
+}
 
 MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
   const ConnPool::RespVariant& obj = arg;

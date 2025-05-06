@@ -322,6 +322,7 @@ NOLINT
 NOLINTBEGIN
 NOLINTEND
 NOLINTNEXTLINE
+NOLOAD
 NONAME
 NONBLOCK
 NONCES
@@ -366,6 +367,7 @@ PEM
 PERF
 PGV
 PID
+PKCE
 PKCS12
 PKTINFO
 PNG
@@ -441,7 +443,9 @@ SPD
 SPDY
 SPIFFE
 SPKI
+SQE
 SQL
+SQPOLL
 SR
 SRCDIR
 SRDS
@@ -619,6 +623,7 @@ cacert
 cacheable
 cacheability
 callee
+callout
 callsite
 callsites
 callstack
@@ -642,6 +647,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
@@ -769,6 +775,8 @@ enqueues
 enum
 enums
 environ
+eu
+euprod
 epoll
 errno
 etag
@@ -949,6 +957,8 @@ lightstep
 linearization
 linearize
 linearized
+linkability
+linkable
 linux
 livelock
 llvm
@@ -1096,6 +1106,7 @@ pcall
 pcap
 pchar
 pclose
+pdf
 performant
 pfctl
 pipelined
@@ -1105,6 +1116,7 @@ plaintext
 pluggable
 pointee
 poller
+polymorphism
 popen
 pos
 posix
@@ -1207,6 +1219,10 @@ regexes
 reified
 reify
 reimplements
+reinitialization
+reinitializations
+reinitialize
+reinitializes
 rele
 releasor
 reloadable
@@ -1456,6 +1472,7 @@ upvalue
 uring
 urlencoded
 urls
+useragent
 userdata
 userinfo
 username

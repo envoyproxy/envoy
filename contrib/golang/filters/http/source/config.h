@@ -15,7 +15,7 @@ namespace Golang {
 constexpr char CanonicalName[] = "envoy.filters.http.golang";
 
 /**
- * Config registration for the golang extentions  filter. @see
+ * Config registration for the golang extensions  filter. @see
  * NamedHttpFilterConfigFactory.
  */
 class GolangFilterConfig : public Common::FactoryBase<

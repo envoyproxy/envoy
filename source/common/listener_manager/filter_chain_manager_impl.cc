@@ -80,8 +80,8 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
       init_manager_(init_manager) {}
 
-bool PerFilterChainFactoryContextImpl::drainClose() const {
-  return is_draining_.load() || parent_context_.drainDecision().drainClose();
+bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
+  return is_draining_.load() || parent_context_.drainDecision().drainClose(scope);
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
@@ -92,15 +92,13 @@ const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() co
   return parent_context_.listenerInfo();
 }
 
-ProtobufMessage::ValidationVisitor&
-PerFilterChainFactoryContextImpl::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
-Configuration::ServerFactoryContext&
-PerFilterChainFactoryContextImpl::serverFactoryContext() const {
+Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFactoryContext() {
   return parent_context_.serverFactoryContext();
 }
 

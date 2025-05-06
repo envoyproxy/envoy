@@ -158,20 +158,7 @@ protected:
     return per_priority_load_.degraded_priority_load_.get()[priority];
   }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
-  uint64_t random(bool peeking) {
-    if (peeking) {
-      stashed_random_.push_back(random_.random());
-      return stashed_random_.back();
-    } else {
-      if (!stashed_random_.empty()) {
-        auto random = stashed_random_.front();
-        stashed_random_.pop_front();
-        return random;
-      } else {
-        return random_.random();
-      }
-    }
-  }
+  uint64_t random(bool peeking);
 
   ClusterLbStats& stats_;
   Runtime::Loader& runtime_;
@@ -438,6 +425,7 @@ private:
 
   // Config for zone aware routing.
   const uint64_t min_cluster_size_;
+  const absl::optional<uint32_t> force_local_zone_min_size_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;

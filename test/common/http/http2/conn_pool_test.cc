@@ -1665,6 +1665,46 @@ TEST_F(Http2ConnPoolImplTest, PreconnectEvenWhenReady) {
   closeAllClients();
 }
 
+// Test that with many concurrent requests that the correct total number of connections are
+// established.
+TEST_F(Http2ConnPoolImplTest, PreconnectConcurrentRequests) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+
+  expectClientConnect(0, r1);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 1 /*capacity*/); // Preconnect required capacity: 2
+
+  expectClientsCreate(1);
+  ActiveTestRequest r2(*this, 0, true);
+  expectClientConnect(1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 2 /*capacity*/); // Preconnect required capacity: 3
+
+  expectClientsCreate(1);
+  ActiveTestRequest r3(*this, 1, true);
+  expectClientConnect(2);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 3 /*capacity*/); // Preconnect required capacity: 5
+
+  ActiveTestRequest r4(*this, 2, true);
+  CHECK_STATE(4 /*active*/, 0 /*pending*/, 2 /*capacity*/); // Preconnect required capacity: 6
+
+  expectClientsCreate(1);
+  ActiveTestRequest r5(*this, 2, true);
+  expectClientConnect(3);
+  CHECK_STATE(5 /*active*/, 0 /*pending*/, 3 /*capacity*/); // Preconnect required capacity: 8
+
+  // Clean up.
+  completeRequest(r1);
+  completeRequest(r2);
+  completeRequest(r3);
+  completeRequest(r4);
+  completeRequest(r5);
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  closeAllClients();
+}
+
 TEST_F(Http2ConnPoolImplTest, PreconnectAfterTimeout) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
@@ -1758,6 +1798,49 @@ TEST_F(Http2ConnPoolImplTest, TestUnusedCapacity) {
   // Closing the last stream, unused capacity remains at 3, as there is only 3 remaining streams.
   completeRequest(r3);
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  // Clean up with an outstanding stream.
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  closeAllClients();
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+}
+
+TEST_F(Http2ConnPoolImplTest, TestNegativeUnusedCapacity) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(4);
+
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(0, r1);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Settings frame results in negative unused capacity.
+  NiceMock<MockReceivedSettings> settings;
+  settings.max_concurrent_streams_ = 1;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, -2 /*capacity*/);
+
+  completeRequest(r1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
+
+  // With negative capacity, verify that a new request creates a new connection.
+  ActiveTestRequest r4(*this, 1, false);
+  CHECK_STATE(2 /*active*/, 1 /*pending*/, 3 /*capacity*/);
+  expectClientConnect(1, r4);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 2 /*capacity*/);
+
+  completeRequest(r2);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  completeRequest(r3);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 4 /*capacity*/);
+
+  completeRequest(r4);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 5 /*capacity*/);
 
   // Clean up with an outstanding stream.
   pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);

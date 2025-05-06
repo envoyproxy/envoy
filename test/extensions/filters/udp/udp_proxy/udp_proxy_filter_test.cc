@@ -2057,6 +2057,58 @@ tunneling_config:
   session->onStreamFailure(ConnectionPool::PoolFailureReason::Timeout, "", upstream_host_);
 }
 
+TEST_F(UdpProxyFilterTest, TunnelingSessionFailedWithRetry) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  retry_options:
+    max_connect_attempts: 2
+  )EOF"),
+        true);
+
+  // Allow for two connect attempts.
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(2, 0, 0, 0, 0);
+  auto session = filter_->createTunnelingSession();
+
+  EXPECT_CALL(
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+      newStream(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Return(nullptr));
+
+  session->onNewSession();
+
+  // First failure will enable the retry timer.
+  Event::MockTimer* retry_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(_, _));
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
+                           upstream_host_);
+
+  // Second failure will remove the session directly and will not enable the retry timer.
+  retry_timer->invokeCallback();
+  EXPECT_CALL(*retry_timer, disableTimer());
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
+                           upstream_host_);
+
+  EXPECT_EQ(1U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+}
+
 using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;
 using MockUpstreamTunnelCallbacks = SessionFilters::MockUpstreamTunnelCallbacks;
 using MockTunnelCreationCallbacks = SessionFilters::MockTunnelCreationCallbacks;

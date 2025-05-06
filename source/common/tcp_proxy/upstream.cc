@@ -367,6 +367,7 @@ void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPt
   }
   combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
       *this, host, downstream_info_.downstreamAddressProvider().sslConnection()));
+  combined_upstream_->recordUpstreamSslConnection();
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -411,17 +412,14 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
       decoder_filter_callbacks_(decoder_callbacks), response_decoder_(*this),
       upstream_callbacks_(callbacks) {
-  auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
+  type_ = parent_.codecType();
   downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
 
   if (config_.usePost()) {
-    const std::string& scheme =
-        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
-    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
 
   config_.headerEvaluator().evaluateHeaders(
@@ -470,7 +468,7 @@ CombinedUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 bool CombinedUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
-  switch (parent_.codecType()) {
+  switch (type_) {
   case Http::CodecType::HTTP1:
     // According to RFC7231 any 2xx response indicates that the connection is
     // established.
@@ -527,6 +525,18 @@ void CombinedUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers
 }
 
 Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() { return downstream_headers_.get(); }
+
+void CombinedUpstream::recordUpstreamSslConnection() {
+  if ((type_ != Http::CodecType::HTTP1) && (config_.usePost())) {
+    auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
+    const std::string& scheme =
+        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+    if (downstream_headers_->Scheme()) {
+      downstream_headers_->removeScheme();
+    }
+    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
+  }
+}
 
 void CombinedUpstream::doneReading() {
   read_half_closed_ = true;

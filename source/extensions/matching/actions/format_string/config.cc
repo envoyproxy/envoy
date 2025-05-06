@@ -34,7 +34,7 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& proto_config,
   Server::GenericFactoryContextImpl generic_context(context, validator);
   Formatter::FormatterConstSharedPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, generic_context),
-      Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+      Formatter::FormatterPtr);
   return [formatter]() { return std::make_unique<ActionImpl>(formatter); };
 }
 

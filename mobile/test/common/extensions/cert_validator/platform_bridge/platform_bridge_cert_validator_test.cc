@@ -170,8 +170,9 @@ INSTANTIATE_TEST_SUITE_P(TrustMode, PlatformBridgeCertValidatorTest,
                                             CertificateValidationContext::ACCEPT_UNTRUSTED}));
 
 TEST_P(PlatformBridgeCertValidatorTest, NoConfig) {
-  EXPECT_ENVOY_BUG({ PlatformBridgeCertValidator::create(nullptr, stats_).IgnoreError(); },
-                   "Invalid certificate validation context config.");
+  EXPECT_ENVOY_BUG(
+      { PlatformBridgeCertValidator::create(nullptr, stats_).IgnoreError(); },
+      "Invalid certificate validation context config.");
 }
 
 TEST_P(PlatformBridgeCertValidatorTest, NonEmptyCaCert) {
@@ -181,8 +182,9 @@ TEST_P(PlatformBridgeCertValidatorTest, NonEmptyCaCert) {
   EXPECT_CALL(config_, trustChainVerification()).WillRepeatedly(Return(GetParam()));
   EXPECT_CALL(config_, customValidatorConfig()).WillRepeatedly(ReturnRef(platform_bridge_config_));
 
-  EXPECT_ENVOY_BUG({ PlatformBridgeCertValidator::create(&config_, stats_).IgnoreError(); },
-                   "Invalid certificate validation context config.");
+  EXPECT_ENVOY_BUG(
+      { PlatformBridgeCertValidator::create(&config_, stats_).IgnoreError(); },
+      "Invalid certificate validation context config.");
 }
 
 TEST_P(PlatformBridgeCertValidatorTest, NonEmptyRevocationList) {
@@ -192,8 +194,9 @@ TEST_P(PlatformBridgeCertValidatorTest, NonEmptyRevocationList) {
   EXPECT_CALL(config_, trustChainVerification()).WillRepeatedly(Return(GetParam()));
   EXPECT_CALL(config_, customValidatorConfig()).WillRepeatedly(ReturnRef(platform_bridge_config_));
 
-  EXPECT_ENVOY_BUG({ PlatformBridgeCertValidator::create(&config_, stats_).IgnoreError(); },
-                   "Invalid certificate validation context config.");
+  EXPECT_ENVOY_BUG(
+      { PlatformBridgeCertValidator::create(&config_, stats_).IgnoreError(); },
+      "Invalid certificate validation context config.");
 }
 
 TEST_P(PlatformBridgeCertValidatorTest, NoCallback) {

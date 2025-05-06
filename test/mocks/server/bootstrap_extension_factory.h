@@ -13,6 +13,7 @@ public:
   ~MockBootstrapExtension() override;
 
   MOCK_METHOD(void, onServerInitialized, (), (override));
+  MOCK_METHOD(void, onWorkerThreadInitialized, (), (override));
 };
 
 namespace Configuration {

@@ -129,7 +129,7 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> method_name_;
+  const Matchers::StringMatcherImpl method_name_;
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 

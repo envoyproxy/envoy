@@ -24,6 +24,7 @@ type HttpCAPI interface {
 	HttpContinue(s unsafe.Pointer, status uint64)
 	HttpSendLocalReply(s unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool)
+	HttpInjectData(s unsafe.Pointer, data []byte)
 
 	// Send a specialized reply that indicates that the filter has failed on the go side. Internally this is used for
 	// when unhandled panics are detected.
@@ -58,6 +59,7 @@ type HttpCAPI interface {
 	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
 	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32

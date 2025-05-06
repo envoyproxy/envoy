@@ -22,6 +22,7 @@
 #include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tcp/async_tcp_client.h"
@@ -29,7 +30,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/config/subscription_factory_impl.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -87,9 +87,9 @@ public:
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                      ClusterManager& cm) override;
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
+                                      ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   Singleton::Manager& singletonManager() override { return context_.singletonManager(); }
 
@@ -295,7 +295,6 @@ public:
     }
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
-    ads_mux_.reset();
     xds_manager_.shutdown();
     active_clusters_.clear();
     warming_clusters_.clear();
@@ -308,8 +307,7 @@ public:
     return bind_config_;
   }
 
-  Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
-  absl::Status replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) override;
+  Config::GrpcMuxSharedPtr adsMux() override { return xds_manager_.adsMux(); }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const absl::optional<std::string>& localClusterName() const override {
@@ -319,7 +317,7 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  OdCdsApiHandlePtr
+  absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
                    const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -327,7 +325,11 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
-  Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
+  // TODO(adisuissa): remove this method, and switch all the callers to invoke
+  // it directly via the XdsManger.
+  Config::SubscriptionFactory& subscriptionFactory() override {
+    return xds_manager_.subscriptionFactory();
+  }
 
   absl::Status
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -389,8 +391,7 @@ protected:
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
                      Router::Context& router_context, Server::Instance& server,
                      Config::XdsManager& xds_manager, absl::Status& creation_status);
 
@@ -518,8 +519,8 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
-                                                                                    host)} {}
+          : host_handle_(host->acquireHandle()),
+            pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
@@ -925,7 +926,6 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  Config::GrpcMuxSharedPtr ads_mux_;
   // Temporarily saved resume cds callback from updateClusterCounts invocation.
   Config::ScopedResume resume_cds_;
   LoadStatsReporterPtr load_stats_reporter_;
@@ -937,7 +937,6 @@ private:
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
-  ProtobufMessage::ValidationContext& validation_context_;
   Router::Context& router_context_;
   ClusterTrafficStatNames cluster_stat_names_;
   ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
@@ -951,11 +950,7 @@ private:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>
       common_lb_config_pool_;
 
-  std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;
-
-  std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
-  std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
 
   bool initialized_{};
   bool ads_mux_initialized_{};

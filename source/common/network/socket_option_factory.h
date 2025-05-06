@@ -38,6 +38,7 @@ public:
   static std::unique_ptr<Socket::Options> buildUdpGroOptions();
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
   static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();
+  static std::unique_ptr<Socket::Options> buildBindAddressNoPort();
   /**
    * @param supports_v4_mapped_v6_addresses true if this option is to be applied to a v6 socket with
    * v4-mapped v6 address(i.e. ::ffff:172.21.0.6) support.

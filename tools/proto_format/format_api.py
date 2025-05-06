@@ -184,6 +184,9 @@ def get_import_deps(proto_path):
                 if import_path.startswith('xds/type/matcher/v3/'):
                     imports.append('@com_github_cncf_xds//xds/type/matcher/v3:pkg')
                     continue
+                if import_path.startswith('xds/type/v3/'):
+                    imports.append('@com_github_cncf_xds//xds/type/v3:pkg')
+                    continue
                 # Special case for handling XDS annotations.
                 if import_path.startswith('xds/annotations/v3/'):
                     imports.append('@com_github_cncf_xds//xds/annotations/v3:pkg')
