@@ -36,13 +36,24 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
       throw EnvoyException("Failed to parse expression into v1alpha1 format");
     }
 
+    // Also need to convert source info properly
+    std::string serialized_source_info;
+    if (!parse_status.value().source_info().SerializeToString(&serialized_source_info)) {
+      throw EnvoyException("Failed to serialize source info");
+    }
+
+    google::api::expr::v1alpha1::SourceInfo v1alpha1_source_info;
+    if (!v1alpha1_source_info.ParseFromString(serialized_source_info)) {
+      throw EnvoyException("Failed to parse source info into v1alpha1 format");
+    }
+
     Filters::Common::Expr::ExpressionPtr expression =
         Extensions::Filters::Common::Expr::createExpression(builder_->builder(), v1alpha1_expr);
 
     // Create a v1alpha1 ParsedExpr to store
     google::api::expr::v1alpha1::ParsedExpr v1alpha1_parsed_expr;
     v1alpha1_parsed_expr.mutable_expr()->CopyFrom(v1alpha1_expr);
-    v1alpha1_parsed_expr.mutable_source_info()->CopyFrom(parse_status.value().source_info());
+    v1alpha1_parsed_expr.mutable_source_info()->CopyFrom(v1alpha1_source_info);
 
     expressions.emplace(
         matcher, ExpressionManager::CelExpression{v1alpha1_parsed_expr, std::move(expression)});

@@ -1,12 +1,43 @@
-From 6e93e8ca24b24642444a51b09d9343a9b9a3b775 Mon Sep 17 00:00:00 2001
+From d88b2a2d81e62335708057b3a044abada46de2a3 Mon Sep 17 00:00:00 2001
 From: Rohit Agrawal <rohit.agrawal@databricks.com>
 Date: Tue, 6 May 2025 17:30:08 +0900
-Subject: [PATCH 1/2] Patches
+Subject: [PATCH] Patches
 
+Signed-off-by: Rohit Agrawal <rohit.agrawal@databricks.com>
 ---
- common/value.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ common/internal/byte_string.cc | 14 ++++++--------
+ common/value.h                 |  2 +-
+ common/values/value_variant.h  | 11 +++--------
+ runtime/type_registry.h        |  4 ++--
+ 4 files changed, 12 insertions(+), 19 deletions(-)
 
+diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
+index e01c797f8..56237a71f 100644
+--- a/common/internal/byte_string.cc
++++ b/common/internal/byte_string.cc
+@@ -104,16 +104,14 @@ ByteString ByteString::Concat(const ByteString& lhs, const ByteString& rhs,
+
+ ByteString::ByteString(Allocator<> allocator, absl::string_view string) {
+   ABSL_DCHECK_LE(string.size(), max_size());
+-  auto* arena = allocator.arena();
+-  if (string.size() <= kSmallByteStringCapacity) {
+-    SetSmall(arena, string);
+-  } else {
+-    SetMedium(arena, string);
++
++  // Check for null data pointer in the string_view
++  if (string.data() == nullptr) {
++    // Handle null data - create an empty ByteString
++    SetSmallEmpty(allocator.arena());
++    return;
+   }
+-}
+
+-ByteString::ByteString(Allocator<> allocator, const std::string& string) {
+-  ABSL_DCHECK_LE(string.size(), max_size());
+   auto* arena = allocator.arena();
+   if (string.size() <= kSmallByteStringCapacity) {
+     SetSmall(arena, string);
 diff --git a/common/value.h b/common/value.h
 index 06a03c13d..9f5d77980 100644
 --- a/common/value.h
@@ -20,16 +51,28 @@ index 06a03c13d..9f5d77980 100644
    ABSL_DCHECK(descriptor_pool != nullptr);
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
-
-From 553448099a76b5ad0e488fb491c62dd1759c45fe Mon Sep 17 00:00:00 2001
-From: Rohit Agrawal <rohit.agrawal@databricks.com>
-Date: Tue, 6 May 2025 17:36:08 +0900
-Subject: [PATCH 2/2] Patches
-
----
- runtime/type_registry.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
+diff --git a/common/values/value_variant.h b/common/values/value_variant.h
+index 61c19ce5f..bca851308 100644
+--- a/common/values/value_variant.h
++++ b/common/values/value_variant.h
+@@ -732,14 +732,9 @@ class alignas(kValueVariantAlign) CEL_COMMON_INTERNAL_VALUE_VARIANT_TRIVIAL_ABI
+       const bool rhs_trivial =
+           (rhs.flags_ & ValueFlags::kNonTrivial) == ValueFlags::kNone;
+       if (lhs_trivial && rhs_trivial) {
+-        alignas(ValueVariant) std::byte tmp[sizeof(ValueVariant)];
+-        // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-        std::memcpy(tmp, std::addressof(lhs), sizeof(ValueVariant));
+-        // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-        std::memcpy(std::addressof(lhs), std::addressof(rhs),
+-                    sizeof(ValueVariant));
+-        // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+-        std::memcpy(std::addressof(rhs), tmp, sizeof(ValueVariant));
++        ValueVariant tmp = lhs;
++        lhs = rhs;
++        rhs = std::move(tmp);
+       } else {
+         SlowSwap(lhs, rhs, lhs_trivial, rhs_trivial);
+       }
 diff --git a/runtime/type_registry.h b/runtime/type_registry.h
 index 2b247946c..3e5ad423b 100644
 --- a/runtime/type_registry.h
