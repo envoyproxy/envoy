@@ -54,6 +54,8 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
     : RoundRobinLoadBalancer(priority_set, local_priority_set, stats, runtime, random,
                              common_config,
                              /*round_robin_config=*/std::nullopt, time_source) {
+  // Explicitly enable locality weighted balancing.
+  setLocalityWeightedBalancing(true);
   if (tls_shim.has_value()) {
     apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) {
       refresh(priority);
