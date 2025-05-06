@@ -112,7 +112,7 @@ GrpcJsonReverseTranscoderConfig::ChangeBodyFieldName(absl::string_view message_n
   if (field_descriptor == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("No field named: ", body_field));
   }
-  return field_descriptor->json_name();
+  return std::string(field_descriptor->json_name());
 }
 
 bool GrpcJsonReverseTranscoderConfig::IsRequestNestedHttpBody(
