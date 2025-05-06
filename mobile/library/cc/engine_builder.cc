@@ -150,6 +150,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
+    const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
+  socket_options_ = socket_options;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addMaxConnectionsPerHost(int max_connections_per_host) {
   max_connections_per_host_ = max_connections_per_host;
   return *this;
@@ -823,6 +829,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           absl::StrCat("SO_NET_SERVICE_TYPE = ", ios_network_service_type_));
     }
 #endif
+    for (const auto& socket_option : socket_options_) {
+      envoy::config::core::v3::SocketOption* sock_opt =
+          base_cluster->mutable_upstream_bind_config()->add_socket_options();
+      sock_opt->CopyFrom(socket_option);
+    }
   }
 
   // Set up stats.
