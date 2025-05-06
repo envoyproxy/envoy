@@ -1,6 +1,6 @@
 admin:
-  allow_listed_routes: 
-    - "/quitquitqut"
+  allow_listed_routes:
+  - "/quitquitqut"
   access_log:
   - name: envoy.access_loggers.file
     typed_config:

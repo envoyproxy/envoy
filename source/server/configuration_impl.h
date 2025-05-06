@@ -213,7 +213,9 @@ private:
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     AccessLog::InstanceSharedPtrVector accessLogs() const override { return access_logs_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
-    absl::flat_hash_set<std::string> allowRouteString() const override { return allow_listed_route_; }
+    absl::flat_hash_set<std::string> allowRouteString() const override {
+      return allow_listed_route_;
+    }
 
     std::string profile_path_;
     AccessLog::InstanceSharedPtrVector access_logs_;
