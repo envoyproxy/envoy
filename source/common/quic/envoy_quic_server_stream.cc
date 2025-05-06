@@ -163,7 +163,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
-  if (fin) {
+  const bool headers_only = fin_received() && highest_received_byte_offset() == NumBytesConsumed();
+  const bool end_stream =
+      fin ||
+      (headers_only && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_signal_"
+                                                      "headers_only_to_http1_backend"));
+  ENVOY_STREAM_LOG(debug, "Headers_only: {}, end_stream: {}.", *this, headers_only, end_stream);
+  if (end_stream) {
     end_stream_decoded_ = true;
   }
   saw_regular_headers_ = false;
@@ -214,7 +220,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 #endif
 
-  request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/end_stream);
   ConsumeHeaderList();
 }
 
