@@ -115,6 +115,10 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
 
   // Build outlier detection config
   if (config.has_outlier_detection()) {
+    // Pre-allocate space for http matchers, to avoid moving them when
+    // std::vector grows. Moving matchers will cause a problem related to how
+    // matchers are build internally.
+    outlier_detection_http_events_.reserve(config.outlier_detection().http_events().size());
     absl::flat_hash_set<absl::string_view> http_destinations;
     for (auto const& event : config.outlier_detection().http_events()) {
       std::vector<Extensions::Common::Matcher::MatcherPtr> matcher;

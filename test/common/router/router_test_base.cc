@@ -1,5 +1,7 @@
 #include "test/common/router/router_test_base.h"
 
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+
 #include "source/common/router/debug_config.h"
 #include "source/common/router/upstream_codec_filter.h"
 
@@ -17,7 +19,7 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_(std::make_shared<FilterConfig>(
-          factory_context_, pool_.add("test"), factory_context_.local_info_,
+          server_factory_context_, pool_.add("test"), server_factory_context_.local_info_,
           *stats_store_.rootScope(), cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true,
           start_child_span, suppress_envoy_headers, false, suppress_grpc_request_failure_code_stats,
           flush_upstream_log_on_upstream_stream, std::move(strict_headers_to_check),
@@ -30,6 +32,39 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
+
+  // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
+  test_time_.setMonotonicTime(std::chrono::milliseconds(50));
+
+  // Allow any number of (append|pop)TrackedObject calls for the dispatcher strict mock.
+  EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+  EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
+  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
+
+  EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
+      .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
+}
+
+RouterTestBase::RouterTestBase(const envoy::extensions::filters::http::router::v3::Router& config)
+    : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
+      router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()) {
+  upstream_locality_.set_zone("to_az");
+  cm_.initializeThreadLocalClusters({"fake_cluster"});
+  ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, address())
+      .WillByDefault(Return(host_address_));
+  ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
+      .WillByDefault(ReturnRef(upstream_locality_));
+  ON_CALL(factory_context_, serverFactoryContext())
+      .WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(server_factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  config_ = std::make_shared<FilterConfig>(pool_.add("test"), factory_context_,
+                                           ShadowWriterPtr{shadow_writer_}, config);
+  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+  router_->setDecoderFilterCallbacks(callbacks_);
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(host_address_);
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
