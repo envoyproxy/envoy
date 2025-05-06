@@ -95,16 +95,22 @@ LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path,
     auto file_or_error = api_.fileSystem().fileReadToEnd(ip_tags_path);
     if (file_or_error.status().ok()) {
       IpTagFileProto ip_tags_proto;
-      try {
-        if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Yaml)) {
+      if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Yaml)) {
+        TRY_NEEDS_AUDIT {
           MessageUtil::loadFromYaml(file_or_error.value(), ip_tags_proto, validation_visitor_);
-        } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
-          MessageUtil::loadFromJson(file_or_error.value(), ip_tags_proto, validation_visitor_);
         }
-      } catch (const EnvoyException& e) {
-        creation_status =
-            absl::InvalidArgumentError(fmt::format("failed to parse ip tags file: {}", e.what()));
-        return nullptr;
+        END_TRY catch (EnvoyException& ex) {
+          creation_status = absl::InvalidArgumentError(
+              fmt::format("failed to parse ip tags file as yaml: {}", ex.what()));
+          return nullptr;
+        }
+      } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
+        bool has_unknown_field;
+        creation_status = MessageUtil::loadFromJsonNoThrow(file_or_error.value(), ip_tags_proto,
+                                                           has_unknown_field);
+        if (!creation_status.ok()) {
+          return nullptr;
+        }
       }
       return parseIpTagsAsProto(ip_tags_proto.ip_tags(), creation_status);
     } else {
