@@ -55,7 +55,7 @@ TEST(OverrideHostLbonfigTest, NoFallbackPolicies) {
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
   config_msg.add_primary_host_sources()->set_header("x-foo");
-  config_msg.mutable_fallback_picking_policy();
+  config_msg.mutable_fallback_policy();
   config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
@@ -74,15 +74,13 @@ TEST(OverrideHostLbonfigTest, NoPrimaryOverideSources) {
   OverrideHost config_msg;
 
   ProtobufWkt::Struct invalid_policy;
-  auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                                     ->add_policies()
-                                     ->mutable_typed_extension_config();
+  auto* typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
-  typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                               ->add_policies()
-                               ->mutable_typed_extension_config();
+  typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
@@ -103,15 +101,13 @@ TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   config_msg.add_primary_host_sources()->set_header("x-foo");
 
   ProtobufWkt::Struct invalid_policy;
-  auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                                     ->add_policies()
-                                     ->mutable_typed_extension_config();
+  auto* typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
-  typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                               ->add_policies()
-                               ->mutable_typed_extension_config();
+  typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
@@ -133,15 +129,13 @@ TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
   config_msg.add_primary_host_sources();
 
   ProtobufWkt::Struct invalid_policy;
-  auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                                     ->add_policies()
-                                     ->mutable_typed_extension_config();
+  auto* typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
   typed_extension_config->set_name("existent_policy");
   Config fallback_picker_config;
-  typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                               ->add_policies()
-                               ->mutable_typed_extension_config();
+  typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
 
@@ -152,6 +146,39 @@ TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
   auto result = factory.loadConfig(context, config_msg);
   EXPECT_THAT(result, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
                                                "Empty override source"));
+}
+
+TEST(OverrideHostLbonfigTest, HeaderAndMetadataInTheSameOverrideSource) {
+  NiceMock<Envoy::Server::Configuration::MockServerFactoryContext> context;
+
+  ::envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name("envoy.load_balancers.override_host");
+  OverrideHost config_msg;
+  // Do not set either host or metadata keys
+  auto* primary_host_source = config_msg.add_primary_host_sources();
+  primary_host_source->set_header("x-foo");
+  auto* metadata_key = primary_host_source->mutable_metadata();
+  metadata_key->set_key("x-bar");
+  metadata_key->add_path()->set_key("a/b/c");
+
+  ProtobufWkt::Struct invalid_policy;
+  auto* typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+  typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
+  typed_extension_config->set_name("existent_policy");
+  Config fallback_picker_config;
+  typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+  typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
+  typed_extension_config->set_name("envoy.load_balancers.override_host.test");
+
+  config.mutable_typed_config()->PackFrom(config_msg);
+
+  auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
+
+  auto result = factory.loadConfig(context, config_msg);
+  EXPECT_THAT(result, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                               "Only one override source must be set"));
 }
 
 TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
@@ -166,9 +193,8 @@ TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
   OverrideHost config_msg;
   config_msg.add_primary_host_sources()->set_header("x-foo");
   Config fallback_picker_config;
-  auto* typed_extension_config = config_msg.mutable_fallback_picking_policy()
-                                     ->add_policies()
-                                     ->mutable_typed_extension_config();
+  auto* typed_extension_config =
+      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(fallback_picker_config);
   typed_extension_config->set_name("envoy.load_balancers.override_host.test");
   config.mutable_typed_config()->PackFrom(config_msg);

@@ -54,7 +54,7 @@ policies:
             key: "envoy.lb"
             path:
             - key: "x-gateway-destination-endpoint"
-        fallback_picking_policy:
+        fallback_policy:
           policies:
           - typed_extension_config:
               name: envoy.load_balancing_policies.round_robin
@@ -71,11 +71,11 @@ policies:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
         primary_host_sources:
         - header: "x-gateway-destination-endpoint"
-          metadata:
+        - metadata:
             key: "envoy.lb"
             path:
             - key: "x-gateway-destination-endpoint"
-        fallback_picking_policy:
+        fallback_policy:
           policies:
           - typed_extension_config:
               name: envoy.load_balancing_policies.round_robin
@@ -91,11 +91,11 @@ policies:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
         primary_host_sources:
         - header: "x-gateway-destination-endpoint"
-          metadata:
+        - metadata:
             key: "envoy.lb"
             path:
             - key: "x-gateway-destination-endpoint"
-        fallback_picking_policy:
+        fallback_policy:
           policies:
           - typed_extension_config:
               name: com.google.load_balancers.override_host.test

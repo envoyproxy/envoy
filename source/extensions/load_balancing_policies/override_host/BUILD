@@ -38,7 +38,7 @@ envoy_cc_library(
     srcs = ["load_balancer.cc"],
     hdrs = ["load_balancer.h"],
     deps = [
-        ":metadata_keys",
+        ":override_host_filter_state",
         ":selected_hosts",
         "//envoy/common:exception_lib",
         "//envoy/common:optref_lib",
@@ -75,19 +75,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "metadata_keys",
-    hdrs = ["metadata_keys.h"],
-    deps = [
-        "@com_google_absl//absl/strings:string_view",
-    ],
-)
-
-envoy_cc_library(
     name = "selected_hosts",
     srcs = ["selected_hosts.cc"],
     hdrs = ["selected_hosts.h"],
     deps = [
-        ":metadata_keys",
         "//envoy/network:address_interface",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
@@ -95,5 +86,13 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_library(
+    name = "override_host_filter_state",
+    hdrs = ["override_host_filter_state.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
     ],
 )

@@ -50,7 +50,6 @@ envoy_extension_cc_test(
         "//envoy/upstream:upstream_interface",
         "//source/extensions/load_balancing_policies/override_host:config",
         "//source/extensions/load_balancing_policies/override_host:load_balancer",
-        "//source/extensions/load_balancing_policies/override_host:metadata_keys",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:server_factory_context_mocks",

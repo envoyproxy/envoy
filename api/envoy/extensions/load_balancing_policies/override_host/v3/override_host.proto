@@ -50,13 +50,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 message OverrideHost {
   message OverrideHostSource {
-    // The header to get the override host addresses. One of the header or metadata field must be set.
+    // The header to get the override host addresses. Only one of the header or metadata field must be set.
     string header = 1
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // The metadata key to get the override host addresses from the request dynamic metadata. If
     // set this field then it will take precedence over the header field.
-    // One of the header or metadata field must be set.
+    // Only one of the header or metadata field must be set.
     type.metadata.v3.MetadataKey metadata = 2;
   }
 
@@ -72,6 +72,6 @@ message OverrideHost {
 
   // The child LB policy to use in case neither header nor metadata with selected
   // hosts is present.
-  config.cluster.v3.LoadBalancingPolicy fallback_picking_policy = 3
+  config.cluster.v3.LoadBalancingPolicy fallback_policy = 3
       [(validate.rules).message = {required: true}];
 }

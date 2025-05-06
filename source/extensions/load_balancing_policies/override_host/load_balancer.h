@@ -20,11 +20,11 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
 #include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -53,7 +53,7 @@ using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 // Parsed configuration for the dynamic forwarding load balancer. It contains
 // factory and config for the load balancer specified in the
-// `fallback_picking_policy` field of the OverrideHost config
+// `fallback_policy` field of the OverrideHost config
 // proto.
 class OverrideHostLbConfig : public Upstream::LoadBalancerConfig {
 public:
@@ -101,14 +101,14 @@ private:
 // format of the host list when it is committed.
 //
 // If the metadata is not present, it falls back to using the load balancer
-// specified in the `fallback_picking_policy` field of the
+// specified in the `fallback_policy` field of the
 // LoadBalancingPolicyConfig config proto.
 // The metadata is not present in two scenarios:
 // 1. The Endpoint Picker LbTrafficExtension extension has not been called yet.
 //    In this case the picked locality is used to call Endpoint Picker specific
 //    to selected locality.
 // 2. The Locality Picker extension failed to select a host. In this case, the
-//    `fallback_picking_policy` is used as a fallback to pick the backend.
+//    `fallback_policy` is used as a fallback to pick the backend.
 //
 // Once the initial locality is picked, the load balancer will use the host list
 // from the request metadata to pick the next backend.
@@ -149,26 +149,24 @@ private:
 
   private:
     HostConstSharedPtr getEndpoint(const SelectedHosts& selected_hosts,
-                                   ::envoy::config::core::v3::Metadata& metadata);
+                                   StreamInfo::FilterState& filter_state);
     HostConstSharedPtr findHost(const SelectedHosts::Endpoint& endpoint);
 
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header (if configured) or in the request metadata.
-    // nullptr if the metadata is not present.
+    // nullptr if neither host nor metadata is present.
     // Error if the metadata is present but cannot be parsed.
     absl::StatusOr<std::unique_ptr<SelectedHosts>> getSelectedHosts(LoadBalancerContext* context);
 
     // Return a list of endpoints selected by the LbTrafficExtension.
-    // nullptr if the metadata is not present.
-    // Error if the metadata is present but cannot be parsed.
-    absl::StatusOr<std::unique_ptr<SelectedHosts>>
+    // nullopt if the metadata is not present.
+    absl::optional<absl::string_view>
     getSelectedHostsFromMetadata(const ::envoy::config::core::v3::Metadata& metadata,
                                  const Config::MetadataKey& metadata_key);
 
     // Return a list of endpoints selected by the LbTrafficExtension, specified.
-    // in the header. nullptr if the header is not present.
-    // Error if the header is present but cannot be parsed.
-    absl::StatusOr<std::unique_ptr<SelectedHosts>>
+    // in the header. nullopt if the header is not present.
+    absl::optional<absl::string_view>
     getSelectedHostsFromHeader(const Http::RequestHeaderMap* header_map,
                                const Http::LowerCaseString& header_name);
 

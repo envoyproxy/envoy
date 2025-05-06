@@ -101,7 +101,7 @@ Upstream::ThreadAwareLoadBalancerPtr
 TestLoadBalancerFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                                 const ClusterInfo&, const PrioritySet&, Loader&, RandomGenerator&,
                                 TimeSource&) {
-  DCHECK(lb_config.has_value());
+  ASSERT(lb_config.has_value());
   return std::make_unique<TestLoadBalancer>();
 }
 

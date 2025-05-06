@@ -9,7 +9,6 @@
 #include "envoy/network/address.h"
 
 #include "source/common/network/utility.h"
-#include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"

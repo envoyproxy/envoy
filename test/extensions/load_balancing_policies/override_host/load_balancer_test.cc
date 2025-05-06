@@ -9,7 +9,6 @@
 
 #include "source/extensions/load_balancing_policies/override_host/config.h"
 #include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
-#include "source/extensions/load_balancing_policies/override_host/metadata_keys.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/load_balancing_policies/override_host/test_lb.pb.h"
@@ -61,6 +60,7 @@ protected:
     load_balancer_ = thread_local_lb_factory_->create(lb_params_);
   }
 
+  // Default config only has metadata based host selection.
   OverrideHost makeDefaultConfig() {
     OverrideHost config;
     OverrideHost::OverrideHostSource* host_source = config.add_primary_host_sources();
@@ -68,14 +68,14 @@ protected:
     host_source->mutable_metadata()->add_path()->set_key("x-gateway-destination-endpoint");
     Config locality_picker_config;
     auto* typed_extension_config =
-        config.mutable_fallback_picking_policy()->add_policies()->mutable_typed_extension_config();
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
     typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
   }
 
-  void setHostSource(OverrideHost::OverrideHostSource* host_source, absl::string_view header_name) {
-    host_source->set_header(header_name);
+  void setMetadataHostSource(OverrideHost::OverrideHostSource* host_source,
+                             absl::string_view header_name) {
     host_source->mutable_metadata()->set_key("envoy.lb");
     host_source->mutable_metadata()->add_path()->set_key(header_name);
   }
@@ -85,11 +85,29 @@ protected:
     OverrideHost config;
     Config locality_picker_config;
     auto* typed_extension_config =
-        config.mutable_fallback_picking_policy()->add_policies()->mutable_typed_extension_config();
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
     typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
-    setHostSource(config.add_primary_host_sources(), primary_header_name);
-    setHostSource(config.add_fallback_host_sources(), fallback_header_name);
+    config.add_primary_host_sources()->set_header(primary_header_name);
+    setMetadataHostSource(config.add_primary_host_sources(), primary_header_name);
+    config.add_fallback_host_sources()->set_header(fallback_header_name);
+    setMetadataHostSource(config.add_fallback_host_sources(), fallback_header_name);
+    return config;
+  }
+
+  OverrideHost
+  makeDefaultConfigWithHeadersMetadataPreferred(absl::string_view primary_header_name,
+                                                absl::string_view fallback_header_name) {
+    OverrideHost config;
+    Config locality_picker_config;
+    auto* typed_extension_config =
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+    typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
+    typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
+    setMetadataHostSource(config.add_primary_host_sources(), primary_header_name);
+    config.add_primary_host_sources()->set_header(primary_header_name);
+    setMetadataHostSource(config.add_fallback_host_sources(), fallback_header_name);
+    config.add_fallback_host_sources()->set_header(fallback_header_name);
     return config;
   }
 
@@ -101,7 +119,7 @@ protected:
 
     Config locality_picker_config;
     auto* typed_extension_config =
-        config.mutable_fallback_picking_policy()->add_policies()->mutable_typed_extension_config();
+        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
     typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
     return config;
@@ -253,6 +271,8 @@ TEST_F(OverrideHostLoadBalancerTest, PrimaryAddressDoesNotExist) {
 }
 
 TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
+  // In this configuration header based override source is configured before the metadata based
+  // override source. Verify that header based value is chosen first.
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
   Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
   Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
@@ -290,7 +310,52 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   // Expect the the address from the header to be used.
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
   // Since there are no fallback hosts header, subsequent calls to chooseHost
-  // will use the fallback LB policy.
+  // will use the fallback LB policy, which returns the first host.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
+  // In this configuration metadata based override source is configured before the header based
+  // override source. Verify that metadata based value is chosen first.
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+  Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
+  Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
+                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
+                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
+                                    Host::HealthStatus::UNHEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
+                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
+                                    Host::HealthStatus::DEGRADED)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
+      {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithHeadersMetadataPreferred(
+      "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  load_balancer_->chooseHost(&load_balancer_context_);
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "[2600:2d00:1:cc00:172:b9fb:a00:4]:80" }
+    }
+  )pb");
+  addHeader("x-gateway-destination-endpoint", "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  // Expect the the address from the metadata to be used.
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:4]:80");
+  // Since there are no fallback hosts header, subsequent calls to chooseHost
+  // will use the fallback LB policy, which returns the first host.
   host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }

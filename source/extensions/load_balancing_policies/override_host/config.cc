@@ -28,7 +28,7 @@ OverrideHostLoadBalancerFactory::loadConfig(Server::Configuration::ServerFactory
   const OverrideHost& override_host_config = MessageUtil::downcastAndValidate<const OverrideHost&>(
       config, context.messageValidationVisitor());
   // Enforced in config validation.
-  ASSERT(override_host_config.has_fallback_picking_policy());
+  ASSERT(override_host_config.has_fallback_policy());
   return OverrideHostLbConfig::make(override_host_config, context);
 }
 
