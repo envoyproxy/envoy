@@ -1128,7 +1128,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>> {
     unsafe {
       let filter_config_ptr =
-        abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr) as *mut std::sync::Arc<dyn Any>;
+        abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr)
+          as *mut std::sync::Arc<dyn Any>;
 
       filter_config_ptr.as_ref().cloned()
     }
