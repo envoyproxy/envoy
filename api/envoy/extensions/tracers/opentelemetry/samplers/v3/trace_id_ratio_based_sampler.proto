@@ -26,5 +26,5 @@ message TraceIdRatioBasedSamplerConfig {
   // trace_id values, ShouldSample will return RECORD_AND_SAMPLE.
   // required
   // [#extension-category: envoy.tracers.opentelemetry.samplers]
-  type.v3.FractionalPercent sampling_percentage = 2;
+  type.v3.FractionalPercent sampling_percentage = 1;
 }
