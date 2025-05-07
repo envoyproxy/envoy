@@ -12,7 +12,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/network/address.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -21,7 +20,6 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
-#include "source/common/network/utility.h"
 #include "source/extensions/load_balancing_policies/override_host/override_host_filter_state.h"
 #include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
@@ -248,21 +246,21 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
   return SelectedHosts::make(primary_host);
 }
 
-HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::findHost(
-    const Network::Address::InstanceConstSharedPtr& endpoint) {
+HostConstSharedPtr
+OverrideHostLoadBalancer::LoadBalancerImpl::findHost(const SelectedHosts::Endpoint& endpoint) {
   HostMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
   if (hosts == nullptr) {
     return nullptr;
   }
-  absl::string_view address_key = endpoint->asStringView();
 
-  ENVOY_LOG(trace, "Looking up {} in {}", address_key,
+  ENVOY_LOG(trace, "Looking up {} in {}", endpoint.address_and_port,
             absl::StrJoin(*hosts, ", ",
                           [](std::string* out, Envoy::Upstream::HostMap::const_reference entry) {
                             absl::StrAppend(out, entry.first);
                           }));
 
-  if (const auto host_iterator = hosts->find(address_key); host_iterator != hosts->end()) {
+  if (const auto host_iterator = hosts->find(endpoint.address_and_port);
+      host_iterator != hosts->end()) {
     // TODO(yanavlasov): Validate that host health status did not change.
     return host_iterator->second;
   }
@@ -278,7 +276,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& sel
           OverrideHostFilterState::kFilterStateKey);
   if (!override_host_state) {
     // Use the primary endpoint.
-    ENVOY_LOG(trace, "Selecting primary endpoint {}", selected_hosts.primary->asStringView());
+    ENVOY_LOG(trace, "Selecting primary endpoint {}", selected_hosts.primary.address_and_port);
     auto new_override_host_state = std::make_shared<OverrideHostFilterState>();
     filter_state.setData(OverrideHostFilterState::kFilterStateKey, new_override_host_state,
                          StreamInfo::FilterState::StateType::Mutable);
@@ -301,7 +299,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& sel
   HostConstSharedPtr host;
   for (; fallback_index < selected_hosts.failover.size() && !host; ++fallback_index) {
     ENVOY_LOG(trace, "Selecting failover endpoint {}: {}", fallback_index,
-              selected_hosts.failover[fallback_index]->asStringView());
+              selected_hosts.failover[fallback_index].address_and_port);
     host = findHost(selected_hosts.failover[fallback_index]);
   }
 

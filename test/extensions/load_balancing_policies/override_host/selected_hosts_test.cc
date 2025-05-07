@@ -18,8 +18,7 @@ TEST(SelectedHostsTest, ValidIPv4) {
   auto selected_hosts_result = SelectedHosts::make("1.2.3.4:1234");
   EXPECT_TRUE(selected_hosts_result.ok());
   auto selected_hosts = std::move(selected_hosts_result.value());
-  EXPECT_EQ(selected_hosts->primary->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_EQ(selected_hosts->primary->ip()->port(), 1234);
+  EXPECT_EQ(selected_hosts->primary.address_and_port, "1.2.3.4:1234");
   EXPECT_TRUE(selected_hosts->failover.empty());
 }
 
@@ -27,8 +26,7 @@ TEST(SelectedHostsTest, ValidIPv6) {
   auto selected_hosts_result = SelectedHosts::make("[1:2:3::4]:1234");
   EXPECT_TRUE(selected_hosts_result.ok());
   auto selected_hosts = std::move(selected_hosts_result.value());
-  EXPECT_EQ(selected_hosts->primary->ip()->addressAsString(), "1:2:3::4");
-  EXPECT_EQ(selected_hosts->primary->ip()->port(), 1234);
+  EXPECT_EQ(selected_hosts->primary.address_and_port, "[1:2:3::4]:1234");
   EXPECT_TRUE(selected_hosts->failover.empty());
 }
 
@@ -47,16 +45,19 @@ TEST(SelectedHostsTest, EmptyAddress) {
 }
 
 TEST(SelectedHostsTest, BadAddress) {
+  // There is no validation if address is valid or not
   auto selected_hosts_result = SelectedHosts::make("i'm not an address");
-  EXPECT_THAT(selected_hosts_result,
-              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
-                                       "Address 'i'm not an address' is not in host:port format"));
+  EXPECT_TRUE(selected_hosts_result.ok());
+  auto selected_hosts = std::move(selected_hosts_result.value());
+  EXPECT_EQ(selected_hosts->primary.address_and_port, "i'm not an address");
+  EXPECT_TRUE(selected_hosts->failover.empty());
 }
 
 TEST(SelectedHostsTest, ProtoInvalidMultipleEndpoints) {
   auto selected_hosts_result = SelectedHosts::make("1.2.3.4:1234, , 5.6.7.8:5678");
   EXPECT_THAT(selected_hosts_result,
-              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument, "Address is empty"));
+              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                       "Primary endpoint is not a single address"));
 }
 
 } // namespace
