@@ -38,6 +38,11 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: conn_pool
   change: |
+    Fixed an issue that could lead to too many connections when using
+    :ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>` if the
+    established connection is ``http/2`` and Envoy predicted it would have lower concurrent capacity.
+- area: conn_pool
+  change: |
     Fixed an issue that could lead to insufficient connections for current pending requests. If a connection starts draining while it
     has negative unused capacity (which happens if an HTTP/2 ``SETTINGS`` frame reduces allowed concurrency to below the current number
     of requests), that connection's unused capacity will be included in total pool capacity even though it is unusable because it is
