@@ -11,6 +11,17 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+
+namespace {
+  // IAM Roles Anywhere credential strings
+  constexpr absl::string_view CREDENTIAL_SET = "credentialSet";
+  constexpr absl::string_view CREDENTIALS_LOWER = "credentials";
+  constexpr absl::string_view ACCESS_KEY_ID_LOWER = "accessKeyId";
+  constexpr absl::string_view SECRET_ACCESS_KEY_LOWER = "secretAccessKey";
+  constexpr absl::string_view EXPIRATION_LOWER = "expiration";
+  constexpr absl::string_view SESSION_TOKEN_LOWER = "sessionToken";
+}
+
 using std::chrono::seconds;
 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
@@ -19,7 +30,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     absl::string_view region, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer,
-    envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
         iam_roles_anywhere_config)
 
     : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
@@ -118,7 +129,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   auto credentialset_object_or_error =
-      document_json_or_error.value()->getObjectArray(CREDENTIAL_SET, false);
+      document_json_or_error.value()->getObjectArray(std::string(CREDENTIAL_SET), false);
   if (!credentialset_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credentialset_object_or_error.status().message());
@@ -128,7 +139,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
 
   // We only consider the first credential returned in a CredentialSet
   auto credential_object_or_error =
-      credentialset_object_or_error.value()[0]->getObject(CREDENTIALS_LOWER);
+      credentialset_object_or_error.value()[0]->getObject(std::string(CREDENTIALS_LOWER));
   if (!credential_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credential_object_or_error.status().message());
@@ -137,11 +148,11 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   const auto access_key_id = Utility::getStringFromJsonOrDefault(credential_object_or_error.value(),
-                                                                 ACCESS_KEY_ID_LOWER, "");
+                                                                 std::string(ACCESS_KEY_ID_LOWER), "");
   const auto secret_access_key = Utility::getStringFromJsonOrDefault(
-      credential_object_or_error.value(), SECRET_ACCESS_KEY_LOWER, "");
+      credential_object_or_error.value(), std::string(SECRET_ACCESS_KEY_LOWER), "");
   const auto session_token = Utility::getStringFromJsonOrDefault(credential_object_or_error.value(),
-                                                                 SESSION_TOKEN_LOWER, "");
+                                                                 std::string(SESSION_TOKEN_LOWER), "");
 
   ENVOY_LOG(debug,
             "Found following AWS credentials from rolesanywhere service: {}={}, {}={}, {}={}",
@@ -150,7 +161,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
 
   const auto expiration_str =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), EXPIRATION_LOWER, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), std::string(EXPIRATION_LOWER), "");
 
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
