@@ -1178,8 +1178,9 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
   validation_visitor_.setSupportKeepMatching(false);
 
   MatchTreeFactoryCb<TestData> matcher_creator = createMatcherFromYaml(yaml);
-  EXPECT_THROW_WITH_MESSAGE(matcher_creator(), EnvoyException,
-                            "keep_matching is not supported in this context");
+  ASSERT_FALSE(validation_visitor_.errors().empty());
+  EXPECT_EQ(validation_visitor_.errors()[0].message(),
+            "keep_matching is not supported in this context");
 }
 
 } // namespace Matcher

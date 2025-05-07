@@ -469,9 +469,7 @@ private:
     on_match_validation_visitor_.validateOnMatch(on_match);
     if (const std::vector<absl::Status>& errors = on_match_validation_visitor_.errors();
         !errors.empty()) {
-      return [error_message = std::string(errors.at(0).message())]() -> OnMatch<DataType> {
-        throwEnvoyExceptionOrPanic(error_message);
-      };
+      return []() -> OnMatch<DataType> { return OnMatch<DataType>{}; };
     }
     if (on_match.has_matcher()) {
       return [matcher_factory = std::move(create(on_match.matcher())),
