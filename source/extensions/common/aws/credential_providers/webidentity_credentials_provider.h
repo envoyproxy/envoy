@@ -48,9 +48,6 @@ private:
   const std::string role_arn_;
   const std::string role_session_name_;
 
-  // This is required because of the base class handling non-async case, which can never be used for
-  // web identity provider
-  bool needsRefresh() override { return true; };
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };

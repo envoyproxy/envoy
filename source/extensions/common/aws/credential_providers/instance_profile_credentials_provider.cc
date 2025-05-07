@@ -20,10 +20,6 @@ InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer) {}
 
-bool InstanceProfileCredentialsProvider::needsRefresh() {
-  return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
-}
-
 void InstanceProfileCredentialsProvider::refresh() {
 
   ENVOY_LOG(debug, "Getting AWS credentials from the EC2MetadataService");
