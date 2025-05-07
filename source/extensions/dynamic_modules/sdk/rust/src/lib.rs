@@ -1128,17 +1128,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>> {
     unsafe {
       let filter_config_ptr =
-        abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr);
-      if filter_config_ptr.is_null() {
-        return None;
-      }
+        abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr) as *mut std::sync::Arc<dyn Any>;
 
-      let ptr = filter_config_ptr as *mut std::sync::Arc<dyn Any>;
-      let boxed = Box::from_raw(ptr);
-      let cloned_filter_config = *boxed.clone();
-      std::mem::forget(boxed);
-
-      Some(cloned_filter_config)
+      filter_config_ptr.as_ref().cloned()
     }
   }
 }
@@ -1396,7 +1388,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_destro
   config_ptr: abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr,
 ) {
   let ptr = config_ptr as *mut std::sync::Arc<dyn Any>;
-  let _arc = Box::from_raw(ptr);
+  std::mem::drop(Box::from_raw(ptr));
 }
 
 fn envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
