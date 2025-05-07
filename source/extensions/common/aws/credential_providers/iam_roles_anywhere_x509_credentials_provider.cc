@@ -25,43 +25,52 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
     absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source)
     : context_(context), certificate_data_source_(certificate_data_source),
       private_key_data_source_(private_key_data_source),
-      certificate_chain_data_source_(certificate_chain_data_source) {
+      certificate_chain_data_source_(certificate_chain_data_source) {};
+
+absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
+
+  absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
 
   auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-      certificate_data_source_, context.mainThreadDispatcher(), context.threadLocal(),
-      context.api(), false, X509_CERTIFICATE_MAX_BYTES);
+      certificate_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
+      context_.api(), false, X509_CERTIFICATE_MAX_BYTES);
   if (provider_or_error_.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
-    ENVOY_LOG(error, "Invalid certificate data source");
+    ENVOY_LOG(error, "Invalid certificate data source - a certificate was provided but it was "
+                     "unable to be loaded");
     certificate_data_source_provider_ = nullptr;
-    return;
+    return status;
   }
 
   if (certificate_chain_data_source_.has_value()) {
     auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-        certificate_chain_data_source_.value(), context.mainThreadDispatcher(),
-        context.threadLocal(), context.api(), false, X509_CERTIFICATE_MAX_BYTES * 5);
+        certificate_chain_data_source_.value(), context_.mainThreadDispatcher(),
+        context_.threadLocal(), context_.api(), false, X509_CERTIFICATE_MAX_BYTES * 5);
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
-      ENVOY_LOG(error, "Invalid certificate chain data source");
+      ENVOY_LOG(error, "Invalid certificate chain data source - a certificate chain was provided "
+                       "but it was unable to be loaded");
+      return status;
     }
   } else {
     certificate_chain_data_source_provider_ = absl::nullopt;
   }
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-      private_key_data_source_, context.mainThreadDispatcher(), context.threadLocal(),
-      context.api(), false, 2048);
+      private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
+      context_.api(), false, 2048);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
-    ENVOY_LOG(error, "Invalid private key data source");
+    ENVOY_LOG(error, "Invalid private key data source - a private key was provided but it was "
+                     "unable to be loaded");
     private_key_data_source_provider_ = nullptr;
-    return;
+    return status;
   }
   refresh();
+  return absl::OkStatus();
 }
 
 bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {

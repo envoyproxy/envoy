@@ -49,6 +49,8 @@ public:
       envoy::config::core::v3::DataSource private_key_data_source,
       absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source);
 
+  absl::Status initialize();
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   envoy::config::core::v3::DataSource certificate_data_source_;

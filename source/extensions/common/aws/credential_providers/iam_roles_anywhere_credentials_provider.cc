@@ -13,14 +13,14 @@ namespace Common {
 namespace Aws {
 
 namespace {
-  // IAM Roles Anywhere credential strings
-  constexpr absl::string_view CREDENTIAL_SET = "credentialSet";
-  constexpr absl::string_view CREDENTIALS_LOWER = "credentials";
-  constexpr absl::string_view ACCESS_KEY_ID_LOWER = "accessKeyId";
-  constexpr absl::string_view SECRET_ACCESS_KEY_LOWER = "secretAccessKey";
-  constexpr absl::string_view EXPIRATION_LOWER = "expiration";
-  constexpr absl::string_view SESSION_TOKEN_LOWER = "sessionToken";
-}
+// IAM Roles Anywhere credential strings
+constexpr absl::string_view CREDENTIAL_SET = "credentialSet";
+constexpr absl::string_view CREDENTIALS_LOWER = "credentials";
+constexpr absl::string_view ACCESS_KEY_ID_LOWER = "accessKeyId";
+constexpr absl::string_view SECRET_ACCESS_KEY_LOWER = "secretAccessKey";
+constexpr absl::string_view EXPIRATION_LOWER = "expiration";
+constexpr absl::string_view SESSION_TOKEN_LOWER = "sessionToken";
+} // namespace
 
 using std::chrono::seconds;
 
@@ -72,8 +72,8 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 
-  auto json_message = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *json_message->mutable_fields();
+  auto json_message = ProtobufWkt::Struct();
+  auto& fields = *json_message.mutable_fields();
   fields["profileArn"].set_string_value(profile_arn_);
   fields["roleArn"].set_string_value(role_arn_);
   fields["trustAnchorArn"].set_string_value(trust_anchor_arn_);
@@ -85,7 +85,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
     fields["roleSessionName"].set_string_value(role_session_name_);
   }
 
-  auto body_data = Json::Factory::loadFromProtobufStruct(*json_message);
+  auto body_data = Json::Factory::loadFromProtobufStruct(json_message);
 
   message.body().add(body_data->asJsonString());
   ENVOY_LOG(debug, "IAM Roles Anywhere /sessions payload: {}", body_data->asJsonString());
@@ -147,12 +147,12 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     return;
   }
 
-  const auto access_key_id = Utility::getStringFromJsonOrDefault(credential_object_or_error.value(),
-                                                                 std::string(ACCESS_KEY_ID_LOWER), "");
+  const auto access_key_id = Utility::getStringFromJsonOrDefault(
+      credential_object_or_error.value(), std::string(ACCESS_KEY_ID_LOWER), "");
   const auto secret_access_key = Utility::getStringFromJsonOrDefault(
       credential_object_or_error.value(), std::string(SECRET_ACCESS_KEY_LOWER), "");
-  const auto session_token = Utility::getStringFromJsonOrDefault(credential_object_or_error.value(),
-                                                                 std::string(SESSION_TOKEN_LOWER), "");
+  const auto session_token = Utility::getStringFromJsonOrDefault(
+      credential_object_or_error.value(), std::string(SESSION_TOKEN_LOWER), "");
 
   ENVOY_LOG(debug,
             "Found following AWS credentials from rolesanywhere service: {}={}, {}={}, {}={}",
@@ -160,8 +160,8 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
             secret_access_key.empty() ? "" : "*****", SESSION_TOKEN_LOWER,
             session_token.empty() ? "" : "*****");
 
-  const auto expiration_str =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), std::string(EXPIRATION_LOWER), "");
+  const auto expiration_str = Utility::getStringFromJsonOrDefault(
+      credential_object_or_error.value(), std::string(EXPIRATION_LOWER), "");
 
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
