@@ -88,6 +88,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: stateful_session
+  change: |
+    Supports envelope stateful session extension to keep the exist session header value
+    from upstream server. See :ref:`mode
+    <envoy_v3_api_msg_extensions.http.stateful_session.envelope.v3.EnvelopeSessionState>`
+    for more details.
 - area: lua
   change: |
     Added support for accessing filter context.
