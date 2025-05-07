@@ -1288,12 +1288,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSE) {
     book.set_title(title);
     auto response_data = Grpc::Common::serializeToGrpcFrame(book);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter.encodeData(*response_data, false));
-    std::string response_fmt = "";
-    if (title == "book1") {
-      EXPECT_EQ(response_data->toString(), absl::StrFormat("data: {\"title\":\"%s\"}", title));
-    } else {
-      EXPECT_EQ(response_data->toString(), absl::StrFormat("\n\ndata: {\"title\":\"%s\"}", title));
-    }
+    EXPECT_EQ(response_data->toString(), absl::StrFormat("data: {\"title\":\"%s\"}\n\n", title));
   }
 }
 
