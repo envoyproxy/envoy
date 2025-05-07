@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/network/address.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -150,7 +151,7 @@ private:
   private:
     HostConstSharedPtr getEndpoint(const SelectedHosts& selected_hosts,
                                    StreamInfo::FilterState& filter_state);
-    HostConstSharedPtr findHost(const SelectedHosts::Endpoint& endpoint);
+    HostConstSharedPtr findHost(const Network::Address::InstanceConstSharedPtr& endpoint);
 
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header (if configured) or in the request metadata.

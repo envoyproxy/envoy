@@ -248,27 +248,13 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
   return SelectedHosts::make(primary_host);
 }
 
-namespace {
-bool isIpv6Address(const SelectedHosts::Endpoint::Address& address) {
-  return absl::StrContains(address.address, ':');
-}
-
-std::string makeAddressKey(const SelectedHosts::Endpoint::Address& address) {
-  // IPv6 address needs to be wrapped in brackets.
-  if (isIpv6Address(address)) {
-    return absl::StrCat("[", address.address, "]:", address.port);
-  }
-  return absl::StrCat(address.address, ":", address.port);
-}
-} // namespace
-
-HostConstSharedPtr
-OverrideHostLoadBalancer::LoadBalancerImpl::findHost(const SelectedHosts::Endpoint& endpoint) {
+HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::findHost(
+    const Network::Address::InstanceConstSharedPtr& endpoint) {
   HostMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
   if (hosts == nullptr) {
     return nullptr;
   }
-  std::string address_key = makeAddressKey(endpoint.address);
+  absl::string_view address_key = endpoint->asStringView();
 
   ENVOY_LOG(trace, "Looking up {} in {}", address_key,
             absl::StrJoin(*hosts, ", ",
@@ -292,7 +278,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& sel
           OverrideHostFilterState::kFilterStateKey);
   if (!override_host_state) {
     // Use the primary endpoint.
-    ENVOY_LOG(trace, "Selecting primary endpoint {}", selected_hosts.primary.address.address);
+    ENVOY_LOG(trace, "Selecting primary endpoint {}", selected_hosts.primary->asStringView());
     auto new_override_host_state = std::make_shared<OverrideHostFilterState>();
     filter_state.setData(OverrideHostFilterState::kFilterStateKey, new_override_host_state,
                          StreamInfo::FilterState::StateType::Mutable);
@@ -315,7 +301,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& sel
   HostConstSharedPtr host;
   for (; fallback_index < selected_hosts.failover.size() && !host; ++fallback_index) {
     ENVOY_LOG(trace, "Selecting failover endpoint {}: {}", fallback_index,
-              selected_hosts.failover[fallback_index].address.address);
+              selected_hosts.failover[fallback_index]->asStringView());
     host = findHost(selected_hosts.failover[fallback_index]);
   }
 

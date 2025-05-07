@@ -18,8 +18,8 @@ TEST(SelectedHostsTest, ValidIPv4) {
   auto selected_hosts_result = SelectedHosts::make("1.2.3.4:1234");
   EXPECT_TRUE(selected_hosts_result.ok());
   auto selected_hosts = std::move(selected_hosts_result.value());
-  EXPECT_EQ(selected_hosts->primary.address.address, "1.2.3.4");
-  EXPECT_EQ(selected_hosts->primary.address.port, 1234);
+  EXPECT_EQ(selected_hosts->primary->ip()->addressAsString(), "1.2.3.4");
+  EXPECT_EQ(selected_hosts->primary->ip()->port(), 1234);
   EXPECT_TRUE(selected_hosts->failover.empty());
 }
 
@@ -27,8 +27,8 @@ TEST(SelectedHostsTest, ValidIPv6) {
   auto selected_hosts_result = SelectedHosts::make("[1:2:3::4]:1234");
   EXPECT_TRUE(selected_hosts_result.ok());
   auto selected_hosts = std::move(selected_hosts_result.value());
-  EXPECT_EQ(selected_hosts->primary.address.address, "1:2:3::4");
-  EXPECT_EQ(selected_hosts->primary.address.port, 1234);
+  EXPECT_EQ(selected_hosts->primary->ip()->addressAsString(), "1:2:3::4");
+  EXPECT_EQ(selected_hosts->primary->ip()->port(), 1234);
   EXPECT_TRUE(selected_hosts->failover.empty());
 }
 

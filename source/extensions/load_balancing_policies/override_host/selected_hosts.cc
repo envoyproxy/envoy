@@ -25,7 +25,7 @@ namespace {
 // This function parses address from the string representation of the address.
 // The string representation has the format of "ip:port".
 // For example: "1.2.3.4:80" or "[2001:db8::1]:80".
-absl::StatusOr<SelectedHosts::Endpoint::Address> toAddress(absl::string_view address) {
+absl::StatusOr<Network::Address::InstanceConstSharedPtr> toAddress(absl::string_view address) {
   if (address.empty()) {
     return absl::InvalidArgumentError("Address is empty");
   }
@@ -37,18 +37,16 @@ absl::StatusOr<SelectedHosts::Endpoint::Address> toAddress(absl::string_view add
     return absl::InvalidArgumentError(
         fmt::format("Address '{}' is not in host:port format", address));
   }
-  return SelectedHosts::Endpoint::Address{
-      parsed_address->ip()->addressAsString(),
-      parsed_address->ip()->port(),
-  };
+  return parsed_address;
 }
 
 // This function parses list of endpoints from the string representation of the
 // endpoints.
 // The string representation has the format of "ip:port,ip:port,...".
 // For example: "1.2.3.4:80,5.6.7.8:80" or "[2001:db8::1]:80,[2001:db8::2]:80".
-absl::StatusOr<std::vector<SelectedHosts::Endpoint>> extractEndpoints(absl::string_view addresses) {
-  std::vector<SelectedHosts::Endpoint> endpoints;
+absl::StatusOr<std::vector<Network::Address::InstanceConstSharedPtr>>
+extractEndpoints(absl::string_view addresses) {
+  std::vector<Network::Address::InstanceConstSharedPtr> endpoints;
   if (!addresses.empty()) {
     std::vector<absl::string_view> addresses_and_ports = absl::StrSplit(addresses, ',');
     for (const auto& address_and_port : addresses_and_ports) {
@@ -57,9 +55,7 @@ absl::StatusOr<std::vector<SelectedHosts::Endpoint>> extractEndpoints(absl::stri
       if (!address_result.ok()) {
         return address_result.status();
       }
-      endpoints.push_back(SelectedHosts::Endpoint{
-          std::move(address_result.value()),
-      });
+      endpoints.push_back(std::move(address_result.value()));
     }
   }
   return endpoints;
