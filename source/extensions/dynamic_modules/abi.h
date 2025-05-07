@@ -489,6 +489,15 @@ envoy_dynamic_module_on_http_filter_per_route_config_new(const char* name_ptr, s
                                                          const char* config_ptr,
                                                          size_t config_size);
 
+/**
+ * envoy_dynamic_module_callback_get_most_specific_route_config may be called by an HTTP filter
+ * to retrieve the most specific per-route filter (based on the route object hierarchy).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
+ * HTTP filter.
+ * @return null if no per-route config exist. Otherwise, a pointer to the per-route config is
+ * returned.
+ */
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
