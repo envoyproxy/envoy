@@ -70,12 +70,10 @@ public:
                                     const PrioritySet& priority_set, Loader& runtime,
                                     RandomGenerator& random, TimeSource& time_source) const;
 
-  const std::vector<OverrideSource>& primaryEndpointOverrideSources() const {
-    return primary_endpoint_source_;
-  }
+  const std::vector<OverrideSource>& overrideHostSources() const { return override_host_sources_; }
 
 private:
-  OverrideHostLbConfig(std::vector<OverrideSource>&& primary_endpoint_source,
+  OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
                        TypedLoadBalancerFactory* fallback_load_balancer_factory,
                        LoadBalancerConfigPtr&& fallback_load_balancer_config);
 
@@ -90,7 +88,7 @@ private:
   };
   const FallbackLbConfig fallback_picker_lb_config_;
 
-  const std::vector<OverrideSource> primary_endpoint_source_;
+  const std::vector<OverrideSource> override_host_sources_;
 };
 
 // Load balancer for the dynamic forwarding, supporting external endpoint
@@ -148,15 +146,15 @@ private:
     }
 
   private:
-    HostConstSharedPtr getEndpoint(const SelectedHosts& selected_hosts,
+    HostConstSharedPtr getEndpoint(const std::vector<std::string>& selected_hosts,
                                    StreamInfo::FilterState& filter_state);
-    HostConstSharedPtr findHost(const SelectedHosts::Endpoint& endpoint);
+    HostConstSharedPtr findHost(absl::string_view endpoint);
 
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header (if configured) or in the request metadata.
     // nullptr if neither host nor metadata is present.
     // Error if the metadata is present but cannot be parsed.
-    absl::StatusOr<std::unique_ptr<SelectedHosts>> getSelectedHosts(LoadBalancerContext* context);
+    std::vector<std::string> getSelectedHosts(LoadBalancerContext* context);
 
     // Return a list of endpoints selected by the LbTrafficExtension.
     // nullopt if the metadata is not present.

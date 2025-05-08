@@ -49,7 +49,7 @@ policies:
     name: envoy.load_balancing_policies.override_host
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
-        primary_host_sources:
+        override_host_sources:
         - metadata:
             key: "envoy.lb"
             path:
@@ -69,7 +69,7 @@ policies:
     name: envoy.load_balancing_policies.override_host
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
-        primary_host_sources:
+        override_host_sources:
         - header: "x-gateway-destination-endpoint"
         - metadata:
             key: "envoy.lb"
@@ -89,7 +89,7 @@ policies:
     name: envoy.load_balancing_policies.override_host
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
-        primary_host_sources:
+        override_host_sources:
         - header: "x-gateway-destination-endpoint"
         - metadata:
             key: "envoy.lb"

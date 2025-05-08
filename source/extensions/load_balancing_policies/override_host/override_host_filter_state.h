@@ -24,7 +24,7 @@ public:
   }
 
 private:
-  uint64_t fallback_host_index_ = 0;
+  uint64_t fallback_host_index_ = 1;
 };
 
 } // namespace OverrideHost

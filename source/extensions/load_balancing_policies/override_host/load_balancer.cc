@@ -49,12 +49,12 @@ using ::Envoy::Upstream::LoadBalancerParams;
 using ::Envoy::Upstream::LoadBalancerPtr;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
-OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& primary_endpoint_source,
+OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
                                            TypedLoadBalancerFactory* fallback_load_balancer_factory,
                                            LoadBalancerConfigPtr&& fallback_load_balancer_config)
     : fallback_picker_lb_config_{fallback_load_balancer_factory,
                                  std::move(fallback_load_balancer_config)},
-      primary_endpoint_source_(std::move(primary_endpoint_source)) {}
+      override_host_sources_(std::move(override_host_sources)) {}
 
 OverrideHostLbConfig::OverrideSource
 OverrideHostLbConfig::OverrideSource::make(const OverrideHost::OverrideHostSource& config) {
@@ -86,9 +86,9 @@ OverrideHostLbConfig::makeOverrideSources(
 absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>>
 OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& context) {
   // Must be validated before calling this function.
-  absl::StatusOr<std::vector<OverrideSource>> primary_endpoint_source =
-      makeOverrideSources(config.primary_host_sources());
-  RETURN_IF_NOT_OK(primary_endpoint_source.status());
+  absl::StatusOr<std::vector<OverrideSource>> override_host_sources =
+      makeOverrideSources(config.override_host_sources());
+  RETURN_IF_NOT_OK(override_host_sources.status());
   ASSERT(config.has_fallback_policy());
   absl::InlinedVector<absl::string_view, 4> missing_policies;
   for (const auto& policy : config.fallback_policy().policies()) {
@@ -105,7 +105,7 @@ OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& con
       auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
       RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
       return std::unique_ptr<OverrideHostLbConfig>(
-          new OverrideHostLbConfig(std::move(primary_endpoint_source).value(), factory,
+          new OverrideHostLbConfig(std::move(override_host_sources).value(), factory,
                                    std::move(fallback_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());
@@ -133,7 +133,6 @@ absl::Status OverrideHostLoadBalancer::initialize() {
 }
 
 LoadBalancerFactorySharedPtr OverrideHostLoadBalancer::factory() {
-  // Must be called from main thread.
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!factory_) {
     factory_ = std::make_shared<LoadBalancerFactoryImpl>(config_, fallback_picker_lb_->factory());
@@ -157,26 +156,20 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
 
   // First check if headers or request metadata contains the list of endpoints
   // that should be used for serving.
-  // TODO(yavlasov): Store parsed SelectedHosts in the filter state to avoid
+  // TODO(yanavlasov): Store parsed SelectedHosts in the filter state to avoid
   // parsing it again during retries.
-  absl::StatusOr<std::unique_ptr<SelectedHosts>> selected_hosts_result = getSelectedHosts(context);
-  if (!selected_hosts_result.ok()) {
-    ENVOY_LOG(trace,
-              "Failed to parse selected endpoints with error {}. "
-              "Using fallback LB policy.",
-              selected_hosts_result.status().message());
+  std::vector<std::string> selected_hosts = getSelectedHosts(context);
+  if (selected_hosts.empty()) {
+    ENVOY_LOG(trace, "No overriden hosts were found. Using fallback LB policy.");
     return fallback_picker_lb_->chooseHost(context);
   }
 
-  auto selected_hosts = std::move(selected_hosts_result.value());
-  if (selected_hosts) {
-    HostConstSharedPtr host =
-        getEndpoint(*selected_hosts, *context->requestStreamInfo()->filterState());
-    if (host) {
-      return {host};
-    }
+  HostConstSharedPtr host =
+      getEndpoint(selected_hosts, *context->requestStreamInfo()->filterState());
+  if (host) {
+    return {host};
   }
-  // If we have metadata with endpoints, but none of them are available in
+  // If some endpoints were found, but none of them are available in
   // the cluster endpoint set, or the number of retries in the retry policy
   // exceeds the number of fallback endpoints, then use to the fallback LB
   // policy.
@@ -212,22 +205,20 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
   return result[0]->value().getStringView();
 }
 
-absl::StatusOr<std::unique_ptr<SelectedHosts>>
+std::vector<std::string>
 OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext* context) {
   // This is checked by config validation.
-  ASSERT(!config_.primaryEndpointOverrideSources().empty());
+  ASSERT(!config_.overrideHostSources().empty());
 
-  absl::string_view primary_host;
-  // Find either first header or metadata key that has a value.
-  for (const auto& override_source : config_.primaryEndpointOverrideSources()) {
+  std::vector<std::string> selected_hosts;
+  for (const auto& override_source : config_.overrideHostSources()) {
     // This is checked by config validation
     ASSERT(override_source.header_name.has_value() != override_source.metadata_key.has_value());
     if (override_source.header_name.has_value()) {
       absl::optional<absl::string_view> host = getSelectedHostsFromHeader(
           context->downstreamHeaders(), override_source.header_name.value());
-      if (host.has_value()) {
-        primary_host = host.value();
-        break;
+      if (host.has_value() && !host.value().empty()) {
+        selected_hosts.push_back(std::string(host.value()));
       }
     }
 
@@ -236,54 +227,50 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
     if (override_source.metadata_key.has_value()) {
       absl::optional<absl::string_view> host = getSelectedHostsFromMetadata(
           context->requestStreamInfo()->dynamicMetadata(), override_source.metadata_key.value());
-      if (host.has_value()) {
-        primary_host = host.value();
-        break;
+      if (host.has_value() && !host.value().empty()) {
+        selected_hosts.push_back(std::string(host.value()));
       }
     }
   }
-  // If neither host or metadata was found, return nullptr
-  return SelectedHosts::make(primary_host);
+  return selected_hosts;
 }
 
 HostConstSharedPtr
-OverrideHostLoadBalancer::LoadBalancerImpl::findHost(const SelectedHosts::Endpoint& endpoint) {
+OverrideHostLoadBalancer::LoadBalancerImpl::findHost(absl::string_view endpoint) {
   HostMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
   if (hosts == nullptr) {
     return nullptr;
   }
 
-  ENVOY_LOG(trace, "Looking up {} in {}", endpoint.address_and_port,
+  ENVOY_LOG(trace, "Looking up {} in {}", endpoint,
             absl::StrJoin(*hosts, ", ",
                           [](std::string* out, Envoy::Upstream::HostMap::const_reference entry) {
                             absl::StrAppend(out, entry.first);
                           }));
 
-  if (const auto host_iterator = hosts->find(endpoint.address_and_port);
-      host_iterator != hosts->end()) {
+  if (const auto host_iterator = hosts->find(endpoint); host_iterator != hosts->end()) {
     // TODO(yanavlasov): Validate that host health status did not change.
     return host_iterator->second;
   }
   return nullptr;
 }
 
-HostConstSharedPtr
-OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& selected_hosts,
-                                                        StreamInfo::FilterState& filter_state) {
-  uint32_t fallback_index = 0;
+HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(
+    const std::vector<std::string>& selected_hosts, StreamInfo::FilterState& filter_state) {
+  uint32_t fallback_index = 1;
   OverrideHostFilterState* override_host_state =
       filter_state.getDataMutable<OverrideHostFilterState>(
           OverrideHostFilterState::kFilterStateKey);
-  if (!override_host_state) {
+  if (!override_host_state && selected_hosts.size()) {
     // Use the primary endpoint.
-    ENVOY_LOG(trace, "Selecting primary endpoint {}", selected_hosts.primary.address_and_port);
+    ENVOY_LOG(trace, "Selecting primary endpoint {}", selected_hosts[0]);
     auto new_override_host_state = std::make_shared<OverrideHostFilterState>();
     filter_state.setData(OverrideHostFilterState::kFilterStateKey, new_override_host_state,
                          StreamInfo::FilterState::StateType::Mutable);
     override_host_state = new_override_host_state.get();
 
     // Endpoint extracted from the header does not have locality.
-    HostConstSharedPtr host = findHost(selected_hosts.primary);
+    HostConstSharedPtr host = findHost(selected_hosts[0]);
     // If the primary endpoint was found in the current host set, use it.
     // Otherwise try to see if one of the failover endpoints is available. This
     // is possible when the cluster received EDS update while the request to the
@@ -297,10 +284,10 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& sel
 
   // Loop through fallback hosts until we find one that is available.
   HostConstSharedPtr host;
-  for (; fallback_index < selected_hosts.failover.size() && !host; ++fallback_index) {
+  for (; fallback_index < selected_hosts.size() && !host; ++fallback_index) {
     ENVOY_LOG(trace, "Selecting failover endpoint {}: {}", fallback_index,
-              selected_hosts.failover[fallback_index].address_and_port);
-    host = findHost(selected_hosts.failover[fallback_index]);
+              selected_hosts[fallback_index]);
+    host = findHost(selected_hosts[fallback_index]);
   }
 
   // Update the fallback index in the metadata.
@@ -309,7 +296,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(const SelectedHosts& sel
     ENVOY_LOG(trace,
               "Number of retry attempts {} has exceeded the number of failover "
               "endpoints {}",
-              fallback_index + 1, selected_hosts.failover.size());
+              fallback_index + 1, selected_hosts.size());
   }
   return host;
 }

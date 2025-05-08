@@ -38,7 +38,7 @@ TEST(OverrideHostLbonfigTest, NoFallbackLb) {
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
-  config_msg.add_primary_host_sources()->set_header("x-foo");
+  config_msg.add_override_host_sources()->set_header("x-foo");
   config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Utility::getAndCheckFactory<::Envoy::Upstream::TypedLoadBalancerFactory>(config);
@@ -54,7 +54,7 @@ TEST(OverrideHostLbonfigTest, NoFallbackPolicies) {
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
-  config_msg.add_primary_host_sources()->set_header("x-foo");
+  config_msg.add_override_host_sources()->set_header("x-foo");
   config_msg.mutable_fallback_policy();
   config.mutable_typed_config()->PackFrom(config_msg);
 
@@ -98,7 +98,7 @@ TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
-  config_msg.add_primary_host_sources()->set_header("x-foo");
+  config_msg.add_override_host_sources()->set_header("x-foo");
 
   ProtobufWkt::Struct invalid_policy;
   auto* typed_extension_config =
@@ -126,7 +126,7 @@ TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
   // Do not set either host or metadata keys
-  config_msg.add_primary_host_sources();
+  config_msg.add_override_host_sources();
 
   ProtobufWkt::Struct invalid_policy;
   auto* typed_extension_config =
@@ -155,7 +155,7 @@ TEST(OverrideHostLbonfigTest, HeaderAndMetadataInTheSameOverrideSource) {
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
   // Do not set either host or metadata keys
-  auto* primary_host_source = config_msg.add_primary_host_sources();
+  auto* primary_host_source = config_msg.add_override_host_sources();
   primary_host_source->set_header("x-foo");
   auto* metadata_key = primary_host_source->mutable_metadata();
   metadata_key->set_key("x-bar");
@@ -191,7 +191,7 @@ TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
   ::envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
-  config_msg.add_primary_host_sources()->set_header("x-foo");
+  config_msg.add_override_host_sources()->set_header("x-foo");
   Config fallback_picker_config;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();

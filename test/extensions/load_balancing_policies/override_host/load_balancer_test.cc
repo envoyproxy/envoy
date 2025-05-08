@@ -63,7 +63,7 @@ protected:
   // Default config only has metadata based host selection.
   OverrideHost makeDefaultConfig() {
     OverrideHost config;
-    OverrideHost::OverrideHostSource* host_source = config.add_primary_host_sources();
+    OverrideHost::OverrideHostSource* host_source = config.add_override_host_sources();
     host_source->mutable_metadata()->set_key("envoy.lb");
     host_source->mutable_metadata()->add_path()->set_key("x-gateway-destination-endpoint");
     Config locality_picker_config;
@@ -88,10 +88,10 @@ protected:
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
     typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
-    config.add_primary_host_sources()->set_header(primary_header_name);
-    setMetadataHostSource(config.add_primary_host_sources(), primary_header_name);
-    config.add_fallback_host_sources()->set_header(fallback_header_name);
-    setMetadataHostSource(config.add_fallback_host_sources(), fallback_header_name);
+    config.add_override_host_sources()->set_header(primary_header_name);
+    setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
+    config.add_override_host_sources()->set_header(fallback_header_name);
+    setMetadataHostSource(config.add_override_host_sources(), fallback_header_name);
     return config;
   }
 
@@ -104,18 +104,18 @@ protected:
         config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
     typed_extension_config->mutable_typed_config()->PackFrom(locality_picker_config);
     typed_extension_config->set_name("envoy.load_balancing_policies.override_host.test");
-    setMetadataHostSource(config.add_primary_host_sources(), primary_header_name);
-    config.add_primary_host_sources()->set_header(primary_header_name);
-    setMetadataHostSource(config.add_fallback_host_sources(), fallback_header_name);
-    config.add_fallback_host_sources()->set_header(fallback_header_name);
+    setMetadataHostSource(config.add_override_host_sources(), primary_header_name);
+    config.add_override_host_sources()->set_header(primary_header_name);
+    setMetadataHostSource(config.add_override_host_sources(), fallback_header_name);
+    config.add_override_host_sources()->set_header(fallback_header_name);
     return config;
   }
 
   OverrideHost makeDefaultConfigWithHeadersOnlyEnabled(absl::string_view primary_header_name,
                                                        absl::string_view fallback_header_name) {
     OverrideHost config;
-    config.add_primary_host_sources()->set_header(primary_header_name);
-    config.add_fallback_host_sources()->set_header(fallback_header_name);
+    config.add_override_host_sources()->set_header(primary_header_name);
+    config.add_override_host_sources()->set_header(fallback_header_name);
 
     Config locality_picker_config;
     auto* typed_extension_config =
@@ -309,8 +309,12 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   // Expect the the address from the header to be used.
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
-  // Since there are no fallback hosts header, subsequent calls to chooseHost
-  // will use the fallback LB policy, which returns the first host.
+  // Next call to chooseHost will use the host from the metadata since it is
+  // second in the override source order.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:4]:80");
+  // Since there are no more overridden hosts, the fallback LB is called while always returns
+  // the first host in the set.
   host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }
@@ -354,8 +358,12 @@ TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   // Expect the the address from the metadata to be used.
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:4]:80");
-  // Since there are no fallback hosts header, subsequent calls to chooseHost
-  // will use the fallback LB policy, which returns the first host.
+  // Next call to chooseHost will use the host from the header since it is
+  // second in the override source order.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  // Since there are no more overridden hosts, the fallback LB is called while always returns
+  // the first host in the set.
   host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }
@@ -398,10 +406,12 @@ TEST_F(OverrideHostLoadBalancerTest, UnparseableHeaderValueUsesFallback) {
 
   addHeader("x-gateway-destination-endpoint", "fff-bar-.bats@just.Wrong");
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  // Fallback LB is used if the host value is invalid (not it return the first host in the set).
+  // The host from metadata is used, since the header value is invalid and metadata
+  // based override is after the header based override.
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
-  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
-  // Calling choseHosts again results in the same behavior.
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:4]:80");
+  // Since there are no more host overrides the fallback LB is called, which always
+  // returns the first element.
   host = load_balancer_->chooseHost(&load_balancer_context_).host;
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
 }
@@ -672,7 +682,7 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
                                                              "x-foo-failover-endpoints"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  EXPECT_CALL(load_balancer_context_, downstreamHeaders()).WillOnce(Return(nullptr));
+  EXPECT_CALL(load_balancer_context_, downstreamHeaders()).WillRepeatedly(Return(nullptr));
   // Even though metadata is invalid, the fallback LB will be used to select a host.
   EXPECT_NE(load_balancer_->chooseHost(&load_balancer_context_).host, nullptr);
 }
