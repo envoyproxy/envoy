@@ -1,6 +1,9 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 
 #include <algorithm>
+#include <future>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -280,6 +283,45 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 }
 
 absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocket(
+    Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+
+#if defined(__linux__)
+  if (address->networkNamespace().has_value()) {
+    // To change the network namespace, we're going to kick off a thread temporarily and change its
+    // network namespace before creating the socket. In the current thread, we'll wait on the result
+    // and while remaining in the same netns.
+    auto f = std::async(std::launch::async, [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      // Get the fd for the network namespace we want the socket in.
+      int netns_fd = open(address->networkNamespace().value().c_str(), O_RDONLY);
+      if (netns_fd <= 0) {
+        return absl::InvalidArgumentError(fmt::format("failed to open netns file {}: {}",
+                                                      address->networkNamespace().value(),
+                                                      strerror(errno)));
+      }
+
+      // Change the network namespace of this launched thread.
+      if (setns(netns_fd, CLONE_NEWNET)) {
+        return absl::InvalidArgumentError(fmt::format("failed to set netns ({}) to {}: {}",
+                                                      netns_fd, address->networkNamespace().value(),
+                                                      strerror(errno)));
+      }
+
+      return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                        worker_index);
+    });
+
+    // Wait on the value and return.
+    return f.get();
+  }
+#endif
+
+  return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                    worker_index);
+}
+
+absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {

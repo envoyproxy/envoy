@@ -144,10 +144,12 @@ public:
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @param network_namespace network namespace containing the address.
    * @return pointer to the Instance, or nullptr if unable to parse the address.
    */
   static Address::InstanceConstSharedPtr
-  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true,
+                              absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
@@ -164,10 +166,12 @@ public:
    *        - "1.2.3.4:80"
    *        - "[1234:5678::9]:443"
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @param network_namespace network namespace containing the address.
    * @return pointer to the Instance, or a nullptr in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr
-  parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only = true);
+  parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only = true,
+                                     absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Get the local address of the first interface address that is of type

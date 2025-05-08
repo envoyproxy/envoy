@@ -97,5 +97,10 @@ new_features:
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+- area: sockets
+  change: |
+    Added a new field, :ref:`network_namespace_filepath
+    <envoy_api_field_core.SocketAddress.network_namespace_filepath>`, which specifies which Linux
+    network namespace to create the socket in. Network namespaces are only configurable on Linux.
 
 deprecated:
