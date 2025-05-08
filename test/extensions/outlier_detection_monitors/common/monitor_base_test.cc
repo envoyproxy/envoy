@@ -13,7 +13,7 @@ using namespace testing;
 class MockMonitor : public ExtMonitorBase {
 public:
   MockMonitor(ExtMonitorConfigSharedPtr config) : ExtMonitorBase(config) {}
-  MOCK_METHOD(bool, onMatch, ());
+  MOCK_METHOD(bool, onError, ());
   MOCK_METHOD(void, onSuccess, ());
   MOCK_METHOD(void, onReset, ());
 };
@@ -40,11 +40,11 @@ TEST_F(MonitorTest, ReportErrorNotTripped) {
   bool callback_called = false;
   monitor_->setExtMonitorCallback(
       [&callback_called](const ExtMonitor*) { callback_called = true; });
-  EXPECT_CALL(*monitor_, onMatch).WillOnce(Return(false));
+  EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
 
   monitor_->reportResult(true);
 
-  // Callback has not been called, because onMatch returned false,
+  // Callback has not been called, because onError returned false,
   // meaning that monitor has not tripped yet.
   ASSERT_FALSE(callback_called);
 }
@@ -53,13 +53,13 @@ TEST_F(MonitorTest, ReportErrorTripped) {
   bool callback_called = false;
   monitor_->setExtMonitorCallback(
       [&callback_called](const ExtMonitor*) { callback_called = true; });
-  EXPECT_CALL(*monitor_, onMatch).WillOnce(Return(true));
+  EXPECT_CALL(*monitor_, onError).WillOnce(Return(true));
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
   monitor_->reportResult(true);
 
-  // Callback has been called, because onMatch returned true,
+  // Callback has been called, because onError returned true,
   // meaning that monitor has tripped.
   ASSERT_TRUE(callback_called);
 }

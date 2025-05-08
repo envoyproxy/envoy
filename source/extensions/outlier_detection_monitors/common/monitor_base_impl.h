@@ -53,7 +53,7 @@ public:
   const ExtMonitorConfigSharedPtr& config() const { return config_; }
 
 protected:
-  virtual bool onMatch() PURE;
+  virtual bool onError() PURE;
   virtual void onSuccess() PURE;
   virtual void onReset() PURE;
 

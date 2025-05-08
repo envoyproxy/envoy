@@ -7,7 +7,7 @@ namespace Outlier {
 void ExtMonitorBase::reportResult(bool error) {
   if (error) {
     // Count as error.
-    if (onMatch()) {
+    if (onError()) {
       callback_(this);
       // Reaching error was reported via callback.
       // but the host may or may not be ejected based on enforce_ parameter.
