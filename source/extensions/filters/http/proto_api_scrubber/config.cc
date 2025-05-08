@@ -17,8 +17,8 @@ namespace ProtoApiScrubber {
 FilterFactoryCreator::FilterFactoryCreator() : FactoryBase(kFilterName) {}
 
 Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::proto_api_scrubber::v3::
-        ProtoApiScrubberConfig& proto_config,
+    const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
+        proto_config,
     const std::string&, Envoy::Server::Configuration::FactoryContext&) {
   auto filter_config = std::make_shared<FilterConfig>(proto_config);
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {

@@ -39,13 +39,13 @@ private:
   FilterConfig& filter_config_;
 };
 
-class FilterFactory : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
-                          envoy::extensions::filters::http::proto_api_scrubber::v3::
-                              ProtoApiScrubberConfig> {
+class FilterFactory
+    : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
+          envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig> {
 private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::proto_api_scrubber::v3::
-          ProtoApiScrubberConfig& proto_config,
+      const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
+          proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
 };
 } // namespace ProtoApiScrubber

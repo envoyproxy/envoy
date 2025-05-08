@@ -15,14 +15,16 @@ namespace ProtoApiScrubber {
 // performance.
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  explicit FilterConfig(const envoy::extensions::filters::http::proto_api_scrubber::v3::
-                            ProtoApiScrubberConfig& proto_config);
+  explicit FilterConfig(
+      const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
+          proto_config);
   // This method would be used for debugging purpose only, during development.
   // It would be removed once the development is complete.
   void PrintConfig();
+
 private:
-  const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig
-    &proto_config_;
+  const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
+      proto_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;

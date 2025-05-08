@@ -15,16 +15,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-class FilterFactoryCreator : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
-                                 envoy::extensions::filters::http::proto_api_scrubber::v3::
-                                     ProtoApiScrubberConfig> {
+class FilterFactoryCreator
+    : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
+          envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig> {
 public:
   FilterFactoryCreator();
 
 private:
   Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::proto_api_scrubber::v3::
-        ProtoApiScrubberConfig& proto_config,
+      const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
+          proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
 };
 } // namespace ProtoApiScrubber

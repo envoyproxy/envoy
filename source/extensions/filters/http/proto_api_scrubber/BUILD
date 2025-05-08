@@ -15,9 +15,9 @@ envoy_cc_extension(
     hdrs = ["filter_config.h"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@com_google_absl//absl/status",
-        "@com_google_protobuf//:protobuf",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )
