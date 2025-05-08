@@ -889,11 +889,6 @@ public:
     )EOF");
   }
 
-  void SetUp() override {
-    GTEST_FLAG_SET(death_test_style, "threadsafe");
-    Http2BufferWatermarksTest::SetUp();
-  }
-
 protected:
   StreamTeeFilterConfig tee_filter_factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>
@@ -1605,20 +1600,19 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
   initialize();
 
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
-               "[\\s\\S]*Crashing as request body over 1000![\\s\\S]*"
-               "ActiveStream[\\s\\S]*Http2::ConnectionImpl[\\s\\S]*Dumping current stream[\\s\\S]*"
-               "ConnectionImpl::StreamImpl[\\s\\S]*ConnectionImpl[\\s\\S]*");
+               "(?s)Crashing as request body over 1000!.*"
+               "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
+               "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }
 
 TEST_P(Http2DeferredProcessingIntegrationTest,
        CanDumpCrashInformationWhenProcessingBufferedDataOfDeferredCloseStream) {
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
-  EXPECT_DEATH(
-      testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
-      "[\\s\\S]*Crashing as response body over 1000![\\s\\S]*"
-      "ActiveStream[\\s\\S]*Http2::ConnectionImpl[\\s\\S]*Dumping 1 Active Streams[\\s\\S]*"
-      "ConnectionImpl::StreamImpl[\\s\\S]*ConnectionImpl[\\s\\S]*");
+  EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
+               "(?s)Crashing as response body over 1000!.*"
+               "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
+               "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }
 
 #endif

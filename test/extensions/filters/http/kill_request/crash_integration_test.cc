@@ -23,11 +23,6 @@ namespace {
 class CrashIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 protected:
-  void SetUp() {
-    GTEST_FLAG_SET(death_test_style, "threadsafe");
-    HttpProtocolIntegrationTest::SetUp();
-  }
-
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();
@@ -73,10 +68,9 @@ TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   //  - ActiveStream
   //  - Http(1|2)::ConnectionImpl
   //  - Network::ConnectionImpl
-  const std::string death_string =
-      GetParam().downstream_protocol == Http::CodecType::HTTP2
-          ? "[\\s\\S]*ActiveStream[\\s\\S]*Http2::ConnectionImpl[\\s\\S]*ConnectionImpl[\\s\\S]*"
-          : "[\\s\\S]*ActiveStream[\\s\\S]*Http1::ConnectionImpl[\\s\\S]*ConnectionImpl[\\s\\S]*";
+  const std::string death_string = GetParam().downstream_protocol == Http::CodecType::HTTP2
+                                       ? "(?s)ActiveStream.*Http2::ConnectionImpl.*ConnectionImpl"
+                                       : "(?s)ActiveStream.*Http1::ConnectionImpl.*ConnectionImpl";
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
                death_string);
 }
@@ -99,8 +93,7 @@ TEST_P(CrashIntegrationTestAllProtocols, ResponseCrashDumpsTheCorrespondingReque
   // Check that we dump the downstream request
   EXPECT_DEATH(
       sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 1024),
-      "[\\s\\S]*Dumping corresponding downstream "
-      "request[\\s\\S]*UpstreamRequest[\\s\\S]*request_headers:[\\s\\S]*");
+      "(?s)Dumping corresponding downstream request.*UpstreamRequest.*request_headers:");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueDoesNotAddTrackedObjectIfExists) {
@@ -135,7 +128,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueDoesNotAddTrackedObjectIf
   // crash:
   // - The filter's custom scope tracked object
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "[\\s\\S]*StopIterationAndContinue decode_delay_timer[\\s\\S]*");
+               "StopIterationAndContinue decode_delay_timer");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueAddsCrashContextIfNoneExists) {
@@ -171,7 +164,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueAddsCrashContextIfNoneExi
   //  - ActiveStream
   //  - Network::ConnectionImpl
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "[\\s\\S]*ActiveStream[\\s\\S]*ConnectionImpl[\\s\\S]*");
+               "(?s)ActiveStream.*.*ConnectionImpl");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueDoesNotAddTrackedObjectIfExists) {
@@ -204,7 +197,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueDoesNotAddTrackedObjectIf
   // crash:
   // - The filter's custom scope tracked object
   EXPECT_DEATH(sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 0),
-               "[\\s\\S]*StopIterationAndContinue encode_delay_timer[\\s\\S]*");
+               "StopIterationAndContinue encode_delay_timer");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueAddsCrashContextIfNoneExists) {
@@ -238,7 +231,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueAddsCrashContextIfNoneExi
   //  - ActiveStream
   //  - Network::ConnectionImpl
   EXPECT_DEATH(sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 0),
-               "[\\s\\S]*ActiveStream[\\s\\S]*ConnectionImpl[\\s\\S]*");
+               "(?s)ActiveStream.*.*ConnectionImpl");
 }
 
 #endif

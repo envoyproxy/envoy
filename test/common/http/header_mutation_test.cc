@@ -272,8 +272,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
   }
 }
 
-TEST(HeaderMutationTestDeathTest, UnsetOneoff) {
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
+TEST(HeaderMutationTest, Death) {
   ProtoHeaderMutatons proto_mutations;
   proto_mutations.Add();
 
