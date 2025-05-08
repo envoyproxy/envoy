@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host into the session context.
 //
 // When processing the request from the downstream, Envoy will check if the request contains the
-// session context. If the request contains the session context, Envoy will get and strip the
+// session context. If the request contains the session context, Envoy will strip the
 // upstream host from the session context.
 //
 // [#extension: envoy.http.stateful_session.envelope]
