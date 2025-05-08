@@ -93,15 +93,6 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
-
-  if (monitors_set_.empty()) {
-    return;
-  }
-  // Wrap reported HTTP code into outlier detection extension's wrapper and forward
-  // it to configured extensions.
-  monitors_set_.forEach([response_code](const ExtMonitorPtr& monitor) {
-    monitor->putResult(HttpCode(response_code));
-  });
 }
 ExtMonitor::ExtMonitorCallback DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
   return [this](const ExtMonitor* failed_monitor) {
@@ -198,17 +189,6 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
 // config parameter.
 void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
   put_result_func_(this, result, code);
-
-  // Call extensions
-  if (monitors_set_.empty()) {
-    return;
-  }
-
-  // Pass the local origin event to all registered extension monitors.
-  // Only monitors "interested" in local origin event will process the result.
-  // Those not "interested" will ignore the call.
-  monitors_set_.forEach(
-      [result](const ExtMonitorPtr& monitor) { monitor->putResult(LocalOriginEvent(result)); });
 }
 
 void DetectorHostMonitorImpl::reportResult(absl::string_view monitor_name, bool error) {

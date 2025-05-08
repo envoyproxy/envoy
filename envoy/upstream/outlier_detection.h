@@ -50,34 +50,6 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
-class HttpCode {
-public:
-  HttpCode(uint32_t code) : code_(code) {}
-  HttpCode() = delete;
-  uint32_t code() const { return code_; }
-
-private:
-  uint32_t code_;
-};
-
-// LocalOriginEvent is used to report errors like resets, timeouts but also
-// successful connection attempts.
-class LocalOriginEvent {
-public:
-  LocalOriginEvent(Result result) : result_(result) {}
-  LocalOriginEvent() = delete;
-  Result result() const { return result_; }
-
-private:
-  Result result_;
-};
-
-/*
- * Class carries result of a transaction with upstream entity
- * or generated internally by Envoy.
- */
-using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
-
 // Base class defining api for various types of monitors.
 // Each monitor may implement different health detection algorithm.
 class ExtMonitor {
@@ -86,7 +58,6 @@ public:
   using ExtMonitorCallback = std::function<void(const ExtMonitor*)>;
 
   // Method to report a result to extensions.
-  virtual void putResult(const ExtResult) PURE;
   virtual void reportResult(bool) PURE;
   virtual void setExtMonitorCallback(ExtMonitorCallback) PURE;
   virtual void reset() PURE;

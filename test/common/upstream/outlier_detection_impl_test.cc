@@ -2808,86 +2808,15 @@ TEST(OutlierUtility, SRThreshold) {
 }
 
 // Test disables "legacy" outlier, so all events will be handled by extensions.
-TEST_F(OutlierDetectorImplTest, BasicCall) {
-  // Disable all other outlier detectors so reported results all go to
-  // extensions.
+TEST_F(OutlierDetectorImplTest, ExtensionsBasicCall) {
   const std::string yaml = R"EOF(
-    consecutive_5xx: 0
-    consecutive_gateway_failure: 0
-    consecutive_local_origin_failure: 0
-    split_external_local_origin_errors: true
     monitors:
-    - name: "5xx"
+    - name: "5xx-monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        errors:
+        common_settings:
           enforcing: 100
-          match:
-            http_codes:
-              - range:
-                  start: 500
-                  end: 510
-  )EOF";
-  envoy::config::cluster::v3::OutlierDetection outlier_detection;
-  TestUtility::loadFromYaml(yaml, outlier_detection);
-
-  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
-  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
-  addHosts({"tcp://127.0.0.1:80"});
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(
-      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
-                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
-          .value());
-
-  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_extension.5xx", 100))
-      .WillByDefault(Return(true));
-  EXPECT_CALL(checker_, check(hosts_[0]));
-
-  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
-
-  // Cause a consecutive 5xx error.
-  // Host will be ejected and event log should indicate that the host was ejected by EXTENSION.
-  EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
-                       envoy::data::cluster::v3::EXTENSION, true, testing::Ne(nullptr)));
-  loadRq(hosts_[0], 4, 503);
-  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-
-  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
-}
-
-// Test disables "legacy" consecutive errors outlier detection  and configures two independent
-// extensions of "consecutive errors" counting errors of different types.
-TEST_F(OutlierDetectorImplTest, TwoExtensions) {
-  // Disable all other outlier detectors so reported results all go to
-  // extensions.
-  const std::string yaml = R"EOF(
-    consecutive_5xx: 0
-    consecutive_gateway_failure: 0
-    consecutive_local_origin_failure: 0
-    split_external_local_origin_errors: true
-    monitors:
-    - name: "5xx"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        threshold: 3
-        errors:
-          enforcing: 100
-          match:
-            http_codes:
-              - range:
-                  start: 500
-                  end: 510
-    - name: "local_origin_monitor"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        threshold: 3
-        errors:
-          enforcing: 100
-          match:
-            local_origin_events: {}
   )EOF";
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
@@ -2902,195 +2831,25 @@ TEST_F(OutlierDetectorImplTest, TwoExtensions) {
           .value());
 
   ON_CALL(runtime_.snapshot_,
-          featureEnabled("outlier_detection.enforcing_extension.local_origin_monitor", 100))
+          featureEnabled("outlier_detection.enforcing_extension.5xx-monitor", 100))
       .WillByDefault(Return(true));
   EXPECT_CALL(checker_, check(hosts_[0]));
 
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
-  // Cause a consecutive local_origin error. "local_origin_monitor" extension should react and eject
-  // the host.
-  EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
-                       envoy::data::cluster::v3::EXTENSION, true, testing::Ne(nullptr)));
-  loadRq(hosts_[0], 4, Result::LocalOriginConnectFailed);
-  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-
-  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
-}
-
-// Test configures "legacy" consecutive 5xx outlier detector and
-// extension, which also counts 5xx errors.
-// The "legacy" outlier detector should react first and eject the node.
-// The test verifies that when the host is unejected, both monitors
-// "legacy" and extension are reset.
-TEST_F(OutlierDetectorImplTest, TwoExtensionsOneOverlapping) {
-  // Configure "legacy" consecutive 5xx to have the same threshold as
-  // new consecutive errors extension.
-  const std::string yaml = R"EOF(
-    consecutive_5xx: 3
-    consecutive_gateway_failure: 0
-    consecutive_local_origin_failure: 0
-    split_external_local_origin_errors: true
-    monitors:
-    - name: "5xx"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        threshold: 3
-        errors:
-          enforcing: 100
-          match:
-            http_codes:
-            - range:
-                start: 500
-                end: 510
-    - name: "local_origin_monitor"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        threshold: 3
-        errors:
-          enforcing: 100
-          match:
-            local_origin_events: {}
-  )EOF";
-  envoy::config::cluster::v3::OutlierDetection outlier_detection;
-  TestUtility::loadFromYaml(yaml, outlier_detection);
-
-  time_system_.setMonotonicTime(std::chrono::seconds(0));
-  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
-  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
-  addHosts({"tcp://127.0.0.1:80"});
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(
-      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
-                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
-          .value());
-
-  ON_CALL(runtime_.snapshot_, featureEnabled(EnforcingConsecutive5xxRuntime, 100))
-      .WillByDefault(Return(true));
-  EXPECT_CALL(checker_, check(hosts_[0]));
-
-  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
-
-  // Cause a consecutive 5xx error. Event log should indicate that
-  // host was ejected by CONSECUTIVE_5XX "legacy" outlier detector.
-  EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
-                       envoy::data::cluster::v3::CONSECUTIVE_5XX, true, nullptr));
-  loadRq(hosts_[0], 4, 500);
-  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-
-  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
-
-  // Move time to uneject time.
-  time_system_.setMonotonicTime(std::chrono::seconds(30));
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  EXPECT_CALL(checker_, check(hosts_[0]));
-  EXPECT_CALL(*event_logger_,
-              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  interval_timer_->invokeCallback();
-  // Make sure that node has been brought back.
+  // Report non-errors. The host should stay healthy.
+  for (int i = 0; i < 4; i++) {
+    hosts_[0]->outlierDetector().reportResult("5xx-monitor", false);
+  }
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-
-  // On uneject, all counters, including extensions should be reset, so next errors
-  // should again trigger "legacy" consecutive 5xx, not the extension monitor.
-
-  EXPECT_CALL(checker_, check(hosts_[0]));
-  EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
-                       envoy::data::cluster::v3::CONSECUTIVE_5XX, true, nullptr));
-  loadRq(hosts_[0], 4, 500);
-  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-
-  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
-}
-
-// Test verifies scenario when "legacy" consecutive errors outlier detector
-// has a smaller threshold than new extension consecutive errors
-// monitor. In that case, the extension monitor should react first
-// and eject the node.
-// When the node is unejected,
-// counters are reset for both "legacy" and extension monitors
-// and new errors reported to outlier detector should cause
-// the extension to eject the host again.
-TEST_F(OutlierDetectorImplTest, TwoExtensionsOnePreferred) {
-  // Configure "legacy" consecutive 5xx to have higher threshold than
-  // new consecutive errors extension.
-  const std::string yaml = R"EOF(
-    consecutive_5xx: 4
-    consecutive_gateway_failure: 0
-    consecutive_local_origin_failure: 0
-    split_external_local_origin_errors: true
-    monitors:
-    - name: "5xx"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        threshold: 3
-        errors:
-          enforcing: 100
-          match:
-            http_codes:
-              - range:
-                  start: 500
-                  end: 510
-    - name: "local_origin_monitor"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
-        threshold: 3
-        errors:
-          enforcing: 100
-          match:
-            local_origin_events: {}
-  )EOF";
-  envoy::config::cluster::v3::OutlierDetection outlier_detection;
-  TestUtility::loadFromYaml(yaml, outlier_detection);
-
-  time_system_.setMonotonicTime(std::chrono::seconds(0));
-  ON_CALL(runtime_.snapshot_, getInteger(MaxEjectionPercentRuntime, _)).WillByDefault(Return(100));
-  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
-  addHosts({"tcp://127.0.0.1:80"});
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  std::shared_ptr<DetectorImpl> detector(
-      DetectorImpl::create(cluster_, outlier_detection, dispatcher_, runtime_, time_system_,
-                           event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
-          .value());
-
-  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_extension.5xx", 100))
-      .WillByDefault(Return(true));
-  EXPECT_CALL(checker_, check(hosts_[0]));
-
-  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
-
-  // Cause a consecutive 5xx error. Event log should indicate that host was
-  // ejected by EXTENSION.
+  // Cause a consecutive 5xx error.
+  // Host will be ejected and event log should indicate that the host was ejected by EXTENSION.
   EXPECT_CALL(*event_logger_,
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
                        envoy::data::cluster::v3::EXTENSION, true, testing::Ne(nullptr)));
-  loadRq(hosts_[0], 4, 500);
-  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-
-  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
-
-  // Move time to uneject time
-  time_system_.setMonotonicTime(std::chrono::seconds(30));
-  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
-  EXPECT_CALL(checker_, check(hosts_[0]));
-  EXPECT_CALL(*event_logger_,
-              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  interval_timer_->invokeCallback();
-  // Make sure that node has been brought back.
-  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-
-  // On uneject, all counters, including extensions should be reset, so next errors
-  // should again trigger extension monitor, not "legacy" consecutive 5xx.
-
-  EXPECT_CALL(checker_, check(hosts_[0]));
-  EXPECT_CALL(*event_logger_,
-              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
-                       envoy::data::cluster::v3::EXTENSION, true, testing::Ne(nullptr)));
-  loadRq(hosts_[0], 4, 500);
+  for (int i = 0; i < 4; i++) {
+    hosts_[0]->outlierDetector().reportResult("5xx-monitor", true);
+  }
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());

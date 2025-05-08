@@ -22,9 +22,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // If number of consecutive errors exceeds the threshold, monitor will report that the host
 // is unhealthy.
 message ConsecutiveErrors {
-  // Base monitor config. Defines which results should be interpreted as errors
-  // and whether to enforce ejection when number of errors exceeds defined threshold.
-  common.v3.MonitorCapture errors = 1 [(validate.rules).message = {required: true}];
+  // Base monitor config. Defines settings shared by all types of monitors.
+  common.v3.MonitorCommonSettings common_settings = 1 [(validate.rules).message = {required: true}];
 
   // The number of consecutive errors before ejection occurs.
   // Defaults to 3.
