@@ -20,7 +20,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"

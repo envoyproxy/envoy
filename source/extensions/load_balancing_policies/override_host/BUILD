@@ -39,7 +39,6 @@ envoy_cc_library(
     hdrs = ["load_balancer.h"],
     deps = [
         ":override_host_filter_state",
-        ":selected_hosts",
         "//envoy/common:exception_lib",
         "//envoy/common:optref_lib",
         "//envoy/common:random_generator_interface",
@@ -70,18 +69,6 @@ envoy_cc_library(
     srcs = ["least_request_lb.cc"],
     hdrs = ["least_request_lb.h"],
     deps = ["//source/extensions/load_balancing_policies/common:load_balancer_lib"],
-)
-
-envoy_cc_library(
-    name = "selected_hosts",
-    srcs = ["selected_hosts.cc"],
-    hdrs = ["selected_hosts.h"],
-    deps = [
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:string_view",
-    ],
 )
 
 envoy_cc_library(

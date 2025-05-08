@@ -89,17 +89,6 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
-    name = "selected_hosts_test",
-    srcs = ["selected_hosts_test.cc"],
-    extension_names = ["envoy.load_balancing_policies.override_host"],
-    deps = [
-        "//source/extensions/load_balancing_policies/override_host:selected_hosts",
-        "//test/test_common:status_utility_lib",
-        "@com_google_absl//absl/status",
-    ],
-)
-
 envoy_proto_library(
     name = "test_lb_proto",
     srcs = ["test_lb.proto"],

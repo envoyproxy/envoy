@@ -21,7 +21,6 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/extensions/load_balancing_policies/override_host/override_host_filter_state.h"
-#include "source/extensions/load_balancing_policies/override_host/selected_hosts.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/log/check.h"
