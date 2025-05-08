@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // When processing the response from the upstream, Envoy will check if the response contains the
 // session context. If the response contains the session context, no matter if it's a new session
-// context or an existing one, Envoy will concat it and the upstream host as new session context.
+// context or an existing one, Envoy will join it and the upstream host as new session context.
 //
 // When processing the request from the downstream, Envoy will check if the request contains the
 // session context. If the request contains the session context, Envoy will strip the

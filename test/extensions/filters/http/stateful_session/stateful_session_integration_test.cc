@@ -157,7 +157,7 @@ typed_config:
   session_state:
     name: envoy.http.stateful_session.envelope
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.EnvelopeSessionState
+      "@type": type.googleapis.com/envoy.extensions.http.stateful_session.envelope.v3.EnvelopeSessionState
       header:
         name: session-header
 )EOF";
