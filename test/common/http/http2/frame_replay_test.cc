@@ -226,6 +226,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
+      setupRequestDecoderMock(codec.request_decoder_);
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
           codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -300,6 +301,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
+      setupRequestDecoderMock(codec.request_decoder_);
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
           codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
