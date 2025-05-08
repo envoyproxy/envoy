@@ -570,6 +570,8 @@ def _com_github_ncopa_suexec():
 def _com_google_googletest():
     external_http_archive(
         "com_google_googletest",
+        patches = ["@envoy//bazel:googletest.patch"],
+        patch_args = ["-p1"],
         repo_mapping = {
             "@abseil-cpp": "@com_google_absl",
             "@re2": "@com_googlesource_code_re2",
