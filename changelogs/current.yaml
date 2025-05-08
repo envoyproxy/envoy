@@ -36,6 +36,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: hcm
+  change: |
+    Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
+    with the lifetime of the codec stream.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

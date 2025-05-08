@@ -602,7 +602,7 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
 #endif
-  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  RequestDecoder* request_decoder = decoder();
   ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
   if (request_decoder) {
     request_decoder->decodeHeaders(std::move(headers), sendEndStream());
@@ -617,7 +617,7 @@ void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   // Consume any buffered trailers.
   stream_manager_.trailers_buffered_ = false;
 
-  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  RequestDecoder* request_decoder = decoder();
   ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
   if (request_decoder) {
     request_decoder->decodeTrailers(
