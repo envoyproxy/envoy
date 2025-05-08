@@ -856,6 +856,20 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
                         "@type": type.googleapis.com/google.protobuf.StringValue
                     value_match:
                       exact: foo
+              - on_match:
+                  action:
+                    name: test_action
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.StringValue
+                      value: no-match-3
+                predicate:
+                  single_predicate:
+                    input:
+                      name: inner_input
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                    value_match:
+                      exact: bar
         predicate:
           single_predicate:
             input:
@@ -875,7 +889,7 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
   auto inner_factory = TestDataInputStringFactory("foo");
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(8);
+      .Times(9);
   std::shared_ptr<MatchTree<TestData>> top_matcher = createMatcherFromYaml(yaml)();
 
   // Expect to hit each match once via repeated re-entry, including the recursive on-no-match.
@@ -916,6 +930,8 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
   EXPECT_THAT(skipped_results, IsEmpty());
   skipped_results.clear();
 
+  // Expect to hit the top-level on_no_match after the sub-matcher returns no-match (after checking
+  // 'no-match-3').
   MaybeMatchResult no_remaining_reentrants_result =
       reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
   EXPECT_THAT(no_remaining_reentrants_result, HasNoMatchResult());
