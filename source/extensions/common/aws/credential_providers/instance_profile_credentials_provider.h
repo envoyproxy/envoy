@@ -38,7 +38,6 @@ public:
   std::string providerName() override { return "InstanceProfileCredentialsProvider"; };
 
 private:
-  bool needsRefresh() override;
   void refresh() override;
   void fetchInstanceRoleAsync(const std::string&& token);
   void fetchCredentialFromInstanceRoleAsync(const std::string&& instance_role,

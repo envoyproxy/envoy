@@ -22,17 +22,6 @@ ContainerCredentialsProvider::ContainerCredentialsProvider(
                                       initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
 
-bool ContainerCredentialsProvider::needsRefresh() {
-  const auto now = api_.timeSource().systemTime();
-  auto expired = (now - last_updated_ > REFRESH_INTERVAL);
-
-  if (expiration_time_.has_value()) {
-    return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
-  } else {
-    return expired;
-  }
-}
-
 void ContainerCredentialsProvider::refresh() {
 
   absl::string_view host, path;
