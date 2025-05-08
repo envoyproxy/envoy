@@ -16,8 +16,8 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using testing::Invoke;
-using testing::Unused;
 using testing::Return;
+using testing::Unused;
 
 namespace Envoy {
 namespace Extensions {
