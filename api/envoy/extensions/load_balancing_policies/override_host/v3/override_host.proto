@@ -30,12 +30,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // metadata. For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
 //
 // For example, to support k8s gateway inference extensions, which uses the ``x-gateway-destination-endpoint`` header or metadata
-// value under the "envoy.lb" key for the primary endpoint, the Override Host load balancing policy should be configured in the 
+// value under the "envoy.lb" key for the primary endpoint, the Override Host load balancing policy should be configured in the
 // following way:
 //
 // .. code-block:: yaml
 //
-//    host_sources:
+//    override_host_sources:
 //      - header: "x-gateway-destination-endpoint"
 //      - metadata:
 //          key: "envoy.lb"
@@ -67,7 +67,8 @@ message OverrideHost {
   // Note that if an overridden host address is not present in the current endpoint set, it is
   // skipped and the next found address is used. If there are not enough overridden addresses to
   // satisfy all retry attempts the fallback load balancing policy is used to pick a host.
-  repeated OverrideHostSource override_host_sources = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated OverrideHostSource override_host_sources = 1
+      [(validate.rules).repeated = {min_items: 1}];
 
   // The child LB policy to use in case neither header nor metadata with selected
   // hosts is present.
