@@ -17,6 +17,7 @@ using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using testing::Invoke;
 using testing::Unused;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -330,6 +331,19 @@ TEST_F(ExtProcStreamTest, OnReceiveMessageAfterFilterDestroy) {
 
   EXPECT_CALL(stream_, closeStream());
   stream->close();
+}
+
+TEST_F(ExtProcStreamTest, ClientStartError) {
+  Http::AsyncClient::ParentContext parent_context;
+  parent_context.stream_info = &stream_info_;
+  auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
+  auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  EXPECT_NE(stream, nullptr);
+
+  EXPECT_CALL(client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(Return(absl::InvalidArgumentError("error")));
+  stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+  EXPECT_EQ(stream, nullptr);
 }
 
 } // namespace

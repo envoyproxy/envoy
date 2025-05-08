@@ -226,7 +226,9 @@ public:
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override {
     auto client_or_error =
         client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
-    THROW_IF_NOT_OK_REF(client_or_error.status());
+    if (!client_or_error.status().ok()) {
+      return nullptr;
+    }
     Grpc::AsyncClient<RequestType, ResponseType> grpcClient(client_or_error.value());
     return ProcessorStreamImpl<RequestType, ResponseType>::create(
         std::move(grpcClient), callbacks, options, sidestream_watermark_callbacks, service_method_);
