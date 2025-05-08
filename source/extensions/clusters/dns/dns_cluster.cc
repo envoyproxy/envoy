@@ -21,17 +21,7 @@ DnsClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
     Upstream::ClusterFactoryContext& context) {
-  absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error;
-  if (proto_config.has_typed_dns_resolver_config()) {
-    Network::DnsResolverFactory& dns_resolver_factory =
-        Network::createDnsResolverFactoryFromTypedConfig(proto_config.typed_dns_resolver_config());
-    auto& server_context = context.serverFactoryContext();
-    dns_resolver_or_error = dns_resolver_factory.createDnsResolver(
-        server_context.mainThreadDispatcher(), server_context.api(),
-        proto_config.typed_dns_resolver_config());
-  } else {
-    dns_resolver_or_error = selectDnsResolver(cluster, context);
-  }
+  auto dns_resolver_or_error = selectDnsResolver(proto_config.typed_dns_resolver_config(), context);
 
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
@@ -45,13 +35,11 @@ DnsClusterFactory::createClusterWithConfig(
 
 REGISTER_FACTORY(DnsClusterFactory, ClusterFactory);
 
-/**
- * LogicalDNSFactory: making it back compatible with ClusterFactoryImplBase
- */
-
-class LogicalDNSFactory : public ClusterFactoryImplBase {
+class LegacyDnsClusterFactory : public ClusterFactoryImplBase {
 public:
-  LogicalDNSFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
+  LegacyDnsClusterFactory(const std::string& name, bool set_all_addresses_in_single_endpoint)
+      : ClusterFactoryImplBase(name),
+        set_all_addresses_in_single_endpoint_(set_all_addresses_in_single_endpoint) {}
   virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
@@ -62,7 +50,7 @@ public:
     envoy::extensions::clusters::dns::v3::DnsCluster typed_config;
     createDnsClusterFromLegacyFields(cluster, typed_config);
 
-    typed_config.set_all_addresses_in_single_endpoint(true);
+    typed_config.set_all_addresses_in_single_endpoint(set_all_addresses_in_single_endpoint_);
 
     absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
     cluster_or_error =
@@ -71,6 +59,18 @@ public:
     RETURN_IF_NOT_OK(cluster_or_error.status());
     return std::make_pair(ClusterImplBaseSharedPtr(std::move(*cluster_or_error)), nullptr);
   }
+
+private:
+  bool set_all_addresses_in_single_endpoint_{false};
+};
+
+/**
+ * LogicalDNSFactory: making it back compatible with ClusterFactoryImplBase
+ */
+
+class LogicalDNSFactory : public LegacyDnsClusterFactory {
+public:
+  LogicalDNSFactory() : LegacyDnsClusterFactory("envoy.cluster.logical_dns", true) {}
 };
 
 REGISTER_FACTORY(LogicalDNSFactory, ClusterFactory);
@@ -79,26 +79,9 @@ REGISTER_FACTORY(LogicalDNSFactory, ClusterFactory);
  * StrictDNSFactory: making it back compatible with ClusterFactoryImplBase
  */
 
-class StrictDNSFactory : public ClusterFactoryImplBase {
+class StrictDNSFactory : public LegacyDnsClusterFactory {
 public:
-  StrictDNSFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    Upstream::ClusterFactoryContext& context) override {
-    absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =
-        selectDnsResolver(cluster, context);
-    RETURN_IF_NOT_OK(dns_resolver_or_error.status());
-
-    envoy::extensions::clusters::dns::v3::DnsCluster typed_config;
-    createDnsClusterFromLegacyFields(cluster, typed_config);
-
-    absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
-    cluster_or_error =
-        DnsClusterImpl::create(cluster, typed_config, context, std::move(*dns_resolver_or_error));
-
-    RETURN_IF_NOT_OK(cluster_or_error.status());
-    return std::make_pair(ClusterImplBaseSharedPtr(std::move(*cluster_or_error)), nullptr);
-  }
+  StrictDNSFactory() : LegacyDnsClusterFactory("envoy.cluster.strict_dns", false) {}
 };
 
 REGISTER_FACTORY(StrictDNSFactory, ClusterFactory);
