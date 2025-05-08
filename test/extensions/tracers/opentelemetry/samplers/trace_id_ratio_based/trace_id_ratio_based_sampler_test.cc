@@ -20,6 +20,35 @@ namespace OpenTelemetry {
 
 const auto percentage_denominator = envoy::type::v3::FractionalPercent::MILLION;
 
+TEST(TraceIdRatioBasedSamplerTest, TestTraceIdToUint64) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig config;
+  config.mutable_sampling_percentage()->set_denominator(percentage_denominator);
+  uint64_t numerator = std::rand() % ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                                         percentage_denominator);
+  config.mutable_sampling_percentage()->set_numerator(numerator);
+  auto sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
+
+  // Test with an empty string.
+  std::string empty_trace_id = "";
+  EXPECT_EQ(sampler->traceIdToUint64(empty_trace_id), 0);
+
+  // Test with a string smaller than 16 characters.
+  std::string short_trace_id = "5b8aa5a";
+  EXPECT_EQ(sampler->traceIdToUint64(short_trace_id), 0);
+
+  uint64_t first_8_bytes = 16749670771141741147ULL;
+
+  // Test with a string of exactly 16 characters.
+  std::string trace_id_16 = "5b8aa5a2d2c872e8";
+  EXPECT_EQ(sampler->traceIdToUint64(trace_id_16), first_8_bytes);
+
+  // Test with a string larger than 16 characters.
+  std::string long_trace_id = "5b8aa5a2d2c872e8321cf37308d69df2";
+  EXPECT_EQ(sampler->traceIdToUint64(long_trace_id), first_8_bytes);
+}
+
 // As per the docs: https://opentelemetry.io/docs/specs/otel/trace/sdk/#traceidratiobased
 // > A TraceIDRatioBased sampler with a given sampling rate MUST also sample
 //	 all traces that any TraceIDRatioBased sampler with a lower sampling rate
