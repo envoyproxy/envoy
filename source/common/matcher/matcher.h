@@ -84,10 +84,8 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree, co
 // Re-entry helper class to track and match against nested reentrants for a MatchTree.
 template <class DataType> class ReenterableMatchEvaluator {
 public:
-  ReenterableMatchEvaluator(std::shared_ptr<MatchTree<DataType>> match_tree,
-                            bool ignore_multiple_skipped_results)
-      : match_tree_(match_tree), ignore_multiple_skipped_results_(ignore_multiple_skipped_results) {
-  }
+  ReenterableMatchEvaluator(std::shared_ptr<MatchTree<DataType>> match_tree)
+      : match_tree_(match_tree) {}
 
   // Match against the reentrant stack (bottom up), cleaning up any that no longer find a match.
   MaybeMatchResult evaluateMatch(const DataType& data,
@@ -198,8 +196,6 @@ private:
   // MatchTree to use for the initial match.
   std::shared_ptr<MatchTree<DataType>> match_tree_;
   std::unique_ptr<ReentrantEntry> reentrant_stack_ = nullptr;
-  // Only record the first skipped result.
-  bool ignore_multiple_skipped_results_ = false;
 };
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;

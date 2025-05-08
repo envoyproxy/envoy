@@ -879,7 +879,7 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
   std::shared_ptr<MatchTree<TestData>> top_matcher = createMatcherFromYaml(yaml)();
 
   // Expect to hit each match once via repeated re-entry, including the recursive on-no-match.
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher, false);
+  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher);
   std::vector<ActionFactoryCb> skipped_results;
   SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
     skipped_results.push_back(match.action_cb_);
@@ -1067,7 +1067,7 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
   // keep_matching setting. The third nested match and on_no_match are not reached as the parent
   // matcher has finished recursion with the second match, which would have been its returned action
   // if the parent matcher wasn't skipped.
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher, false);
+  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher);
   std::vector<ActionFactoryCb> skipped_results;
   SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
     skipped_results.push_back(match.action_cb_);
@@ -1122,7 +1122,7 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   validation_visitor_.setSupportKeepMatching(true);
   std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher, false);
+  ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher);
   std::vector<ActionFactoryCb> skipped_results;
   SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
     skipped_results.push_back(match.action_cb_);
