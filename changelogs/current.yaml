@@ -1,11 +1,17 @@
-date: May 7, 2025
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: eds
-  change: |
-    Fixed crash when creating an EDS cluster with invalid configuration.
-- area: url_template
-  change: |
-    Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
-    This behavioral change can be temporarily reverted by setting runtime guard
-    ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
