@@ -9,10 +9,14 @@
 
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 
-namespace {
+namespace Envoy {
+namespace Extensions {
+namespace Tracers {
+namespace OpenTelemetry {
 
 /**
  * @param trace_id a required value to be converted to uint64_t. trace_id must
@@ -20,7 +24,12 @@ namespace {
  * @return Returns the uint64 value associated with first 8 bytes of the trace_id.
  *
  */
-uint64_t traceIdToUint64(const std::string& trace_id) noexcept {
+uint64_t TraceIdRatioBasedSampler::traceIdToUint64(const std::string& trace_id) noexcept {
+  if (trace_id.size() < 16) {
+    ENVOY_LOG(warn, "Trace ID is not long enough: {}", trace_id);
+    return 0;
+  }
+
   uint8_t buffer[8] = {0};
   for (size_t i = 0; i < 8; ++i) {
     std::string byte_string = trace_id.substr(i * 2, 2);
@@ -32,12 +41,6 @@ uint64_t traceIdToUint64(const std::string& trace_id) noexcept {
 
   return first_8_bytes;
 }
-} // namespace
-
-namespace Envoy {
-namespace Extensions {
-namespace Tracers {
-namespace OpenTelemetry {
 
 TraceIdRatioBasedSampler::TraceIdRatioBasedSampler(
     const envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig&

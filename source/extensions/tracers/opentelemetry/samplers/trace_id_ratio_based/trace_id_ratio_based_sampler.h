@@ -31,6 +31,7 @@ public:
                               OptRef<const Tracing::TraceContext> trace_context,
                               const std::vector<SpanContext>& links) override;
   std::string getDescription() const override;
+  uint64_t traceIdToUint64(const std::string& trace_id) noexcept;
 
 private:
   std::string description_;
