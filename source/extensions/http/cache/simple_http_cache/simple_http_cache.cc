@@ -5,7 +5,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -228,12 +228,13 @@ public:
         envoy::extensions::http::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  std::shared_ptr<ActiveCache>
+  std::shared_ptr<CacheSessions>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
            Server::Configuration::FactoryContext& context) override {
-    return context.serverFactoryContext().singletonManager().getTyped<ActiveCache>(
-        SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton),
-        [&context]() { return ActiveCache::create(context, std::make_unique<SimpleHttpCache>()); });
+    return context.serverFactoryContext().singletonManager().getTyped<CacheSessions>(
+        SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), [&context]() {
+          return CacheSessions::create(context, std::make_unique<SimpleHttpCache>());
+        });
   }
 
 private:

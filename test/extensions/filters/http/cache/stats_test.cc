@@ -87,21 +87,21 @@ TEST_F(CacheStatsTest, StatsAreConstructedCorrectly) {
       "cache.event.cache_label.fake_cache.event_type.lookup_error");
   EXPECT_THAT(lookup_errors, OptCounterIs("cache.event", 1));
 
-  stats_->incActiveCacheEntries();
-  stats_->incActiveCacheEntries();
-  stats_->incActiveCacheEntries();
-  stats_->decActiveCacheEntries();
-  Stats::GaugeOptConstRef active_cache_entries =
-      context_.store_.findGaugeByString("cache.active_cache_entries.cache_label.fake_cache");
-  EXPECT_THAT(active_cache_entries, OptGaugeHasValue(2));
+  stats_->incCacheSessionsEntries();
+  stats_->incCacheSessionsEntries();
+  stats_->incCacheSessionsEntries();
+  stats_->decCacheSessionsEntries();
+  Stats::GaugeOptConstRef cache_sessions_entries =
+      context_.store_.findGaugeByString("cache.cache_sessions_entries.cache_label.fake_cache");
+  EXPECT_THAT(cache_sessions_entries, OptGaugeHasValue(2));
 
-  stats_->incActiveCacheSubscribers();
-  stats_->incActiveCacheSubscribers();
-  stats_->incActiveCacheSubscribers();
-  stats_->subActiveCacheSubscribers(2);
-  Stats::GaugeOptConstRef active_cache_subscribers =
-      context_.store_.findGaugeByString("cache.active_cache_subscribers.cache_label.fake_cache");
-  EXPECT_THAT(active_cache_subscribers, OptGaugeHasValue(1));
+  stats_->incCacheSessionsSubscribers();
+  stats_->incCacheSessionsSubscribers();
+  stats_->incCacheSessionsSubscribers();
+  stats_->subCacheSessionsSubscribers(2);
+  Stats::GaugeOptConstRef cache_sessions_subscribers =
+      context_.store_.findGaugeByString("cache.cache_sessions_subscribers.cache_label.fake_cache");
+  EXPECT_THAT(cache_sessions_subscribers, OptGaugeHasValue(1));
 
   stats_->addUpstreamBufferedBytes(1024);
   stats_->subUpstreamBufferedBytes(512);

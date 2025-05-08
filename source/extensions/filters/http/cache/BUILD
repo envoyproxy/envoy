@@ -42,12 +42,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "active_cache_lib",
+    name = "cache_sessions_lib",
     srcs = [
-        "active_cache.cc",
+        "cache_sessions.cc",
     ],
     hdrs = [
-        "active_cache.h",
+        "cache_sessions.h",
     ],
     deps = [
         ":http_cache_lib",
@@ -58,15 +58,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "active_cache_impl_lib",
+    name = "cache_sessions_impl_lib",
     srcs = [
-        "active_cache_impl.cc",
+        "cache_sessions_impl.cc",
     ],
     hdrs = [
-        "active_cache_impl.h",
+        "cache_sessions_impl.h",
     ],
     deps = [
-        ":active_cache_lib",
+        ":cache_sessions_lib",
         ":cacheability_utils_lib",
         ":upstream_request_lib",
         "//source/common/common:cancel_wrapper_lib",
@@ -82,8 +82,8 @@ envoy_cc_library(
         "cache_filter.h",
     ],
     deps = [
-        ":active_cache_impl_lib",
-        ":active_cache_lib",
+        ":cache_sessions_impl_lib",
+        ":cache_sessions_lib",
         ":cache_custom_headers",
         ":cache_entry_utils_lib",
         ":cache_headers_utils_lib",
@@ -236,7 +236,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":active_cache_lib",
+        ":cache_sessions_lib",
         ":cache_filter_lib",
         ":stats",
         "//source/extensions/filters/http/common:factory_base_lib",

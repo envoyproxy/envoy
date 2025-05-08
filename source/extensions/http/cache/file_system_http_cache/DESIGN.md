@@ -20,7 +20,7 @@
 
 ## Storage design
 
-* An ActiveCacheEntry maintains an open file handle of which ownership is passed to the ActiveCacheEntry. It is possible for such an entry to be evicted (on a validation fail most likely), which should be fine - the file will be unlinked and the open file handle will keep the data "alive" until the requests using the old file handle are completed.
+* An CacheSession maintains an open file handle of which ownership is passed to the CacheSession. It is possible for such an entry to be evicted (on a validation fail most likely), which should be fine - the file will be unlinked and the open file handle will keep the data "alive" until the requests using the old file handle are completed.
 * Simultaneous writes don't break anything, and may occur when multiple processes are touching the same cache.
 * The cache can be configured with a maximum number of cache entry files, thereby effectively enforcing a maximum number of files per path.
 * A new cache entry that causes the cache to exceed the configured maximum size or maximum number of entries triggers the eviction thread to evict sufficient LRU entries to bring it back below the threshold\[s\] exceeded.

@@ -49,7 +49,7 @@ enum class CacheEntryStatus {
   // response.
   FoundNotModified,
   // The cache lookup failed, e.g. because the cache was unreachable or an RPC
-  // timed out. Mostly behaves the same as Uncacheable but will retry each time.
+  // timed out. Mostly behaves the same as Uncacheable but may retry each time.
   LookupError,
   // The cache attempted to read from upstream for insert, but upstream reset.
   UpstreamReset,

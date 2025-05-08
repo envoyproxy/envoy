@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 
 #include <limits>
 

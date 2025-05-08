@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/cache/http_source.h"
 #include "source/extensions/filters/http/cache/stats.h"
@@ -20,17 +20,17 @@ void PrintTo(const Key& key, std::ostream* os);
 class MockCacheFilterStats : public CacheFilterStats {
 public:
   MOCK_METHOD(void, incForStatus, (CacheEntryStatus s));
-  MOCK_METHOD(void, incActiveCacheEntries, ());
-  MOCK_METHOD(void, decActiveCacheEntries, ());
-  MOCK_METHOD(void, incActiveCacheSubscribers, ());
-  MOCK_METHOD(void, subActiveCacheSubscribers, (uint64_t count));
+  MOCK_METHOD(void, incCacheSessionsEntries, ());
+  MOCK_METHOD(void, decCacheSessionsEntries, ());
+  MOCK_METHOD(void, incCacheSessionsSubscribers, ());
+  MOCK_METHOD(void, subCacheSessionsSubscribers, (uint64_t count));
   MOCK_METHOD(void, addUpstreamBufferedBytes, (uint64_t bytes));
   MOCK_METHOD(void, subUpstreamBufferedBytes, (uint64_t bytes));
 };
 
-class MockActiveCache : public ActiveCache {
+class MockCacheSessions : public CacheSessions {
 public:
-  MockActiveCache() {
+  MockCacheSessions() {
     EXPECT_CALL(*this, stats)
         .Times(testing::AnyNumber())
         .WillRepeatedly(testing::ReturnRef(mock_stats_));
@@ -119,7 +119,7 @@ public:
 
 class MockHttpCacheFactory : public HttpCacheFactory {
 public:
-  MOCK_METHOD(std::shared_ptr<ActiveCache>, getCache,
+  MOCK_METHOD(std::shared_ptr<CacheSessions>, getCache,
               (const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
                Server::Configuration::FactoryContext& context));
 };

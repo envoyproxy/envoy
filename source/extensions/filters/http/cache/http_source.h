@@ -25,6 +25,12 @@ using GetBodyCallback = absl::AnyInvocable<void(Buffer::InstancePtr buffer, EndS
 using GetTrailersCallback =
     absl::AnyInvocable<void(Http::ResponseTrailerMapPtr trailers, EndStream end_stream)>;
 
+// HttpSource is an interface for a source of HTTP data.
+// Callbacks can potentially be called before returning from the get* function.
+// The callback should be called on the same thread as the caller.
+// Only one request should be in flight at a time, and requests must be in
+// order as the source is assumed to be a stream (i.e. headers before body,
+// earlier body before later body, trailers last).
 class HttpSource {
 public:
   // Calls the provided callback with http headers.

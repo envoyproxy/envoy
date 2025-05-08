@@ -70,7 +70,7 @@ using ActiveLookupRequestPtr = std::unique_ptr<ActiveLookupRequest>;
 
 struct ActiveLookupResult {
   // The source from which headers, body and trailers can be retrieved. May be
-  // a cache-reader ActiveCacheEntry, or may be an UpstreamRequest if the request
+  // a cache-reader CacheSession, or may be an UpstreamRequest if the request
   // was uncacheable. The filter doesn't need to know which.
   std::unique_ptr<HttpSource> http_source_;
 
@@ -80,25 +80,25 @@ struct ActiveLookupResult {
 using ActiveLookupResultPtr = std::unique_ptr<ActiveLookupResult>;
 using ActiveLookupResultCallback = absl::AnyInvocable<void(ActiveLookupResultPtr)>;
 
-// ActiveCache is a wrapper around an HttpCache which provides a shorter-lived in-memory
+// CacheSessions is a wrapper around an HttpCache which provides a shorter-lived in-memory
 // cache of headers and already open cache entries. All the http-specific aspects of the
-// cache (range requests, validation, etc.) are performed by the ActiveCacheEntry
+// cache (range requests, validation, etc.) are performed by the CacheSession
 // so the HttpCache only needs to support simple read/write operations.
 //
 // May or may not be a singleton, depending on the specific cache extension; must include
 // the Singleton::Instance interface to support cases when it is.
-class ActiveCache : public Singleton::Instance, public CacheFilterStatsProvider {
+class CacheSessions : public Singleton::Instance, public CacheFilterStatsProvider {
 public:
-  // This is implemented in ActiveCacheImpl so that tests which only use a mock don't
+  // This is implemented in CacheSessionsImpl so that tests which only use a mock don't
   // need to build the real thing, but declared here so that the actual use-site can
   // create an instance without including the larger header.
-  static std::shared_ptr<ActiveCache> create(Server::Configuration::FactoryContext& context,
-                                             std::unique_ptr<HttpCache> cache);
+  static std::shared_ptr<CacheSessions> create(Server::Configuration::FactoryContext& context,
+                                               std::unique_ptr<HttpCache> cache);
 
   virtual void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) PURE;
   virtual HttpCache& cache() const PURE;
   CacheInfo cacheInfo() const { return cache().cacheInfo(); }
-  ~ActiveCache() override = default;
+  ~CacheSessions() override = default;
 };
 
 } // namespace Cache

@@ -14,7 +14,7 @@ envoy_cc_test_library(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//source/extensions/filters/http/cache:active_cache_lib",
+        "//source/extensions/filters/http/cache:cache_sessions_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/filters/http/cache:http_source_interface",
         "//source/extensions/filters/http/cache:stats",
@@ -124,13 +124,13 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "active_cache_test",
-    srcs = ["active_cache_test.cc"],
+    name = "cache_sessions_test",
+    srcs = ["cache_sessions_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = "6gig",
     deps = [
         ":mocks",
-        "//source/extensions/filters/http/cache:active_cache_impl_lib",
+        "//source/extensions/filters/http/cache:cache_sessions_impl_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",

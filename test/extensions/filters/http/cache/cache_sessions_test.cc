@@ -3,7 +3,7 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/http/headers.h"
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 
 #include "test/extensions/filters/http/cache/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -40,12 +40,12 @@ template <typename T> T consumeCallback(T& cb) {
   return ret;
 }
 
-class ActiveCacheTest : public ::testing::Test {
+class CacheSessionsTest : public ::testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
-  std::shared_ptr<ActiveCache> active_cache_;
+  std::shared_ptr<CacheSessions> cache_sessions_;
   MockHttpCache* mock_http_cache_;
   Http::MockAsyncClient mock_async_client_;
   std::vector<HttpCache::LookupCallback> captured_lookup_callbacks_;
@@ -68,7 +68,7 @@ protected:
         .WillRepeatedly(Return(true));
     auto mock_http_cache = std::make_unique<MockHttpCache>();
     mock_http_cache_ = mock_http_cache.get();
-    active_cache_ = ActiveCache::create(mock_factory_context_, std::move(mock_http_cache));
+    cache_sessions_ = CacheSessions::create(mock_factory_context_, std::move(mock_http_cache));
     ON_CALL(*mock_http_cache_, lookup)
         .WillByDefault([this](LookupRequest&&, HttpCache::LookupCallback&& cb) {
           captured_lookup_callbacks_.push_back(std::move(cb));
@@ -80,7 +80,7 @@ protected:
   void TearDown() override {
     pumpDispatcher();
     // Any residual cache lookups must complete their callbacks to close
-    // out ownership of the ActiveCacheEntries.
+    // out ownership of the CacheSessionsEntries.
     for (auto& cb : captured_lookup_callbacks_) {
       if (cb) {
         // Cache entries will be evicted when cache returns an error for lookup.
@@ -90,7 +90,7 @@ protected:
       }
     }
     // Any residual upstreams must complete their callbacks to close out
-    // ownership of the ActiveCacheEntries.
+    // ownership of the CacheSessionsEntries.
     for (auto& cb : fake_upstream_get_headers_callbacks_) {
       if (cb) {
         consumeCallback(cb)(nullptr, EndStream::Reset);
@@ -131,7 +131,7 @@ protected:
   ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers) {
     return std::make_unique<ActiveLookupRequest>(
         headers, mockUpstreamFactory(), "test_cluster", *dispatcher_,
-        api_->timeSource().systemTime(), mock_cacheable_response_checker_, active_cache_, false);
+        api_->timeSource().systemTime(), mock_cacheable_response_checker_, cache_sessions_, false);
   }
 
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {
@@ -211,55 +211,55 @@ MATCHER_P2(HasHeader, key, matcher, "") {
                             result_listener);
 }
 
-TEST_F(ActiveCacheTest, RequestsForSeparateKeysIssueSeparateLookupRequests) {
+TEST_F(CacheSessionsTest, RequestsForSeparateKeysIssueSeparateLookupRequests) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/b"), _));
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/c"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/b"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/c"), _));
-  active_cache_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
-  active_cache_->lookup(testLookupRequest("/b"), [](ActiveLookupResultPtr) {});
-  active_cache_->lookup(testLookupRequest("/c"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/b"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/c"), [](ActiveLookupResultPtr) {});
   pumpDispatcher();
   EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(3));
 }
 
-TEST_F(ActiveCacheTest, MultipleRequestsForSameKeyIssuesOnlyOneLookupRequest) {
+TEST_F(CacheSessionsTest, MultipleRequestsForSameKeyIssuesOnlyOneLookupRequest) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
-  active_cache_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
-  active_cache_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
-  active_cache_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
   pumpDispatcher();
   EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(1));
 }
 
-TEST_F(ActiveCacheTest, ActiveCacheEntriesExpireOnAdjacentLookup) {
+TEST_F(CacheSessionsTest, CacheSessionsEntriesExpireOnAdjacentLookup) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _)).Times(2);
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/b"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/b"), _));
-  active_cache_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
   advanceTime(std::chrono::hours(1));
   // request to adjacent resource to trigger expiry of original.
-  active_cache_->lookup(testLookupRequest("/b"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/b"), [](ActiveLookupResultPtr) {});
   // another request for the original resource should have a new lookup because
   // the old entry should have been removed.
-  active_cache_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
+  cache_sessions_->lookup(testLookupRequest("/a"), [](ActiveLookupResultPtr) {});
   pumpDispatcher();
   EXPECT_THAT(captured_lookup_callbacks_.size(), Eq(3));
 }
 
-TEST_F(ActiveCacheTest, CacheDeletionDuringLookupStillCompletesLookup) {
+TEST_F(CacheSessionsTest, CacheDeletionDuringLookupStillCompletesLookup) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
   ActiveLookupResultPtr result;
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
   // cache gets deleted before lookup callback.
-  active_cache_.reset();
+  cache_sessions_.reset();
   pumpDispatcher();
   consumeCallback(captured_lookup_callbacks_[0])(absl::UnknownError("cache fail"));
   pumpDispatcher();
@@ -269,7 +269,7 @@ TEST_F(ActiveCacheTest, CacheDeletionDuringLookupStillCompletesLookup) {
   EXPECT_THAT(result->http_source_.get(), Eq(fake_upstreams_[0]));
 }
 
-TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
+TEST_F(CacheSessionsTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
   Mock::VerifyAndClearExpectations(mock_cacheable_response_checker_.get());
   EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse)
       .Times(testing::AnyNumber())
@@ -277,10 +277,10 @@ TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
   ActiveLookupResultPtr result1, result2, result3;
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
@@ -322,8 +322,8 @@ TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
   EXPECT_THAT(headers2, Pointee(IsSupersetOfHeaders(
                             Http::TestResponseHeaderMapImpl{{"cache-control", "no-cache"}})));
   // Finally, a subsequent request should also be pass-through with no lookup required.
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
   pumpDispatcher();
   ASSERT_THAT(result3, NotNull());
   EXPECT_THAT(result3->status_, Eq(CacheEntryStatus::Uncacheable));
@@ -337,15 +337,15 @@ TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
                             Http::TestResponseHeaderMapImpl{{"cache-control", "no-cache"}})));
 }
 
-TEST_F(ActiveCacheTest, CacheMissWithCacheableResponseProvokesSharedInsertStream) {
+TEST_F(CacheSessionsTest, CacheMissWithCacheableResponseProvokesSharedInsertStream) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
   ActiveLookupResultPtr result1, result2, result3;
   auto response_headers = cacheableResponseHeaders();
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
@@ -377,8 +377,8 @@ TEST_F(ActiveCacheTest, CacheMissWithCacheableResponseProvokesSharedInsertStream
   // Second result should be a follower from the insertion.
   EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Follower));
   // Request after insert is complete should be able to lookup immediately.
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
   pumpDispatcher();
   ASSERT_THAT(result3, NotNull());
   EXPECT_THAT(result3->status_, Eq(CacheEntryStatus::Hit));
@@ -393,16 +393,16 @@ TEST_F(ActiveCacheTest, CacheMissWithCacheableResponseProvokesSharedInsertStream
   EXPECT_THAT(end_stream, Eq(EndStream::End));
 }
 
-TEST_F(ActiveCacheTest,
+TEST_F(CacheSessionsTest,
        CacheMissWithCacheableResponseProvokesSharedInsertStreamWithBodyAndTrailers) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
   ActiveLookupResultPtr result1, result2, result3;
   auto response_headers = cacheableResponseHeaders();
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
@@ -440,8 +440,8 @@ TEST_F(ActiveCacheTest,
   // Second result should be a follower from the existing insertion.
   EXPECT_THAT(result2->status_, Eq(CacheEntryStatus::Follower));
   // Request after header-insert is complete should be able to lookup immediately.
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
   pumpDispatcher();
   ASSERT_THAT(result3, NotNull());
   EXPECT_THAT(result3->status_, Eq(CacheEntryStatus::Hit));
@@ -508,13 +508,13 @@ TEST_F(ActiveCacheTest,
   pumpDispatcher();
 }
 
-TEST_F(ActiveCacheTest, CacheHitGoesDirectlyToCachedResponses) {
+TEST_F(CacheSessionsTest, CacheHitGoesDirectlyToCachedResponses) {
   auto response_headers = cacheableResponseHeaders();
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
   ActiveLookupResultPtr result;
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result](ActiveLookupResultPtr r) { result = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result](ActiveLookupResultPtr r) { result = std::move(r); });
   pumpDispatcher();
   MockCacheReader* mock_cache_reader;
   // Cache hit.
@@ -559,15 +559,15 @@ TEST_F(ActiveCacheTest, CacheHitGoesDirectlyToCachedResponses) {
   pumpDispatcher();
 }
 
-TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain) {
+TEST_F(CacheSessionsTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   ActiveLookupResultPtr result1, result2, result3;
   auto response_headers = cacheableResponseHeaders();
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
@@ -610,8 +610,8 @@ TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain
   pumpDispatcher();
   // A new request should provoke a new lookup because the previous insertion failed.
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
   pumpDispatcher();
   // Should have sent a second lookup.
   ASSERT_THAT(captured_lookup_callbacks_.size(), Eq(2));
@@ -638,15 +638,15 @@ TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain
   ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(5));
 }
 
-TEST_F(ActiveCacheTest, CacheInsertFailureResetsStreamingContexts) {
+TEST_F(CacheSessionsTest, CacheInsertFailureResetsStreamingContexts) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   ActiveLookupResultPtr result1, result2;
   auto response_headers = cacheableResponseHeaders();
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  active_cache_->lookup(testLookupRequest("/a"),
-                        [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
@@ -684,15 +684,15 @@ TEST_F(ActiveCacheTest, CacheInsertFailureResetsStreamingContexts) {
   pumpDispatcher();
 }
 
-TEST_F(ActiveCacheTest, RangeRequestMissGetsFullResourceFromUpstreamAndServesRanges) {
+TEST_F(CacheSessionsTest, RangeRequestMissGetsFullResourceFromUpstreamAndServesRanges) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   ActiveLookupResultPtr result1, result2;
   auto response_headers = cacheableResponseHeaders(1024);
-  active_cache_->lookup(testLookupRangeRequest("/a", 0, 5),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  active_cache_->lookup(testLookupRangeRequest("/a", 5, 10),
-                        [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
+  cache_sessions_->lookup(testLookupRangeRequest("/a", 0, 5),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRangeRequest("/a", 5, 10),
+                          [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
@@ -736,16 +736,16 @@ TEST_F(ActiveCacheTest, RangeRequestMissGetsFullResourceFromUpstreamAndServesRan
   // No need to test the body behavior here because it's no different than
   // how body ranges are requested by any other request - the difference
   // in behavior there is controlled by the filter which is outside the scope
-  // of ActiveCache unit tests.
+  // of CacheSessions unit tests.
 }
 
-TEST_F(ActiveCacheTest, RangeRequestWhenLengthIsUnknownReturnsNotSatisfiable) {
+TEST_F(CacheSessionsTest, RangeRequestWhenLengthIsUnknownReturnsNotSatisfiable) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
   ActiveLookupResultPtr result1;
   auto response_headers = cacheableResponseHeaders(0);
-  active_cache_->lookup(testLookupRangeRequest("/a", 0, 5),
-                        [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+  cache_sessions_->lookup(testLookupRangeRequest("/a", 0, 5),
+                          [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});

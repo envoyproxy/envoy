@@ -7,7 +7,7 @@
 
 #include "source/common/common/cancel_wrapper.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/stats.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -20,7 +20,7 @@ namespace Cache {
 class CacheFilterConfig : public CacheableResponseChecker, public CacheFilterStatsProvider {
 public:
   CacheFilterConfig(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                    std::shared_ptr<ActiveCache> active_cache,
+                    std::shared_ptr<CacheSessions> cache_sessions,
                     Server::Configuration::CommonFactoryContext& context);
 
   // Implements CacheableResponseChecker::isCacheableResponse.
@@ -32,9 +32,9 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   const std::string& overrideUpstreamCluster() const { return override_upstream_cluster_; }
   bool ignoreRequestCacheControlHeader() const { return ignore_request_cache_control_header_; }
-  ActiveCache& activeCache() const { return *active_cache_; }
-  bool hasCache() const { return active_cache_ != nullptr; }
-  CacheFilterStats& stats() const override { return active_cache_->stats(); }
+  CacheSessions& cacheSessions() const { return *cache_sessions_; }
+  bool hasCache() const { return cache_sessions_ != nullptr; }
+  CacheFilterStats& stats() const override { return cache_sessions_->stats(); }
 
 private:
   const VaryAllowList vary_allow_list_;
@@ -42,7 +42,7 @@ private:
   const bool ignore_request_cache_control_header_;
   Upstream::ClusterManager& cluster_manager_;
   Http::AsyncClient::StreamOptions upstream_options_;
-  std::shared_ptr<ActiveCache> active_cache_;
+  std::shared_ptr<CacheSessions> cache_sessions_;
   CacheFilterStatsPtr stats_;
   std::string override_upstream_cluster_;
 };

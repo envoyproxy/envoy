@@ -44,10 +44,11 @@ static constexpr absl::string_view CacheFilterAbortedDuringTrailers = "cache.abo
 
 CacheFilterConfig::CacheFilterConfig(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-    std::shared_ptr<ActiveCache> active_cache, Server::Configuration::CommonFactoryContext& context)
+    std::shared_ptr<CacheSessions> cache_sessions,
+    Server::Configuration::CommonFactoryContext& context)
     : vary_allow_list_(config.allowed_vary_headers(), context), time_source_(context.timeSource()),
       ignore_request_cache_control_header_(config.ignore_request_cache_control_header()),
-      cluster_manager_(context.clusterManager()), active_cache_(std::move(active_cache)),
+      cluster_manager_(context.clusterManager()), cache_sessions_(std::move(cache_sessions)),
       override_upstream_cluster_(config.override_upstream_cluster()) {}
 
 bool CacheFilterConfig::isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
@@ -153,7 +154,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
       config_->ignoreRequestCacheControlHeader());
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
-  config_->activeCache().lookup(
+  config_->cacheSessions().lookup(
       std::move(lookup_request),
       cancelWrapped(
           [this](ActiveLookupResultPtr lookup_result) { onLookupResult(std::move(lookup_result)); },
@@ -339,7 +340,7 @@ void CacheFilter::onHeaders(Http::ResponseHeaderMapPtr response_headers,
   if (lookup_result_->status_ == CacheEntryStatus::Miss ||
       lookup_result_->status_ == CacheEntryStatus::Validated ||
       lookup_result_->status_ == CacheEntryStatus::ValidatedFree) {
-    // ActiveCache adds an age header indiscriminately because once it has
+    // CacheSessions adds an age header indiscriminately because once it has
     // handed off it doesn't remember which request is associated with the insert.
     // So here we remove that header for the non-cache response and the validated
     // response.

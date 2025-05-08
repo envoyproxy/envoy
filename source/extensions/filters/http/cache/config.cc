@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/cache/config.h"
 
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/stats.h"
 
@@ -12,7 +12,7 @@ namespace Cache {
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<ActiveCache> cache;
+  std::shared_ptr<CacheSessions> cache;
   if (!config.disabled().value()) {
     if (!config.has_typed_config()) {
       throw EnvoyException("at least one of typed_config or disabled must be set");

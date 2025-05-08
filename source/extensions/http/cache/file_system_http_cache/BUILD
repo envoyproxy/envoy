@@ -50,7 +50,7 @@ envoy_cc_extension(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/common/async_files",
-        "//source/extensions/filters/http/cache:active_cache_impl_lib",
+        "//source/extensions/filters/http/cache:cache_sessions_impl_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/strings",

@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/cache/active_cache_impl.h"
+#include "source/extensions/filters/http/cache/cache_sessions_impl.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/enum_to_int.h"
@@ -21,7 +21,7 @@ class UpstreamRequestWithCacheabilityReset : public HttpSource {
 public:
   UpstreamRequestWithCacheabilityReset(
       std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
-      std::unique_ptr<HttpSource> original_source, std::shared_ptr<ActiveCacheEntry> entry)
+      std::unique_ptr<HttpSource> original_source, std::shared_ptr<CacheSession> entry)
       : cacheable_response_checker_(cacheable_response_checker),
         original_source_(std::move(original_source)), entry_(std::move(entry)) {}
   void getHeaders(GetHeadersCallback&& cb) override {
@@ -45,7 +45,7 @@ public:
 private:
   std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_;
   std::unique_ptr<HttpSource> original_source_;
-  std::shared_ptr<ActiveCacheEntry> entry_;
+  std::shared_ptr<CacheSession> entry_;
 };
 
 class UpstreamRequestWithHeadersPrepopulated : public HttpSource {
@@ -132,15 +132,15 @@ void ActiveLookupContext::getTrailers(GetTrailersCallback&& cb) {
   entry_->wantTrailers(dispatcher(), std::move(cb));
 }
 
-std::shared_ptr<ActiveCache> ActiveCache::create(Server::Configuration::FactoryContext& context,
-                                                 std::unique_ptr<HttpCache> cache) {
-  return std::make_shared<ActiveCacheImpl>(context, std::move(cache));
+std::shared_ptr<CacheSessions> CacheSessions::create(Server::Configuration::FactoryContext& context,
+                                                     std::unique_ptr<HttpCache> cache) {
+  return std::make_shared<CacheSessionsImpl>(context, std::move(cache));
 }
 
-ActiveCacheEntry::ActiveCacheEntry(std::weak_ptr<ActiveCacheImpl> cache, const Key& key)
-    : cache_(std::move(cache)), key_(key) {}
+CacheSession::CacheSession(std::weak_ptr<CacheSessionsImpl> cache_sessions, const Key& key)
+    : cache_sessions_(std::move(cache_sessions)), key_(key) {}
 
-void ActiveCacheEntry::clearUncacheableState() {
+void CacheSession::clearUncacheableState() {
   absl::MutexLock lock(&mu_);
   if (state_ != State::NotCacheable) {
     return;
@@ -148,8 +148,8 @@ void ActiveCacheEntry::clearUncacheableState() {
   state_ = State::New;
 }
 
-void ActiveCacheEntry::wantHeaders(Event::Dispatcher&, SystemTime lookup_timestamp,
-                                   GetHeadersCallback&& cb) {
+void CacheSession::wantHeaders(Event::Dispatcher&, SystemTime lookup_timestamp,
+                               GetHeadersCallback&& cb) {
   Http::ResponseHeaderMapPtr headers;
   EndStream end_stream_after_headers;
   {
@@ -165,20 +165,20 @@ void ActiveCacheEntry::wantHeaders(Event::Dispatcher&, SystemTime lookup_timesta
   cb(std::move(headers), end_stream_after_headers);
 }
 
-void ActiveCacheEntry::wantBodyRange(AdjustedByteRange range, Event::Dispatcher& dispatcher,
-                                     GetBodyCallback&& cb) {
+void CacheSession::wantBodyRange(AdjustedByteRange range, Event::Dispatcher& dispatcher,
+                                 GetBodyCallback&& cb) {
   absl::MutexLock lock(&mu_);
   ASSERT(entry_.response_headers_ != nullptr,
          "body should not be requested when headers haven't been sent");
-  if (auto active_cache = cache_.lock()) {
-    active_cache->stats().incActiveCacheSubscribers();
+  if (auto cache_sessions = cache_sessions_.lock()) {
+    cache_sessions->stats().incCacheSessionsSubscribers();
   }
   body_subscribers_.emplace_back(dispatcher, std::move(range), std::move(cb));
   // if there's not already a body read operation in flight, start one.
   maybeTriggerBodyReadForWaitingSubscriber();
 }
 
-void ActiveCacheEntry::wantTrailers(Event::Dispatcher& dispatcher, GetTrailersCallback&& cb) {
+void CacheSession::wantTrailers(Event::Dispatcher& dispatcher, GetTrailersCallback&& cb) {
   absl::MutexLock lock(&mu_);
   if (entry_.response_trailers_ != nullptr) {
     auto trailers = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*entry_.response_trailers_);
@@ -189,39 +189,39 @@ void ActiveCacheEntry::wantTrailers(Event::Dispatcher& dispatcher, GetTrailersCa
   }
   ASSERT(!entry_.body_length_.has_value(),
          "wantTrailers should not be called when there are no trailers");
-  if (auto active_cache = cache_.lock()) {
-    active_cache->stats().incActiveCacheSubscribers();
+  if (auto cache_sessions = cache_sessions_.lock()) {
+    cache_sessions->stats().incCacheSessionsSubscribers();
   }
   trailer_subscribers_.emplace_back(dispatcher, std::move(cb));
 }
 
-void ActiveCacheEntry::onHeadersInserted(CacheReaderPtr cache_reader,
-                                         Http::ResponseHeaderMapPtr headers, bool end_stream) {
+void CacheSession::onHeadersInserted(CacheReaderPtr cache_reader,
+                                     Http::ResponseHeaderMapPtr headers, bool end_stream) {
   absl::MutexLock lock(&mu_);
-  std::shared_ptr<ActiveCacheImpl> active_cache = cache_.lock();
-  if (!active_cache) {
+  std::shared_ptr<CacheSessionsImpl> cache_sessions = cache_sessions_.lock();
+  if (!cache_sessions) {
     ENVOY_LOG(error, "cache config was deleted while header-insertion was in flight");
     return onCacheWentAway();
   }
   entry_.cache_reader_ = std::move(cache_reader);
   entry_.response_headers_ = std::move(headers);
-  entry_.response_metadata_ = active_cache->makeMetadata();
+  entry_.response_metadata_ = cache_sessions->makeMetadata();
   if (end_stream) {
     insertComplete();
   } else {
     state_ = State::Inserting;
   }
-  handleValidationAndSendLookupResponses(CacheEntryStatus::Miss);
+  sendLookupResponsesAndMaybeValidationRequest(CacheEntryStatus::Miss);
 }
 
-bool ActiveCacheEntry::requiresValidationFor(const ActiveLookupRequest& lookup) const {
+bool CacheSession::requiresValidationFor(const ActiveLookupRequest& lookup) const {
   mu_.AssertHeld();
   const Seconds age = CacheHeadersUtils::calculateAge(
       *entry_.response_headers_, entry_.response_metadata_.response_time_, lookup.timestamp());
   return lookup.requiresValidation(*entry_.response_headers_, age);
 }
 
-void ActiveCacheEntry::handleValidationAndSendLookupResponses(CacheEntryStatus status) {
+void CacheSession::sendLookupResponsesAndMaybeValidationRequest(CacheEntryStatus status) {
   mu_.AssertHeld();
   ASSERT(state_ == State::Exists || state_ == State::Inserting);
   auto it = lookup_subscribers_.begin();
@@ -242,8 +242,9 @@ void ActiveCacheEntry::handleValidationAndSendLookupResponses(CacheEntryStatus s
     }
   }
   if (it != lookup_subscribers_.end()) {
-    if (auto active_cache = cache_.lock()) {
-      active_cache->stats().subActiveCacheSubscribers(std::distance(it, lookup_subscribers_.end()));
+    if (auto cache_sessions = cache_sessions_.lock()) {
+      cache_sessions->stats().subCacheSessionsSubscribers(
+          std::distance(it, lookup_subscribers_.end()));
     }
   }
   lookup_subscribers_.erase(it, lookup_subscribers_.end());
@@ -253,21 +254,21 @@ void ActiveCacheEntry::handleValidationAndSendLookupResponses(CacheEntryStatus s
   }
 }
 
-EndStream ActiveCacheEntry::endStreamAfterHeaders() const {
+EndStream CacheSession::endStreamAfterHeaders() const {
   mu_.AssertHeld();
   bool end_stream = entry_.body_length_.value_or(1) == 0 && entry_.response_trailers_ == nullptr;
   return end_stream ? EndStream::End : EndStream::More;
 }
 
-EndStream ActiveCacheEntry::endStreamAfterBody() const {
+EndStream CacheSession::endStreamAfterBody() const {
   mu_.AssertHeld();
   ASSERT(entry_.body_length_.has_value(),
          "should not be testing endStreamAfterBody if body not complete");
   return (entry_.response_trailers_ == nullptr) ? EndStream::End : EndStream::More;
 }
 
-void ActiveCacheEntry::sendSuccessfulLookupResultTo(LookupSubscriber& subscriber,
-                                                    CacheEntryStatus status) {
+void CacheSession::sendSuccessfulLookupResultTo(LookupSubscriber& subscriber,
+                                                CacheEntryStatus status) {
   mu_.AssertHeld();
   ASSERT(state_ == State::Exists || state_ == State::Inserting);
   auto result = std::make_unique<ActiveLookupResult>();
@@ -279,7 +280,7 @@ void ActiveCacheEntry::sendSuccessfulLookupResultTo(LookupSubscriber& subscriber
       });
 }
 
-void ActiveCacheEntry::onBodyInserted(AdjustedByteRange range, bool end_stream) {
+void CacheSession::onBodyInserted(AdjustedByteRange range, bool end_stream) {
   absl::MutexLock lock(&mu_);
   body_length_available_ = range.end();
   if (end_stream) {
@@ -289,7 +290,7 @@ void ActiveCacheEntry::onBodyInserted(AdjustedByteRange range, bool end_stream) 
   maybeTriggerBodyReadForWaitingSubscriber();
 }
 
-void ActiveCacheEntry::onTrailersInserted(Http::ResponseTrailerMapPtr trailers) {
+void CacheSession::onTrailersInserted(Http::ResponseTrailerMapPtr trailers) {
   ASSERT(trailers);
   absl::MutexLock lock(&mu_);
   entry_.response_trailers_ = std::move(trailers);
@@ -297,13 +298,13 @@ void ActiveCacheEntry::onTrailersInserted(Http::ResponseTrailerMapPtr trailers) 
   for (TrailerSubscriber& subscriber : trailer_subscribers_) {
     sendTrailersTo(subscriber);
   }
-  if (auto active_cache = cache_.lock()) {
-    active_cache->stats().subActiveCacheSubscribers(trailer_subscribers_.size());
+  if (auto cache_sessions = cache_sessions_.lock()) {
+    cache_sessions->stats().subCacheSessionsSubscribers(trailer_subscribers_.size());
   }
   trailer_subscribers_.clear();
 }
 
-void ActiveCacheEntry::sendTrailersTo(TrailerSubscriber& subscriber) {
+void CacheSession::sendTrailersTo(TrailerSubscriber& subscriber) {
   mu_.AssertHeld();
   ASSERT(entry_.response_trailers_ != nullptr);
   subscriber.dispatcher().post(
@@ -313,14 +314,13 @@ void ActiveCacheEntry::sendTrailersTo(TrailerSubscriber& subscriber) {
       });
 }
 
-void ActiveCacheEntry::onInsertFailed() {
+void CacheSession::onInsertFailed() {
   absl::MutexLock lock(&mu_);
   ENVOY_LOG(error, "cache insert failed");
   onCacheError();
 }
 
-static void postUpstreamPassThrough(ActiveCacheEntry::LookupSubscriber&& sub,
-                                    CacheEntryStatus status) {
+static void postUpstreamPassThrough(CacheSession::LookupSubscriber&& sub, CacheEntryStatus status) {
   Event::Dispatcher& dispatcher = sub.dispatcher();
   dispatcher.post([sub = std::move(sub), status]() mutable {
     auto result = std::make_unique<ActiveLookupResult>();
@@ -333,8 +333,8 @@ static void postUpstreamPassThrough(ActiveCacheEntry::LookupSubscriber&& sub,
   });
 }
 
-static void postUpstreamPassThroughWithReset(ActiveCacheEntry::LookupSubscriber&& sub,
-                                             std::shared_ptr<ActiveCacheEntry> entry) {
+static void postUpstreamPassThroughWithReset(CacheSession::LookupSubscriber&& sub,
+                                             std::shared_ptr<CacheSession> entry) {
   Event::Dispatcher& dispatcher = sub.dispatcher();
   dispatcher.post([sub = std::move(sub), entry = std::move(entry)]() mutable {
     auto result = std::make_unique<ActiveLookupResult>();
@@ -348,10 +348,10 @@ static void postUpstreamPassThroughWithReset(ActiveCacheEntry::LookupSubscriber&
   });
 }
 
-void ActiveCacheEntry::onCacheError() {
+void CacheSession::onCacheError() {
   mu_.AssertHeld();
-  auto active_cache = cache_.lock();
-  if (active_cache) {
+  auto cache_sessions = cache_sessions_.lock();
+  if (cache_sessions) {
     Event::Dispatcher* dispatcher = nullptr;
     if (!lookup_subscribers_.empty()) {
       dispatcher = &lookup_subscribers_.front().dispatcher();
@@ -361,11 +361,13 @@ void ActiveCacheEntry::onCacheError() {
       dispatcher = &trailer_subscribers_.front().dispatcher();
     }
     if (dispatcher) {
-      active_cache->cache().evict(*dispatcher, key_);
+      // TODO(toddmgreer): there may be some kinds of cache error that
+      // don't merit evicting the entry.
+      cache_sessions->cache().evict(*dispatcher, key_);
     }
-    active_cache->stats().subActiveCacheSubscribers(body_subscribers_.size());
-    active_cache->stats().subActiveCacheSubscribers(trailer_subscribers_.size());
-    active_cache->stats().subActiveCacheSubscribers(lookup_subscribers_.size());
+    cache_sessions->stats().subCacheSessionsSubscribers(body_subscribers_.size());
+    cache_sessions->stats().subCacheSessionsSubscribers(trailer_subscribers_.size());
+    cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
   }
   for (LookupSubscriber& sub : lookup_subscribers_) {
     postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
@@ -382,7 +384,7 @@ void ActiveCacheEntry::onCacheError() {
   state_ = State::New;
 }
 
-void ActiveCacheEntry::insertComplete() {
+void CacheSession::insertComplete() {
   mu_.AssertHeld();
   state_ = State::Exists;
   entry_.body_length_ = body_length_available_;
@@ -398,20 +400,22 @@ void ActiveCacheEntry::insertComplete() {
   content_length_header_ = body_length_available_;
 }
 
-void ActiveCacheEntry::abortBodyOutOfRangeSubscribers() {
+void CacheSession::abortBodyOutOfRangeSubscribers() {
   mu_.AssertHeld();
   if (!entry_.body_length_.has_value()) {
     // Don't know if a request is out of range until the available range is known.
     return;
   }
-  // Any subscribers who requested an invalid range should be aborted now that
-  // we know their range is invalid. Subscribers who asked for body starting at
-  // the end of the range should receive null body.
+  // For any subscribers whose requested range has been revealed to be invalid
+  // (we only get here in the case where the content length was not known after
+  // headers), reset their requests. Subscribers who asked for body starting at
+  // or beyond the end of the available range should receive null body rather
+  // than reset.
   EndStream end_stream = endStreamAfterBody();
-  auto active_cache = cache_.lock();
+  auto cache_sessions = cache_sessions_.lock();
   body_subscribers_.erase(
       std::remove_if(body_subscribers_.begin(), body_subscribers_.end(),
-                     [this, end_stream, &active_cache](BodySubscriber& bs)
+                     [this, end_stream, &cache_sessions](BodySubscriber& bs)
                          ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
                            if (bs.range_.begin() >= body_length_available_) {
                              if (bs.range_.begin() == body_length_available_) {
@@ -422,8 +426,8 @@ void ActiveCacheEntry::abortBodyOutOfRangeSubscribers() {
                              } else {
                                bs.callback_(nullptr, EndStream::Reset);
                              }
-                             if (active_cache) {
-                               active_cache->stats().subActiveCacheSubscribers(1);
+                             if (cache_sessions) {
+                               cache_sessions->stats().subCacheSessionsSubscribers(1);
                              }
                              return true;
                            }
@@ -432,7 +436,7 @@ void ActiveCacheEntry::abortBodyOutOfRangeSubscribers() {
       body_subscribers_.end());
 }
 
-void ActiveCacheEntry::maybeTriggerBodyReadForWaitingSubscriber() {
+void CacheSession::maybeTriggerBodyReadForWaitingSubscriber() {
   mu_.AssertHeld();
   ASSERT(entry_.cache_reader_);
   if (read_action_in_flight_) {
@@ -455,7 +459,7 @@ void ActiveCacheEntry::maybeTriggerBodyReadForWaitingSubscriber() {
     range = AdjustedByteRange(range.begin(), range.begin() + max_read_chunk_size_);
   }
   // Don't need this to be cancellable because there's a shared_ptr in the lambda keeping the
-  // ActiveCacheEntry alive. We post to a thread before making the request for two reasons - we want
+  // CacheSession alive. We post to a thread before making the request for two reasons - we want
   // the request to be performed on the requester's worker thread for balance, and we want to be
   // able to lock the mutex again on the callback - if the cache called back immediately rather than
   // posting and we *didn't* post before making the request, the mutex would still be held
@@ -475,13 +479,13 @@ void ActiveCacheEntry::maybeTriggerBodyReadForWaitingSubscriber() {
   });
 }
 
-bool ActiveCacheEntry::canReadBodyRangeFromCacheEntry(BodySubscriber& subscriber) {
+bool CacheSession::canReadBodyRangeFromCacheEntry(BodySubscriber& subscriber) {
   mu_.AssertHeld();
   return subscriber.range_.begin() < body_length_available_;
 }
 
-void ActiveCacheEntry::onBodyChunkFromCache(AdjustedByteRange range, Buffer::InstancePtr buffer,
-                                            EndStream end_stream) {
+void CacheSession::onBodyChunkFromCache(AdjustedByteRange range, Buffer::InstancePtr buffer,
+                                        EndStream end_stream) {
   absl::MutexLock lock(&mu_);
   read_action_in_flight_ = false;
   if (end_stream == EndStream::Reset) {
@@ -523,16 +527,16 @@ void ActiveCacheEntry::onBodyChunkFromCache(AdjustedByteRange range, Buffer::Ins
           std::make_unique<Buffer::OwnedImpl>(bytes + r.begin() - range.begin(), r.length()));
     }
   }
-  if (auto active_cache = cache_.lock()) {
-    active_cache->stats().subActiveCacheSubscribers(
+  if (auto cache_sessions = cache_sessions_.lock()) {
+    cache_sessions->stats().subCacheSessionsSubscribers(
         std::distance(recipients_begin, body_subscribers_.end()));
   }
   body_subscribers_.erase(recipients_begin, body_subscribers_.end());
   maybeTriggerBodyReadForWaitingSubscriber();
 }
 
-void ActiveCacheEntry::sendBodyChunkTo(BodySubscriber& subscriber, AdjustedByteRange range,
-                                       Buffer::InstancePtr buffer) {
+void CacheSession::sendBodyChunkTo(BodySubscriber& subscriber, AdjustedByteRange range,
+                                   Buffer::InstancePtr buffer) {
   mu_.AssertHeld();
   bool end_stream = entry_.body_length_.has_value() && range.end() == entry_.body_length_.value() &&
                     entry_.response_trailers_ == nullptr;
@@ -542,10 +546,9 @@ void ActiveCacheEntry::sendBodyChunkTo(BodySubscriber& subscriber, AdjustedByteR
   });
 }
 
-ActiveCacheEntry::~ActiveCacheEntry() { ASSERT(!upstream_request_); }
+CacheSession::~CacheSession() { ASSERT(!upstream_request_); }
 
-void ActiveCacheEntry::getLookupResult(ActiveLookupRequestPtr lookup,
-                                       ActiveLookupResultCallback&& cb) {
+void CacheSession::getLookupResult(ActiveLookupRequestPtr lookup, ActiveLookupResultCallback&& cb) {
   ASSERT(lookup->dispatcher().isThreadSafe());
   absl::MutexLock lock(&mu_);
   LookupSubscriber sub{std::make_unique<ActiveLookupContext>(std::move(lookup), shared_from_this(),
@@ -561,7 +564,7 @@ void ActiveCacheEntry::getLookupResult(ActiveLookupRequestPtr lookup,
   }
   case State::Validating:
   case State::Pending:
-    sub.context_->lookup().stats().incActiveCacheSubscribers();
+    sub.context_->lookup().stats().incCacheSessionsSubscribers();
     lookup_subscribers_.push_back(std::move(sub));
     return;
   case State::Exists:
@@ -578,7 +581,7 @@ void ActiveCacheEntry::getLookupResult(ActiveLookupRequestPtr lookup,
         // Skip validation if the cache write is still in progress.
         status = CacheEntryStatus::ValidatedFree;
       } else {
-        sub.context_->lookup().stats().incActiveCacheSubscribers();
+        sub.context_->lookup().stats().incCacheSessionsSubscribers();
         lookup_subscribers_.push_back(std::move(sub));
         return performValidation();
       }
@@ -601,17 +604,17 @@ void ActiveCacheEntry::getLookupResult(ActiveLookupRequestPtr lookup,
       return;
     }
     LookupRequest request(Key{sub.context_->lookup().key()}, dispatcher);
-    sub.context_->lookup().stats().incActiveCacheSubscribers();
+    sub.context_->lookup().stats().incCacheSessionsSubscribers();
     lookup_subscribers_.emplace_back(std::move(sub));
     state_ = State::Pending;
-    std::shared_ptr<ActiveCacheImpl> active_cache = cache_.lock();
-    ASSERT(active_cache, "should be impossible for cache to be deleted in getLookupResult");
+    std::shared_ptr<CacheSessionsImpl> cache_sessions = cache_sessions_.lock();
+    ASSERT(cache_sessions, "should be impossible for cache to be deleted in getLookupResult");
     // posted to prevent callback mutex-deadlock.
-    return dispatcher.post([active_cache = std::move(active_cache), p = shared_from_this(),
+    return dispatcher.post([cache_sessions = std::move(cache_sessions), p = shared_from_this(),
                             request = std::move(request)]() mutable {
       // p is captured as shared_ptr to ensure 'this' is not deleted while the
       // lookup is in flight.
-      active_cache->cache().lookup(
+      cache_sessions->cache().lookup(
           std::move(request), [p = std::move(p)](absl::StatusOr<LookupResult>&& lookup_result) {
             p->onCacheLookupResult(std::move(lookup_result));
           });
@@ -620,7 +623,7 @@ void ActiveCacheEntry::getLookupResult(ActiveLookupRequestPtr lookup,
   }
 }
 
-void ActiveCacheEntry::onCacheLookupResult(absl::StatusOr<LookupResult>&& lookup_result) {
+void CacheSession::onCacheLookupResult(absl::StatusOr<LookupResult>&& lookup_result) {
   absl::MutexLock lock(&mu_);
   if (!lookup_result.ok()) {
     return onCacheError();
@@ -631,11 +634,11 @@ void ActiveCacheEntry::onCacheLookupResult(absl::StatusOr<LookupResult>&& lookup
   } else {
     state_ = State::Exists;
     body_length_available_ = entry_.body_length_.value();
-    handleValidationAndSendLookupResponses();
+    sendLookupResponsesAndMaybeValidationRequest();
   }
 }
 
-void ActiveCacheEntry::performUpstreamRequest() {
+void CacheSession::performUpstreamRequest() {
   ENVOY_LOG(debug, "making upstream request to populate cache for {}", key_.path());
   mu_.AssertHeld();
   ASSERT(state_ == State::Pending);
@@ -664,7 +667,7 @@ void ActiveCacheEntry::performUpstreamRequest() {
   });
 }
 
-void ActiveCacheEntry::onCacheWentAway() {
+void CacheSession::onCacheWentAway() {
   mu_.AssertHeld();
   for (LookupSubscriber& sub : lookup_subscribers_) {
     postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
@@ -672,7 +675,7 @@ void ActiveCacheEntry::onCacheWentAway() {
   lookup_subscribers_.clear();
 }
 
-void ActiveCacheEntry::processSuccessfulValidation(Http::ResponseHeaderMapPtr headers) {
+void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr headers) {
   mu_.AssertHeld();
   ENVOY_LOG(debug, "successful validation");
   ASSERT(!lookup_subscribers_.empty(),
@@ -705,16 +708,15 @@ void ActiveCacheEntry::processSuccessfulValidation(Http::ResponseHeaderMapPtr he
 
   entry_.response_headers_ = std::move(headers);
   state_ = State::Exists;
-  auto cache = cache_.lock();
-  if (cache) {
+  if (auto cache_sessions = cache_sessions_.lock()) {
     if (should_update_cached_entry) {
       // TODO(yosrym93): else evict, set state to Pending, and treat as insert.
       LookupSubscriber& sub = lookup_subscribers_.front();
       // Update metadata associated with the cached response. Right now this is only
       // response_time.
-      entry_.response_metadata_.response_time_ = cache->time_source_.systemTime();
-      cache->cache().updateHeaders(sub.dispatcher(), key_, *entry_.response_headers_,
-                                   entry_.response_metadata_);
+      entry_.response_metadata_.response_time_ = cache_sessions->time_source_.systemTime();
+      cache_sessions->cache().updateHeaders(sub.dispatcher(), key_, *entry_.response_headers_,
+                                            entry_.response_metadata_);
     }
   }
 
@@ -725,14 +727,14 @@ void ActiveCacheEntry::processSuccessfulValidation(Http::ResponseHeaderMapPtr he
     // so it's detectable that we didn't need to do multiple validations.
     status = CacheEntryStatus::ValidatedFree;
   }
-  if (auto active_cache = cache_.lock()) {
-    active_cache->stats().subActiveCacheSubscribers(lookup_subscribers_.size());
+  if (auto cache_sessions = cache_sessions_.lock()) {
+    cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
   }
   lookup_subscribers_.clear();
 }
 
-void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
-                                         bool range_header_was_stripped) {
+void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
+                                     bool range_header_was_stripped) {
   absl::MutexLock lock(&mu_);
   Event::Dispatcher& dispatcher = lookup_subscribers_.front().dispatcher();
   ASSERT(upstream_request_);
@@ -746,8 +748,8 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
         callback(std::move(result));
       });
     }
-    if (auto active_cache = cache_.lock()) {
-      active_cache->stats().subActiveCacheSubscribers(lookup_subscribers_.size());
+    if (auto cache_sessions = cache_sessions_.lock()) {
+      cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
     }
     lookup_subscribers_.clear();
     return;
@@ -760,9 +762,8 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
     } else {
       // Validate failed, so going down the 'insert' path instead.
       state_ = State::Pending;
-      auto active_cache = cache_.lock();
-      if (active_cache) {
-        active_cache->cache().evict(dispatcher, key_);
+      if (auto cache_sessions = cache_sessions_.lock()) {
+        cache_sessions->cache().evict(dispatcher, key_);
       }
       body_length_available_ = 0;
       entry_ = {};
@@ -794,14 +795,14 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
         postUpstreamPassThrough(std::move(sub), CacheEntryStatus::Uncacheable);
       }
     }
-    if (auto active_cache = cache_.lock()) {
-      active_cache->stats().subActiveCacheSubscribers(lookup_subscribers_.size());
+    if (auto cache_sessions = cache_sessions_.lock()) {
+      cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
     }
     lookup_subscribers_.clear();
     return;
   }
-  auto active_cache = cache_.lock();
-  if (!active_cache) {
+  auto cache_sessions = cache_sessions_.lock();
+  if (!cache_sessions) {
     // Cache was deleted while callback was in flight. As a fallback just make all
     // requests pass through. This shouldn't happen, but it's possible that a config
     // update can come in *and* the last filter using the cache can get
@@ -817,29 +818,30 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
   // deadlock on the mutex if the insert operation calls back directly.
   lookup_subscribers_.front().dispatcher().post(
       [p = shared_from_this(), &dispatcher = lookup_subscribers_.front().dispatcher(), key = key_,
-       active_cache, headers = std::move(headers),
+       cache_sessions, headers = std::move(headers),
        upstream_request = std::move(upstream_request_)]() mutable {
-        active_cache->cache().insert(dispatcher, key, std::move(headers),
-                                     active_cache->makeMetadata(), std::move(upstream_request), p);
+        cache_sessions->cache().insert(dispatcher, key, std::move(headers),
+                                       cache_sessions->makeMetadata(), std::move(upstream_request),
+                                       p);
         // When the cache entry insertion completes it will call back to onHeadersInserted,
         // or on error onInsertFailed.
       });
 }
 
-void ActiveCacheImpl::lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) {
+void CacheSessionsImpl::lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) {
   ASSERT(request);
   ASSERT(cb);
-  std::shared_ptr<ActiveCacheEntry> entry = getEntry(request->key());
+  std::shared_ptr<CacheSession> entry = getEntry(request->key());
   entry->getLookupResult(std::move(request), std::move(cb));
 }
 
-ResponseMetadata ActiveCacheImpl::makeMetadata() {
+ResponseMetadata CacheSessionsImpl::makeMetadata() {
   ResponseMetadata metadata;
   metadata.response_time_ = time_source_.systemTime();
   return metadata;
 }
 
-void ActiveCacheEntry::performValidation() {
+void CacheSession::performValidation() {
   mu_.AssertHeld();
   ASSERT(!lookup_subscribers_.empty());
   ENVOY_LOG(debug, "validating");
@@ -859,14 +861,14 @@ void ActiveCacheEntry::performValidation() {
   });
 }
 
-std::shared_ptr<ActiveCacheEntry> ActiveCacheImpl::getEntry(const Key& key) {
+std::shared_ptr<CacheSession> CacheSessionsImpl::getEntry(const Key& key) {
   const SystemTime now = time_source_.systemTime();
   cache().touch(key, now);
   absl::MutexLock lock(&mu_);
   auto [it, is_new] = entries_.try_emplace(key);
   if (is_new) {
-    stats().incActiveCacheEntries();
-    it->second = std::make_shared<ActiveCacheEntry>(weak_from_this(), key);
+    stats().incCacheSessionsEntries();
+    it->second = std::make_shared<CacheSession>(weak_from_this(), key);
   }
   auto ret = it->second;
   ret->setExpiry(now + expiry_duration_);
@@ -880,7 +882,7 @@ std::shared_ptr<ActiveCacheEntry> ActiveCacheImpl::getEntry(const Key& key) {
     it = entries_.begin();
   }
   if (it->second->isExpiredAt(now)) {
-    stats().decActiveCacheEntries();
+    stats().decCacheSessionsEntries();
     entries_.erase(it);
   }
   return ret;

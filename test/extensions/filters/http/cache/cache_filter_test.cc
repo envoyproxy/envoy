@@ -34,7 +34,7 @@ using ::testing::Return;
 
 class CacheFilterTest : public ::testing::Test {
 protected:
-  CacheFilterSharedPtr makeFilter(std::shared_ptr<ActiveCache> cache, bool auto_destroy = true) {
+  CacheFilterSharedPtr makeFilter(std::shared_ptr<CacheSessions> cache, bool auto_destroy = true) {
     auto config = std::make_shared<CacheFilterConfig>(config_, std::move(cache),
                                                       context_.server_factory_context_);
     std::shared_ptr<CacheFilter> filter(new CacheFilter(config), [auto_destroy](CacheFilter* f) {
@@ -96,7 +96,7 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
-  std::shared_ptr<MockActiveCache> mock_cache_ = std::make_shared<MockActiveCache>();
+  std::shared_ptr<MockCacheSessions> mock_cache_ = std::make_shared<MockCacheSessions>();
   std::unique_ptr<MockHttpSource> mock_http_source_ = std::make_unique<MockHttpSource>();
   MockCacheFilterStats& stats() { return mock_cache_->mock_stats_; }
   ActiveLookupRequestPtr captured_lookup_request_;

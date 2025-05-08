@@ -6,7 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
@@ -48,10 +48,10 @@ public:
       : async_file_manager_factory_(async_file_manager_factory),
         cache_eviction_thread_(thread_factory) {}
 
-  std::shared_ptr<ActiveCache> get(std::shared_ptr<CacheSingleton> singleton,
-                                   const ConfigProto& non_normalized_config,
-                                   Server::Configuration::FactoryContext& context) {
-    std::shared_ptr<ActiveCache> cache;
+  std::shared_ptr<CacheSessions> get(std::shared_ptr<CacheSingleton> singleton,
+                                     const ConfigProto& non_normalized_config,
+                                     Server::Configuration::FactoryContext& context) {
+    std::shared_ptr<CacheSessions> cache;
     ConfigProto config = normalizeConfig(non_normalized_config);
     auto key = config.cache_path();
     absl::MutexLock lock(&mu_);
@@ -65,7 +65,7 @@ public:
       std::unique_ptr<FileSystemHttpCache> fs_cache = std::make_unique<FileSystemHttpCache>(
           singleton, cache_eviction_thread_, std::move(config), std::move(async_file_manager),
           context.scope());
-      cache = ActiveCache::create(context, std::move(fs_cache));
+      cache = CacheSessions::create(context, std::move(fs_cache));
       caches_[key] = cache;
     } else {
       // Check that the config of the cache found in the lookup table for the given path
@@ -88,7 +88,7 @@ private:
   // that config of cache. The caches each keep shared_ptrs to this singleton, which keeps the
   // singleton from being destroyed unless it's no longer keeping track of any caches.
   // (The singleton shared_ptr is *only* held by cache instances.)
-  absl::flat_hash_map<std::string, std::weak_ptr<ActiveCache>> caches_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<std::string, std::weak_ptr<CacheSessions>> caches_ ABSL_GUARDED_BY(mu_);
 };
 
 SINGLETON_MANAGER_REGISTRATION(file_system_http_cache_singleton);
@@ -102,7 +102,7 @@ public:
     return std::make_unique<ConfigProto>();
   }
   // From HttpCacheFactory
-  std::shared_ptr<ActiveCache>
+  std::shared_ptr<CacheSessions>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& filter_config,
            Server::Configuration::FactoryContext& context) override {
     ConfigProto config;

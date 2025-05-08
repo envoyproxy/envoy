@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
-class ActiveCacheEntry;
+class CacheSession;
 class FileSystemHttpCache;
 
 using Envoy::Extensions::Common::AsyncFiles::AsyncFileHandle;

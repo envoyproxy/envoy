@@ -12,10 +12,10 @@ namespace Cache {
 class CacheFilterStats {
 public:
   virtual void incForStatus(CacheEntryStatus status) PURE;
-  virtual void incActiveCacheEntries() PURE;
-  virtual void decActiveCacheEntries() PURE;
-  virtual void incActiveCacheSubscribers() PURE;
-  virtual void subActiveCacheSubscribers(uint64_t count) PURE;
+  virtual void incCacheSessionsEntries() PURE;
+  virtual void decCacheSessionsEntries() PURE;
+  virtual void incCacheSessionsSubscribers() PURE;
+  virtual void subCacheSessionsSubscribers(uint64_t count) PURE;
   virtual void addUpstreamBufferedBytes(uint64_t bytes) PURE;
   virtual void subUpstreamBufferedBytes(uint64_t bytes) PURE;
   virtual ~CacheFilterStats() = default;

@@ -3,7 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/cancel_wrapper.h"
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/upstream_request.h"
 
 #include "absl/base/thread_annotations.h"
@@ -16,12 +16,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class ActiveCacheEntry;
-class ActiveCacheImpl;
+class CacheSession;
+class CacheSessionsImpl;
 
 class ActiveLookupContext : public HttpSource {
 public:
-  ActiveLookupContext(ActiveLookupRequestPtr lookup, std::shared_ptr<ActiveCacheEntry> entry,
+  ActiveLookupContext(ActiveLookupRequestPtr lookup, std::shared_ptr<CacheSession> entry,
                       uint64_t content_length = 0)
       : lookup_(std::move(lookup)), entry_(entry), content_length_(content_length) {}
   // HttpSource
@@ -36,15 +36,15 @@ public:
 
 private:
   ActiveLookupRequestPtr lookup_;
-  std::shared_ptr<ActiveCacheEntry> entry_;
+  std::shared_ptr<CacheSession> entry_;
   uint64_t content_length_;
 };
 
-class ActiveCacheEntry : public Logger::Loggable<Logger::Id::cache_filter>,
-                         public CacheProgressReceiver,
-                         public std::enable_shared_from_this<ActiveCacheEntry> {
+class CacheSession : public Logger::Loggable<Logger::Id::cache_filter>,
+                     public CacheProgressReceiver,
+                     public std::enable_shared_from_this<CacheSession> {
 public:
-  ActiveCacheEntry(std::weak_ptr<ActiveCacheImpl> cache, const Key& key);
+  CacheSession(std::weak_ptr<CacheSessionsImpl> cache_sessions, const Key& key);
 
   // CacheProgressReceiver
   void onHeadersInserted(CacheReaderPtr cache_reader, Http::ResponseHeaderMapPtr headers,
@@ -66,7 +66,7 @@ public:
       ABSL_LOCKS_EXCLUDED(mu_);
   void clearUncacheableState() ABSL_LOCKS_EXCLUDED(mu_);
 
-  ~ActiveCacheEntry();
+  ~CacheSession();
 
   class Subscriber {
   public:
@@ -155,8 +155,8 @@ private:
   // For each subscriber, either sends a lookup response (if validation passes), or
   // triggers validation *once* for all subscribers for whom validation failed.
   // If an insert occurred then first_status should be Miss, otherwise Hit.
-  void handleValidationAndSendLookupResponses(CacheEntryStatus first_status = CacheEntryStatus::Hit)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void sendLookupResponsesAndMaybeValidationRequest(
+      CacheEntryStatus first_status = CacheEntryStatus::Hit) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   // Sends an upstream validation request.
   void performValidation() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
@@ -241,7 +241,7 @@ private:
   // While streaming this is a proxy for body_length_ which should not
   // be populated in entry_ until the insert is complete.
   uint64_t body_length_available_ = 0;
-  std::weak_ptr<ActiveCacheImpl> cache_;
+  std::weak_ptr<CacheSessionsImpl> cache_sessions_;
   Key key_;
   bool in_body_loop_callback_ = false;
 
@@ -251,8 +251,8 @@ private:
   UpstreamRequestPtr upstream_request_ ABSL_GUARDED_BY(mu_);
   bool read_action_in_flight_ ABSL_GUARDED_BY(mu_) = false;
 
-  // The following fields and functions are only used by ActiveCache.
-  friend class ActiveCacheImpl;
+  // The following fields and functions are only used by CacheSessions.
+  friend class CacheSessionsImpl;
   bool inserting() const {
     absl::MutexLock lock(&mu_);
     return state_ == State::Inserting;
@@ -260,16 +260,18 @@ private:
   void setExpiry(SystemTime expiry) { expires_at_ = expiry; }
   bool isExpiredAt(SystemTime t) const { return expires_at_ < t && !inserting(); }
 
-  SystemTime expires_at_; // This is guarded by ActiveCache's mutex.
+  SystemTime expires_at_; // This is guarded by CacheSessions's mutex.
 
   // An arbitrary 256k limit on per-read fragment size.
   // TODO(ravenblack): Make this configurable?
   static constexpr uint64_t max_read_chunk_size_ = 256 * 1024;
 };
 
-class ActiveCacheImpl : public ActiveCache, public std::enable_shared_from_this<ActiveCacheImpl> {
+class CacheSessionsImpl : public CacheSessions,
+                          public std::enable_shared_from_this<CacheSessionsImpl> {
 public:
-  ActiveCacheImpl(Server::Configuration::FactoryContext& context, std::unique_ptr<HttpCache> cache)
+  CacheSessionsImpl(Server::Configuration::FactoryContext& context,
+                    std::unique_ptr<HttpCache> cache)
       : time_source_(context.serverFactoryContext().timeSource()), cache_(std::move(cache)),
         stats_(generateStats(context.scope(), cache_->cacheInfo().name_)) {}
 
@@ -282,7 +284,7 @@ public:
 
 private:
   // Returns an entry with the given key, creating it if necessary.
-  std::shared_ptr<ActiveCacheEntry> getEntry(const Key& key) ABSL_LOCKS_EXCLUDED(mu_);
+  std::shared_ptr<CacheSession> getEntry(const Key& key) ABSL_LOCKS_EXCLUDED(mu_);
 
   TimeSource& time_source_;
   std::unique_ptr<HttpCache> cache_;
@@ -294,10 +296,10 @@ private:
   // their own mutex. Since it's only held for a short time and is related to
   // async operations, it seems unlikely that mutex contention would be a
   // significant bottleneck.
-  absl::flat_hash_map<Key, std::shared_ptr<ActiveCacheEntry>, MessageUtil, MessageUtil>
+  absl::flat_hash_map<Key, std::shared_ptr<CacheSession>, MessageUtil, MessageUtil>
       entries_ ABSL_GUARDED_BY(mu_);
 
-  friend class ActiveCacheEntry;
+  friend class CacheSession;
 };
 
 } // namespace Cache

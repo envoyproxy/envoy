@@ -23,7 +23,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class ActiveCache;
+class CacheSessions;
 class CacheReader;
 
 // Result of a lookup operation.
@@ -107,6 +107,7 @@ public:
   virtual void lookup(LookupRequest&& request, LookupCallback&& callback) PURE;
 
   // Remove the entry from the cache.
+  // This should accept any dispatcher, as the cache has no worker affinity.
   virtual void evict(Event::Dispatcher& dispatcher, const Key& key) PURE;
 
   // To facilitate LRU cache eviction, provide a timestamp whenever a cache entry is
@@ -143,12 +144,12 @@ public:
   // From UntypedFactory
   std::string category() const override { return "envoy.http.cache"; }
 
-  // Returns an ActiveCache initialized with an HttpCache that will remain
+  // Returns a CacheSessions initialized with an HttpCache that will remain
   // valid indefinitely (at least as long as the calling CacheFilter).
   //
   // Pass factory context to allow HttpCache to use async client, stats scope
   // etc.
-  virtual std::shared_ptr<ActiveCache>
+  virtual std::shared_ptr<CacheSessions>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
            Server::Configuration::FactoryContext& context) PURE;
 

@@ -22,7 +22,7 @@ envoy_cc_extension(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "//source/extensions/filters/http/cache:active_cache_impl_lib",
+        "//source/extensions/filters/http/cache:cache_sessions_impl_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "@envoy_api//envoy/extensions/http/cache/simple_http_cache/v3:pkg_cc_proto",
     ],

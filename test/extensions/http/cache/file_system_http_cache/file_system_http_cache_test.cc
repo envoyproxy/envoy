@@ -4,7 +4,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/filesystem/directory.h"
-#include "source/extensions/filters/http/cache/active_cache.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
@@ -105,7 +105,7 @@ protected:
   ::Envoy::TestEnvironment env_;
   std::string cache_path_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  std::shared_ptr<ActiveCache> cache_;
+  std::shared_ptr<CacheSessions> cache_;
   HttpCacheFactory* http_cache_factory_;
 };
 
@@ -674,9 +674,9 @@ TEST(Registration, GetCacheFromFactory) {
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");
-  auto active_cache = factory->getCache(cache_config, factory_context);
+  auto cache_sessions = factory->getCache(cache_config, factory_context);
   // Verify that the config path got a / suffixed onto it.
-  EXPECT_EQ(dynamic_cast<FileSystemHttpCache&>(active_cache->cache()).config().cache_path(),
+  EXPECT_EQ(dynamic_cast<FileSystemHttpCache&>(cache_sessions->cache()).config().cache_path(),
             "/tmp/");
 }
 
