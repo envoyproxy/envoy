@@ -36,6 +36,19 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: conn_pool
+  change: |
+    Fixed an issue that could lead to too many connections when using
+    :ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>` if the
+    established connection is ``http/2`` and Envoy predicted it would have lower concurrent capacity.
+- area: conn_pool
+  change: |
+    Fixed an issue that could lead to insufficient connections for current pending requests. If a connection starts draining while it
+    has negative unused capacity (which happens if an HTTP/2 ``SETTINGS`` frame reduces allowed concurrency to below the current number
+    of requests), that connection's unused capacity will be included in total pool capacity even though it is unusable because it is
+    draining. This can result in not enough connections being established for current pending requests. This is most problematic for
+    long-lived requests (such as streaming gRPC requests or long-poll requests) because a connection could be in the draining state
+    for a long time.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -80,6 +93,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: lua
+  change: |
+    Added support for accessing filter context.
+    See :ref:`filterContext() <config_http_filters_lua_stream_handle_api_filter_context>` for more details.
 - area: resource_monitors
   change: |
     added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates

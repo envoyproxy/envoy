@@ -208,7 +208,6 @@ absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersRespons
   headers_ = nullptr;
   filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
   continueIfNecessary();
-  clearWatermark();
   return absl::OkStatus();
 }
 

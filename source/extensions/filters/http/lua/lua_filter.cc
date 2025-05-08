@@ -822,14 +822,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : disabled_(config.disabled()), name_(config.name()) {
+    : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
-    return;
+    return; // Filter is disabled or explicit script name is provided.
   }
-  // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = THROW_OR_RETURN_VALUE(
-      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  if (config.has_source_code()) {
+    // Read and parse the inline Lua code defined in the route configuration.
+    const std::string code_str = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(config.source_code(), true, context.api()), std::string);
+    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  }
 }
 
 void Filter::onDestroy() {
@@ -931,6 +933,17 @@ int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
 int StreamHandleWrapper::luaClearRouteCache(lua_State*) {
   callbacks_.clearRouteCache();
   return 0;
+}
+
+int StreamHandleWrapper::luaFilterContext(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (filter_context_wrapper_.get() != nullptr) {
+    filter_context_wrapper_.pushStack();
+  } else {
+    filter_context_wrapper_.reset(
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.filterContext()), true);
+  }
+  return 1;
 }
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,

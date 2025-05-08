@@ -245,7 +245,6 @@ build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
 # 1.5x original timeout + 300s for trace merger in all categories
 build:coverage --test_timeout=390,750,1500,5700
-build:coverage --define=dynamic_link_tests=true
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --test_env=HEAPCHECK=
@@ -268,9 +267,11 @@ build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
 build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
+build:test-coverage --define=dynamic_link_tests=false
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage
+build:fuzz-coverage --define=dynamic_link_tests=true
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
