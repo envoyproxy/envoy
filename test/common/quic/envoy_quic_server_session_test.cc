@@ -335,24 +335,19 @@ TEST_F(EnvoyQuicServerSessionTest, DoesNotCrashWithDestroyedRequestDecoder) {
       .WillOnce(testing::ReturnRef(request_decoder));
   EXPECT_CALL(request_decoder, accessLogHandlers());
   Http::MockRequestDecoderHandle* request_decoder_handle = nullptr;
-  EXPECT_CALL(request_decoder, getRequestDecoderHandle())
-      .WillOnce(Invoke([&]() {
-        auto handle = std::make_unique<Http::MockRequestDecoderHandle>();
-        ON_CALL(*handle, get())
-            .WillByDefault(
-                Return(OptRef<Http::RequestDecoder>(request_decoder)));
-        request_decoder_handle = handle.get();
-        return handle;
-      }));
+  EXPECT_CALL(request_decoder, getRequestDecoderHandle()).WillOnce(Invoke([&]() {
+    auto handle = std::make_unique<Http::MockRequestDecoderHandle>();
+    ON_CALL(*handle, get()).WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
+    request_decoder_handle = handle.get();
+    return handle;
+  }));
   quic::QuicStreamId stream_id = 4u;
-  auto stream = dynamic_cast<EnvoyQuicServerStream*>(
-      envoy_quic_session_.GetOrCreateStream(stream_id));
+  auto stream =
+      dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
   ASSERT_NE(stream, nullptr);
   ASSERT_NE(request_decoder_handle, nullptr);
 
-  EXPECT_CALL(*request_decoder_handle, get())
-      .WillOnce(Return(OptRef<Http::RequestDecoder>()));
-
+  EXPECT_CALL(*request_decoder_handle, get()).WillOnce(Return(OptRef<Http::RequestDecoder>()));
   EXPECT_CALL(request_decoder, decodeHeaders_(_, _)).Times(0);
   quic::QuicHeaderList headers;
   std::string host("www.abc.com");
@@ -362,8 +357,7 @@ TEST_F(EnvoyQuicServerSessionTest, DoesNotCrashWithDestroyedRequestDecoder) {
   headers.OnHeader(":scheme", "https");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
                            /*compressed_header_bytes=*/0);
-  stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(),
-                             headers);
+  stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {

@@ -585,9 +585,7 @@ protected:
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
     bool useDeferredReset() const override { return true; }
-    StreamDecoder* decoder() override {
-      return request_decoder_handle_->get().ptr();
-    }
+    StreamDecoder* decoder() override { return request_decoder_handle_->get().ptr(); }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
