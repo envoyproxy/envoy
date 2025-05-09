@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Proto API Scrubber]
-// [#not-implemented-hide:] Implementation in progress.
+
 // [#extension: envoy.filters.http.proto_api_scrubber]
 
 // ProtoApiScrubber filter supports filtering of the request and
