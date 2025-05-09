@@ -7,7 +7,6 @@ NOTE: This filter is currently WIP and not ready for use.
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig``.
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`.
 
 ProtoApiScrubber filter supports filtering of the request and
 response payloads based on the configured field restrictions and actions.
@@ -30,6 +29,7 @@ Process Flow
 ------------
 
 1. Filter Initialization
+
   a. if parsed AST is provided, store it to be used later.
   b. otherwise, parse the provided CEL expression and store it to be used later.
 
@@ -213,6 +213,3 @@ The filtered response output by this filter will be the following:
 Note that the fields ``debug_info`` and ``book.debug_info`` are filtered out
 from the response since the configured restrictions (i.e., the CEL
 expressions) for these fields are not satisfied.
-
-For more details, please refer to the
-:ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`.
