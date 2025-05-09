@@ -30,6 +30,7 @@ project-lifecycle:
   - github:ravenblackx
   - github:tonya11en
   - github:tyxia
+  - github:agrawroh
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true

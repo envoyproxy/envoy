@@ -3,7 +3,7 @@ adisuissa:
   opsgenie: Adi
   slack: UT17EMMTP
 agrawroh:
-  first-pass: true
+  maintainer: true
   slack: U025KC9D7T5
 antoniovleonti:
   first-pass: true

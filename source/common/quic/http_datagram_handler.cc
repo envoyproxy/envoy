@@ -18,10 +18,11 @@ void HttpDatagramHandler::decodeCapsule(const quiche::Capsule& capsule) {
   quiche::QuicheBuffer serialized_capsule = SerializeCapsule(capsule, &capsule_buffer_allocator_);
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add(serialized_capsule.AsStringView());
-  if (!stream_decoder_) {
+  if (stream_decoder_) {
+    stream_decoder_->decodeData(*buffer, stream_.IsDoneReading());
+  } else {
     IS_ENVOY_BUG("HTTP/3 Datagram received before a stream decoder is set.");
   }
-  stream_decoder_->decodeData(*buffer, stream_.IsDoneReading());
 }
 
 void HttpDatagramHandler::OnHttp3Datagram(quic::QuicStreamId stream_id, absl::string_view payload) {

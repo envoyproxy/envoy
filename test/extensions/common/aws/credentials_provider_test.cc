@@ -8,7 +8,9 @@
 #include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
+using testing::MockFunction;
 using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -261,6 +263,51 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   // We now have credentials so sign should complete immediately
   auto result = signer->sign(*message_, false, "");
   ASSERT_TRUE(result.ok());
+}
+
+class ControlledCredentialsProvider : public CredentialsProvider {
+public:
+  ControlledCredentialsProvider(CredentialSubscriberCallbacks* cb) : cb_(cb) {}
+
+  Credentials getCredentials() override {
+    Thread::LockGuard guard(mu_);
+    return credentials_;
+  }
+
+  bool credentialsPending() override {
+    Thread::LockGuard guard(mu_);
+    return pending_;
+  }
+
+  std::string providerName() override { return "Controlled Credentials Provider"; }
+
+  void refresh(const Credentials& credentials) {
+    {
+      Thread::LockGuard guard(mu_);
+      credentials_ = credentials;
+      pending_ = false;
+    }
+    if (cb_) {
+      cb_->onCredentialUpdate();
+    }
+  }
+
+private:
+  CredentialSubscriberCallbacks* cb_;
+  Thread::MutexBasicLockable mu_;
+  Credentials credentials_ ABSL_GUARDED_BY(mu_);
+  bool pending_ ABSL_GUARDED_BY(mu_) = true;
+};
+
+TEST(CredentialsProviderChainTest, SignerCallbacksCalledWhenCredentialsReturned) {
+  MockFunction<void()> signer_callback;
+  EXPECT_CALL(signer_callback, Call());
+
+  CredentialsProviderChain chain;
+  auto provider = std::make_shared<ControlledCredentialsProvider>(&chain);
+  chain.add(provider);
+  ASSERT_TRUE(chain.addCallbackIfChainCredentialsPending(signer_callback.AsStdFunction()));
+  provider->refresh(Credentials());
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {

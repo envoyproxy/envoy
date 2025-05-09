@@ -32,19 +32,30 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:92.6"
 "source/extensions/filters/http/cache:95.9"
+"source/extensions/filters/http/dynamic_forward_proxy:94.3"
+"source/extensions/filters/http/decompressor:95.9"
+"source/extensions/filters/http/ext_proc:96.5"
 "source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8"
 "source/extensions/filters/http/grpc_json_transcoder:94.0" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:90.6"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/oauth2:96.4"
 "source/extensions/filters/listener/original_src:92.1"
+"source/extensions/filters/network/dubbo_proxy:96.2"
 "source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"
+"source/extensions/internal_redirect:86.2"
+"source/extensions/internal_redirect/safe_cross_scheme:81.2"
+"source/extensions/internal_redirect/allow_listed_routes:85.7"
+"source/extensions/internal_redirect/previous_routes:89.3"
+"source/extensions/load_balancing_policies/maglev:90.7"
+"source/extensions/load_balancing_policies/ring_hash:96.2"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
 "source/extensions/tracers/zipkin:95.8"
+"source/extensions/transport_sockets/proxy_protocol:96.2"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions

@@ -164,6 +164,7 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
 
   // Prepare the request message
   ProcessingRequest request;
+  addDynamicMetadata(request);
 
   if (is_read) {
     auto* read_data = request.mutable_read_data();
@@ -268,6 +269,39 @@ void NetworkExtProcFilter::closeConnection(const std::string& reason) {
   write_callbacks_->disableClose(false);
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite, reason);
   stats_.connections_closed_.inc();
+}
+
+void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {
+  if (config_->untypedForwardingMetadataNamespaces().empty() &&
+      config_->typedForwardingMetadataNamespaces().empty()) {
+    return;
+  }
+
+  envoy::config::core::v3::Metadata forwarding_metadata;
+
+  const auto& dynamic_metadata = read_callbacks_->connection().streamInfo().dynamicMetadata();
+  const auto& connection_metadata = dynamic_metadata.filter_metadata();
+  const auto& connection_typed_metadata = dynamic_metadata.typed_filter_metadata();
+
+  for (const auto& context_key : config_->untypedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = connection_metadata.find(context_key);
+        metadata_it != connection_metadata.end()) {
+      (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  for (const auto& context_key : config_->typedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = connection_typed_metadata.find(context_key);
+        metadata_it != connection_typed_metadata.end()) {
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
+    }
+  }
+
+  if (!forwarding_metadata.filter_metadata().empty() ||
+      !forwarding_metadata.typed_filter_metadata().empty()) {
+    *req.mutable_metadata() = std::move(forwarding_metadata);
+  }
 }
 
 } // namespace ExtProc

@@ -15,7 +15,10 @@
   } while (0)
 
 using testing::AnyNumber;
+using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
@@ -29,6 +32,17 @@ bool skipForUhv() {
   return false;
 #endif
 }
+
+void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
+  EXPECT_CALL(request_decoder, getRequestDecoderHandle())
+      .WillRepeatedly(Invoke([&request_decoder]() {
+        auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+        ON_CALL(*handle, get())
+            .WillByDefault(Return(OptRef<Http::RequestDecoder>(request_decoder)));
+        return handle;
+      }));
+}
+
 // For organizational purposes only.
 class RequestFrameCommentTest : public ::testing::Test {};
 class ResponseFrameCommentTest : public ::testing::Test {};
@@ -64,6 +78,7 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
+  setupRequestDecoderMock(codec.request_decoder_);
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
       codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -142,6 +157,7 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
 
   // Validate HEADERS decode.
   ServerCodecFrameInjector codec;
+  setupRequestDecoderMock(codec.request_decoder_);
   TestServerConnectionImpl connection(
       codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
       codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -210,6 +226,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
+      setupRequestDecoderMock(codec.request_decoder_);
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
           codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
@@ -284,6 +301,7 @@ TEST_F(RequestFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       header.frame()[offset] = c;
       // Play the frames back.
       ServerCodecFrameInjector codec;
+      setupRequestDecoderMock(codec.request_decoder_);
       TestServerConnectionImpl connection(
           codec.server_connection_, codec.server_callbacks_, *codec.stats_store_.rootScope(),
           codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,

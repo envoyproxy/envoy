@@ -163,7 +163,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, SingleTcpClient) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
-  assertOnDemandCounters(1, 0, 0);
+  ASSERT_TRUE(assertOnDemandCounters(1, 0, 0));
 }
 
 // Verify only one delta xds response is needed for multiple tcp_proxy requests.
@@ -249,7 +249,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnTimeout) {
 
   tcp_client->waitForHalfClose();
   tcp_client->close();
-  assertOnDemandCounters(0, 0, 1);
+  ASSERT_TRUE(assertOnDemandCounters(0, 0, 1));
 }
 
 TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnClusterMissing) {
@@ -277,7 +277,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownConnectionOnClusterMissing) {
 
   tcp_client->waitForHalfClose();
   tcp_client->close();
-  assertOnDemandCounters(0, 1, 0);
+  ASSERT_TRUE(assertOnDemandCounters(0, 1, 0));
 }
 
 TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeout) {
@@ -306,7 +306,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownAllConnectionsOnClusterLookupTimeou
 
   tcp_client_1->waitForHalfClose(true);
   tcp_client_2->waitForHalfClose(true);
-  assertOnDemandCounters(0, 0, 2);
+  ASSERT_TRUE(assertOnDemandCounters(0, 0, 2));
   tcp_client_1->close();
   tcp_client_2->close();
 }
@@ -331,7 +331,7 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownTcpClientBeforeOdcdsResponse) {
   EXPECT_EQ(1, test_server_->counter("tcp.tcpproxy_stats.on_demand_cluster_attempt")->value());
   // Client disconnect when the tcp proxy is waiting for the on demand response.
   tcp_client->close();
-  assertOnDemandCounters(0, 0, 0);
+  ASSERT_TRUE(assertOnDemandCounters(0, 0, 0));
 }
 
 } // namespace

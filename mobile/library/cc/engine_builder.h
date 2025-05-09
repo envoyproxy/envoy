@@ -7,6 +7,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/socket_option.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -76,6 +77,9 @@ public:
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
+  // Set additional socket options on the upstream cluster outbound sockets.
+  EngineBuilder& setAdditionalSocketOptions(
+      const std::vector<envoy::config::core::v3::SocketOption>& socket_options);
   // Adds the hostnames that should be pre-resolved by DNS prior to the first request issued for
   // that host. When invoked, any previous preresolve hostname entries get cleared and only the ones
   // provided in the hostnames argument get set.
@@ -201,6 +205,7 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
+  std::vector<envoy::config::core::v3::SocketOption> socket_options_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
