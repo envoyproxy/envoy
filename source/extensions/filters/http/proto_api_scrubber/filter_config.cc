@@ -1,10 +1,5 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
-#include "source/common/common/logger.h"
-#include "source/common/protobuf/protobuf.h"
-
-#include "absl/status/status.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
