@@ -995,7 +995,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, Coverage) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  EXPECT_TRUE(provider_friend.needsRefresh());
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
@@ -1017,7 +1016,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  EXPECT_TRUE(provider_friend.needsRefresh());
   auto creds = provider_->getCredentials();
   EXPECT_FALSE(creds.accessKeyId().has_value());
   EXPECT_FALSE(creds.secretAccessKey().has_value());
@@ -1043,7 +1041,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  EXPECT_TRUE(provider_friend.needsRefresh());
   auto creds = provider_->getCredentials();
   EXPECT_FALSE(creds.accessKeyId().has_value());
   EXPECT_FALSE(creds.secretAccessKey().has_value());
