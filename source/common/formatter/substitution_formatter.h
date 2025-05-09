@@ -186,9 +186,9 @@ private:
   };
 
   using StructFormatMapVisitor = StructFormatMapVisitorHelper<
-      const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
-      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
-      const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
+      std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>,
+      std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>,
+      std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
   class FormatBuilder {
