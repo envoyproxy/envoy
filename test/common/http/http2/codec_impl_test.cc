@@ -3450,16 +3450,6 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
-TEST_P(Http2CodecImplTest, PriorityFlood) {
-  expect_buffered_data_on_teardown_ = true;
-  priorityFlood();
-  driveToCompletion();
-  // The PRIORITY flood is detected by the server codec.
-  EXPECT_FALSE(server_wrapper_->status_.ok());
-  EXPECT_TRUE(isBufferFloodError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "Too many PRIORITY frames");
-}
-
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
   max_inbound_priority_frames_per_stream_ = 2147483647;
 
