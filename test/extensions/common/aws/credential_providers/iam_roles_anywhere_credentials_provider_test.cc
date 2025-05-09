@@ -192,6 +192,8 @@ public:
 
     TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source_);
 
+    absl::optional<envoy::config::core::v3::DataSource> cert_chain_opt;
+
     if(chain != "")
     {
       auto chain_env = std::string("CHAIN");
@@ -204,6 +206,7 @@ public:
       TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
 
       iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
+      cert_chain_opt = iam_roles_anywhere_config_.certificate_chain();
     }
 
     iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
@@ -224,8 +227,8 @@ public:
         std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
             context_, iam_roles_anywhere_config_.certificate(),
             iam_roles_anywhere_config_.private_key(),
-            (chain == "")? (absl::nullopt) : iam_roles_anywhere_config_.certificate_chain());
-    auto a = roles_anywhere_certificate_provider->initialize();
+            cert_chain_opt);
+    EXPECT_EQ(roles_anywhere_certificate_provider->initialize(), absl::OkStatus());
     // Create our own x509 signer just for IAM Roles Anywhere
     auto roles_anywhere_signer =
         std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
