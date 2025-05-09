@@ -65,7 +65,6 @@ public:
   const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Configuration::ServerFactoryContext& serverFactoryContext() override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
   void startDraining() override { is_draining_.store(true); }

@@ -71,6 +71,7 @@ envoy_cc_extension(
         ":oauth_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )

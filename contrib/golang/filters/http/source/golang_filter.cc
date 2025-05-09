@@ -22,6 +22,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/context.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/field_access.h"
@@ -595,7 +596,7 @@ CAPIStatus Filter::injectData(ProcessorState& state, absl::string_view data) {
     if (!weak_ptr.expired() && !hasDestroyed()) {
       ENVOY_LOG(debug, "golang filter inject data to filter chain, length: {}",
                 data_to_write->length());
-      state.injectDataToFilterChain(*data_to_write.get(), false);
+      state.injectDataToFilterChain(*data_to_write, false);
     } else {
       ENVOY_LOG(debug, "golang filter has gone or destroyed in injectData event");
     }
@@ -1784,14 +1785,15 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
 namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::ServerFactoryContext& server_context,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
+    Server::Configuration::TransportSocketFactoryContextImpl transport_socket_factory_context(
+        server_context, server_context.messageValidationVisitor());
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), transport_socket_factory_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 } // namespace
@@ -1800,9 +1802,6 @@ SecretReader::SecretReader(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
     Server::Configuration::FactoryContext& context) {
   if (proto_config.generic_secrets_size() > 0) {
-    auto& secret_manager =
-        context.serverFactoryContext().clusterManager().clusterManagerFactory().secretManager();
-    auto& transport_socket_factory = context.getTransportSocketFactoryContext();
     auto& init_manager = context.initManager();
     auto& tls = context.serverFactoryContext().threadLocal();
     auto& api = context.serverFactoryContext().api();
@@ -1811,8 +1810,7 @@ SecretReader::SecretReader(
       if (secrets_.contains(secret.name())) {
         throw EnvoyException(absl::StrCat("duplicate secret ", secret.name()));
       }
-      auto secret_provider =
-          secretsProvider(secret, secret_manager, transport_socket_factory, init_manager);
+      auto secret_provider = secretsProvider(secret, context.serverFactoryContext(), init_manager);
       if (secret_provider == nullptr) {
         throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
       }
