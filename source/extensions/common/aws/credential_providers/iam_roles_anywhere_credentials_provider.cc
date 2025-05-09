@@ -22,8 +22,6 @@ constexpr absl::string_view EXPIRATION_LOWER = "expiration";
 constexpr absl::string_view SESSION_TOKEN_LOWER = "sessionToken";
 } // namespace
 
-using std::chrono::seconds;
-
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
     absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
@@ -40,12 +38,9 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       role_session_name_(iam_roles_anywhere_config.role_session_name()),
       profile_arn_(iam_roles_anywhere_config.profile_arn()),
       trust_anchor_arn_(iam_roles_anywhere_config.trust_anchor_arn()), region_(region),
-      roles_anywhere_signer_(std::move(roles_anywhere_signer)) {
-
-  session_duration_ = PROTOBUF_GET_SECONDS_OR_DEFAULT(
-      iam_roles_anywhere_config, session_duration,
-      Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
-}
+      session_duration_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+        iam_roles_anywhere_config, session_duration,
+        Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration)), roles_anywhere_signer_(std::move(roles_anywhere_signer)) {}
 
 void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   ENVOY_LOG(debug, "AWS IAM Roles Anywhere fetch success, calling callback func");
@@ -62,6 +57,12 @@ void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
 void IAMRolesAnywhereCredentialsProvider::refresh() {
 
   const auto uri = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
+  if (!uri.ok()) {
+    ENVOY_LOG(error, "AWS Cluster Manager Unable to find cluster {}", cluster_name_);
+    credentialsRetrievalError();
+    return;
+  }
+
   ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}",
             uri.value());
 
@@ -90,7 +91,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.body().add(body_data->asJsonString());
   ENVOY_LOG(debug, "IAM Roles Anywhere /sessions payload: {}", body_data->asJsonString());
 
-  auto status = roles_anywhere_signer_->sign(message, true, region_);
+  const auto status = roles_anywhere_signer_->sign(message, true, region_);
   if (!status.ok()) {
     ENVOY_LOG(debug, status.message());
     credentialsRetrievalError();

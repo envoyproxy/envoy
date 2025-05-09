@@ -31,11 +31,11 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
 
-  auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+  auto provider_or_error = Config::DataSource::DataSourceProvider::create(
       certificate_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
       context_.api(), false, X509_CERTIFICATE_MAX_BYTES);
-  if (provider_or_error_.ok()) {
-    certificate_data_source_provider_ = std::move(provider_or_error_.value());
+  if (provider_or_error.ok()) {
+    certificate_data_source_provider_ = std::move(provider_or_error.value());
   } else {
     ENVOY_LOG(error, "Invalid certificate data source - a certificate was provided but it was "
                      "unable to be loaded");
@@ -75,7 +75,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
 bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {
   const auto now = context_.api().timeSource().systemTime();
-  auto expired = (now - last_updated_ > REFRESH_INTERVAL);
+  const auto expired = (now - last_updated_ > REFRESH_INTERVAL);
 
   if (expiration_time_.has_value()) {
     return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
@@ -94,6 +94,14 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   auto pemstr = pem.c_str();
   auto pemsize = pem.size();
+
+  // We should not be able to get here with an empty certificate or one larger than the max size
+  // defined in the header. This is a sanity check.
+  
+  if (!pemsize || pemsize > X509_CERTIFICATE_MAX_BYTES) {
+    return absl::InvalidArgumentError("Invalid certificate size");
+  }
+
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pemstr, pemsize));
 
   // Not checking return code - we've already validated this certificate in previous call during der
