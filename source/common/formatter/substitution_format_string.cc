@@ -37,10 +37,7 @@ absl::StatusOr<FormatterPtr> SubstitutionFormatStringUtils::fromProtoConfig(
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
     return FormatterImpl::create(config.text_format(), config.omit_empty_values(), *commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat:
-    return createJsonFormatter(
-        config.json_format(), true, config.omit_empty_values(),
-        config.has_json_format_options() ? config.json_format_options().sort_properties() : false,
-        *commands);
+    return createJsonFormatter(config.json_format(), config.omit_empty_values(), *commands);
   case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormatSource: {
     auto data_source_or_error = Config::DataSource::read(config.text_format_source(), true,
                                                          context.serverFactoryContext().api());
@@ -54,23 +51,10 @@ absl::StatusOr<FormatterPtr> SubstitutionFormatStringUtils::fromProtoConfig(
   return nullptr;
 }
 
-FormatterPtr SubstitutionFormatStringUtils::createJsonFormatter(
-    const ProtobufWkt::Struct& struct_format, bool preserve_types, bool omit_empty_values,
-    bool sort_properties, const std::vector<CommandParserPtr>& commands) {
-
-// TODO(alyssawilk, wbpcode) when deprecating logging_with_fast_json_formatter
-// remove LegacyJsonFormatterImpl and StructFormatterBase
-#ifndef ENVOY_DISABLE_EXCEPTIONS
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.logging_with_fast_json_formatter")) {
-    return std::make_unique<LegacyJsonFormatterImpl>(struct_format, preserve_types,
-                                                     omit_empty_values, sort_properties, commands);
-  }
-#else
-  UNREFERENCED_PARAMETER(preserve_types);
-  UNREFERENCED_PARAMETER(sort_properties);
-#endif
-
+FormatterPtr
+SubstitutionFormatStringUtils::createJsonFormatter(const ProtobufWkt::Struct& struct_format,
+                                                   bool omit_empty_values,
+                                                   const std::vector<CommandParserPtr>& commands) {
   return std::make_unique<JsonFormatterImpl>(struct_format, omit_empty_values, commands);
 }
 

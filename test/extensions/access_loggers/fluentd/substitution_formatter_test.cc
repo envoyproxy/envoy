@@ -12,8 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
-
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -26,7 +24,7 @@ TEST(FluentdFormatterImplTest, FormatMsgpack) {
   (*log_struct.mutable_fields())["LogType"].set_string_value("%ACCESS_LOG_TYPE%");
 
   auto json_formatter =
-      Formatter::SubstitutionFormatStringUtils::createJsonFormatter(log_struct, true, false, true);
+      Formatter::SubstitutionFormatStringUtils::createJsonFormatter(log_struct, false);
 
   auto fluentd_formatter = FluentdFormatterImpl(std::move(json_formatter));
   auto expected_json = "{\"Message\":\"SomeValue\",\"LogType\":\"NotSet\"}";
