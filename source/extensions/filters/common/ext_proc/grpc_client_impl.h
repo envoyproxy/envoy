@@ -227,8 +227,8 @@ public:
     auto client_or_error =
         client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
     if (!client_or_error.status().ok()) {
-      ENVOY_LOG_EVERY_NTH_MISC(error, 100, "Creating raw asyc client failed {}",
-                               client_or_error.status());
+      ENVOY_LOG_PERIODIC_MISC(error, std::chrono::seconds(10), "Creating raw asyc client failed {}",
+                              client_or_error.status());
       return nullptr;
     }
     Grpc::AsyncClient<RequestType, ResponseType> grpcClient(client_or_error.value());
