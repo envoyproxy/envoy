@@ -97,6 +97,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: load_balancing
+  change: |
+    Added Override Host Load Balancing policy. See
+    :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
 - area: lua
   change: |
     Added support for accessing filter context.
