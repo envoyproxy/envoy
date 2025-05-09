@@ -180,7 +180,7 @@ Request Body
 .. code-block:: json
 
     {
-      "book_id": ABC1234
+      "book_id": "ABC1234"
     }
 
 And consider the following response body received by the filter corresponding
