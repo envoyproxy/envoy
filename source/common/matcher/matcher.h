@@ -94,16 +94,20 @@ public:
     if (!reentrant_stack_) {
       reentrant_stack_ = std::make_unique<ReentrantEntry>();
       // Recursion & keep_matching handled internally.
-      return translateToMaybeMatchResult(
+      return processMatchResult(
           evaluateMatchForRecursion(match_tree_.get(), *reentrant_stack_, data, skipped_match_cb));
+    }
+    // If past matching has already failed, repeat the failure.
+    if (error_result_.has_value()) {
+      return *error_result_;
     }
     // Otherwise, use the top reentrant if available. If no reentrant is available, all further
     // evaluateMatch(...) calls result in no-match.
     if (!reentrant_stack_->reentrant) {
       return MaybeMatchResult{nullptr, MatchState::MatchComplete};
     }
-    return translateToMaybeMatchResult(evaluateMatchForRecursion(
-        reentrant_stack_->reentrant.get(), *reentrant_stack_, data, skipped_match_cb));
+    return processMatchResult(evaluateMatchForRecursion(reentrant_stack_->reentrant.get(),
+                                                        *reentrant_stack_, data, skipped_match_cb));
   }
 
 private:
@@ -115,9 +119,11 @@ private:
 
   // Note: this assumes that `result` is actionable, and will not check for sub-matchers or
   // keep_matching.
-  static inline MaybeMatchResult translateToMaybeMatchResult(const MatchResult& result) {
+  inline MaybeMatchResult processMatchResult(const MatchResult& result) {
+    // If the match failed, return the failure and save it for any future calls.
     if (result.match_state_ == MatchState::UnableToMatch) {
-      return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
+      error_result_.emplace(MaybeMatchResult{nullptr, MatchState::UnableToMatch});
+      return *error_result_;
     }
     if (!result.on_match_.has_value()) {
       return MaybeMatchResult{nullptr, MatchState::MatchComplete};
@@ -196,6 +202,8 @@ private:
   // MatchTree to use for the initial match.
   std::shared_ptr<MatchTree<DataType>> match_tree_;
   std::unique_ptr<ReentrantEntry> reentrant_stack_ = nullptr;
+  // If a match returns an error, store it here to return on all subsequent calls.
+  absl::optional<MaybeMatchResult> error_result_ = absl::nullopt;
 };
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;

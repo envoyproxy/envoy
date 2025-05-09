@@ -1199,5 +1199,36 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
             "keep_matching is not supported in this context");
 }
 
+// Ensure that a nested matcher that has an internal failure surfaces the error.
+TEST_P(MatcherAmbiguousTest, ReentryWithFailingNestedMatcher) {
+  auto matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
+
+  matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
+                      stringOnMatch<TestData>("match"));
+
+  auto nested_matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
+  nested_matcher->addMatcher(
+      createSingleMatcher(
+          "string", [](auto) { return true; }, DataInputGetResult::DataAvailability::NotAvailable),
+      stringOnMatch<TestData>("fail"));
+
+  matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
+                      OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/nested_matcher,
+                                        /*.keep_matching=*/false});
+
+  // Expect the first match to be fine.
+  ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher);
+  MaybeMatchResult result = reenterable_matcher.evaluateMatch(TestData(), nullptr);
+  EXPECT_THAT(result, HasResult(IsStringAction("match")));
+
+  // Expect re-entry to fail due to the nested matcher.
+  MaybeMatchResult reentry_result = reenterable_matcher.evaluateMatch(TestData(), nullptr);
+  EXPECT_THAT(reentry_result, HasFailureResult());
+
+  // Expect further re-entry to fail instead of an undefined behavior.
+  MaybeMatchResult reentry_result_2 = reenterable_matcher.evaluateMatch(TestData(), nullptr);
+  EXPECT_THAT(reentry_result_2, HasFailureResult());
+}
+
 } // namespace Matcher
 } // namespace Envoy
