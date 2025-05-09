@@ -35,6 +35,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
           Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
               ? cluster_context.clusterManager().edsResourcesCache()
               : absl::nullopt) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -246,9 +247,11 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (transport_factory_context_->clusterManager().adsMux()) {
+  if (transport_factory_context_->serverFactoryContext().clusterManager().adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
+    maybe_resume_leds =
+        transport_factory_context_->serverFactoryContext().clusterManager().adsMux()->pause(
+            type_url);
   }
 
   update(cluster_load_assignment);

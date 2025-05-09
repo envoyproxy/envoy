@@ -22,6 +22,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
+    "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
@@ -371,6 +372,115 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     let ns_res_body = envoy_filter.get_dynamic_metadata_number("ns_res_body", "key");
     assert!(ns_res_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+}
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the filter state related
+/// callbacks.
+struct FilterStateCallbacksFilterConfig {}
+
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for FilterStateCallbacksFilterConfig
+{
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(FilterStateCallbacksFilter {})
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct FilterStateCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.set_filter_state_bytes(b"req_header_key", b"req_header_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"req_header_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_request_body(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+    envoy_filter.set_filter_state_bytes(b"req_body_key", b"req_body_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"req_body_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"req_body_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_request_trailers(
+    &mut self,
+    envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+    envoy_filter.set_filter_state_bytes(b"req_trailer_key", b"req_trailer_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"req_trailer_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"req_trailer_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter.set_filter_state_bytes(b"res_header_key", b"res_header_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"res_header_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"res_header_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_response_body(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+    envoy_filter.set_filter_state_bytes(b"res_body_key", b"res_body_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"res_body_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"res_body_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+
+  fn on_response_trailers(
+    &mut self,
+    envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+    envoy_filter.set_filter_state_bytes(b"res_trailer_key", b"res_trailer_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"res_trailer_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"res_trailer_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter.set_filter_state_bytes(b"stream_complete_key", b"stream_complete_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"stream_complete_key");
+    assert!(filter_state.is_some());
+    assert_eq!(filter_state.unwrap().as_slice(), b"stream_complete_value");
+    let filter_state = envoy_filter.get_filter_state_bytes(b"key");
+    assert!(filter_state.is_none());
   }
 }
 

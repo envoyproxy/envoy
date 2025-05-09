@@ -868,6 +868,35 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
   redis_client->close();
 }
 
+TEST_P(RedisProxyIntegrationTest, KEYSRequestAndResponse) {
+  initialize();
+  std::string request = makeBulkStringArray({"keys", "*"});
+  std::string upstream_response = "*2\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n";
+  std::string downstream_response = upstream_response;
+
+  // Make KEYS request from downstream
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  ASSERT_TRUE(redis_client->write(request));
+
+  // Make KEYS request to upstream
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request = makeBulkStringArray({"keys", "*"});
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  // Downstream response for KEYS
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
+
+  // Cleanup
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
 TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));

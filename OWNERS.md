@@ -48,8 +48,10 @@ routing PRs, questions, etc. to the right place.
   * Overload manager, security, logging, wasm, data plane.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
-* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
+* Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
   * Dynamic modules, API gateway, WASM, Istio.
+* Rohit Agrawal ([agrawroh](https://github.com/agrawroh) (rohit.agrawal@databricks.com)
+  * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 
 # Envoy mobile maintainers
 
@@ -85,6 +87,7 @@ without further review.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
 * Kirtimaan Rajshiva ([krajshiva](https://github.com/krajshiva))
 * Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
+* Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
 
 # Emeritus maintainers
 

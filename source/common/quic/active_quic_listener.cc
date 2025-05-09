@@ -8,6 +8,7 @@
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/network/exception.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
@@ -223,9 +224,14 @@ void ActiveQuicListener::shutdownListener(const Network::ExtraShutdownListenerOp
 
 uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const {
   if (kernel_worker_routing_) {
-    ASSERT(select_connection_id_worker_(*data.buffer_, worker_index_) == worker_index_);
+    uint32_t expected_worker_index = select_connection_id_worker_(*data.buffer_, worker_index_);
+    if (expected_worker_index != worker_index_) {
+      ENVOY_LOG_EVERY_POW_2(error, "Mismacthed worker index. expected {}, actual {}",
+                            expected_worker_index, worker_index_);
+    }
 
-    // The kernel has already routed the packet correctly. Make it stay on the current worker.
+    // Any mismatch should only happen in the very short period when kernel worker routing is being
+    // setup. Make it stay on the current worker and ignore the edge case.
     return worker_index_;
   }
 

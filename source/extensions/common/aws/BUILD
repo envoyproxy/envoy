@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/init:target_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -51,6 +50,22 @@ envoy_cc_library(
         "//source/common/crypto:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "iam_roles_anywhere_signer_base_impl",
+    srcs = ["iam_roles_anywhere_signer_base_impl.cc"],
+    hdrs = ["iam_roles_anywhere_signer_base_impl.h"],
+    deps = [
+        ":credentials_provider_interface",
+        ":signer_interface",
+        ":utility_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:message_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -102,7 +117,6 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib_header",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -135,7 +149,6 @@ envoy_cc_library(
             "-DENVOY_SSL_FIPS",
         ],
     ),
-    external_deps = ["curl"],
     deps = [
         "//envoy/common:pure_lib",
         "//envoy/http:message_interface",

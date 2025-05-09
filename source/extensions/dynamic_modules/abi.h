@@ -371,6 +371,34 @@ typedef enum {
   envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
 } envoy_dynamic_module_type_attribute_id;
 
+/**
+ * envoy_dynamic_module_type_http_callout_init_result represents the result of the HTTP callout
+ * initialization after envoy_dynamic_module_callback_http_filter_http_callout is called.
+ * Success means the callout is successfully initialized and ready to be used.
+ * MissingRequiredHeaders means the callout is missing one of the required headers, :path, :method,
+ * or host header. DuplicateCalloutId means the callout id is already used by another callout.
+ * ClusterNotFound means the cluster is not found in the configuration. CannotCreateRequest means
+ * the request cannot be created. That happens when, for example, there's no healthy upstream host
+ * in the cluster.
+ */
+typedef enum {
+  envoy_dynamic_module_type_http_callout_init_result_Success,
+  envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders,
+  envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound,
+  envoy_dynamic_module_type_http_callout_init_result_DuplicateCalloutId,
+  envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+} envoy_dynamic_module_type_http_callout_init_result;
+
+/**
+ * envoy_dynamic_module_type_http_callout_result represents the result of the HTTP callout.
+ * This corresponds to `AsyncClient::FailureReason::*` in envoy/http/async_client.h plus Success.
+ */
+typedef enum {
+  envoy_dynamic_module_type_http_callout_result_Success,
+  envoy_dynamic_module_type_http_callout_result_Reset,
+  envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit,
+} envoy_dynamic_module_type_http_callout_result;
+
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
 // -----------------------------------------------------------------------------
@@ -565,6 +593,32 @@ void envoy_dynamic_module_on_http_filter_stream_complete(
  */
 void envoy_dynamic_module_on_http_filter_destroy(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a HTTP filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_vector is the body of the response.
+ * @param body_vector_size is the size of the body.
+ *
+ * headers and body_vector are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_http_filter_http_callout_done(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_vector, size_t body_vector_size);
 
 // -----------------------------------------------------------------------------
 // -------------------------------- Callbacks ----------------------------------
@@ -990,6 +1044,50 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
 
+// -------------------------- Filter State Callbacks ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_bytes is called by the module to set the
+ * bytes value of the filter state with the given key. If the filter state is not accessible, this
+ * returns false. If the key does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key_ptr is the key of the filter state.
+ * @param key_length is the length of the key.
+ * @param value_ptr is the bytes value of the filter state to be set.
+ * @param value_length is the length of the value.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_bytes is called by the module to get the
+ * bytes value of the filter state with the given key. If the filter state is not accessible, the
+ * key does not exist or the value is not bytes, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key_ptr is the key of the filter state.
+ * @param key_length is the length of the key.
+ * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the buffer
+ * of the value will be stored.
+ * @param result_buffer_length_ptr is the pointer to the variable where the length of the buffer
+ * will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+
 // ------------------- Misc Callbacks for HTTP Filters -------------------------
 
 /**
@@ -1038,6 +1136,32 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
+ * an HTTP callout. The callout is initiated by the HTTP filter and the response is received in
+ * envoy_dynamic_module_on_http_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param callout_id is the ID of the callout. This can be arbitrary and is used to
+ * differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param cluster_name_length is the length of the cluster name.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the pointer to the buffer of the body of the request.
+ * @param body_size is the length of the body.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_http_callout(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
+    uint64_t timeout_milliseconds);
 
 #ifdef __cplusplus
 }

@@ -874,11 +874,6 @@ envoy.geoip_providers.maxmind:
   status: wip
   type_urls:
   - envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
-envoy.grpc_credentials.aws_iam:
-  categories:
-  - envoy.grpc_credentials
-  security_posture: data_plane_agnostic
-  status: alpha
 envoy.grpc_credentials.file_based_metadata:
   categories:
   - envoy.grpc_credentials
@@ -1151,6 +1146,13 @@ envoy.resource_monitors.injected_resource:
   status: alpha
   type_urls:
   - envoy.extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig
+envoy.resource_monitors.cgroup_memory:
+  categories:
+  - envoy.resource_monitors
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig
 envoy.retry_host_predicates.omit_canary_hosts:
   categories:
   - envoy.retry_host_predicates
@@ -1254,6 +1256,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tracers.fluentd:
+  categories:
+  - envoy.tracers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.fluentd.v3.FluentdConfig
 envoy.tracers.datadog:
   categories:
   - envoy.tracers
@@ -1275,6 +1284,20 @@ envoy.tracers.opentelemetry.samplers.always_on:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+envoy.tracers.opentelemetry.samplers.parent_based:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig
+envoy.tracers.opentelemetry.samplers.trace_id_ratio_based:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
 envoy.tracers.opentelemetry.samplers.dynatrace:
   categories:
   - envoy.tracers.opentelemetry.samplers
@@ -1491,6 +1514,13 @@ envoy.rbac.matchers.upstream_ip_port:
   status: alpha
   type_urls:
   - envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+envoy.rbac.principals.mtls_authenticated:
+  categories:
+  - envoy.rbac.principals
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.rbac.principals.mtls_authenticated.v3.Config
 envoy.http.stateful_session.cookie:
   categories:
   - envoy.http.stateful_session
@@ -1727,6 +1757,13 @@ envoy.load_balancing_policies.client_side_weighted_round_robin:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+envoy.load_balancing_policies.override_host:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
