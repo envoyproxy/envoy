@@ -60,6 +60,18 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+TEST(DynamicModulesTest, NonExistentFilter) {
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "non_existent", "", std::move(dynamic_module.value()), context);
+  EXPECT_FALSE(filter_config_or_status.ok());
+  EXPECT_THAT(filter_config_or_status.status().message(),
+              testing::HasSubstr("Failed to initialize dynamic module"));
+}
+
 TEST(DynamicModulesTest, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
