@@ -719,6 +719,13 @@ bool schemeIsHttps(const absl::string_view scheme);
 std::string newUri(::Envoy::OptRef<const RedirectConfig> redirect_config,
                    const Http::RequestHeaderMap& headers);
 
+/**
+  * Generates a Sec-WebSocket-Key as per the WebSocket protocol.
+  * The key is a randomly generated 16-byte value encoded in Base64.
+  * @return std::string A Base64-encoded Sec-WebSocket-Key.
+  */
+std::string generateSecWebSocketKey();
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
