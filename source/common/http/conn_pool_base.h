@@ -105,9 +105,9 @@ private:
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t effective_concurrent_stream_limit,
-               uint64_t configured_concurrent_stream_limit,
+  ActiveClient(HttpConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t effective_concurrent_stream_limit,
+               uint32_t configured_concurrent_stream_limit,
                OptRef<Upstream::Host::CreateConnectionData> opt_data)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
@@ -207,7 +207,7 @@ public:
                               OptRef<Upstream::Host::CreateConnectionData> data);
   ~MultiplexedActiveClientBase() override = default;
   // Caps max streams per connection below 2^31 to prevent overflow.
-  static uint64_t maxStreamsPerConnection(uint64_t max_streams_config);
+  static uint32_t maxStreamsPerConnection(uint32_t max_streams_config);
 
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;

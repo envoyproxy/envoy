@@ -2499,6 +2499,7 @@ envoy_quic_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform",
+        ":quiche_common_wire_serialization",
         "@envoy//bazel/foreign_cc:zlib",
     ],
 )

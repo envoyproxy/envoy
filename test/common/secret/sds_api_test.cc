@@ -179,14 +179,15 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config = Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx, *api_).value();
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config =
+      std::move(Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx, *api_).value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config->certificateChain());
+            tls_config.certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config->privateKey());
+            tls_config.privateKey());
 }
 
 class SdsRotationApiTest : public SdsApiTestBase {
@@ -600,14 +601,15 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
       subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config = Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx, *api_).value();
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config =
+      std::move(Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx, *api_).value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config->certificateChain());
+            tls_config.certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config->privateKey());
+            tls_config.privateKey());
 }
 
 // Validate that CertificateValidationContextSdsApi updates secrets successfully if

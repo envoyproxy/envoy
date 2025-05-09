@@ -223,6 +223,21 @@ public:
   )EOF"};
 };
 
+TEST(NoopCallbacksTest, NoopCallbacksTest) {
+  NoopCallbacks noop_callbacks;
+
+  NiceMock<Envoy::Http::MockAsyncClient> async_client;
+  NiceMock<Envoy::Http::MockAsyncClientRequest> request(&async_client);
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo", "bar"}});
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl());
+  Tracing::MockSpan span;
+
+  noop_callbacks.onBeforeFinalizeUpstreamSpan(span, response_headers.get());
+  noop_callbacks.onFailure(request, {});
+  noop_callbacks.onSuccess(request, std::move(response));
+}
+
 // Bad code in initial config.
 TEST(LuaHttpFilterConfigTest, BadCode) {
   const std::string SCRIPT{R"EOF(
@@ -2773,6 +2788,72 @@ TEST_F(LuaHttpFilterTest, DisableAutomaticRouteCacheClearing) {
   EXPECT_EQ("world", request_headers_1.get_("hello"));
 }
 
+TEST_F(LuaHttpFilterTest, LuaFilterContext) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  const std::string SCRIPT_WITH_ACCESS_FILTER_CONTEXT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:filterContext():get("foo") == nil then
+        request_handle:logTrace("foo in filter context is nil")
+      else
+        request_handle:logTrace(request_handle:filterContext():get("foo"))
+      end
+    end
+    function envoy_on_response(response_handle)
+      if response_handle:filterContext():get("foo") == nil then
+        response_handle:logTrace("foo in filter context is nil")
+      else
+        response_handle:logTrace(response_handle:filterContext():get("foo"))
+      end
+    end
+  )EOF"};
+  proto_config.mutable_default_source_code()->set_inline_string(SCRIPT_WITH_ACCESS_FILTER_CONTEXT);
+
+  {
+    setupConfig(proto_config, {});
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(nullptr));
+
+    Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
+
+    EXPECT_LOG_CONTAINS("trace", "foo in filter context is nil", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->decodeHeaders(request_headers_1, true));
+    });
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
+    Http::TestResponseHeaderMapImpl response_headers_1{{":status", "200"}};
+    EXPECT_LOG_CONTAINS("trace", "foo in filter context is nil", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers_1, true));
+    });
+    filter_->onDestroy();
+  }
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    (*per_route_proto_config.mutable_filter_context()->mutable_fields())["foo"].set_string_value(
+        "foo_value_in_filter_context");
+
+    setupConfig(proto_config, per_route_proto_config);
+    setupFilter();
+
+    ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(per_route_config_.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->decodeHeaders(request_headers_2, true));
+    });
+
+    Http::TestResponseHeaderMapImpl response_headers_2{{":status", "200"}};
+    EXPECT_LOG_CONTAINS("trace", "foo_value_in_filter_context", {
+      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                filter_->encodeHeaders(response_headers_2, true));
+    });
+  }
+}
+
 // Test whether the route can directly reuse the Lua code in the global configuration.
 TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
@@ -2806,6 +2887,31 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ("This request is routed by ROUTE_TWO", request_headers.get_("route_info"));
+}
+
+// Test whether the route can directly reuse the Lua code in the global configuration.
+TEST_F(LuaHttpFilterTest, LuaFilterWithInlinePerRouteSourceCode) {
+  const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_ONE");
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.mutable_source_code()->set_inline_string(SCRIPT_FOR_ROUTE_ONE);
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("This request is routed by ROUTE_ONE", request_headers.get_("route_info"));
 }
 
 // Lua filter do nothing when the referenced name does not exist.

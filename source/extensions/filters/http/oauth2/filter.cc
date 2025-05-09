@@ -760,6 +760,15 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   std::string csrf_token =
       Http::Utility::parseCookieValue(headers, config_->cookieNames().oauth_nonce_);
   bool csrf_token_cookie_exists = !csrf_token.empty();
+
+  // Validate the CSRF token HMAC if the CSRF token cookie exists.
+  // If the CSRF token HMAC is invalid, it might be that the HMAC secret has changed. Clear the
+  // token and regenerate it
+  if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
+    csrf_token_cookie_exists = false;
+    csrf_token.clear();
+  }
+
   // Set the CSRF token cookie if it does not exist.
   if (!csrf_token_cookie_exists) {
     // Generate a CSRF token to prevent CSRF attacks.
@@ -777,13 +786,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(config_->cookieNames().oauth_nonce_, "=", csrf_token, cookie_tail_http_only));
-  }
-
-  // Validate the CSRF token HMAC if the CSRF token cookie exists.
-  if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
-    ENVOY_LOG(error, "csrf token validation failed");
-    sendUnauthorizedResponse();
-    return;
   }
 
   const std::string state = encodeState(original_url, csrf_token);

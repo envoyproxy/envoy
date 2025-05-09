@@ -711,6 +711,9 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(testing::Return(Http::Protocol::Http11));
   EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(200));
+  StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
+  EXPECT_CALL(stream_info, getStreamIdProvider())
+      .WillRepeatedly(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(stream_info, downstreamAddressProvider())
@@ -765,6 +768,13 @@ TEST(ABIImpl, GetAttributes) {
       &result_str_length));
   EXPECT_EQ(result_str_length, 14);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "127.0.0.2:4321");
+
+  // envoy_dynamic_module_type_attribute_id_RequestId
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestId, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 36);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "ffffffff-0012-0110-00ff-0c00400600ff");
 
   // envoy_dynamic_module_type_attribute_id_ResponseCode
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(

@@ -18,13 +18,41 @@ minor_behavior_changes:
 - area: grpc-json
   change: |
     Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
+- area: oauth2
+  change: |
+    Reset CSRF token when token validation fails during redirection.
+    If the CSRF token cookie is present during the redirection to the authorization server, it will be validated.
+    Previously, if this validation failed, the oauth flow would fail. Now the CSRF token will simply be reset. This fixes
+    the case where an hmac secret change causes a redirect flow, but the CSRF token cookie hasn't yet expired
+    causing a CSRF token validation failure.
 - area: cel
   change: |
     Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
     ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
+- area: dns
+  change: |
+    Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
+    <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: conn_pool
+  change: |
+    Fixed an issue that could lead to too many connections when using
+    :ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>` if the
+    established connection is ``http/2`` and Envoy predicted it would have lower concurrent capacity.
+- area: conn_pool
+  change: |
+    Fixed an issue that could lead to insufficient connections for current pending requests. If a connection starts draining while it
+    has negative unused capacity (which happens if an HTTP/2 ``SETTINGS`` frame reduces allowed concurrency to below the current number
+    of requests), that connection's unused capacity will be included in total pool capacity even though it is unusable because it is
+    draining. This can result in not enough connections being established for current pending requests. This is most problematic for
+    long-lived requests (such as streaming gRPC requests or long-poll requests) because a connection could be in the draining state
+    for a long time.
+- area: hcm
+  change: |
+    Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
+    with the lifetime of the codec stream.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -69,8 +97,26 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: load_balancing
+  change: |
+    Added Override Host Load Balancing policy. See
+    :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
+- area: lua
+  change: |
+    Added support for accessing filter context.
+    See :ref:`filterContext() <config_http_filters_lua_stream_handle_api_filter_context>` for more details.
+- area: resource_monitors
+  change: |
+    added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
+    memory pressure, with configurable max_memory_bytes limit
+    :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`.
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+- area: url_template
+  change: |
+    Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
 
 deprecated:
