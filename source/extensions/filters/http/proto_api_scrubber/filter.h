@@ -23,7 +23,7 @@ inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubb
 class Filter : public Envoy::Http::PassThroughFilter,
                Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  explicit Filter(FilterConfig& config);
+  explicit Filter(FilterConfig&);
 
   Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                  bool end_stream) override;
@@ -34,9 +34,6 @@ public:
                                                  bool end_stream) override;
 
   Envoy::Http::FilterDataStatus encodeData(Envoy::Buffer::Instance& data, bool end_stream) override;
-
-private:
-  FilterConfig& filter_config_;
 };
 
 class FilterFactory

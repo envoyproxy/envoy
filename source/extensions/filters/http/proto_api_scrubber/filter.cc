@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-Filter::Filter(FilterConfig& config) : filter_config_(config) { filter_config_.PrintConfig(); }
+Filter::Filter(FilterConfig&) {}
 
 Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                        bool) {
