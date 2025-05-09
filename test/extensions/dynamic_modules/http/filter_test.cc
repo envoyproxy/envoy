@@ -61,7 +61,6 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
 }
 
 TEST(DynamicModulesTest, NonExistentFilter) {
-  // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
