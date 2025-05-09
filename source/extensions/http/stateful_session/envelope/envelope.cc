@@ -26,11 +26,7 @@ void EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
 }
 
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
-    : name_(config.header().name()) {
-  if (name_.get().empty()) {
-    throw EnvoyException("'header' should be set for envelope stateful sessions");
-  }
-}
+    : name_(config.header().name()) {}
 
 absl::optional<std::string>
 EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {
@@ -58,8 +54,8 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
 
   const std::string decoded = Envoy::Base64::decode(upstream_value);
   if (decoded.empty()) {
-    // Do nothing if the 'UV' part is not valid.
-    ENVOY_LOG(info, "Header {} contains invalid 'UV' part", name_);
+    // Do nothing if the 'UV' part is not valid or if there is no UV part.
+    ENVOY_LOG(info, "Header {} contains invalid 'UV' part or there is no 'UV' part", name_);
     return absl::nullopt;
   }
   headers.setReferenceKey(name_, decoded);

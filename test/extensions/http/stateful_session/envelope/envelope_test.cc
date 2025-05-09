@@ -11,12 +11,6 @@ namespace StatefulSession {
 namespace Envelope {
 namespace {
 
-TEST(EnvelopeSessionStateFactoryTest, EmptyHeaderName) {
-  EnvelopeSessionStateProto config;
-  EXPECT_THROW_WITH_MESSAGE(std::make_shared<EnvelopeSessionStateFactory>(config), EnvoyException,
-                            "'header' should be set for envelope stateful sessions")
-}
-
 TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTest) {
   {
     EnvelopeSessionStateProto config;
@@ -24,10 +18,15 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTest) {
 
     EnvelopeSessionStateFactory factory(config);
 
-    // No valid address in the request headers.
+    // No session header in the request headers.
     Envoy::Http::TestRequestHeaderMapImpl request_headers;
     auto session_state = factory.create(request_headers);
     EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
+
+    // Empty session header in the request headers.
+    request_headers.addCopy("session-header", "");
+    auto session_state2 = factory.create(request_headers);
+    EXPECT_EQ(absl::nullopt, session_state2->upstreamAddress());
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
     session_state->onUpdate("1.2.3.4:80", response_headers);

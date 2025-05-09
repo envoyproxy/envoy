@@ -28,22 +28,6 @@ TEST(EnvelopeSessionStateFactoryConfigTest, Basic) {
   EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
 }
 
-TEST(EnvelopeSessionStateFactoryConfigTest, MissingHeaderName) {
-  auto* factory = Registry::FactoryRegistry<Envoy::Http::SessionStateFactoryConfig>::getFactory(
-      "envoy.http.stateful_session.envelope");
-  ASSERT_NE(factory, nullptr);
-
-  EnvelopeSessionStateProto proto_config;
-  const std::string yaml = R"EOF(
-    header:
-      name: ""
-    )EOF";
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  EXPECT_THROW(factory->createSessionStateFactory(proto_config, context), EnvoyException);
-}
-
 } // namespace
 } // namespace Envelope
 } // namespace StatefulSession
