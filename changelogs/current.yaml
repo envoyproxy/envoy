@@ -10,6 +10,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    The MaxMind geoip provider has a new field
+    ``envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.read_asn_info_from_isp_db``
+    that changes the behavior of ASN lookups. The default value is ``false``, which means that ASN
+    lookups will be done using the ``asn_db`` database. Setting this value to ``true`` will cause ASN
+    lookups to be done using the ``isp_db`` database instead.
 - area: lua
   change: |
     The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name

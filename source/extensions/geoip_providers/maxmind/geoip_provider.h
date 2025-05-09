@@ -24,6 +24,8 @@ public:
   const absl::optional<std::string>& anonDbPath() const { return anon_db_path_; }
   const absl::optional<std::string>& asnDbPath() const { return asn_db_path_; }
 
+  bool readAsnInfoFromIspDb() { return read_asn_info_from_isp_db_; }
+
   bool isLookupEnabledForHeader(const absl::optional<std::string>& header);
 
   const absl::optional<std::string>& countryHeader() const { return country_header_; }
@@ -88,6 +90,8 @@ private:
 
   absl::optional<std::string> isp_header_;
   absl::optional<std::string> apple_private_relay_header_;
+
+  bool read_asn_info_from_isp_db_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
