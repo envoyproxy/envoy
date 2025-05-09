@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
 #include "source/common/http/message_impl.h"
@@ -191,16 +192,20 @@ public:
 
     TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source_);
 
-    auto chain_env = std::string("CHAIN");
-    TestEnvironment::setEnvVar(chain_env, chain, 1);
-    yaml = fmt::format(R"EOF(
-    environment_variable: "{}"
-  )EOF",
-                       chain_env);
+    if(chain != "")
+    {
+      auto chain_env = std::string("CHAIN");
+      TestEnvironment::setEnvVar(chain_env, chain, 1);
+      yaml = fmt::format(R"EOF(
+      environment_variable: "{}"
+    )EOF",
+                        chain_env);
 
-    TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
+      TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
 
-    iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
+      iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
+    }
+
     iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
     iam_roles_anywhere_config_.mutable_certificate()->set_environment_variable("CERT");
     iam_roles_anywhere_config_.set_role_session_name(session);
@@ -219,13 +224,14 @@ public:
         std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
             context_, iam_roles_anywhere_config_.certificate(),
             iam_roles_anywhere_config_.private_key(),
-            iam_roles_anywhere_config_.certificate_chain());
+            (chain == "")? (absl::nullopt) : iam_roles_anywhere_config_.certificate_chain());
+    auto a = roles_anywhere_certificate_provider->initialize();
     // Create our own x509 signer just for IAM Roles Anywhere
     auto roles_anywhere_signer =
         std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
             absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
             roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
-
+    
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context_, mock_manager_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         [this](Upstream::ClusterManager&, absl::string_view) {

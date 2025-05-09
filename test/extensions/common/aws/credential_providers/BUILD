@@ -107,6 +107,11 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//test/extensions/common/aws:aws_mocks",
+
     ],
 )

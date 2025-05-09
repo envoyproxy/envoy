@@ -79,6 +79,7 @@ envoy_cc_library(
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib"
     ],
 )
 
@@ -91,6 +92,8 @@ envoy_cc_library(
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+        "//source/common/common:base64_lib",
+        "//source/common/tls:utility_lib"
     ],
 )
 
