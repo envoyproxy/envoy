@@ -82,11 +82,11 @@ envoy_cc_library(
         "cache_filter.h",
     ],
     deps = [
-        ":cache_sessions_impl_lib",
-        ":cache_sessions_lib",
         ":cache_custom_headers",
         ":cache_entry_utils_lib",
         ":cache_headers_utils_lib",
+        ":cache_sessions_impl_lib",
+        ":cache_sessions_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
         ":stats",
@@ -236,8 +236,8 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":cache_sessions_lib",
         ":cache_filter_lib",
+        ":cache_sessions_lib",
         ":stats",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",

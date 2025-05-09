@@ -7,8 +7,8 @@
 
 #include "source/common/common/cancel_wrapper.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/stats.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 

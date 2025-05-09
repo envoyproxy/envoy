@@ -1,7 +1,7 @@
 #include "source/extensions/filters/http/cache/config.h"
 
-#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/filters/http/cache/stats.h"
 
 namespace Envoy {
