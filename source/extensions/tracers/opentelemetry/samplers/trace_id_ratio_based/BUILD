@@ -26,7 +26,6 @@ envoy_cc_library(
     srcs = ["trace_id_ratio_based_sampler.cc"],
     hdrs = ["trace_id_ratio_based_sampler.h"],
     deps = [
-        # "//source/common/common:minimal_logger_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:safe_memcpy_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
