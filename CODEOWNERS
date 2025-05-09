@@ -94,7 +94,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # previous hosts
 /*/extensions/retry/host/previous_hosts @nezdolik @mattklein123
 # HTTP caching extension
-/*/extensions/filters/http/cache @toddmgreer @ravenblackx @mpwarres @capoferro
+/*/extensions/filters/http/cache @toddmgreer @penguingao @ravenblackx @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @suniltheta @mattklein123 @nbaws @niax
