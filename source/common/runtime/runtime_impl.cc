@@ -284,82 +284,13 @@ bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   return false;
 }
 
-// Handle an awful corner case where we explicitly shove a yaml percent in a proto string
-// value. Basically due to prior parsing logic we have to handle any combination
-// of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
-// E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
-bool parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
-    return false;
-  }
-
-  const re2::RE2 numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
-
-  std::string match_string;
-  if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
-    return false;
-  }
-
-  uint32_t numerator;
-  if (!absl::SimpleAtoi(match_string, &numerator)) {
-    return false;
-  }
-  envoy::type::v3::FractionalPercent converted_fractional_percent;
-  converted_fractional_percent.set_numerator(numerator);
-  entry.fractional_percent_value_ = converted_fractional_percent;
-
-  if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
-    return true;
-  }
-  if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
-    entry.fractional_percent_value_->set_denominator(
-        envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-  }
-  if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
-    entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
-  }
-  return true;
-}
-
-// Handle corner cases in non-yaml parsing: mixed case strings aren't parsed as booleans.
-bool parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  absl::string_view stripped = entry.raw_string_value_;
-  stripped = absl::StripAsciiWhitespace(stripped);
-
-  if (absl::EqualsIgnoreCase(stripped, "true")) {
-    entry.bool_value_ = true;
-    return true;
-  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
-    entry.bool_value_ = false;
-    return true;
-  }
-  return false;
-}
-
 void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
                             const ProtobufWkt::Value& value, absl::string_view raw_string) {
-  const char* error_message = nullptr;
-  values.emplace(key, SnapshotImpl::createEntry(value, raw_string, error_message));
-  if (error_message != nullptr) {
-    IS_ENVOY_BUG(
-        absl::StrCat(error_message, "\n[ key:", key, ", value: ", value.DebugString(), "]"));
-  }
+  values.emplace(key, SnapshotImpl::createEntry(value, raw_string));
 }
 
-static const char* kBoolError =
-    "Runtime YAML appears to be setting booleans as strings. Support for this is planned "
-    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
-    "working "
-    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
-static const char* kFractionError =
-    "Runtime YAML appears to be setting fractions as strings. Support for this is planned "
-    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
-    "working "
-    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
-
 SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
-                                              absl::string_view raw_string,
-                                              const char*& error_message) {
+                                              absl::string_view raw_string) {
   Entry entry;
   entry.raw_string_value_ = value.string_value();
   if (!raw_string.empty()) {
@@ -375,13 +306,8 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.boolean_to_string_fix")) {
-        // Convert boolean to "true"/"false"
-        entry.raw_string_value_ = value.bool_value() ? "true" : "false";
-      } else {
-        // Use absl::StrCat for backward compatibility, which converts to "1"/"0"
-        entry.raw_string_value_ = absl::StrCat(value.bool_value());
-      }
+      // Convert boolean to "true"/"false"
+      entry.raw_string_value_ = value.bool_value() ? "true" : "false";
     }
     break;
   case ProtobufWkt::Value::kStructValue:
@@ -392,14 +318,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
     break;
   case ProtobufWkt::Value::kStringValue:
     parseEntryDoubleValue(entry);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_invalid_yaml")) {
-      if (parseEntryBooleanValue(entry)) {
-        error_message = kBoolError;
-      }
-      if (parseEntryFractionalPercentValue(entry)) {
-        error_message = kFractionError;
-      }
-    }
+    break;
   default:
     break;
   }
@@ -742,7 +661,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
   return absl::OkStatus();
 }
 
-const Snapshot& LoaderImpl::snapshot() {
+const Snapshot& LoaderImpl::snapshot() const {
   ASSERT(tls_->currentThreadRegistered(),
          "snapshot can only be called from a worker thread or after the main thread is registered");
   return tls_->getTyped<Snapshot>();

@@ -1,18 +1,21 @@
 #pragma once
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstddef>
 #include <memory>
 
+#include "envoy/common/token_bucket.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/rate_limit_quota/client.h"
-
-#include "absl/time/time.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,100 +30,100 @@ using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 
 struct QuotaUsage {
+  QuotaUsage(uint64_t num_requests_allowed, uint64_t num_requests_denied,
+             std::chrono::nanoseconds last_report)
+      : num_requests_allowed(num_requests_allowed), num_requests_denied(num_requests_denied),
+        last_report(last_report) {}
+
   // Requests allowed.
-  uint64_t num_requests_allowed = {};
+  std::atomic<uint64_t> num_requests_allowed;
   // Requests throttled.
-  uint64_t num_requests_denied = {};
-  // Last report time.
-  std::chrono::nanoseconds last_report = {};
+  std::atomic<uint64_t> num_requests_denied;
+  // Last report time. Should be visible to worker threads so they can check if
+  // reporting timing is going correctly. Should only be updated by main thread.
+  std::atomic<std::chrono::nanoseconds> last_report;
 };
 
-// This object stores the data for single bucket entry.
-struct Bucket {
-  // BucketId object that is associated with this bucket. It is part of the report that is sent to
-  // RLQS server.
+// This object stores the data for single bucket entry. The usage cache & action
+// cache are in separate pointers to enable separate pointer-swapping.
+struct CachedBucket {
+  CachedBucket(const BucketId& bucket_id, std::shared_ptr<QuotaUsage> quota_usage,
+               std::unique_ptr<BucketAction> cached_action,
+               std::shared_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
+               std::chrono::milliseconds fallback_ttl, const BucketAction& default_action,
+               std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter)
+      : bucket_id(bucket_id), quota_usage(quota_usage), cached_action(std::move(cached_action)),
+        fallback_action(fallback_action), fallback_ttl(fallback_ttl),
+        default_action(default_action), token_bucket_limiter(token_bucket_limiter) {}
+
+  // BucketId object that is associated with this bucket. It is part of the
+  // report that is sent to RLQS server.
   BucketId bucket_id;
-  // Cached action from the response that was received from the RLQS server.
-  absl::optional<BucketAction> cached_action = absl::nullopt;
+
+  // Aggregated usage of the ID'd bucket for the next report cycle.
+  std::shared_ptr<QuotaUsage> quota_usage;
+
+  // Cached action from the RLQS server's last response that gave an updated
+  // assignment for this ID'd bucket. Can be null if no assignment has been
+  // received yet or if the previous assignment has passed its time-to-live.
+  std::unique_ptr<BucketAction> cached_action;
+
+  // Set in the bucket config's expired_assignment_behavior, this fallback
+  // action has its own TTL and determines behavior after a cached assignment
+  // expires. After this action's TTL passes the bucket reverts back to its
+  // default_action.
+  std::shared_ptr<envoy::type::v3::RateLimitStrategy> fallback_action;
+  std::chrono::milliseconds fallback_ttl;
   // Default action defined by the bucket's no_assignment_behavior setting. Used
   // when the bucket is waiting for an assigned action from the RLQS server
   // (e.g. during initial bucket hits & after stale assignments expire).
   BucketAction default_action;
-  // Cache quota usage.
-  QuotaUsage quota_usage;
-  // Rate limiter based on token bucket algorithm.
-  TokenBucketPtr token_bucket_limiter;
-  // Most recent assignment time.
-  Envoy::MonotonicTime current_assignment_time;
+
+  // Action expiration timer when assignments haven't been sent for this bucket
+  // for too long & the current assignment passes its TTL. This triggers a
+  // bucket write-operation so the timer triggers and calls back to operations
+  // on the main thread (through the global client).
+  Envoy::Event::TimerPtr action_expiration_timer = nullptr;
+  // Fallback expiration timer for when the cached_action has expired and the
+  // fallback_action has its own TTL.
+  Envoy::Event::TimerPtr fallback_expiration_timer = nullptr;
+
+  // Rate limiter based on token bucket algorithm. Shared to make a single
+  // TokenBucket reusable when copying & pointer-swapping the overall cache.
+  std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter;
 };
 
-using BucketsCache = absl::flat_hash_map<size_t, std::unique_ptr<Bucket>>;
-
-struct ThreadLocalClient : public Logger::Loggable<Logger::Id::rate_limit_quota> {
-  ThreadLocalClient(Envoy::Event::Dispatcher& dispatcher) {
-    send_reports_timer = dispatcher.createTimer([this] { sendPeriodicalReports(); });
-  }
-
-  // Disable copy constructor and assignment.
-  ThreadLocalClient(const ThreadLocalClient& client) = delete;
-  ThreadLocalClient& operator=(const ThreadLocalClient& client) = delete;
-  // Default move constructor and assignment.
-  ThreadLocalClient(ThreadLocalClient&& client) = default;
-  ThreadLocalClient& operator=(ThreadLocalClient&& client) = default;
-
-  ~ThreadLocalClient() {
-    if (rate_limit_client != nullptr) {
-      rate_limit_client->closeStream();
-    }
-  }
-
-  // Helper function to send the reports periodically on timer.
-  void sendPeriodicalReports() {
-    if (rate_limit_client != nullptr) {
-      rate_limit_client->sendUsageReport(absl::nullopt);
-    } else {
-      ENVOY_LOG(error, "Rate limit client has been destroyed; no periodical report send");
-    }
-
-    if (send_reports_timer != nullptr) {
-      send_reports_timer->enableTimer(report_interval_ms);
-    } else {
-      ENVOY_LOG(error, "Reports timer has been destroyed; no periodical report send");
-    }
-  }
-
-  // Rate limit client. It is owned here (in TLS) and is used by all the buckets.
-  std::unique_ptr<RateLimitClient> rate_limit_client;
-  // The timer for sending the reports periodically.
-  Event::TimerPtr send_reports_timer;
-  // Periodical reporting interval(in milliseconds).
-  std::chrono::milliseconds report_interval_ms = std::chrono::milliseconds::zero();
-};
-
-class ThreadLocalBucket : public Envoy::ThreadLocal::ThreadLocalObject {
+/**
+ * An interface for a client used in the RateLimitQuotaService (RLQS) filter
+ * worker threads to safely access & modify global resources.
+ */
+class RateLimitClient {
 public:
-  ThreadLocalBucket(Envoy::Event::Dispatcher& dispatcher) : client_(dispatcher) {}
+  virtual ~RateLimitClient() = default;
 
-  // Return the buckets; returned by reference so it can be modified.
-  BucketsCache& quotaBuckets() { return quota_buckets_; }
-
-  // Return the rate limit client; returned by reference so no ownership transferred.
-  ThreadLocalClient& rateLimitClient() { return client_; }
-
-private:
-  // Thread local storage for bucket container and client.
-  BucketsCache quota_buckets_;
-  ThreadLocalClient client_;
+  // Safe creation & getting of global buckets.
+  virtual void createBucket(const BucketId& bucket_id, size_t id,
+                            const BucketAction& default_bucket_action,
+                            std::unique_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
+                            std::chrono::milliseconds fallback_ttl,
+                            bool initial_request_allowed) PURE;
+  virtual std::shared_ptr<CachedBucket> getBucket(size_t id) PURE;
 };
 
-struct QuotaBucket {
-  QuotaBucket(Envoy::Server::Configuration::FactoryContext& context)
-      : tls(context.serverFactoryContext().threadLocal()) {
-    tls.set([](Envoy::Event::Dispatcher& dispatcher) {
-      return std::make_shared<ThreadLocalBucket>(dispatcher);
-    });
-  }
-  Envoy::ThreadLocal::TypedSlot<ThreadLocalBucket> tls;
+// shared_ptr<CachedBucket> must be passed around to guarantee the
+// CachedBucket's existence for the duration of its use in a local thread after
+// getting it via getBucket.
+using BucketsCache = absl::flat_hash_map<size_t, std::shared_ptr<CachedBucket>>;
+
+class ThreadLocalBucketsCache : public Envoy::ThreadLocal::ThreadLocalObject,
+                                Logger::Loggable<Logger::Id::rate_limit_quota> {
+public:
+  ThreadLocalBucketsCache(std::shared_ptr<BucketsCache> quota_buckets)
+      : quota_buckets_(quota_buckets) {}
+
+  // Thread-unsafe operations like index creation should only be done by the
+  // global ThreadLocalClient.
+  std::shared_ptr<BucketsCache> quota_buckets_;
 };
 
 } // namespace RateLimitQuota

@@ -157,6 +157,11 @@ public:
   virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return nullptr; }
 };
 
+using FilterDependenciesPtr =
+    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::FilterDependencies>;
+using MatchingRequirementsPtr =
+    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>;
+
 /**
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
@@ -184,6 +189,20 @@ public:
    */
   virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) {
     return false;
+  }
+
+  /**
+   * Match requirements for the filters created by this filter factory. These requirements inform
+   * the validator what input/outputs are valid for a match tree specified via the
+   * ExtensionWithMatcher wrapper, allowing us to reject the match tree at configuration time if
+   * there are any violations.
+   *
+   * @return MatchingRequirementsPtr specification of matching requirements
+   * for a match tree that can be used with this filter factory.
+   */
+  virtual MatchingRequirementsPtr matchingRequirements() {
+    return std::make_unique<
+        envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   }
 };
 
@@ -214,11 +233,6 @@ public:
   }
 };
 
-using FilterDependenciesPtr =
-    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::FilterDependencies>;
-using MatchingRequirementsPtr =
-    std::unique_ptr<envoy::extensions::filters::common::dependency::v3::MatchingRequirements>;
-
 /**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
@@ -242,7 +256,7 @@ public:
    * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
    * config. Returned object will be stored in the loaded route configuration.
    */
-  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) {
     return nullptr;
@@ -278,7 +292,7 @@ public:
     auto config_types = TypedFactory::configTypes();
 
     if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
-      config_types.insert(createReflectableMessage(*message)->GetDescriptor()->full_name());
+      config_types.emplace(createReflectableMessage(*message)->GetDescriptor()->full_name());
     }
 
     return config_types;

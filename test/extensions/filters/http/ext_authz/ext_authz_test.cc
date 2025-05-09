@@ -207,6 +207,63 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
                          HttpFilterTestParam::ParamsToString);
 
+class ExtAuthzLoggingInfoTest
+    : public testing::TestWithParam<
+          std::tuple<std::string /* field_name */, absl::optional<uint64_t> /* value */>> {
+public:
+  ExtAuthzLoggingInfoTest() : logging_info_({}) {}
+
+  void SetUp() override {
+    std::string fieldName = std::get<0>(GetParam());
+    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    if (optional.has_value()) {
+      if (fieldName == "latency_us") {
+        logging_info_.setLatency(std::chrono::microseconds(optional.value()));
+      }
+      if (fieldName == "bytesSent") {
+        logging_info_.setBytesSent(optional.value());
+      }
+      if (fieldName == "bytesReceived") {
+        logging_info_.setBytesReceived(optional.value());
+      }
+    }
+  }
+
+  void test() {
+    ASSERT_TRUE(logging_info_.hasFieldSupport());
+    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    if (optional.has_value()) {
+      EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
+                  testing::VariantWith<int64_t>(optional.value()));
+    } else {
+      EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
+                  testing::VariantWith<absl::monostate>(absl::monostate{}));
+    }
+  }
+
+  static std::string ParamsToString(
+      const testing::TestParamInfo<std::tuple<std::string, absl::optional<uint64_t>>>& info) {
+    return absl::StrCat(std::get<1>(info.param).has_value() ? "" : "no_", std::get<0>(info.param),
+                        std::get<1>(info.param).has_value()
+                            ? absl::StrCat("_", std::to_string(std::get<1>(info.param).value()))
+                            : "");
+  }
+
+  ExtAuthzLoggingInfo logging_info_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    ExtAuthzLoggingInfoTestValid, ExtAuthzLoggingInfoTest,
+    testing::Combine(testing::Values("latency_us", "bytesSent", "bytesReceived"),
+                     testing::Values(absl::optional<uint64_t>{}, absl::optional<uint64_t>{0},
+                                     absl::optional<uint64_t>{1})),
+    ExtAuthzLoggingInfoTest::ParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(ExtAuthzLoggingInfoTestInvalid, ExtAuthzLoggingInfoTest,
+                         testing::Values(std::make_tuple("wrong_property_name",
+                                                         absl::optional<uint64_t>{})),
+                         ExtAuthzLoggingInfoTest::ParamsToString);
+
 class EmitFilterStateTest
     : public HttpFilterTestBase<testing::TestWithParam<
           std::tuple<bool /*http_client*/, bool /*emit_stats*/, bool /*emit_filter_metadata*/>>> {
@@ -315,6 +372,10 @@ public:
     EXPECT_EQ(actual.clusterInfo(), expected.clusterInfo());
     EXPECT_EQ(actual.bytesSent(), expected.bytesSent());
     EXPECT_EQ(actual.bytesReceived(), expected.bytesReceived());
+    EXPECT_EQ(actual.grpcStatus().has_value(), expected.grpcStatus().has_value());
+    if (expected.grpcStatus().has_value()) {
+      EXPECT_EQ(actual.grpcStatus().value(), expected.grpcStatus().value());
+    }
 
     ASSERT_EQ(actual.filterMetadata().has_value(), expected.filterMetadata().has_value());
     if (expected.filterMetadata().has_value()) {
@@ -3960,6 +4021,10 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
 TEST_P(EmitFilterStateTest, OkResponse) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -3967,6 +4032,10 @@ TEST_P(EmitFilterStateTest, OkResponse) {
 TEST_P(EmitFilterStateTest, Error) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Canceled;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Canceled);
+  }
 
   test(response);
 }
@@ -3974,6 +4043,10 @@ TEST_P(EmitFilterStateTest, Error) {
 TEST_P(EmitFilterStateTest, Denied) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  }
 
   test(response);
 }
@@ -3991,6 +4064,10 @@ TEST_P(EmitFilterStateTest, NullStreamInfo) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4010,6 +4087,10 @@ TEST_P(EmitFilterStateTest, NullStreamInfoFields) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4025,6 +4106,10 @@ TEST_P(EmitFilterStateTest, NullUpstreamHost) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4043,6 +4128,10 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
@@ -4060,9 +4149,15 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  if (!std::get<0>(GetParam()) && std::get<1>(GetParam())) {
+    response.grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+    expected_output_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
+  }
 
   test(response);
 }
+
+TEST_P(ExtAuthzLoggingInfoTest, FieldTest) { test(); }
 
 } // namespace
 } // namespace ExtAuthz

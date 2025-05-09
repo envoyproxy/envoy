@@ -95,8 +95,10 @@ enum CoreResponseFlag : uint16_t {
   DropOverLoad,
   // Downstream remote codec level reset was received on the stream.
   DownstreamRemoteReset,
+  // Unconditionally drop all traffic due to drop_overload is set to 100%.
+  UnconditionalDropOverload,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamRemoteReset,
+  LastFlag = UnconditionalDropOverload,
 };
 
 class ResponseFlagUtils;
@@ -196,6 +198,9 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
   const std::string DropOverload = "drop_overload";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration is set to
+  // 100%.
+  const std::string UnconditionalDropOverload = "unconditional_drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
@@ -651,6 +656,15 @@ public:
   virtual void
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
+  /*
+   * @param short string type flag to indicate the noteworthy event of this stream. Mutliple flags
+   * could be added and will be concatenated with comma. It should not contain any empty or space
+   * characters (' ', '\t', '\f', '\v', '\n', '\r').
+   *
+   * The short string should not duplicate with the any registered response flags.
+   */
+  virtual void addCustomFlag(absl::string_view) PURE;
+
   /**
    * @return std::string& the name of the route. The name is get from the route() and it is
    *         empty if there is no route.
@@ -802,6 +816,11 @@ public:
    * flag. Only flags that are declared in the enum CoreResponseFlag type are supported.
    */
   virtual uint64_t legacyResponseFlags() const PURE;
+
+  /**
+   * @return all stream flags that are added.
+   */
+  virtual absl::string_view customFlags() const PURE;
 
   /**
    * @return whether the request is a health check request or not.

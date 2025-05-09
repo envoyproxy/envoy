@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 
 #if defined(__APPLE__)
@@ -118,8 +119,24 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setDisableDnsRefreshOnFailure(bool disable_dns_refresh_on_failure) {
+  disable_dns_refresh_on_failure_ = disable_dns_refresh_on_failure;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setDisableDnsRefreshOnNetworkChange(bool disable_dns_refresh_on_network_change) {
+  disable_dns_refresh_on_network_change_ = disable_dns_refresh_on_network_change;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
   dns_num_retries_ = dns_num_retries;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setGetaddrinfoNumThreads(uint32_t num_threads) {
+  getaddrinfo_num_threads_ = num_threads;
   return *this;
 }
 
@@ -130,6 +147,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   for (const std::string& hostname : hostnames) {
     dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
   }
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
+    const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
+  socket_options_ = socket_options;
   return *this;
 }
 
@@ -334,8 +357,11 @@ EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool val
 }
 
 #if defined(__APPLE__)
-EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
+EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
   respect_system_proxy_settings_ = value;
+  if (refresh_interval_secs > 0) {
+    proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
+  }
   return *this;
 }
 
@@ -476,6 +502,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(
       dns_failure_refresh_seconds_max_);
   dns_cache_config->mutable_dns_query_timeout()->set_seconds(dns_query_timeout_seconds_);
+  dns_cache_config->set_disable_dns_refresh_on_failure(disable_dns_refresh_on_failure_);
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
@@ -516,6 +543,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     if (dns_num_retries_.has_value()) {
       resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
     }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.getaddrinfo");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
@@ -801,6 +829,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           absl::StrCat("SO_NET_SERVICE_TYPE = ", ios_network_service_type_));
     }
 #endif
+    for (const auto& socket_option : socket_options_) {
+      envoy::config::core::v3::SocketOption* sock_opt =
+          base_cluster->mutable_upstream_bind_config()->add_socket_options();
+      sock_opt->CopyFrom(socket_option);
+    }
   }
 
   // Set up stats.
@@ -848,19 +881,19 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   for (auto& guard_and_value : runtime_guards_) {
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
-  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
@@ -883,7 +916,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
       new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_);
+                         network_thread_priority_, disable_dns_refresh_on_network_change_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
@@ -905,7 +938,7 @@ EngineSharedPtr EngineBuilder::build() {
 
 #if defined(__APPLE__)
   if (respect_system_proxy_settings_) {
-    registerAppleProxyResolver();
+    registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif
 

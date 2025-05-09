@@ -2,8 +2,13 @@
 
 set -euo pipefail
 
-simulator_name="iPhone 14 Pro Max"
+simulator_name="iPhone 15 Pro Max"
 simulator_uuid="$(xcrun simctl list | sed -nr "s/.*$simulator_name \(([A-Z0-9\-]{36})\).*/\1/p" | head -n1)"
+
+if [[ -z "$simulator_uuid" ]]; then
+    echo "Failed to find simulator (${simulator_name})" >&2
+    exit 1
+fi
 
 echo "Booting simulator named '$simulator_name' with uuid '$simulator_uuid'"
 

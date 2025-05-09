@@ -19,16 +19,12 @@ envoy_cmake(
     cache_entries = {
         "BORINGSSL": "on",
         "DYNAMIC_LIB": "off",
-        "MB_STANDALONE": "off",
+        "MB_STANDALONE": "on",
     },
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",
     ],
-    lib_source = select({
-        "//bazel:boringssl_fips": "@com_github_intel_ipp_crypto_crypto_mb_fips//:all",
-        "//conditions:default": "@com_github_intel_ipp_crypto_crypto_mb//:all",
-    }),
-    out_lib_dir = "lib/intel64",
+    lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
     out_static_libs = ["libcrypto_mb.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),

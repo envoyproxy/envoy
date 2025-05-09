@@ -317,5 +317,11 @@ public:
   virtual Config::XdsManager& xdsManager() PURE;
 };
 
+// Pick a class HdsDelegate inherits from
+class HdsDelegateApi : public Logger::Loggable<Logger::Id::upstream> {
+public:
+  virtual ~HdsDelegateApi() = default;
+};
+
 } // namespace Server
 } // namespace Envoy

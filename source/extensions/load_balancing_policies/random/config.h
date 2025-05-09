@@ -13,6 +13,7 @@ namespace LoadBalancingPolices {
 namespace Random {
 
 using RandomLbProto = envoy::extensions::load_balancing_policies::random::v3::Random;
+using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 /**
  * Empty load balancer config that used to represent the config for the random load balancer.
@@ -43,13 +44,18 @@ class Factory : public Common::FactoryBase<RandomLbProto, RandomCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.random") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
-                                             const Protobuf::Message& config) override {
-    auto typed_config = dynamic_cast<const RandomLbProto*>(&config);
-    if (typed_config == nullptr) {
-      return std::make_unique<EmptyRandomLbConfig>();
-    }
-    return std::make_unique<TypedRandomLbConfig>(*typed_config);
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&,
+             const Protobuf::Message& config) override {
+    ASSERT(dynamic_cast<const RandomLbProto*>(&config) != nullptr);
+    const RandomLbProto& typed_config = dynamic_cast<const RandomLbProto&>(config);
+    // TODO(wbocode): to merge the legacy and typed config and related constructors into one.
+    return Upstream::LoadBalancerConfigPtr{new TypedRandomLbConfig(typed_config)};
+  }
+
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext&, const ClusterProto&) override {
+    return Upstream::LoadBalancerConfigPtr{new EmptyRandomLbConfig()};
   }
 };
 

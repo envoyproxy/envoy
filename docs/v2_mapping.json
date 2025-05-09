@@ -121,7 +121,6 @@
   "envoy/config/trace/v3/dynamic_ot.proto": "envoy/config/trace/v2/dynamic_ot.proto",
   "envoy/config/trace/v3/http_tracer.proto": "envoy/config/trace/v2/http_tracer.proto",
   "envoy/config/trace/v3/lightstep.proto": "envoy/config/trace/v2/lightstep.proto",
-  "envoy/config/trace/v3/opencensus.proto": "envoy/config/trace/v2/opencensus.proto",
   "envoy/config/trace/v3/service.proto": "envoy/config/trace/v2/service.proto",
   "envoy/config/trace/v3/zipkin.proto": "envoy/config/trace/v2/zipkin.proto",
   "envoy/config/trace/v3/xray.proto": "envoy/config/trace/v2alpha/xray.proto",
@@ -149,7 +148,6 @@
   "envoy/service/status/v3/csds.proto": "envoy/service/status/v2/csds.proto",
   "envoy/config/tap/v3/common.proto": "envoy/service/tap/v2alpha/common.proto",
   "envoy/service/tap/v3/tap.proto": "envoy/service/tap/v2alpha/tap.proto",
-  "envoy/service/trace/v3/trace_service.proto": "envoy/service/trace/v2/trace_service.proto",
   "envoy/type/metadata/v3/metadata.proto": "envoy/type/metadata/v2/metadata.proto",
   "envoy/type/tracing/v3/custom_tag.proto": "envoy/type/tracing/v2/custom_tag.proto"
 }

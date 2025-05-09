@@ -55,14 +55,23 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
                                std::unique_ptr<Server::Platform> platform_impl,
                                std::unique_ptr<Random::RandomGenerator>&& random_generator,
                                std::unique_ptr<ProcessContext> process_context)
-    : StrippedMainBase(options, time_system, listener_hooks, component_factory,
-                       std::move(platform_impl), std::move(random_generator),
-                       std::move(process_context), createFunction())
+    : StrippedMainBase(options, component_factory, std::move(platform_impl), *random_generator)
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
       ,
       shared_response_set_(std::make_shared<AdminResponse::PtrSet>())
 #endif
 {
+  if (options.mode() == Server::Mode::Serve) {
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
+    // try/catch block or not.
+    std::set_new_handler([]() { PANIC("out of memory"); });
+  }
+
+  logging_context_ = std::make_unique<Logger::Context>(
+      options_.logLevel(), options_.logFormat(), restarter_->logLock(), options_.logFormatEscaped(),
+      options_.mode() == Server::Mode::Validate ? false : options_.enableFineGrainLogging());
+  init(time_system, listener_hooks, std::move(random_generator), std::move(process_context),
+       createFunction());
 }
 
 bool MainCommonBase::run() {

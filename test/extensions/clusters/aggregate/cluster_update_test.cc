@@ -10,6 +10,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
@@ -35,18 +36,21 @@ class AggregateClusterUpdateTest : public Event::TestUsingSimulatedTime,
                                    public testing::TestWithParam<bool> {
 public:
   AggregateClusterUpdateTest()
-      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()),
+      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
+        http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()),
         router_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
     const bool use_deferred_cluster = GetParam();
     bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(use_deferred_cluster);
+    // Replace the adsMux to have mocked GrpcMux object that will allow invoking
+    // methods when creating the cluster-manager.
+    ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
     cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
-        server_);
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
     ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
@@ -56,8 +60,8 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   NiceMock<Upstream::TestClusterManagerFactory> factory_;
   Upstream::ThreadLocalCluster* cluster_;
-
-  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   Http::ContextImpl http_context_;
@@ -85,7 +89,7 @@ INSTANTIATE_TEST_SUITE_P(DeferredClusters, AggregateClusterUpdateTest, testing::
 
 TEST_P(AggregateClusterUpdateTest, NoHealthyUpstream) {
   initialize(default_yaml_config_);
-  EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr));
+  EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr).host);
 }
 
 TEST_P(AggregateClusterUpdateTest, BasicFlow) {
@@ -96,43 +100,44 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   Upstream::ClusterUpdateCallbacksHandlePtr cb =
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
-  auto host = cluster_->loadBalancer().chooseHost(nullptr);
+  auto host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
+      *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
   auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("tertiary"), ""));
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("tertiary"), ""));
   auto tertiary = cluster_manager_->getThreadLocalCluster("tertiary");
   EXPECT_NE(nullptr, tertiary);
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
   EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("primary"));
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("secondary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
   EXPECT_EQ(3, cluster_manager_->activeClusters().size());
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
@@ -140,11 +145,11 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
 
 TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   initialize(default_yaml_config_);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
+      *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
   auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
 
@@ -185,22 +190,22 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 33; i < 66; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 66; i < 99; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 99; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
@@ -227,24 +232,24 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   //   Priority 1: 1/3 healthy, 1/3 degraded
   for (int i = 0; i < 33; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
+    host = cluster_->loadBalancer().chooseHost(nullptr).host;
+    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 33; i < 66; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ(host9, cluster_->loadBalancer().chooseHost(nullptr));
+    host = cluster_->loadBalancer().chooseHost(nullptr).host;
+    EXPECT_EQ(host9, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 66; i < 99; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 99; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host7, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host7, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 }
 
@@ -278,16 +283,19 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   )EOF";
 
   auto bootstrap = parseBootstrapFromV2Yaml(config);
+  // Replace the adsMux to have mocked GrpcMux object that will allow invoking
+  // methods when creating the cluster-manager.
+  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
   cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
       bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
       factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-      validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+      *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
   ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
-  auto host = cluster_->loadBalancer().chooseHost(nullptr);
+  auto host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:80", host->address()->asString());
@@ -311,12 +319,12 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
 
   for (int i = 0; i < 50; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 50; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 }
 

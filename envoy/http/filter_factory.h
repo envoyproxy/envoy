@@ -91,13 +91,11 @@ public:
    * Called when a new HTTP stream is created on the connection.
    * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
    *                FilterChainManager.
-   * @param only_create_if_configured if true, only creates filter chain if there is a non-default
-   *                                  configured filter chain. Default false.
    * @param options additional options for creating a filter chain.
    * @return whather a filter chain has been created.
    */
   virtual bool
-  createFilterChain(FilterChainManager& manager, bool only_create_if_configured = false,
+  createFilterChain(FilterChainManager& manager,
                     const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 
   /**

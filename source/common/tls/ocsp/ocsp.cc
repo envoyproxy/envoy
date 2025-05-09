@@ -114,8 +114,8 @@ OcspResponseWrapperImpl::create(std::vector<uint8_t> der_response, TimeSource& t
   auto response_or_error = readDerEncodedOcspResponse(der_response);
   RETURN_IF_NOT_OK(response_or_error.status());
   RETURN_IF_NOT_OK(validateResponse(response_or_error.value()));
-  return std::unique_ptr<OcspResponseWrapperImpl>{
-      new OcspResponseWrapperImpl(der_response, time_source, std::move(response_or_error.value()))};
+  return std::make_unique<OcspResponseWrapperImpl>(der_response, time_source,
+                                                   std::move(response_or_error.value()));
 }
 
 OcspResponseWrapperImpl::OcspResponseWrapperImpl(std::vector<uint8_t> der_response,
@@ -184,7 +184,7 @@ absl::StatusOr<std::unique_ptr<OcspResponse>> Asn1OcspUtility::parseOcspResponse
   RETURN_IF_NOT_OK_REF(status_or_error.status());
   auto opt = Asn1Utility::getOptional(elem, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
   RETURN_IF_NOT_OK_REF(opt.status());
-  auto maybe_bytes = opt.value();
+  auto maybe_bytes = std::move(opt.value());
   ResponsePtr resp = nullptr;
   if (maybe_bytes) {
     auto resp_or_error = Asn1OcspUtility::parseResponseBytes(maybe_bytes.value());
@@ -244,7 +244,7 @@ absl::StatusOr<ResponsePtr> Asn1OcspUtility::parseResponseBytes(CBS& cbs) {
 
   auto parse_or_error = Asn1Utility::parseOid(elem);
   RETURN_IF_NOT_OK_REF(parse_or_error.status());
-  auto oid_str = parse_or_error.value();
+  auto oid_str = std::move(parse_or_error.value());
   if (!CBS_get_asn1(&elem, &response, CBS_ASN1_OCTETSTRING)) {
     return absl::InvalidArgumentError("Expected ASN.1 OCTETSTRING for response");
   }
@@ -296,11 +296,11 @@ absl::StatusOr<ResponseData> Asn1OcspUtility::parseResponseData(CBS& cbs) {
   auto version_or_error =
       Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0);
   RETURN_IF_NOT_OK_REF(version_or_error.status());
-  auto version_cbs = version_or_error.value();
+  auto version_cbs = std::move(version_or_error.value());
   if (version_cbs.has_value()) {
     auto version_or_error = Asn1Utility::parseInteger(*version_cbs);
     RETURN_IF_NOT_OK_REF(version_or_error.status());
-    auto version = version_or_error.value();
+    auto version = std::move(version_or_error.value());
     if (version != "00") {
       return absl::InvalidArgumentError(
           fmt::format("OCSP ResponseData version 0x{} is not supported", version));

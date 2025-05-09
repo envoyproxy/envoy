@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/empty_string.h"
@@ -66,6 +67,23 @@ FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
               SINGLETON_MANAGER_REGISTERED_NAME(downstream_filter_config_provider_manager),
               [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); }, true);
   return downstream_filter_config_provider_manager;
+}
+
+absl::Status FilterChainUtility::checkUpstreamHttpFiltersList(const FiltersList& filters) {
+  static const std::string upstream_codec_type_url(
+      envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
+          .GetTypeName());
+
+  if (!filters.empty()) {
+    const auto last_type_url = Config::Utility::getFactoryType(filters.rbegin()->typed_config());
+    if (last_type_url != upstream_codec_type_url) {
+      return absl::InvalidArgumentError(
+          fmt::format("The codec filter is the only valid terminal upstream HTTP filter, use '{}'",
+                      upstream_codec_type_url));
+    }
+  }
+
+  return absl::OkStatus();
 }
 
 } // namespace Http

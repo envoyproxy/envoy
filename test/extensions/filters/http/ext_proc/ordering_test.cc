@@ -183,7 +183,7 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(reply));
   }
 
-  void sendGrpcError() { stream_callbacks_->onGrpcError(Grpc::Status::Internal); }
+  void sendGrpcError() { stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message"); }
 
   void closeGrpcStream() { stream_callbacks_->onGrpcClose(); }
 
@@ -227,7 +227,7 @@ class FastFailOrderingTest : public OrderingTest {
   doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
           const Envoy::Http::AsyncClient::StreamOptions&,
           Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) override {
-    callbacks.onGrpcError(Grpc::Status::Internal);
+    callbacks.onGrpcError(Grpc::Status::Internal, "error message");
     // Returns nullptr on start stream failure.
     return nullptr;
   }

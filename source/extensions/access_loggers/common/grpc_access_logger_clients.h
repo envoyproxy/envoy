@@ -61,7 +61,7 @@ private:
 template <typename LogRequest, typename LogResponse>
 class UnaryGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
 public:
-  typedef std::function<Grpc::AsyncRequestCallbacks<LogResponse>&()> AsyncRequestCallbacksFactory;
+  using AsyncRequestCallbacksFactory = std::function<Grpc::AsyncRequestCallbacks<LogResponse>&()>;
 
   UnaryGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                            const Protobuf::MethodDescriptor& service_method,

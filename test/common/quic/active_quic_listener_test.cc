@@ -89,9 +89,8 @@ protected:
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-        packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
-        crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
-        testWorkerSelector, std::nullopt);
+        packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
+        proof_source_factory, std::move(cid_generator), testWorkerSelector, std::nullopt);
   }
 };
 
@@ -141,7 +140,6 @@ protected:
   }
 
   void SetUp() override {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     listen_socket_ =
@@ -647,7 +645,6 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(ActiveQuicListenerTest, EcnReporting) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
@@ -665,7 +662,6 @@ TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
   if (local_address_->ip()->version() == Network::Address::IpVersion::v4) {
     return;
   }
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);

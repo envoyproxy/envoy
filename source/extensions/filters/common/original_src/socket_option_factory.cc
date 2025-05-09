@@ -2,6 +2,7 @@
 
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/original_src/original_src_socket_option.h"
 
 namespace Envoy {
@@ -29,6 +30,14 @@ buildOriginalSrcOptions(Network::Address::InstanceConstSharedPtr source, uint32_
   const auto transparent_options = Network::SocketOptionFactory::buildIpTransparentOptions();
   options_to_add->insert(options_to_add->end(), transparent_options->begin(),
                          transparent_options->end());
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.original_src_fix_port_exhaustion")) {
+    const auto addr_bind_options = Network::SocketOptionFactory::buildBindAddressNoPort();
+    options_to_add->insert(options_to_add->end(), addr_bind_options->begin(),
+                           addr_bind_options->end());
+  }
+
   return options_to_add;
 }
 

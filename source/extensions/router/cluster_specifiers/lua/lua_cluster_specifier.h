@@ -66,6 +66,8 @@ public:
     };
   }
 
+  void onMarkDead() override { cluster_.reset(); }
+
 private:
   DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumConnections);
   DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumRequests);
@@ -74,7 +76,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
 };
 
-using ClusterRef = Filters::Common::Lua::LuaRef<ClusterWrapper>;
+using ClusterRef = Filters::Common::Lua::LuaDeathRef<ClusterWrapper>;
 
 class RouteHandleWrapper : public Filters::Common::Lua::BaseLuaObject<RouteHandleWrapper> {
 public:
@@ -91,7 +93,10 @@ public:
   // All embedded references should be reset when the object is marked dead. This is to ensure that
   // we won't do the resetting in the destructor, which may be called after the referenced
   // coroutine's lua_State is closed. And if that happens, the resetting will cause a crash.
-  void onMarkDead() override { headers_wrapper_.reset(); }
+  void onMarkDead() override {
+    headers_wrapper_.reset();
+    clusters_.clear();
+  }
 
 private:
   /**
@@ -113,31 +118,11 @@ public:
   LuaClusterSpecifierConfig(const LuaClusterSpecifierConfigProto& config,
                             Server::Configuration::CommonFactoryContext& context);
 
-  ~LuaClusterSpecifierConfig() {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.allow_slot_destroy_on_worker_threads")) {
-      return;
-    }
-
-    // The design of the TLS system does not allow TLS state to be modified in worker threads.
-    // However, when the route configuration is dynamically updated via RDS, the old
-    // LuaClusterSpecifierConfig object may be destructed in a random worker thread. Therefore, to
-    // ensure thread safety, ownership of per_lua_code_setup_ptr_ must be transferred to the main
-    // thread and destroyed when the LuaClusterSpecifierConfig object is not destructed in the main
-    // thread.
-    if (per_lua_code_setup_ptr_ && !main_thread_dispatcher_.isThreadSafe()) {
-      auto shared_ptr_wrapper =
-          std::make_shared<PerLuaCodeSetupPtr>(std::move(per_lua_code_setup_ptr_));
-      main_thread_dispatcher_.post([shared_ptr_wrapper] { shared_ptr_wrapper->reset(); });
-    }
-  }
-
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
   const std::string& defaultCluster() const { return default_cluster_; }
   Upstream::ClusterManager& clusterManager() { return cm_; }
 
 private:
-  Event::Dispatcher& main_thread_dispatcher_;
   Upstream::ClusterManager& cm_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
   const std::string default_cluster_;

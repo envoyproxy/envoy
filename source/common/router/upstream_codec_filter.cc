@@ -225,7 +225,7 @@ void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason rea
     // string through the reset stream call, so append it here.
     std::string failure_reason(Http::Utility::resetReasonToString(reason));
     if (!transport_failure_reason.empty()) {
-      absl::StrAppend(&failure_reason, absl::StrCat("|", transport_failure_reason));
+      absl::StrAppend(&failure_reason, "|", transport_failure_reason);
     }
     filter_.deferred_reset_status_ = absl::InternalError(failure_reason);
     return;
@@ -247,6 +247,33 @@ void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason rea
 
 REGISTER_FACTORY(UpstreamCodecFilterFactory,
                  Server::Configuration::UpstreamHttpFilterConfigFactory);
+
+class DefaultUpstreamHttpFilterChainFactory : public Http::FilterChainFactory {
+public:
+  DefaultUpstreamHttpFilterChainFactory()
+      : factory_([](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        }) {}
+
+  bool createFilterChain(
+      Http::FilterChainManager& manager,
+      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override {
+    manager.applyFilterFactoryCb({"envoy.filters.http.upstream_codec"}, factory_);
+    return true;
+  }
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
+    // Upgrade filter chains not yet supported for upstream HTTP filters.
+    return false;
+  }
+
+private:
+  mutable Http::FilterFactoryCb factory_;
+};
+
+const Http::FilterChainFactory& defaultUpstreamHttpFilterChainFactory() {
+  CONSTRUCT_ON_FIRST_USE(DefaultUpstreamHttpFilterChainFactory);
+}
 
 } // namespace Router
 } // namespace Envoy

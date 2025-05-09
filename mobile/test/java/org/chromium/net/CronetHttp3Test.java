@@ -3,6 +3,8 @@ package org.chromium.net;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import android.Manifest;
+
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import org.chromium.net.impl.CronvoyUrlRequestContext;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
@@ -10,6 +12,7 @@ import org.chromium.net.impl.CronvoyLogger;
 import androidx.test.core.app.ApplicationProvider;
 import org.chromium.net.testing.TestUploadDataProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.rule.GrantPermissionRule;
 
 import org.chromium.net.impl.NativeCronvoyEngineBuilderImpl;
 import org.chromium.net.testing.CronetTestRule;
@@ -32,6 +35,10 @@ import java.util.Collections;
  */
 @RunWith(RobolectricTestRunner.class)
 public class CronetHttp3Test {
+  @Rule
+  public GrantPermissionRule grantPermissionRule =
+      GrantPermissionRule.grant(Manifest.permission.ACCESS_NETWORK_STATE);
+
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
   private static final String TAG = CronetHttp3Test.class.getSimpleName();
@@ -51,6 +58,9 @@ public class CronetHttp3Test {
   private CronvoyUrlRequestContext cronvoyEngine;
   // A URL which will point to the IP and port of the test servers.
   private String testServerUrl;
+  // Optional reloadable flags to set.
+  private boolean drainOnNetworkChange = false;
+  private boolean resetBrokennessOnNetworkChange = false;
 
   @BeforeClass
   public static void loadJniLibrary() {
@@ -88,7 +98,11 @@ public class CronetHttp3Test {
     // Set up the Envoy engine.
     NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
         new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
-    nativeCronetEngineBuilder.addRuntimeGuard("reset_brokenness_on_nework_change", true);
+    nativeCronetEngineBuilder.addRuntimeGuard("drain_pools_on_network_change",
+                                              drainOnNetworkChange);
+    nativeCronetEngineBuilder.addRuntimeGuard("reset_brokenness_on_nework_change",
+                                              resetBrokennessOnNetworkChange);
+
     if (setUpLogging) {
       nativeCronetEngineBuilder.setLogger(logger);
       nativeCronetEngineBuilder.setLogLevel(EnvoyEngine.LogLevel.TRACE);
@@ -273,7 +287,75 @@ public class CronetHttp3Test {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  public void networkChangeNoDrains() throws Exception {
+    setUp(printEnvoyLogs);
+
+    // Do the initial handshake dance
+    doInitialHttp2Request();
+
+    // Do an HTTP/3 request
+    TestUrlRequestCallback get1Callback = doBasicGetRequest();
+    assertEquals(200, get1Callback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", get1Callback.mResponseInfo.getNegotiatedProtocol());
+
+    // There should be one HTTP/3 connection
+    String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+
+    // Force a network change
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(2);
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkAvailable();
+
+    // Do another HTTP/3 request
+    TestUrlRequestCallback get2Callback = doBasicGetRequest();
+    assertEquals(200, get2Callback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", get2Callback.mResponseInfo.getNegotiatedProtocol());
+
+    // There should still only be one HTTP/3 connection.
+    postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+  }
+
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  public void networkChangeWithDrains() throws Exception {
+    drainOnNetworkChange = true;
+    setUp(printEnvoyLogs);
+
+    // Do the initial handshake dance
+    doInitialHttp2Request();
+
+    // Do an HTTP/3 request
+    TestUrlRequestCallback get1Callback = doBasicGetRequest();
+    assertEquals(200, get1Callback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", get1Callback.mResponseInfo.getNegotiatedProtocol());
+
+    // There should be one HTTP/3 connection
+    String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+
+    // Force a network change
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(2);
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkAvailable();
+
+    // Do another HTTP/3 request
+    TestUrlRequestCallback get2Callback = doBasicGetRequest();
+    assertEquals(200, get2Callback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", get2Callback.mResponseInfo.getNegotiatedProtocol());
+
+    // There should still only be one HTTP/3 connection.
+    postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+  }
+
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
   public void networkChangeAffectsBrokenness() throws Exception {
+    resetBrokennessOnNetworkChange = true;
     setUp(printEnvoyLogs);
 
     // Set HTTP/3 to be marked as broken.
@@ -285,7 +367,7 @@ public class CronetHttp3Test {
 
     // This should change QUIC brokenness to "failed recently".
     cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
-    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(2);
     cronvoyEngine.getEnvoyEngine().onDefaultNetworkAvailable();
 
     // The next request may go out over HTTP/2 or HTTP/3 (depends on who wins the race)

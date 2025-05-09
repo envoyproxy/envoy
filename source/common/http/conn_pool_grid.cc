@@ -140,11 +140,9 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
-    if (!grid_.isPoolHttp3(attempt->pool())) {
-      // TCP pool failed before HTTP/3 pool.
-      prev_tcp_pool_failure_reason_ = reason;
-      prev_tcp_pool_transport_failure_reason_ = transport_failure_reason;
-    }
+    prev_pool_failure_reason_ = reason;
+    prev_pool_transport_failure_reason_ = fmt::format(
+        "{}: {}", grid_.isPoolHttp3(attempt->pool()) ? "QUIC" : "TCP", transport_failure_reason);
     return;
   }
 
@@ -167,12 +165,12 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
   if (callbacks != nullptr) {
     ENVOY_LOG(trace, "Passing pool failure up to caller.");
     std::string failure_str;
-    if (prev_tcp_pool_failure_reason_.has_value()) {
-      // TCP pool failed early on, log its error details as well.
-      failure_str = fmt::format("{} (with earlier TCP attempt failure reason {}, {})",
-                                transport_failure_reason,
-                                static_cast<int>(prev_tcp_pool_failure_reason_.value()),
-                                prev_tcp_pool_transport_failure_reason_);
+    if (prev_pool_failure_reason_.has_value()) {
+      // The other pool (either TCP or QUIC depending on which failed first) also failed, log its
+      // error details as well.
+      failure_str = fmt::format(
+          "{} (with earlier attempt failure reason {}, {})", transport_failure_reason,
+          static_cast<int>(prev_pool_failure_reason_.value()), prev_pool_transport_failure_reason_);
       transport_failure_reason = failure_str;
     }
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
@@ -417,9 +415,17 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   bool delay_tcp_attempt = true;
   bool delay_alternate_http3_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
-    if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
-      overriding_options.can_send_early_data_ = false;
-      delay_tcp_attempt = false;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
+      if (getHttp3StatusTracker().isHttp3Pending() ||
+          getHttp3StatusTracker().hasHttp3FailedRecently()) {
+        overriding_options.can_send_early_data_ = false;
+        delay_tcp_attempt = false;
+      }
+    } else {
+      if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
+        overriding_options.can_send_early_data_ = false;
+        delay_tcp_attempt = false;
+      }
     }
     if (http3_pool_ && http3_alternate_pool_ && !http3_pool_->hasActiveConnections() &&
         http3_alternate_pool_->hasActiveConnections()) {
@@ -488,11 +494,15 @@ HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusT
   return alternate_protocols_->getOrCreateHttp3StatusTracker(origin_);
 }
 
-bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
+bool ConnectivityGrid::isHttp3Broken() const {
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
+  return alternate_protocols_->isHttp3Broken(origin_);
+}
 
 void ConnectivityGrid::markHttp3Broken() {
   host_->cluster().trafficStats()->upstream_http3_broken_.inc();
-  getHttp3StatusTracker().markHttp3Broken();
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
+  alternate_protocols_->markHttp3Broken(origin_);
 }
 
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }

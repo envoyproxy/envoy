@@ -1,8 +1,11 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
@@ -21,7 +24,8 @@ using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
 class ClientSideWeightedRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
 public:
   ClientSideWeightedRoundRobinLbConfig(const ClientSideWeightedRoundRobinLbProto& lb_proto,
-                                       Event::Dispatcher& main_thread_dispatcher);
+                                       Event::Dispatcher& main_thread_dispatcher,
+                                       ThreadLocal::SlotAllocator& tls_slot_allocator);
 
   // Parameters for weight calculation from Orca Load report.
   std::vector<std::string> metric_names_for_computing_utilization;
@@ -32,6 +36,7 @@ public:
   std::chrono::milliseconds weight_update_period;
 
   Event::Dispatcher& main_thread_dispatcher_;
+  ThreadLocal::SlotAllocator& tls_slot_allocator_;
 };
 
 /**
@@ -42,15 +47,22 @@ public:
 class ClientSideWeightedRoundRobinLoadBalancer : public Upstream::ThreadAwareLoadBalancer,
                                                  protected Logger::Loggable<Logger::Id::upstream> {
 public:
+  class OrcaLoadReportHandler;
+  using OrcaLoadReportHandlerSharedPtr = std::shared_ptr<OrcaLoadReportHandler>;
+
   // This struct is used to store the client side data for the host. Hosts are
   // not shared between different clusters, but are shared between load
   // balancer instances on different threads.
-  struct ClientSideHostLbPolicyData : public Envoy::Upstream::Host::HostLbPolicyData {
-    ClientSideHostLbPolicyData() = default;
-    ClientSideHostLbPolicyData(uint32_t weight, MonotonicTime non_empty_since,
-                               MonotonicTime last_update_time)
-        : weight_(weight), non_empty_since_(non_empty_since), last_update_time_(last_update_time) {}
-    virtual ~ClientSideHostLbPolicyData() = default;
+  struct ClientSideHostLbPolicyData : public Envoy::Upstream::HostLbPolicyData {
+    ClientSideHostLbPolicyData(OrcaLoadReportHandlerSharedPtr handler)
+        : report_handler_(std::move(handler)) {}
+    ClientSideHostLbPolicyData(OrcaLoadReportHandlerSharedPtr handler, uint32_t weight,
+                               MonotonicTime non_empty_since, MonotonicTime last_update_time)
+        : report_handler_(std::move(handler)), weight_(weight), non_empty_since_(non_empty_since),
+          last_update_time_(last_update_time) {}
+
+    absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report) override;
+
     // Update the weight and timestamps for first and last update time.
     void updateWeightNow(uint32_t weight, const MonotonicTime& now) {
       weight_.store(weight);
@@ -77,6 +89,8 @@ public:
       return weight_;
     }
 
+    OrcaLoadReportHandlerSharedPtr report_handler_;
+
     // Weight as calculated from the last load report.
     std::atomic<uint32_t> weight_ = 1;
     // Time when the weight is first updated. The weight is invalid if it is within of
@@ -92,20 +106,16 @@ public:
 
   // This class is used to handle ORCA load reports.
   // It stores the config necessary to calculate host weight based on the report.
-  // The load balancer context stores a weak pointer to this handler,
-  // so it is NOT invoked if the load balancer is deleted.
-  class OrcaLoadReportHandler : public LoadBalancerContext::OrcaLoadReportCallbacks {
+  class OrcaLoadReportHandler {
   public:
     OrcaLoadReportHandler(const ClientSideWeightedRoundRobinLbConfig& lb_config,
                           TimeSource& time_source);
-    ~OrcaLoadReportHandler() override = default;
 
-  private:
-    friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
-
-    // {LoadBalancerContext::OrcaLoadReportCallbacks} implementation.
-    absl::Status onOrcaLoadReport(const OrcaLoadReportProto& orca_load_report,
-                                  const HostDescription& host_description) override;
+    // Update client side data from `orca_load_report`. Invoked from `onOrcaLoadReport` callback of
+    // ClientSideHostLbPolicyData.
+    absl::Status
+    updateClientSideDataFromOrcaLoadReport(const OrcaLoadReportProto& orca_load_report,
+                                           ClientSideHostLbPolicyData& client_side_data);
 
     // Get utilization from `orca_load_report` using named metrics specified in
     // `metric_names_for_computing_utilization`.
@@ -120,52 +130,50 @@ public:
         const std::vector<std::string>& metric_names_for_computing_utilization,
         double error_utilization_penalty);
 
-    // Update client side data from `orca_load_report`. Invoked from `onOrcaLoadReport` callback on
-    // the worker thread.
-    absl::Status
-    updateClientSideDataFromOrcaLoadReport(const OrcaLoadReportProto& orca_load_report,
-                                           ClientSideHostLbPolicyData& client_side_data);
-
     const std::vector<std::string> metric_names_for_computing_utilization_;
     const double error_utilization_penalty_;
     TimeSource& time_source_;
   };
 
+  // Thread local shim to store callbacks for weight updates of worker local lb.
+  class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
+  public:
+    Common::CallbackManager<uint32_t> apply_weights_cb_helper_;
+  };
+
   // This class is used to handle the load balancing on the worker thread.
   class WorkerLocalLb : public RoundRobinLoadBalancer {
   public:
-    WorkerLocalLb(
-        const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-        ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
-        const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-        const ClientSideWeightedRoundRobinLbConfig& client_side_weighted_round_robin_config,
-        TimeSource& time_source);
+    WorkerLocalLb(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                  ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+                  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                  TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim);
 
   private:
     friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
-
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
-    bool alwaysUseEdfScheduler() const override { return true; };
-
-    std::shared_ptr<OrcaLoadReportHandler> orca_load_report_handler_;
+    Common::CallbackHandlePtr apply_weights_cb_handle_;
   };
 
   // Factory used to create worker-local load balancer on the worker thread.
   class WorkerLocalLbFactory : public Upstream::LoadBalancerFactory {
   public:
-    WorkerLocalLbFactory(OptRef<const Upstream::LoadBalancerConfig> lb_config,
-                         const Upstream::ClusterInfo& cluster_info,
+    WorkerLocalLbFactory(const Upstream::ClusterInfo& cluster_info,
                          const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
-                         Envoy::Random::RandomGenerator& random, TimeSource& time_source)
-        : lb_config_(lb_config), cluster_info_(cluster_info), priority_set_(priority_set),
-          runtime_(runtime), random_(random), time_source_(time_source) {}
+                         Envoy::Random::RandomGenerator& random, TimeSource& time_source,
+                         ThreadLocal::SlotAllocator& tls)
+        : cluster_info_(cluster_info), priority_set_(priority_set), runtime_(runtime),
+          random_(random), time_source_(time_source) {
+      tls_ = ThreadLocal::TypedSlot<ThreadLocalShim>::makeUnique(tls);
+      tls_->set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalShim>(); });
+    }
 
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
 
     bool recreateOnHostChange() const override { return false; }
 
-  protected:
-    OptRef<const Upstream::LoadBalancerConfig> lb_config_;
+    void applyWeightsToAllWorkers(uint32_t priority);
+
+    std::unique_ptr<Envoy::ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 
     const Upstream::ClusterInfo& cluster_info_;
     const Upstream::PrioritySet& priority_set_;
@@ -192,18 +200,16 @@ private:
   // Initialize LB based on the config.
   void initFromConfig(const ClientSideWeightedRoundRobinLbConfig& lb_config);
 
-  // Start weight updates on the main thread.
-  void startWeightUpdatesOnMainThread(Event::Dispatcher& main_thread_dispatcher);
-
   // Update weights using client side host LB policy data for all priority sets.
   // Executed on the main thread.
   void updateWeightsOnMainThread();
 
   // Update weights using client side host LB policy data for all `hosts`.
-  void updateWeightsOnHosts(const HostVector& hosts);
+  // Returns true if any host weight is updated.
+  bool updateWeightsOnHosts(const HostVector& hosts);
 
   // Add client side host LB policy data to all `hosts`.
-  static void addClientSideLbPolicyDataToHosts(const HostVector& hosts);
+  void addClientSideLbPolicyDataToHosts(const HostVector& hosts);
 
   // Get weight based on client side host LB policy data if it is valid (not
   // empty at least since `max_non_empty_since` and updated no later than
@@ -212,10 +218,10 @@ private:
   getClientSideWeightIfValidFromHost(const Host& host, MonotonicTime max_non_empty_since,
                                      MonotonicTime min_last_update_time);
 
+  OrcaLoadReportHandlerSharedPtr report_handler_;
   // Factory used to create worker-local load balancers on the worker thread.
   std::shared_ptr<WorkerLocalLbFactory> factory_;
-  // Data that is also passed to the worker-local load balancer via factory_.
-  OptRef<const Upstream::LoadBalancerConfig> lb_config_;
+
   const Upstream::ClusterInfo& cluster_info_;
   const Upstream::PrioritySet& priority_set_;
   Runtime::Loader& runtime_;

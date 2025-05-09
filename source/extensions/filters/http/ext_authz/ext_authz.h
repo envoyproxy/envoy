@@ -63,6 +63,8 @@ public:
   absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
+  // Gets the gRPC status returned by the authorization server when it is making a gRPC call.
+  const absl::optional<Grpc::Status::GrpcStatus>& grpcStatus() const { return grpc_status_; }
 
   void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
@@ -72,6 +74,21 @@ public:
   }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
     upstream_host_ = std::move(upstream_host);
+  }
+  // Sets the gRPC status returned by the authorization server when it is making a gRPC call.
+  void setGrpcStatus(const Grpc::Status::GrpcStatus& grpc_status) { grpc_status_ = grpc_status; }
+
+  bool hasFieldSupport() const override { return true; }
+  Envoy::StreamInfo::FilterState::Object::FieldType
+  getField(absl::string_view field_name) const override {
+    if (field_name == "latency_us" && latency_.has_value()) {
+      return int64_t(latency_.value().count());
+    } else if (field_name == "bytesSent" && bytes_sent_.has_value()) {
+      return int64_t(bytes_sent_.value());
+    } else if (field_name == "bytesReceived" && bytes_received_.has_value()) {
+      return int64_t(bytes_received_.value());
+    }
+    return {};
   }
 
   // For convenience in testing.
@@ -89,6 +106,8 @@ private:
   absl::optional<uint64_t> bytes_received_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  // The gRPC status returned by the authorization server when it is making a gRPC call.
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
 };
 
 /**
@@ -369,7 +388,7 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
-  void updateLoggingInfo();
+  void updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {

@@ -15,6 +15,7 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
+#include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -36,7 +37,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
         continue;
       }
       providers.push_back(
-          factory_context.secretManager().createInlineTlsCertificateProvider(tls_certificate));
+          factory_context.serverFactoryContext().secretManager().createInlineTlsCertificateProvider(
+              tls_certificate));
     }
     return providers;
   }
@@ -44,13 +46,16 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
     for (const auto& sds_secret_config : config.tls_certificate_sds_secret_configs()) {
       if (sds_secret_config.has_sds_config()) {
         // Fetch dynamic secret.
-        providers.push_back(factory_context.secretManager().findOrCreateTlsCertificateProvider(
-            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-            factory_context.initManager()));
+        providers.push_back(factory_context.serverFactoryContext()
+                                .secretManager()
+                                .findOrCreateTlsCertificateProvider(
+                                    sds_secret_config.sds_config(), sds_secret_config.name(),
+                                    factory_context, factory_context.initManager()));
       } else {
         // Load static secret.
-        auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
-            sds_secret_config.name());
+        auto secret_provider =
+            factory_context.serverFactoryContext().secretManager().findStaticTlsCertificateProvider(
+                sds_secret_config.name());
         if (!secret_provider) {
           creation_status = absl::InvalidArgumentError(
               fmt::format("Unknown static secret: {}", sds_secret_config.name()));
@@ -70,14 +75,17 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
     absl::Status& creation_status) {
   if (sds_secret_config.has_sds_config()) {
     // Fetch dynamic secret.
-    return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
-        sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-        factory_context.initManager());
+    return factory_context.serverFactoryContext()
+        .secretManager()
+        .findOrCreateCertificateValidationContextProvider(sds_secret_config.sds_config(),
+                                                          sds_secret_config.name(), factory_context,
+                                                          factory_context.initManager());
   } else {
     // Load static secret.
     auto secret_provider =
-        factory_context.secretManager().findStaticCertificateValidationContextProvider(
-            sds_secret_config.name());
+        factory_context.serverFactoryContext()
+            .secretManager()
+            .findStaticCertificateValidationContextProvider(sds_secret_config.name());
     if (secret_provider) {
       return secret_provider;
     }
@@ -97,8 +105,9 @@ getCertificateValidationContextConfigProvider(
   switch (config.validation_context_type_case()) {
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContext:
-    return factory_context.secretManager().createInlineCertificateValidationContextProvider(
-        config.validation_context());
+    return factory_context.serverFactoryContext()
+        .secretManager()
+        .createInlineCertificateValidationContextProvider(config.validation_context());
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig:
     return getProviderFromSds(factory_context, config.validation_context_sds_secret_config(),
@@ -117,18 +126,34 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
+absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
+  switch (params.compliance_policies_size()) {
+  case 0:
+    return absl::nullopt;
+  case 1:
+    return params.compliance_policies(0);
+  default:
+    IS_ENVOY_BUG("more than one policies are not supported");
+    return absl::nullopt;
+  }
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
-    const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
-    const std::string& default_cipher_suites, const std::string& default_curves,
+    bool auto_sni_san_match, const unsigned default_min_protocol_version,
+    const unsigned default_max_protocol_version, const std::string& default_cipher_suites,
+    const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
     : api_(factory_context.serverFactoryContext().api()),
       options_(factory_context.serverFactoryContext().options()),
       singleton_manager_(factory_context.serverFactoryContext().singletonManager()),
       lifecycle_notifier_(factory_context.serverFactoryContext().lifecycleNotifier()),
+      auto_sni_san_match_(auto_sni_san_match),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
@@ -143,7 +168,8 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()) {
+      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
+      compliance_policy_(compliancePolicyFromProto(config.tls_params())) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   auto list_or_error = Network::Address::IpList::create(config.key_log().local_address_range());
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);
@@ -178,7 +204,7 @@ ContextConfigImpl::ContextConfigImpl(
         validation_context_config_ = std::move(*context_or_error);
       } else {
         auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
-            *certificate_validation_context_provider_->secret(), api_);
+            *certificate_validation_context_provider_->secret(), auto_sni_san_match, api_);
         SET_AND_RETURN_IF_NOT_OK(config_or_status.status(), creation_status);
         validation_context_config_ = std::move(config_or_status.value());
       }
@@ -225,8 +251,8 @@ ContextConfigImpl::getCombinedValidationContextConfig(
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext combined_cvc =
       *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
-  auto config_or_status =
-      Envoy::Ssl::CertificateValidationContextConfigImpl::create(combined_cvc, api_);
+  auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
+      combined_cvc, auto_sni_san_match_, api_);
   RETURN_IF_NOT_OK(config_or_status.status());
   return std::move(config_or_status.value());
 }
@@ -270,7 +296,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> ca
       cvc_update_callback_handle_ =
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
-                *certificate_validation_context_provider_->secret(), api_);
+                *certificate_validation_context_provider_->secret(), auto_sni_san_match_, api_);
             RETURN_IF_NOT_OK(config_or_status.status());
             validation_context_config_ = std::move(config_or_status.value());
             return callback();
@@ -307,21 +333,21 @@ const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
 
 const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
-#ifndef BORINGSSL_FIPS
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-#else // BoringSSL FIPS
-    "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-#endif
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:";
 
-const std::string ClientContextConfigImpl::DEFAULT_CURVES =
-#ifndef BORINGSSL_FIPS
-    "X25519:"
-#endif
-    "P-256";
+const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES_FIPS =
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES = "X25519:"
+                                                            "P-256";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
 absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -337,9 +363,12 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
-    : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
-                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context, creation_status),
-      server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
+    : ContextConfigImpl(
+          config.common_tls_context(), config.auto_sni_san_validation(), DEFAULT_MIN_VERSION,
+          DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
+          FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
+      server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
+      allow_renegotiation_(config.allow_renegotiation()),
       enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not

@@ -12,6 +12,8 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/tls/cert_validator/san_matcher.h"
+
 #include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
@@ -56,6 +58,7 @@ public:
   MOCK_METHOD(const std::string&, subjectLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
+  MOCK_METHOD(bool, peerCertificateSanMatches, (const Ssl::SanMatcher&), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansPeerCertificate, (), (const));
@@ -111,6 +114,8 @@ public:
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
+  MOCK_METHOD(bool, autoHostServerNameIndication, (), (const));
+  MOCK_METHOD(bool, autoSniSanMatch, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(bool, enforceRsaKeyUsage, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
@@ -118,6 +123,9 @@ public:
   MOCK_METHOD(const Network::Address::IpList&, tlsKeyLogRemote, (), (const));
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
+  MOCK_METHOD(absl::optional<
+                  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
+              compliancePolicy, (), (const));
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
@@ -162,6 +170,9 @@ public:
   MOCK_METHOD(const std::string&, tlsKeyLogPath, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (const));
   MOCK_METHOD(bool, fullScanCertsOnSNIMismatch, (), (const));
+  MOCK_METHOD(absl::optional<
+                  envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
+              compliancePolicy, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};
@@ -210,6 +221,7 @@ public:
               trustChainVerification, (), (const));
   MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
   MOCK_METHOD(absl::optional<uint32_t>, maxVerifyDepth, (), (const));
+  MOCK_METHOD(bool, autoSniSanMatch, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

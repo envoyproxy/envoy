@@ -23,7 +23,7 @@ static constexpr absl::string_view http_events_header = R"EOF(
 )EOF";
 static constexpr absl::string_view http_event_config = R"EOF(
                   - match:
-                      or_match: 
+                      or_match:
                         rules:
                         - http_response_headers_match:
                             headers:

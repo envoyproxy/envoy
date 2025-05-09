@@ -70,6 +70,9 @@ TEST(HeaderParserTest, TestParse) {
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
       {"%DOWNSTREAM_LOCAL_PORT%", {"0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
+      {"%DOWNSTREAM_DIRECT_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
+      {"%DOWNSTREAM_DIRECT_LOCAL_PORT%", {"0"}, {}},
+      {"%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
       {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%]", {"value]"}, {}},
@@ -1087,6 +1090,10 @@ response_headers_to_add:
       key: "x-per-header"
       value: "per"
     append_action: ADD_IF_ABSENT
+  - header:
+      key: "x-baz-header"
+      value: "baz"
+    append_action: OVERWRITE_IF_EXISTS # Unsupported action for getHeaderTransforms
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 
@@ -1096,16 +1103,31 @@ response_headers_to_remove: ["x-baz-header"]
           .value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  auto transforms =
-      response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
-  EXPECT_THAT(transforms.headers_to_append_or_add,
-              ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
-  EXPECT_THAT(transforms.headers_to_overwrite_or_add,
-              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
-  EXPECT_THAT(transforms.headers_to_add_if_absent,
-              ElementsAre(Pair(Http::LowerCaseString("x-per-header"), "per")));
+  {
+    auto transforms =
+        response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
+    EXPECT_THAT(transforms.headers_to_append_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
+    EXPECT_THAT(transforms.headers_to_add_if_absent,
+                ElementsAre(Pair(Http::LowerCaseString("x-per-header"), "per")));
 
-  EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+    EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+  }
+
+  {
+    auto transforms =
+        response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/true);
+    EXPECT_THAT(transforms.headers_to_append_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
+    EXPECT_THAT(transforms.headers_to_add_if_absent,
+                ElementsAre(Pair(Http::LowerCaseString("x-per-header"), "per")));
+
+    EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+  }
 }
 
 } // namespace

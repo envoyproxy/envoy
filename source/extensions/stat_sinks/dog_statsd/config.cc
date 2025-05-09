@@ -16,14 +16,14 @@ namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
 
-Stats::SinkPtr
+absl::StatusOr<Stats::SinkPtr>
 DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                       Server::Configuration::ServerFactoryContext& server) {
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::DogStatsdSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
   auto address_or_error = Network::Address::resolveProtoAddress(sink_config.address());
-  THROW_IF_NOT_OK_REF(address_or_error.status());
+  RETURN_IF_NOT_OK_REF(address_or_error.status());
   Network::Address::InstanceConstSharedPtr address = address_or_error.value();
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   absl::optional<uint64_t> max_bytes;

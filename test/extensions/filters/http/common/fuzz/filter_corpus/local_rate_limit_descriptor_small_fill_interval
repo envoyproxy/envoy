@@ -1,0 +1,7 @@
+config {
+  name: "envoy.local_rate_limit"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
+    value: "\n\002\337\214B&\n\026\n\020envoy.ip_tagging\022\002\337\214\022\014\010\200\200\200\004\032\005\020\200\200\200\010h\001x\001"
+  }
+}

@@ -208,6 +208,32 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   return skip_if_absent_;
 }
 
+QueryParametersAction::QueryParametersAction(
+    const envoy::config::route::v3::RateLimit::Action::QueryParameters& action)
+    : query_param_name_(action.query_parameter_name()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_param"),
+      skip_if_absent_(action.skip_if_absent()) {}
+
+bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                               const std::string&,
+                                               const Http::RequestHeaderMap& headers,
+                                               const StreamInfo::StreamInfo&) const {
+  Http::Utility::QueryParamsMulti query_parameters =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+
+  const absl::optional<std::string> query_param_value =
+      query_parameters.getFirstValue(query_param_name_);
+
+  // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
+  // If ``skip_if_absent`` is ``false``, do not call rate limiting service.
+  if (!query_param_value.has_value()) {
+    return skip_if_absent_;
+  }
+
+  descriptor_entry = {descriptor_key_, query_param_value.value()};
+  return true;
+}
+
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
     Server::Configuration::CommonFactoryContext& context)
@@ -267,7 +293,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
-      stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
+      stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
+      apply_on_stream_done_(config.apply_on_stream_done()) {
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kSourceCluster:
@@ -275,6 +302,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
+      break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kQueryParameters:
+      actions_.emplace_back(new QueryParametersAction(action.query_parameters()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
@@ -314,15 +344,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
-      RateLimit::DescriptorProducerPtr producer =
+      absl::StatusOr<RateLimit::DescriptorProducerPtr> producer_or =
           factory->createDescriptorProducerFromProto(*message, context);
-      if (producer) {
-        actions_.emplace_back(std::move(producer));
-      } else {
-        creation_status = absl::InvalidArgumentError(
-            absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
-        return;
-      }
+      SET_AND_RETURN_IF_NOT_OK(producer_or.status(), creation_status);
+      actions_.emplace_back(std::move(producer_or.value()));
       break;
     }
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:

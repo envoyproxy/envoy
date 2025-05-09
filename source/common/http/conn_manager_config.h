@@ -217,7 +217,7 @@ public:
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
    */
-  virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() PURE;
 
   /**
    * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
@@ -528,7 +528,7 @@ public:
   /**
    * @return maximum requests for downstream.
    */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
   /**
    * @return the config describing if/how to write the Proxy-Status HTTP response header.
    * If nullptr, don't write the Proxy-Status HTTP response header.

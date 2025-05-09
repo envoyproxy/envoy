@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
@@ -53,6 +54,7 @@ configure_make(
     targets = [
         "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
     ],
+    alwayslink = True,
 )
 
 # Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
@@ -96,7 +98,7 @@ configure_make(
     ],
     tags = ["skip_on_windows"],
     targets = [
-        "ARFLAGS='' libs install-subdirs",
+        "ARFLAGS='' WITH_LDS='n' libs install-subdirs",
     ],
     deps = [":lz4"],
     alwayslink = True,
@@ -199,7 +201,10 @@ configure_make(
     env = {
         "CXXFLAGS": "-fPIC -DU_CHARSET_IS_UTF8=1 -DU_USING_ICU_NAMESPACE=0 -DUCONFIG_ONLY_HTML_CONVERSION=1 -DUCONFIG_NO_LEGACY_CONVERSION=1 -DUCONFIG_NO_BREAK_ITERATION=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_REGULAR_EXPRESSIONS=1",
         "CFLAGS": "-fPIC",
+        "LIBS": "-l:libstdc++.a",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
+        "ARFLAGS": "r",
+        "MAKEFLAGS": "ARFLAGS=r",
     },
     lib_source = "@com_github_unicode_org_icu//:all",
     out_static_libs = [
@@ -259,60 +264,6 @@ envoy_cmake(
         "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
         "//conditions:default": "rm -f $INSTALLDIR/include/ares_dns.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
     }),
-)
-
-envoy_cmake(
-    name = "curl",
-    cache_entries = {
-        "BUILD_CURL_EXE": "off",
-        "BUILD_TESTING": "off",
-        "BUILD_SHARED_LIBS": "off",
-        "CURL_HIDDEN_SYMBOLS": "off",
-        "CURL_USE_LIBSSH2": "off",
-        "CURL_USE_LIBPSL": "off",
-        "CURL_BROTLI": "off",
-        "CURL_USE_GSSAPI": "off",
-        "HTTP_ONLY": "on",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-        # Explicitly enable Unix sockets, once afunix.h is correctly detected
-        # "USE_UNIX_SOCKETS": "on",
-        # Explicitly disable "Windows" crypto for Windows
-        "CURL_DISABLE_CRYPTO_AUTH": "on",
-        # C-Ares.
-        "ENABLE_ARES": "on",
-        "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
-        "CARES_INCLUDE_DIR": "$EXT_BUILD_DEPS/ares/include",
-        # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses
-        # FindOpenSSL.cmake which fails at what looks like version parsing
-        # (the libraries are found ok).
-        "CURL_CA_PATH": "none",
-        "CURL_USE_OPENSSL": "off",
-        "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
-        # Avoid libidn2
-        "USE_LIBIDN2": "off",
-        # NGHTTP2.
-        "USE_NGHTTP2": "on",
-        "NGHTTP2_LIBRARY": "$EXT_BUILD_DEPS/nghttp2",
-        "NGHTTP2_INCLUDE_DIR": "$EXT_BUILD_DEPS/nghttp2/include",
-        # ZLIB.
-        "CURL_ZLIB": "on",
-        "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
-        "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-    },
-    defines = ["CURL_STATICLIB"],
-    generate_crosstool_file = True,
-    lib_source = "@com_github_curl//:all",
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["libcurl.lib"],
-        "//conditions:default": ["libcurl.a"],
-    }),
-    deps = [
-        ":ares",
-        ":nghttp2",
-        ":zlib",
-        "//external:ssl",
-    ],
 )
 
 envoy_cmake(

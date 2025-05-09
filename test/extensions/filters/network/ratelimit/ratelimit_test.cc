@@ -493,7 +493,7 @@ public:
   }
 
   NiceMock<Network::MockFilterManagerConnection> connection_;
-  NiceMock<Network::MockListenSocket> socket_;
+  NiceMock<Network::MockConnectionSocket> socket_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -559,7 +559,14 @@ stat_prefix: name
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
   EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_,
-              tcpConnPool(_, _))
+              chooseHost(_))
+      .WillRepeatedly(Invoke([&] {
+        return Upstream::HostSelectionResponse{
+            factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                .host_};
+      }));
+  EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,

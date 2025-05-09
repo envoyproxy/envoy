@@ -230,7 +230,9 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
       route.redirect().prefix_rewrite(),
       route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
       route.redirect().has_regex_rewrite()
-          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern(), regex_engine)
+          ? THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(
+                                      route.redirect().regex_rewrite().pattern(), regex_engine),
+                                  Regex::CompiledMatcherPtr)
           : nullptr,
       route.redirect().path_redirect().find('?') != absl::string_view::npos,
       route.redirect().https_redirect(),
@@ -252,8 +254,8 @@ std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
 }
 
 HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& hedge_policy)
-    : initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
-      additional_request_chance_(hedge_policy.additional_request_chance()),
+    : additional_request_chance_(hedge_policy.additional_request_chance()),
+      initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
@@ -403,7 +405,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(predicate);
     auto config = factory.createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config);
+    SET_AND_RETURN_IF_NOT_OK(
+        Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config),
+        creation_status);
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
   for (const auto& header : policy_config.response_headers_to_copy()) {
@@ -485,7 +489,18 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
     default_value_.set_numerator(100);
     default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   }
-  trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
+  // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
+  // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
+  // disabled.
+  if (config.has_trace_sampled()) {
+    trace_sampled_ = config.trace_sampled().value();
+  } else {
+    // If the shadow policy does not specify trace_sampled, we will inherit the parent's sampling
+    // decision.
+    const bool user_parent_sampling_decision = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.shadow_policy_inherit_trace_sampling");
+    trace_sampled_ = user_parent_sampling_decision ? absl::nullopt : absl::make_optional(true);
+  }
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -556,8 +571,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                     : absl::nullopt),
       host_rewrite_path_regex_(
           route.route().has_host_rewrite_path_regex()
-              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern(),
-                                           factory_context.regexEngine())
+              ? THROW_OR_RETURN_VALUE(
+                    Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern(),
+                                               factory_context.regexEngine()),
+                    Regex::CompiledMatcherPtr)
               : nullptr),
       host_rewrite_path_regex_substitution_(
           route.route().has_host_rewrite_path_regex()
@@ -581,6 +598,16 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         std::vector<Envoy::Matchers::MetadataMatcher> vec;
         for (const auto& elt : route.match().dynamic_metadata()) {
           vec.emplace_back(elt, factory_context);
+        }
+        return vec;
+      }()),
+      filter_state_([&]() {
+        std::vector<Envoy::Matchers::FilterStateMatcherPtr> vec;
+        for (const auto& elt : route.match().filter_state()) {
+          Envoy::Matchers::FilterStateMatcherPtr match = THROW_OR_RETURN_VALUE(
+              Envoy::Matchers::FilterStateMatcher::create(elt, factory_context),
+              Envoy::Matchers::FilterStateMatcherPtr);
+          vec.push_back(std::move(match));
         }
         return vec;
       }()),
@@ -710,8 +737,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().hash_policy().empty()) {
-    hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy(),
-                                                          factory_context.regexEngine());
+    hash_policy_ = THROW_OR_RETURN_VALUE(
+        Http::HashPolicyImpl::create(route.route().hash_policy(), factory_context.regexEngine()),
+        std::unique_ptr<Http::HashPolicyImpl>);
   }
 
   if (route.match().has_tls_context()) {
@@ -789,8 +817,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
-    regex_rewrite_ =
-        Regex::Utility::parseRegex(rewrite_spec.pattern(), factory_context.regexEngine());
+    regex_rewrite_ = THROW_OR_RETURN_VALUE(
+        Regex::Utility::parseRegex(rewrite_spec.pattern(), factory_context.regexEngine()),
+        Regex::CompiledMatcherPtr);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
@@ -869,6 +898,18 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   return matches;
 }
 
+bool RouteEntryImplBase::isRedirect() const {
+  if (!isDirectResponse()) {
+    return false;
+  }
+  if (redirect_config_ == nullptr) {
+    return false;
+  }
+  return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
+         !redirect_config_->prefix_rewrite_redirect_.empty() ||
+         redirect_config_->regex_rewrite_redirect_ != nullptr;
+}
+
 bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
@@ -908,6 +949,14 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
       break;
     }
     matches &= m.match(stream_info.dynamicMetadata());
+  }
+
+  for (const auto& m : filter_state_) {
+    if (!matches) {
+      // No need to check anymore as all filter state matchers must match for a match to occur.
+      break;
+    }
+    matches &= m->match(stream_info.filterState());
   }
 
   return matches;
@@ -1623,7 +1672,7 @@ UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
-      uri_template_(path_matcher_->uriTemplate()){};
+      uri_template_(path_matcher_->uriTemplate()) {};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                          bool insert_envoy_original_path) const {
@@ -1652,7 +1701,10 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
-                                                        factory_context)) {}
+                                                        factory_context)) {
+  // The createPrefix function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -1681,7 +1733,10 @@ PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
-                                                       factory_context)) {}
+                                                       factory_context)) {
+  // The createExact function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -1713,6 +1768,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
           Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
          envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
+  // The createSafeRegex function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1776,7 +1833,10 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
-                                                        !case_sensitive(), factory_context)) {}
+                                                        !case_sensitive(), factory_context)) {
+  // The createPrefix function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {
@@ -1811,7 +1871,8 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+    : name_(virtual_host.name()),
+      stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
@@ -2433,8 +2494,12 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config);
-  auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  RETURN_IF_NOT_OK(
+      Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
+  auto object_status_or_error =
+      factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  RETURN_IF_NOT_OK(object_status_or_error.status());
+  auto object = std::move(*object_status_or_error);
   if (object == nullptr) {
     if (is_optional) {
       ENVOY_LOG(
@@ -2455,8 +2520,8 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
 
-  std::string filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
+  std::string filter_config_type(
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
@@ -2465,8 +2530,11 @@ PerFilterConfigs::PerFilterConfigs(
     if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
         filter_config_type) {
       envoy::config::route::v3::FilterConfig filter_config;
-      Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
-                                                    filter_config);
+      creation_status = Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second,
+                                                                      validator, filter_config);
+      if (!creation_status.ok()) {
+        return;
+      }
 
       // The filter is marked as disabled explicitly and the config is ignored directly.
       if (filter_config.disabled()) {

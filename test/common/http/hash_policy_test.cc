@@ -18,7 +18,7 @@ public:
   // Utility method to create a HashPolicyImpl based on a provided hash policy
   void setupHashPolicy(const envoy::config::route::v3::RouteAction::HashPolicy& policy) {
     hash_policies_ = {&policy};
-    hash_policy_impl_ = std::make_unique<HashPolicyImpl>(hash_policies_, *regex_engine_);
+    hash_policy_impl_ = *HashPolicyImpl::create(hash_policies_, *regex_engine_);
   }
 
 protected:

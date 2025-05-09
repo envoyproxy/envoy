@@ -93,7 +93,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["http_grpc_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.http_grpc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

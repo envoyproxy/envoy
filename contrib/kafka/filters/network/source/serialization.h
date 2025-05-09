@@ -1477,7 +1477,7 @@ uint32_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& 
 
 /**
  * Encode nullable object as marker byte (1 if present, -1 otherwise), then if object is present,
- * have it serialise itself.
+ * have it to serialize itself.
  */
 template <typename T>
 uint32_t EncodingContext::encode(const absl::optional<T>& arg, Buffer::Instance& dst) {

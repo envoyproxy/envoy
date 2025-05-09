@@ -1,4 +1,5 @@
 #include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/http/headers.h"
 #include "source/exe/main_common.h"
 #include "source/server/admin/admin_html_util.h"
 

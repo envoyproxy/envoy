@@ -1,4 +1,4 @@
-package main
+package property
 
 import (
 	"google.golang.org/protobuf/types/known/anypb"
@@ -38,5 +38,3 @@ func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.Strea
 		config:    conf,
 	}
 }
-
-func main() {}

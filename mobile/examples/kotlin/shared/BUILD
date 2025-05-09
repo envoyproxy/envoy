@@ -1,6 +1,6 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 load("@rules_jvm_external//:defs.bzl", "artifact")
+load("@rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 licenses(["notice"])  # Apache 2
 

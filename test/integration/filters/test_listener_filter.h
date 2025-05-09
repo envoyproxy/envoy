@@ -87,7 +87,7 @@ public:
 
 class TestFirstPacketReceivedFilterState : public StreamInfo::FilterState::Object {
 public:
-  explicit TestFirstPacketReceivedFilterState() {}
+  explicit TestFirstPacketReceivedFilterState() = default;
   static const absl::string_view key() { return "test.filter_state.quic_first_packet_received"; }
   void incrementPacketCount() { packet_count_++; }
   void setPacketLength(size_t packet_length) { packet_length_ = packet_length; }
@@ -154,6 +154,10 @@ public:
     test_first_packet_received_filter_state_->incrementPacketCount();
     test_first_packet_received_filter_state_->setPacketLength(packet.length());
     test_first_packet_received_filter_state_->setPacketHeadersLength(packet.headers_length());
+    if (packet.headers_length() > 0 && packet.packet_headers() != nullptr) {
+      char* headers_buffer = new char[packet.headers_length()];
+      memcpy(headers_buffer, packet.packet_headers(), packet.headers_length());
+    }
     return Network::FilterStatus::Continue;
   }
 

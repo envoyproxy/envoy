@@ -1,6 +1,7 @@
 Checks: >
   -clang-analyzer-core.NonNullParamChecker,
   -clang-analyzer-optin.cplusplus.UninitializedObject,
+  -clang-diagnostic-builtin-macro-redefined,
   abseil-duration-*,
   abseil-faster-strsplit-delimiter,
   abseil-no-namespace,
@@ -67,6 +68,7 @@ CheckOptions:
     |^event_base_free$|
     |^(get|set)EVP_PKEY$|
     |^has_value$|
+    |^value_or$|
     |^Ip6(ntohl|htonl)$|
     |^get_$|
     |^HeaderHasValue(Ref)?$|

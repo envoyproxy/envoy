@@ -15,4 +15,14 @@ TEST(EngineCommonTest, SignalHandlingFalse) {
   ASSERT_FALSE(main_common.server()->options().signalHandlingEnabled());
 }
 
+TEST(EngineCommonTest, NewHandlerNotSet) {
+  ExtensionRegistry::registerFactories();
+  auto options = std::make_shared<Envoy::OptionsImplBase>();
+
+  Platform::EngineBuilder builder;
+  options->setConfigProto(builder.generateBootstrap());
+  EngineCommon main_common{std::move(options)};
+  ASSERT_EQ(std::get_new_handler(), nullptr);
+}
+
 } // namespace Envoy

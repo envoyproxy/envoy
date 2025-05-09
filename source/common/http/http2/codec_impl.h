@@ -324,7 +324,7 @@ protected:
     // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
     // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
     virtual bool useDeferredReset() const PURE;
-    virtual StreamDecoder& decoder() PURE;
+    virtual StreamDecoder* decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
@@ -402,6 +402,11 @@ protected:
     void onEndStreamEncoded() {
       if (codec_callbacks_) {
         codec_callbacks_->onCodecEncodeComplete();
+      }
+    }
+    void onResetEncoded(uint32_t error_code) {
+      if (codec_callbacks_ && error_code != 0) {
+        codec_callbacks_->onCodecLowLevelReset();
       }
     }
 
@@ -491,26 +496,6 @@ protected:
     void grantPeerAdditionalStreamWindow();
   };
 
-  // Encapsulates the logic for sending DATA frames on a given stream.
-  // Deprecated. Remove when removing
-  // `envoy_reloadable_features_http2_use_visitor_for_data`.
-  class StreamDataFrameSource : public http2::adapter::DataFrameSource {
-  public:
-    explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
-
-    // Returns a pair of the next payload length, and whether that payload is the end of the data
-    // for this stream.
-    std::pair<int64_t, bool> SelectPayloadLength(size_t max_length) override;
-    // Queues the frame header and a DATA frame payload of the specified length for writing.
-    bool Send(absl::string_view frame_header, size_t payload_length) override;
-    // Whether the codec should send the END_STREAM flag on the final DATA frame.
-    bool send_fin() const override { return send_fin_; }
-
-  private:
-    StreamImpl& stream_;
-    bool send_fin_ = false;
-  };
-
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
 
   /**
@@ -538,7 +523,7 @@ protected:
     HeadersState headersState() const override { return headers_state_; }
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
-    StreamDecoder& decoder() override { return response_decoder_; }
+    StreamDecoder* decoder() override { return &response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -600,7 +585,7 @@ protected:
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
     bool useDeferredReset() const override { return true; }
-    StreamDecoder& decoder() override { return *request_decoder_; }
+    StreamDecoder* decoder() override { return request_decoder_handle_->get().ptr(); }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -625,7 +610,9 @@ protected:
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
-    void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+    void setRequestDecoder(Http::RequestDecoder& decoder) override {
+      request_decoder_handle_ = decoder.getRequestDecoderHandle();
+    }
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
                                               Http::ResponseHeaderMapConstSharedPtr,
                                               Http::ResponseTrailerMapConstSharedPtr,
@@ -641,7 +628,7 @@ protected:
     }
 
   private:
-    RequestDecoder* request_decoder_{};
+    RequestDecoderHandlePtr request_decoder_handle_;
     HeadersState headers_state_ = HeadersState::Request;
   };
 
@@ -735,6 +722,7 @@ protected:
   const uint32_t max_headers_count_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
+  uint64_t max_metadata_size_;
   const bool stream_error_on_invalid_http_messaging_;
 
   // Status for any errors encountered by the nghttp2 callbacks.

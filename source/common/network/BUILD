@@ -277,10 +277,10 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
-        "@com_github_google_quiche//:quic_core_lru_cache_lib",
         "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ] + select({
+        "//bazel:android": [],
         "//bazel:linux": [
             "//source/common/io:io_uring_impl_lib",
             "//source/common/io:io_uring_worker_factory_impl_lib",
@@ -421,6 +421,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
+        "//source/common/memory:aligned_allocator_lib",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

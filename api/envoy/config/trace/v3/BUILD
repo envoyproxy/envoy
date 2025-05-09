@@ -9,6 +9,5 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
     ],
 )

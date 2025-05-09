@@ -23,6 +23,7 @@ Extensions
   health_checker/health_checker
   http/early_header_mutation
   http/custom_response
+  http/ext_proc
   http/header_formatters
   http/header_validators
   http/original_ip_detection

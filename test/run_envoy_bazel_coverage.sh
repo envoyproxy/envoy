@@ -2,26 +2,26 @@
 
 set -e -o pipefail
 
-LLVM_VERSION=${LLVM_VERSION:-"14.0.0"}
+LLVM_VERSION=${LLVM_VERSION:-"18.1.8"}
 CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \([0-9.]*\).*/\1/')
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \([0-9.]*\).*/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
 if [ "${CLANG_VERSION}" != "${LLVM_VERSION}" ]
 then
-  echo "clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}"
+  echo "ERROR: clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}" >&2
   exit 1
 fi
 
 if [ "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]
 then
-  echo "llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}"
+  echo "ERROR: llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}" >&2
   exit 1
 fi
 
 if [ "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]
 then
-  echo "llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}"
+  echo "ERROR: llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}" >&2
   exit 1
 fi
 
@@ -103,10 +103,10 @@ rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
 if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
-    echo "No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
+    echo "ERROR: No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
     exit 1
 elif [[ ! -s bazel-out/_coverage/_coverage_report.dat ]]; then
-    echo "Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
+    echo "ERROR: Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
     exit 1
 else
     COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
@@ -140,7 +140,7 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
       echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
-      echo "Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}"
+      echo "ERROR: Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}" >&2
       exit 1
   else
       echo "Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}"

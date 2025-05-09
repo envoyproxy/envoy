@@ -65,9 +65,9 @@ public:
       std::string ca_cert = "", absl::optional<uint32_t> verify_depth = absl::nullopt)
       : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
         custom_validator_config_(custom_config), san_matchers_(san_matchers), ca_cert_(ca_cert),
-        max_verify_depth_(verify_depth){};
+        max_verify_depth_(verify_depth) {};
   TestCertificateValidationContextConfig()
-      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt){};
+      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt) {};
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
@@ -105,6 +105,7 @@ public:
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
   absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  bool autoSniSanMatch() const override { return auto_sni_san_match_; }
 
 private:
   bool allow_expired_certificate_{false};
@@ -115,6 +116,7 @@ private:
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
   const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+  const bool auto_sni_san_match_{false};
 };
 
 } // namespace Tls

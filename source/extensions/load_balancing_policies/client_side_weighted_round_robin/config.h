@@ -16,7 +16,6 @@ namespace ClientSideWeightedRoundRobin {
 
 using ClientSideWeightedRoundRobinLbProto = envoy::extensions::load_balancing_policies::
     client_side_weighted_round_robin::v3::ClientSideWeightedRoundRobin;
-// using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 class Factory : public Upstream::TypedLoadBalancerFactoryBase<ClientSideWeightedRoundRobinLbProto> {
 public:
@@ -34,11 +33,12 @@ public:
         lb_config, cluster_info, priority_set, runtime, random, time_source);
   }
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext& context,
-                                             const Protobuf::Message& config) override {
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext& context,
+             const Protobuf::Message& config) override {
     const auto& lb_config = dynamic_cast<const ClientSideWeightedRoundRobinLbProto&>(config);
     return Upstream::LoadBalancerConfigPtr{new Upstream::ClientSideWeightedRoundRobinLbConfig(
-        lb_config, context.mainThreadDispatcher())};
+        lb_config, context.mainThreadDispatcher(), context.threadLocal())};
   }
 };
 

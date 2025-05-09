@@ -6,7 +6,6 @@ import android.net.ConnectivityManager;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
@@ -24,13 +23,13 @@ public class AndroidEngineImpl implements EnvoyEngine {
    */
   public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback,
                            EnvoyLogger logger, EnvoyEventTracker eventTracker,
-                           Boolean enableProxying) {
+                           Boolean enableProxying, Boolean useNetworkChangeEvent) {
     this.context = context;
     this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker);
     if (ContextUtils.getApplicationContext() == null) {
       ContextUtils.initApplicationContext(context.getApplicationContext());
     }
-    AndroidNetworkMonitor.load(context, envoyEngine);
+    AndroidNetworkMonitor.load(context, envoyEngine, useNetworkChangeEvent);
     if (enableProxying) {
       AndroidProxyMonitor.load(context, envoyEngine);
     }
@@ -86,8 +85,13 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
+  public void onDefaultNetworkChanged(int network) {
     envoyEngine.onDefaultNetworkChanged(network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangeEvent(int network) {
+    envoyEngine.onDefaultNetworkChangeEvent(network);
   }
 
   @Override

@@ -32,7 +32,7 @@
 #endif
 
 namespace Envoy {
-#ifndef OPENSSL_IS_BORINGSSL
+#if !defined OPENSSL_IS_BORINGSSL && !defined OPENSSL_IS_AWSLC
 #error Envoy requires BoringSSL
 #endif
 
@@ -67,10 +67,11 @@ struct TlsContext {
   }
   absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
   absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
-                              const std::string& password);
+                              const std::string& password, bool fips_mode);
   absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
-                          const std::string& password);
-  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
+                          const std::string& password, bool fips_mode);
+  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
+                               bool fips_mode);
 };
 } // namespace Ssl
 
@@ -82,7 +83,8 @@ class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
   virtual absl::StatusOr<bssl::UniquePtr<SSL>>
-  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+         Upstream::HostDescriptionConstSharedPtr host);
 
   /**
    * Logs successful TLS handshake and updates stats.

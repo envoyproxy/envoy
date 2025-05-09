@@ -43,6 +43,9 @@ public:
       absl::StatusOr<CancelFunction>, duplicate,
       (Event::Dispatcher * dispatcher,
        absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete));
+  MOCK_METHOD(absl::StatusOr<CancelFunction>, truncate,
+              (Event::Dispatcher * dispatcher, size_t length,
+               absl::AnyInvocable<void(absl::Status)> on_complete));
 
 private:
   std::shared_ptr<MockAsyncFileManager> manager_;
@@ -53,7 +56,7 @@ using MockAsyncFileHandle = std::shared_ptr<MockAsyncFileContext>;
 class MockAsyncFileAction : public AsyncFileAction {
 public:
   virtual std::string describe() const PURE;
-  void execute() override{};
+  void execute() override {};
 };
 
 template <typename T> class TypedMockAsyncFileAction : public MockAsyncFileAction {
@@ -130,14 +133,14 @@ public:
 
 // Add deduction guides for comping with the ctad-maybe-unsupported warning
 TypedMockAsyncFileAction(absl::AnyInvocable<void(absl::Status)>)
-    ->TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::Status)>>;
+    -> TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::Status)>>;
 TypedMockAsyncFileAction(absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)>)
-    ->TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)>>;
+    -> TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)>>;
 TypedMockAsyncFileAction(absl::AnyInvocable<void(absl::StatusOr<size_t>)>)
-    ->TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::StatusOr<size_t>)>>;
+    -> TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::StatusOr<size_t>)>>;
 TypedMockAsyncFileAction(
     absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>)
-    ->TypedMockAsyncFileAction<
+    -> TypedMockAsyncFileAction<
         absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>>;
 
 } // namespace AsyncFiles

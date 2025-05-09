@@ -22,11 +22,19 @@ class SuccessCriteriaTest : public testing::Test {
 public:
   SuccessCriteriaTest() = default;
 
-  void makeEvaluator(const std::string& yaml) {
+  void makeEvaluator(const std::string& yaml,
+                     absl::optional<std::string> error_status_message = absl::nullopt) {
     AdmissionControlProto::SuccessCriteria proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
 
-    evaluator_ = std::make_unique<SuccessCriteriaEvaluator>(proto);
+    absl::StatusOr<std::unique_ptr<SuccessCriteriaEvaluator>> evaluator_or =
+        SuccessCriteriaEvaluator::create(proto);
+    if (error_status_message.has_value()) {
+      EXPECT_EQ(error_status_message.value(), evaluator_or.status().message());
+      return;
+    }
+    EXPECT_TRUE(evaluator_or.ok());
+    evaluator_ = std::move(evaluator_or.value());
   }
 
   void expectHttpSuccess(int code) { EXPECT_TRUE(evaluator_->isHttpSuccess(code)); }
@@ -139,35 +147,34 @@ grpc_criteria:
   grpc_success_status:
     - 17
 )EOF";
-  EXPECT_THROW_WITH_REGEX(makeEvaluator(yaml), EnvoyException, "invalid gRPC code*");
+  makeEvaluator(yaml, "invalid gRPC code 17");
 }
 
 // Verify correct HTTP range validation.
 TEST_F(SuccessCriteriaTest, HttpRangeValidation) {
-  auto check_ranges = [this](std::string&& yaml) {
-    EXPECT_THROW_WITH_REGEX(makeEvaluator(yaml), EnvoyException, "invalid HTTP range*");
-  };
-
-  check_ranges(R"EOF(
+  makeEvaluator(R"EOF(
 http_criteria:
   http_success_status:
     - start: 300
       end:   200
-)EOF");
+)EOF",
+                "invalid HTTP range: [300, 200)");
 
-  check_ranges(R"EOF(
+  makeEvaluator(R"EOF(
 http_criteria:
   http_success_status:
     - start: 600
       end:   600
-)EOF");
+)EOF",
+                "invalid HTTP range: [600, 600)");
 
-  check_ranges(R"EOF(
+  makeEvaluator(R"EOF(
 http_criteria:
   http_success_status:
     - start: 99
       end:   99
-)EOF");
+)EOF",
+                "invalid HTTP range: [99, 99)");
 }
 
 } // namespace

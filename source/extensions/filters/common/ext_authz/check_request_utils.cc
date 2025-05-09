@@ -306,9 +306,7 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
     for (const auto& key : keys) {
       envoy::type::matcher::v3::StringMatcher matcher;
       matcher.set_exact(key.get());
-      matchers.push_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher, context));
+      matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
     }
   }
 
@@ -320,9 +318,7 @@ CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStri
                                         Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
-    matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher, context));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
   }
   return matchers;
 }

@@ -158,7 +158,7 @@ void Matcher::compile(const std::vector<const char*>& expressions,
 
 hs_scratch_t* Matcher::getScratch(ScratchThreadLocalPtr& local_scratch) const {
   // Some matchers are constructed before dispatching threads and set() method of thread local slot
-  // will only initialize thread local object in existing threads, which may lead to unintialized
+  // will only initialize thread local object in existing threads, which may lead to uninitialized
   // thread local object in threads which are dispatched later. E.g, stats matchers are constructed
   // before workers while there is chance to use these matchers in working threads. As a result,
   // we have to ask main thread to allocate thread local object again.

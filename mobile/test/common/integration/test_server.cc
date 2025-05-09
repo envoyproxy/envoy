@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 
 #include "source/common/listener_manager/connection_handler_impl.h"
@@ -12,7 +13,7 @@
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_context_impl.h"
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
@@ -135,7 +136,7 @@ TestServer::TestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_, sslContextManager())
+  ON_CALL(factory_context_.server_context_, sslContextManager())
       .WillByDefault(testing::ReturnRef(context_manager_));
 
   Envoy::ExtensionRegistry::registerFactories();
@@ -160,7 +161,8 @@ void TestServer::start(TestServerType type, int port) {
     Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
     Quic::forceRegisterQuicServerTransportSocketConfigFactory();
     Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+    Quic::Extensions::ConnectionIdGenerator::Deterministic::
+        forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 
     // envoy.quic.crypto_stream.server.quiche
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;

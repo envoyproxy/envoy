@@ -49,6 +49,11 @@ public:
   virtual const std::string& disableKey() const PURE;
 
   /**
+   * @return true if this rate limit policy should be applied on stream done.
+   */
+  virtual bool applyOnStreamDone() const PURE;
+
+  /**
    * Potentially populate the descriptor array with new descriptors to query.
    * @param descriptors supplies the descriptor array to optionally fill.
    * @param local_service_cluster supplies the name of the local service cluster.

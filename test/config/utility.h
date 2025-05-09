@@ -295,6 +295,9 @@ public:
   // Called by finalize to set up the ports.
   void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
 
+  // Switch from a default of round robin to async round robin.
+  void setAsyncLb(bool hang = false);
+
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
 
@@ -324,7 +327,7 @@ public:
   void disableDelayClose();
 
   // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
-  void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
+  void setDownstreamMaxRequestsPerConnection(uint32_t max_requests_per_connection);
 
   envoy::config::route::v3::VirtualHost createVirtualHost(const char* host, const char* route = "/",
                                                           const char* cluster = "cluster_0");
@@ -424,7 +427,7 @@ public:
       bool use_alpn = false, bool http3 = false,
       absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
           alternate_protocol_cache_config = {},
-      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
           configure_tls_context = nullptr);
 
   // Skip validation that ensures that all upstream ports are referenced by the
@@ -465,6 +468,8 @@ public:
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
+  static void setHttp2WithMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
+                                               uint32_t max_concurrent_streams);
 
   // Populate and return a Http3ProtocolOptions instance based on http2_options.
   static envoy::config::core::v3::Http3ProtocolOptions

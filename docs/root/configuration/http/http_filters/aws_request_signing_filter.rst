@@ -59,6 +59,8 @@ the following HTTP header modifications will be made by this extension:
 Example configuration
 ---------------------
 
+.. _config_http_filters_aws_request_signing_examples:
+
 Example filter configuration:
 
 .. literalinclude:: _include/aws-request-signing-filter.yaml
@@ -86,6 +88,16 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
     :linenos:
     :caption: :download:`aws-request-signing-filter-sigv4a.yaml <_include/aws-request-signing-filter-sigv4a.yaml>`
 
+An example of using the credential provider configuration to modify the default behaviour of the credential provider chain. In this scenario, we use
+the ``custom_credential_provider_chain`` option to disable the default credential provider chain and use specific settings for the credential file
+credentials provider. These settings include a ``watched_directory``, which configures the filter to reload the credentials file when it changes.
+
+.. literalinclude:: _include/aws-request-signing-filter-credential-provider-config.yaml
+    :language: yaml
+    :lines: 46-56
+    :lineno-start: 46
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-credential-provider-config.yaml <_include/aws-request-signing-filter-credential-provider-config.yaml>`
 
 Configuration as an upstream HTTP filter
 ----------------------------------------

@@ -2695,7 +2695,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
                                Filesystem::DestinationType::File, "foo"}))
       .WillOnce(Return(file));
-  EventLoggerImpl event_logger(log_manager, "foo", time_system);
+  std::unique_ptr<EventLoggerImpl> event_logger =
+      *EventLoggerImpl::create(log_manager, "foo", time_system);
 
   StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -2721,7 +2722,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log2));
 
-  event_logger.logUneject(host);
+  event_logger->logUneject(host);
   *Json::Factory::loadFromString(log2);
 
   // now test with time since last action.
@@ -2759,7 +2760,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
                          "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log4));
-  event_logger.logUneject(host);
+  event_logger->logUneject(host);
   *Json::Factory::loadFromString(log4);
 
   StringViewSaver log5;
@@ -2789,7 +2790,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
                          "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log6));
-  event_logger.logUneject(host);
+  event_logger->logUneject(host);
   *Json::Factory::loadFromString(log6);
 }
 

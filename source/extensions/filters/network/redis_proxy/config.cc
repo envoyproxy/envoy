@@ -91,10 +91,16 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
       server_context.api().randomGenerator(), server_context.runtime(), proto_config.faults());
 
+  absl::flat_hash_set<std::string> custom_commands;
+  for (const auto& cmd : proto_config.custom_commands()) {
+    custom_commands.insert(cmd);
+  }
+
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_,
-          server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager));
+          server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager),
+          std::move(custom_commands));
 
   auto has_external_auth_provider_ = proto_config.has_external_auth_provider();
   auto grpc_service = proto_config.external_auth_provider().grpc_service();
@@ -114,7 +120,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       THROW_IF_NOT_OK_REF(auth_client_factory_or_error.status());
 
       auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(
-          auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+          THROW_OR_RETURN_VALUE(
+              auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+              Grpc::RawAsyncClientPtr),
           std::chrono::milliseconds(timeout_ms));
     }
 

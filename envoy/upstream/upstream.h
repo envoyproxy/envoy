@@ -300,36 +300,6 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
-
-  /**
-   * Base interface for attaching LbPolicy-specific data to individual hosts.
-   */
-  class HostLbPolicyData {
-  public:
-    virtual ~HostLbPolicyData() = default;
-  };
-  using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;
-
-  /**
-   * Set load balancing policy related data to the host.
-   * NOTE: this method should only be called at main thread before the host is used
-   * across worker threads.
-   */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
-
-  /**
-   * Get the load balancing policy related data of the host.
-   * @return the optional reference to the load balancing policy related data of the host.
-   */
-  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
-
-  /**
-   * Get the typed load balancing policy related data of the host.
-   * @return the optional reference to the typed load balancing policy related data of the host.
-   */
-  template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
-    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
-  }
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -820,8 +790,10 @@ public:
  */
 #define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rq_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rs_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rs_body_size, Bytes)
 
 /**
@@ -1067,11 +1039,11 @@ public:
   virtual bool maintenanceMode() const PURE;
 
   /**
-   * @return uint64_t the maximum number of outbound requests that a connection pool will make on
+   * @return uint32_t the maximum number of outbound requests that a connection pool will make on
    *         each upstream connection. This can be used to increase spread if the backends cannot
    *         tolerate imbalance. 0 indicates no maximum.
    */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
 
   /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
@@ -1157,7 +1129,7 @@ public:
   virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
+   * @return std::shared_ptr<const UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
@@ -1307,7 +1279,7 @@ public:
    *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
    *        called when initial DNS resolution is complete.
    */
-  virtual void initialize(std::function<void()> callback) PURE;
+  virtual void initialize(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that

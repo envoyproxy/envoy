@@ -70,11 +70,11 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::RawSlice saved_cmsg) override {
+                     Buffer::OwnedImpl saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos, saved_cmsg);
+                                             receive_time, tos, std::move(saved_cmsg));
     ++num_packets_received_;
   }
 
@@ -126,7 +126,6 @@ public:
   }
 
   void SetUp() override {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
         *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
@@ -680,6 +679,15 @@ TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
                                               "QUIC_STREAM_REQUEST_REJECTED|FROM_SELF"));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   stream.resetStream(Http::StreamResetReason::LocalReset);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, DisableQpack) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_disable_qpack(true);
+
+  envoy_quic_session_->setHttp3Options(http3_options);
+
+  EXPECT_EQ(envoy_quic_session_->qpack_maximum_dynamic_table_capacity(), 0);
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {

@@ -26,18 +26,22 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
 
 Envoy::Http::OriginalIPDetectionResult
 CustomHeaderIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
+  // NOTE: The ``XFF`` header from this extension is intentionally not appended.
+  // To preserve the behavior prior to #31831, ``skip_xff_append`` is explicitly set to true.
+  constexpr bool skip_xff_append = true;
+
   auto hdr = params.request_headers.get(header_name_);
   if (hdr.empty()) {
-    return {nullptr, false, reject_options_, false};
+    return {nullptr, false, reject_options_, skip_xff_append};
   }
 
   auto header_value = hdr[0]->value().getStringView();
   auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(header_value));
   if (addr) {
-    return {addr, allow_trusted_address_checks_, absl::nullopt, false};
+    return {addr, allow_trusted_address_checks_, absl::nullopt, skip_xff_append};
   }
 
-  return {nullptr, false, reject_options_, false};
+  return {nullptr, false, reject_options_, skip_xff_append};
 }
 
 } // namespace CustomHeader

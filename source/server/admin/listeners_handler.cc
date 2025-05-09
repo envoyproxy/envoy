@@ -29,15 +29,25 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
     return Http::Code::BadRequest;
   }
   if (graceful) {
-    // Ignore calls to /drain_listeners?graceful if the drain sequence has
-    // already started.
-    if (!server_.drainManager().draining()) {
-      server_.drainManager().startDrainSequence([this, stop_listeners_type, skip_exit]() {
-        if (!skip_exit) {
-          server_.listenerManager().stopListeners(stop_listeners_type, {});
-        }
-      });
+    auto direction = Network::DrainDirection::All;
+    if (stop_listeners_type == ListenerManager::StopListenersType::InboundOnly) {
+      direction = Network::DrainDirection::InboundOnly;
     }
+    // If draining(direction) returns true, it means:
+    // 1. we are already draining
+    // 2. That drain includes the direction we're being asked to drain
+    // We should just return a 200
+    if (const bool duplicate_drain = server_.drainManager().draining(direction); duplicate_drain) {
+      response.add("OK\n");
+      return Http::Code::OK;
+    }
+    // This means either we aren't draining or we still have to do some work
+    // (e.g. we were draining inbound only but now we're being asked to drain all)
+    server_.drainManager().startDrainSequence(direction, [this, stop_listeners_type, skip_exit]() {
+      if (!skip_exit) {
+        server_.listenerManager().stopListeners(stop_listeners_type, {});
+      }
+    });
   } else {
     server_.listenerManager().stopListeners(stop_listeners_type, {});
   }

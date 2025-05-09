@@ -69,8 +69,8 @@ public:
     }
 
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
-                                             ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    config_ = *FilterConfig::create(prefix.statName(), context_,
+                                    ShadowWriterPtr(new MockShadowWriter()), router_proto);
     router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());
@@ -87,6 +87,11 @@ public:
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         locality())
         .WillByDefault(ReturnRef(upstream_locality_));
+    ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
+        }));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_

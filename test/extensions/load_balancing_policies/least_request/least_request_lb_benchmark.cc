@@ -38,7 +38,7 @@ void benchmarkLeastRequestLoadBalancerChooseHost(::benchmark::State& state) {
     state.ResumeTiming();
 
     for (uint64_t i = 0; i < keys_to_simulate; ++i) {
-      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
+      hit_counter[tester.lb_->chooseHost(&context).host->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.

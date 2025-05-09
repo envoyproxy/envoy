@@ -6,6 +6,8 @@
 
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -26,5 +28,10 @@ struct ProxyProtocolData {
   }
 };
 
+enum class ProxyProtocolVersion { NotFound = 1, V1 = 2, V2 = 3 };
+
+struct ProxyProtocolDataWithVersion : public ProxyProtocolData {
+  const absl::optional<ProxyProtocolVersion> version_;
+};
 } // namespace Network
 } // namespace Envoy

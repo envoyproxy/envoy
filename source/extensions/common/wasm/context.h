@@ -299,10 +299,12 @@ protected:
     // Http::AsyncClient::Callbacks
     void onSuccess(const Http::AsyncClient::Request&,
                    Envoy::Http::ResponseMessagePtr&& response) override {
+      request_ = nullptr;
       context_->onHttpCallSuccess(token_, std::move(response));
     }
     void onFailure(const Http::AsyncClient::Request&,
                    Http::AsyncClient::FailureReason reason) override {
+      request_ = nullptr;
       context_->onHttpCallFailure(token_, reason);
     }
     void
@@ -320,10 +322,12 @@ protected:
       context_->onGrpcCreateInitialMetadata(token_, initial_metadata);
     }
     void onSuccessRaw(::Envoy::Buffer::InstancePtr&& response, Tracing::Span& /* span */) override {
+      request_ = nullptr;
       context_->onGrpcReceiveWrapper(token_, std::move(response));
     }
     void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                    Tracing::Span& /* span */) override {
+      request_ = nullptr;
       context_->onGrpcCloseWrapper(token_, status, message);
     }
 
@@ -350,6 +354,7 @@ protected:
     }
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
       remote_closed_ = true;
+      stream_ = nullptr;
       context_->onGrpcCloseWrapper(token_, status, message);
     }
 

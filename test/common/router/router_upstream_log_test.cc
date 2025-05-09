@@ -115,8 +115,8 @@ public:
     }
 
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
-                                             ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    config_ = *FilterConfig::create(prefix.statName(), context_,
+                                    ShadowWriterPtr(new MockShadowWriter()), router_proto);
     mock_upstream_log_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
     config_->upstream_logs_.push_back(mock_upstream_log_);
     router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
@@ -131,6 +131,11 @@ public:
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         address())
         .WillByDefault(Return(host_address_));
+    ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
+        }));
     ON_CALL(
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         locality())

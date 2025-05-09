@@ -186,10 +186,10 @@ public:
   MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
   MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
               (absl::string_view resource_type_url), (const));
-  MOCK_METHOD(void, setDynamicContextParam,
+  MOCK_METHOD(absl::Status, setDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key,
                absl::string_view value));
-  MOCK_METHOD(void, unsetDynamicContextParam,
+  MOCK_METHOD(absl::Status, unsetDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key));
   MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
               (UpdateNotificationCb callback), (const));

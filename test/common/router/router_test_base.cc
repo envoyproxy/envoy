@@ -47,6 +47,9 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
       .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
+  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+    return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+  }));
 }
 
 RouterTestBase::RouterTestBase(const envoy::extensions::filters::http::router::v3::Router& config)
@@ -147,9 +150,9 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
         .WillByDefault(Return(nullptr));
   }
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
         EXPECT_EQ(match.size(), 2);
         auto it = match.begin();

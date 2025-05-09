@@ -17,21 +17,23 @@ namespace DirectResponse {
  * Config registration for the direct response filter. @see NamedNetworkFilterConfigFactory.
  */
 class DirectResponseConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::direct_response::v3::Config> {
+    : public Common::ExceptionFreeFactoryBase<
+          envoy::extensions::filters::network::direct_response::v3::Config> {
 public:
-  DirectResponseConfigFactory() : FactoryBase(NetworkFilterNames::get().DirectResponse) {}
+  DirectResponseConfigFactory()
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().DirectResponse) {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
       Server::Configuration::FactoryContext& context) override {
-    auto content = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(config.response(), true, context.serverFactoryContext().api()),
-        std::string);
-
-    return [content](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
-    };
+    absl::StatusOr<std::string> content_or =
+        Config::DataSource::read(config.response(), true, context.serverFactoryContext().api());
+    RETURN_IF_NOT_OK_REF(content_or.status());
+    return
+        [content = std::move(content_or.value())](Network::FilterManager& filter_manager) -> void {
+          filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
+        };
   }
 
   bool isTerminalFilterByProtoTyped(

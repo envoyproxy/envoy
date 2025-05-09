@@ -63,6 +63,7 @@ public:
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
     EXPECT_CALL(stream_decoder_, accessLogHandlers());
+    setupRequestDecoderMock(stream_decoder_);
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
@@ -116,6 +117,16 @@ public:
                   SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed by application"));
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+  }
+
+  void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
+    EXPECT_CALL(request_decoder, getRequestDecoderHandle())
+        .WillRepeatedly(Invoke([&request_decoder]() {
+          auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+          ON_CALL(*handle, get())
+              .WillByDefault(testing::Return(OptRef<Http::RequestDecoder>(request_decoder)));
+          return handle;
+        }));
   }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -844,7 +855,7 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
 
   // Set up QuicStatsGatherer with required access logger, stream info, headers and trailers.
   std::shared_ptr<AccessLog::MockInstance> mock_logger(new NiceMock<AccessLog::MockInstance>());
-  std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
+  AccessLog::InstanceSharedPtrVector loggers = {mock_logger};
   Event::GlobalTimeSystem test_time_;
   Envoy::StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, test_time_.timeSystem(),
                                                 nullptr,

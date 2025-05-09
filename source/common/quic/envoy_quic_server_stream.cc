@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 
 #include <memory>
+#include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
@@ -214,7 +215,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 #endif
 
-  request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+  if (decoder != nullptr) {
+    decoder->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  }
   ConsumeHeaderList();
 }
 
@@ -262,7 +266,10 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    if (decoder != nullptr) {
+      decoder->decodeData(*buffer, fin_read_and_no_trailers);
+    }
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
@@ -314,7 +321,10 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
-    request_decoder_->decodeTrailers(std::move(trailers));
+    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    if (decoder != nullptr) {
+      decoder->decodeTrailers(std::move(trailers));
+    }
     MarkTrailersConsumed();
   }
 }
@@ -421,6 +431,12 @@ void EnvoyQuicServerStream::OnClose() {
     return;
   }
   clearWatermarkBuffer();
+  if (stats_gatherer_->notify_ack_listener_before_soon_to_be_destroyed()) {
+    // Either stats_gatherer_ will do deferred logging upon receiving the last
+    // ACK, or OnSoonToBeDestroyed() will catch all the cases where the stream
+    // is destroyed without receiving the last ACK.
+    return;
+  }
   if (!stats_gatherer_->loggingDone()) {
     stats_gatherer_->maybeDoDeferredLog(/* record_ack_timing */ false);
   }
@@ -465,6 +481,11 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
   }
   ASSERT(!header_name.empty());
   if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_cookie")) {
+      if (header_name == "cookie" && header_value.empty()) {
+        return Http::HeaderUtility::HeaderValidationResult::DROP;
+      }
+    }
     return result;
   }
   static const absl::flat_hash_set<std::string> known_pseudo_headers{":authority", ":protocol",
@@ -488,7 +509,10 @@ void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
     return;
   }
   if (!header_list.empty()) {
-    request_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    if (decoder != nullptr) {
+      decoder->decodeMetadata(metadataMapFromHeaderList(header_list));
+    }
   }
 }
 
@@ -531,13 +555,24 @@ bool EnvoyQuicServerStream::hasPendingData() {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  ASSERT(request_decoder_ != nullptr);
-  http_datagram_handler_->setStreamDecoder(request_decoder_);
+  ASSERT(request_decoder_->get().has_value());
+  http_datagram_handler_->setStreamDecoder(request_decoder_->get().ptr());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 
 void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(absl::nullopt); }
+
+void EnvoyQuicServerStream::OnSoonToBeDestroyed() {
+  quic::QuicSpdyServerStreamBase::OnSoonToBeDestroyed();
+  if (stats_gatherer_ != nullptr &&
+      stats_gatherer_->notify_ack_listener_before_soon_to_be_destroyed() &&
+      !stats_gatherer_->loggingDone()) {
+    // Catch all the cases where the stream is destroyed without receiving the
+    // last ACK.
+    stats_gatherer_->maybeDoDeferredLog(/* record_ack_timing */ false);
+  }
+}
 
 } // namespace Quic
 } // namespace Envoy

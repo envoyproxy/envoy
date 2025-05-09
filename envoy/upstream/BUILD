@@ -74,6 +74,7 @@ envoy_cc_library(
         "//envoy/protobuf:message_validator_interface",
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
+        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -85,7 +86,7 @@ envoy_cc_library(
         ":upstream_interface",
         "//envoy/router:router_interface",
         "//envoy/upstream:types_interface",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

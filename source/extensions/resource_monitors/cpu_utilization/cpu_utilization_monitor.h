@@ -1,7 +1,6 @@
 #pragma once
 
-#include <chrono>
-
+#include "envoy/common/time.h"
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/server/resource_monitor.h"
 
@@ -22,7 +21,7 @@ public:
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
-  double utilization_;
+  double utilization_ = 0.0;
   CpuTimes previous_cpu_times_;
   std::unique_ptr<CpuStatsReader> cpu_stats_reader_;
 };

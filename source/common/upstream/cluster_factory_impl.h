@@ -149,6 +149,13 @@ public:
     return std::make_unique<ConfigProto>();
   }
 
+  std::set<std::string> configTypes() override {
+    auto ptr = createEmptyConfigProto();
+    ASSERT(ptr != nullptr);
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*ptr);
+    return {std::string(reflectable_message->GetDescriptor()->full_name())};
+  }
+
 protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
@@ -157,8 +164,8 @@ private:
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
-                                           context.messageValidationVisitor(), *config);
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster.cluster_type().typed_config(), context.messageValidationVisitor(), *config));
     return createClusterWithConfig(cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(
                                        *config, context.messageValidationVisitor()),

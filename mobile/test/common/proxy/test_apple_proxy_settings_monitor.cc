@@ -11,8 +11,9 @@ namespace Network {
 TestAppleSystemProxySettingsMonitor::TestAppleSystemProxySettingsMonitor(
     const std::string& host, const int port, const bool use_pac_resolver,
     Network::SystemProxySettingsReadCallback proxy_settings_read_callback)
-    : AppleSystemProxySettingsMonitor(std::move(proxy_settings_read_callback)), host_(host),
-      port_(port), use_pac_resolver_(use_pac_resolver) {}
+    : AppleSystemProxySettingsMonitor(std::move(proxy_settings_read_callback),
+                                      /*proxy_settings_refresh_interval=*/10),
+      host_(host), port_(port), use_pac_resolver_(use_pac_resolver) {}
 
 CFDictionaryRef TestAppleSystemProxySettingsMonitor::getSystemProxySettings() const {
   if (use_pac_resolver_) {

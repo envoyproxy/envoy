@@ -3,6 +3,7 @@ load(
     "envoy_cc_library",
     "envoy_mobile_package",
 )
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 licenses(["notice"])  # Apache 2
 

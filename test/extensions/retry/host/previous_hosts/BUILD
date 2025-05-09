@@ -33,5 +33,6 @@ envoy_extension_cc_test(
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

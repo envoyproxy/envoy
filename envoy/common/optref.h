@@ -71,6 +71,8 @@ template <class T> struct OptRef {
    */
   bool has_value() const { return ptr_ != nullptr; }
 
+  T& value_or(T& other) const { return has_value() ? *ptr_ : other; }
+
   /**
    * @return true if the object has a value.
    */

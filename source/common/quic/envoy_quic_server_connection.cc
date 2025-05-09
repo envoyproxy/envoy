@@ -1,13 +1,31 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 
+#include <memory>
+
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
+#include "quiche/quic/core/quic_packet_writer_wrapper.h"
 #include "quiche/quic/core/quic_packets.h"
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+std::unique_ptr<quic::QuicPacketWriterWrapper>
+wrapWriter(quic::QuicPacketWriter* writer, bool owns_writer,
+           quic::QuicPacketWriterWrapper::OnWriteDoneCallback on_write_done) {
+  auto wrapper = std::make_unique<quic::QuicPacketWriterWrapper>();
+  if (owns_writer) {
+    wrapper->set_writer(writer);
+  } else {
+    wrapper->set_non_owning_writer(writer);
+  }
+  wrapper->set_on_write_done(std::move(on_write_done));
+  return wrapper;
+}
+} // namespace
 
 EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     const quic::QuicConnectionId& server_connection_id,
@@ -17,9 +35,15 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::ConnectionSocketPtr connection_socket, quic::ConnectionIdGeneratorInterface& generator,
     std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager)
-    : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
-                           &helper, &alarm_factory, writer, owns_writer,
-                           quic::Perspective::IS_SERVER, supported_versions, generator),
+    : quic::QuicConnection(
+          server_connection_id, initial_self_address, initial_peer_address, &helper, &alarm_factory,
+          // Wrap the packet writer to get notified when a packet is written.
+          wrapWriter(writer, owns_writer,
+                     [this](size_t packet_size, const quic::WriteResult& result) {
+                       OnWritePacketDone(packet_size, result);
+                     })
+              .release(),
+          /*owns_writer=*/true, quic::Perspective::IS_SERVER, supported_versions, generator),
       QuicNetworkConnection(std::move(connection_socket)),
       listener_filter_manager_(std::move(listener_filter_manager)) {
 #ifndef WIN32
@@ -45,6 +69,13 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
       quicAddressToEnvoyAddressInstance(self_address()));
 
   return true;
+}
+
+void EnvoyQuicServerConnection::OnWritePacketDone(size_t packet_size,
+                                                  const quic::WriteResult& /*result*/) {
+  if (hasConnectionStats()) {
+    connectionStats().write_total_.add(packet_size);
+  }
 }
 
 void EnvoyQuicServerConnection::OnCanWrite() {

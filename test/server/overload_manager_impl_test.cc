@@ -94,7 +94,7 @@ private:
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
 public:
-  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0){};
+  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0) {};
 
   bool tryAllocateResource(int64_t increment) override {
     int64_t new_val = (current_ += increment);
@@ -180,7 +180,7 @@ public:
                       const Server::MockOptions& options, absl::Status& creation_status)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
                             api, options, creation_status) {
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &TestOverloadManager::createDefaultScaledRangeTimerManager));

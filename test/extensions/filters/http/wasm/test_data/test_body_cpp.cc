@@ -41,7 +41,14 @@ void BodyContext::logBody(WasmBufferType type) {
   uint32_t flags;
   getBufferStatus(type, &buffered_size, &flags);
   auto body = getBufferBytes(type, 0, buffered_size);
-  logError(std::string("onBody ") + std::string(body->view()));
+  absl::string_view body_view = body->view();
+
+  // To avoid log too large body.
+  if (body_view.size() > 2048) {
+    body_view = body_view.substr(0, 2048);
+  }
+
+  logError(std::string("onBody ") + std::string(body_view));
 }
 
 FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
@@ -130,7 +137,6 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
   } else {
     // This is a test and the test was configured incorrectly.
     logError("Invalid body test op " + body_op_);
-    abort();
   }
   return FilterDataStatus::Continue;
 }

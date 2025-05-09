@@ -162,6 +162,13 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #define ENVOY_IP_PKTINFO IP_PKTINFO
 #endif
 
+#ifdef IP_BIND_ADDRESS_NO_PORT
+#define ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT                                                       \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_BIND_ADDRESS_NO_PORT)
+#else
+#define ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT Network::SocketOptionName()
+#endif
+
 #define ENVOY_SELF_IP_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, ENVOY_IP_PKTINFO)
 
 // Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
@@ -224,6 +231,12 @@ public:
    * @return the local address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
+
+  /**
+   * @return the direct local address of the socket. This is the listener address and it can not be
+   * modified by listener filters.
+   */
+  virtual const Address::InstanceConstSharedPtr& directLocalAddress() const PURE;
 
   /**
    * @return true if the local address has been restored to a value that is different from the

@@ -17,6 +17,9 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl_base.h"
@@ -358,8 +361,8 @@ public:
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
 
-  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override{};
-  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override{};
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {};
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {};
   const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
 
   // Stats::StoreRoot

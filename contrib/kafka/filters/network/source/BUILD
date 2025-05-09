@@ -39,6 +39,7 @@ envoy_cc_library(
     name = "kafka_request_parser_lib",
     srcs = [
         "external/kafka_request_resolver.cc",
+        "external/requests.cc",
         "kafka_request_parser.cc",
     ],
     hdrs = [
@@ -74,12 +75,15 @@ genrule(
     ],
     outs = [
         "external/requests.h",
+        "external/requests.cc",
         "external/kafka_request_resolver.cc",
         "external/request_metrics.h",
     ],
     cmd = """
       ./$(location :kafka_protocol_code_generator_bin) request \
-        $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
+        $(location external/requests.h) \
+        $(location external/requests.cc) \
+        $(location external/kafka_request_resolver.cc) \
         $(location external/request_metrics.h) $(SRCS)
     """,
     tools = [
@@ -103,6 +107,7 @@ envoy_cc_library(
     name = "kafka_response_parser_lib",
     srcs = [
         "external/kafka_response_resolver.cc",
+        "external/responses.cc",
         "kafka_response_parser.cc",
     ],
     hdrs = [
@@ -139,12 +144,15 @@ genrule(
     ],
     outs = [
         "external/responses.h",
+        "external/responses.cc",
         "external/kafka_response_resolver.cc",
         "external/response_metrics.h",
     ],
     cmd = """
       ./$(location :kafka_protocol_code_generator_bin) response \
-        $(location external/responses.h) $(location external/kafka_response_resolver.cc) \
+        $(location external/responses.h) \
+        $(location external/responses.cc) \
+        $(location external/kafka_response_resolver.cc) \
         $(location external/response_metrics.h) $(SRCS)
     """,
     tools = [

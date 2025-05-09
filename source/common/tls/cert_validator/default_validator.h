@@ -62,7 +62,8 @@ public:
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
                     const std::vector<SanMatcherPtr>& subject_alt_name_matchers,
-                    std::string* error_details, uint8_t* out_alert);
+                    OptRef<const StreamInfo::StreamInfo> stream_info, std::string* error_details,
+                    uint8_t* out_alert);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -100,12 +101,13 @@ public:
    * @param subject_alt_name_matchers the configured matchers to match
    * @return true if the verification succeeds
    */
-  static bool matchSubjectAltName(X509* cert,
+  static bool matchSubjectAltName(X509* cert, OptRef<const StreamInfo::StreamInfo> stream_info,
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
-  bool verifyCertAndUpdateStatus(X509* leaf_cert,
+  bool verifyCertAndUpdateStatus(X509* leaf_cert, absl::string_view sni,
                                  const Network::TransportSocketOptions* transport_socket_options,
+                                 const CertValidator::ExtraValidationContext& validation_context,
                                  Envoy::Ssl::ClientValidationStatus& detailed_status,
                                  std::string* error_details, uint8_t* out_alert);
 
@@ -113,13 +115,14 @@ private:
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
 
-  bool allow_untrusted_certificate_{false};
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
+  bool allow_untrusted_certificate_{false};
   bool verify_trusted_ca_{false};
+  const bool auto_sni_san_match_{false};
 };
 
 DECLARE_FACTORY(DefaultCertValidatorFactory);

@@ -48,6 +48,7 @@ envoy_cc_library(
         ":oauth_client",
         "//envoy/server:filter_config_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:matchers_lib",
         "//source/common/crypto:utility_lib",

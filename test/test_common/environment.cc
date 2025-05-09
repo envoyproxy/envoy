@@ -280,8 +280,8 @@ Server::Options& TestEnvironment::getOptions() {
     }
   }
 #else
-  static OptionsImpl* options = new OptionsImpl(
-      argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
+  static OptionsImpl* options =
+      new OptionsImpl(argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
 #endif
   return *options;
 }

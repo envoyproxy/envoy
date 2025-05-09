@@ -12,11 +12,11 @@ FactoryContextImplBase::FactoryContextImplBase(
   ASSERT(listener_info_ != nullptr);
 }
 
-Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() const {
+Configuration::ServerFactoryContext& FactoryContextImplBase::serverFactoryContext() {
   return server_.serverFactoryContext();
 }
 
-ProtobufMessage::ValidationVisitor& FactoryContextImplBase::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& FactoryContextImplBase::messageValidationVisitor() {
   return validation_visitor_;
 }
 

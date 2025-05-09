@@ -8,7 +8,12 @@ on:
     secrets:
       gcp-key:
         required: true
+      gcs-cache-key:
+        required: true
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -25,20 +30,22 @@ jobs:
   publish:
     secrets:
       gcp-key: ${{ secrets.gcp-key }}
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name || matrix.target }}
     with:
+      arch: ${{ matrix.arch }}
       bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
-      gcs-only: "true"
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
-      runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
+      runs-on: ${{ matrix.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu  }}
       timeout-minutes: ${{ matrix.timeout-minutes || 120 }}
       error-match: |
         ERROR
@@ -61,12 +68,8 @@ jobs:
           name: Release (arm64)
           target-suffix: arm64
           arch: arm64
-          bazel-extra: >-
-            --config=common-envoy-engflow
-            --config=cache-envoy-engflow
-            --config=bes-envoy-engflow
-          rbe: false
-          runs-on: envoy-arm64-large
+          rbe: true
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
           timeout-minutes: 180
         - target: docs
           name: Docs
@@ -75,8 +78,14 @@ jobs:
             --config=docs-ci
           rbe: true
           steps-post: |
-            - run: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
-              shell: bash
-              env:
-                GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
-                GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}
+            - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.16
+              with:
+                bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+                path: generated/docs
+                path-upload: docs
+                sha: ${{ fromJSON(inputs.request).request.sha }}
+                redirect: >-
+                  ${{ vars.GCS_ARTIFACT_PREFIX
+                      && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+                  }}${{ fromJSON(inputs.request).request.pr
+                        || fromJSON(inputs.request).request.target-branch }}

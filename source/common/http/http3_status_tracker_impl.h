@@ -15,12 +15,16 @@ class Http3StatusTrackerImpl : public HttpServerPropertiesCache::Http3StatusTrac
 public:
   explicit Http3StatusTrackerImpl(Event::Dispatcher& dispatcher);
 
+  // Returns true if HTTP/3 status is pending.
+  bool isHttp3Pending() const override;
   // Returns true if HTTP/3 is broken.
   bool isHttp3Broken() const override;
   // Returns true if HTTP/3 is confirmed to be working.
   bool isHttp3Confirmed() const override;
   // Returns true if HTTP/3 has failed recently.
   bool hasHttp3FailedRecently() const override;
+  // Marks HTTP/3 status as pending.
+  void markHttp3Pending() override;
   // Marks HTTP/3 broken for a period of time, subject to backoff.
   void markHttp3Broken() override;
   // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.

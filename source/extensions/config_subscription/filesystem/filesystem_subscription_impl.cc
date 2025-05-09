@@ -35,8 +35,9 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
           return absl::OkStatus();
         }));
   } else {
-    directory_watcher_ =
-        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
+    directory_watcher_ = THROW_OR_RETURN_VALUE(
+        WatchedDirectory::create(path_config_source.watched_directory(), dispatcher),
+        std::unique_ptr<WatchedDirectory>);
     directory_watcher_->setCallback([this]() {
       if (started_) {
         refresh();

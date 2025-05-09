@@ -10,7 +10,8 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class TransportSocketFactoryContext;
+class GenericFactoryContext;
+using TransportSocketFactoryContext = GenericFactoryContext;
 } // namespace Configuration
 } // namespace Server
 

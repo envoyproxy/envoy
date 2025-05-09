@@ -34,6 +34,9 @@ public:
   const std::string ENVOY_LB = "envoy.lb";
   // Filter namespace for built-in transport socket match in cluster.
   const std::string ENVOY_TRANSPORT_SOCKET_MATCH = "envoy.transport_socket_match";
+  // Filter namespace for storing custom upstream PP TLVs in metadata.
+  const std::string ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL =
+      "envoy.transport_sockets.proxy_protocol";
   // Proxy address configuration namespace for HTTP/1.1 proxy transport sockets.
   const std::string ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR =
       "envoy.http11_proxy_transport_socket.proxy_address";

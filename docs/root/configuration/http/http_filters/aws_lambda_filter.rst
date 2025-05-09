@@ -87,12 +87,12 @@ The filter supports :ref:`per-filter configuration
 
 If you use the per-filter configuration, the target cluster *must* have the following metadata:
 
-.. code-block:: yaml
-
-    metadata:
-      filter_metadata:
-        com.amazonaws.lambda:
-          egress_gateway: true
+.. literalinclude:: _include/aws-lambda-typed-filter.yaml
+    :language: yaml
+    :lines: 44-47
+    :lineno-start: 44
+    :linenos:
+    :caption: :download:`aws-lambda-typed-filter.yaml <_include/aws-lambda-typed-filter.yaml>`
 
 If you use the upstream filter configuration, this metadata is not required.
 
@@ -103,88 +103,41 @@ Example configuration
 
 In this configuration, the filter applies to all routes in the filter chain of the http connection manager:
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.aws_lambda
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.aws_lambda.v3.Config
-      arn: "arn:aws:lambda:us-west-2:987654321:function:hello_envoy"
-      payload_passthrough: true
+.. literalinclude:: _include/aws-lambda-filter.yaml
+    :language: yaml
+    :lines: 25-30
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`aws-lambda-filter.yaml <_include/aws-lambda-filter.yaml>`
 
 The corresponding regional endpoint must be specified in the target cluster. So, for example if the Lambda function is
 in us-west-2:
 
-.. code-block:: yaml
-
-  clusters:
-  - name: lambda_egress_gateway
-    connect_timeout: 0.25s
-    type: LOGICAL_DNS
-    dns_lookup_family: V4_ONLY
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: lambda_egress_gateway
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: lambda.us-west-2.amazonaws.com
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: "*.amazonaws.com"
-
+.. literalinclude:: _include/aws-lambda-filter.yaml
+    :language: yaml
+    :lines: 35-53
+    :lineno-start: 35
+    :linenos:
+    :caption: :download:`aws-lambda-filter.yaml <_include/aws-lambda-filter.yaml>`
 
 The filter can also be configured per virtual-host, route or weighted-cluster. In that case, the target cluster *must*
 have specific Lambda metadata and target cluster's endpoint should point to a region where the Lambda function is present.
 
-
-.. code-block:: yaml
-
-    weighted_clusters:
-    clusters:
-    - name: lambda_egress_gateway
-      weight: 42
-      typed_per_filter_config:
-        envoy.filters.http.aws_lambda:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.aws_lambda.v3.PerRouteConfig
-          invoke_config:
-            arn: "arn:aws:lambda:us-west-1:987654321:function:hello_envoy"
-            payload_passthrough: false
-
+.. literalinclude:: _include/aws-lambda-typed-filter.yaml
+    :language: yaml
+    :lines: 24-33
+    :lineno-start: 24
+    :linenos:
+    :caption: :download:`aws-lambda-typed-filter.yaml <_include/aws-lambda-typed-filter.yaml>`
 
 An example with the Lambda metadata applied to a weighted-cluster:
 
-.. code-block:: yaml
-
-  clusters:
-  - name: lambda_egress_gateway
-    connect_timeout: 0.25s
-    type: LOGICAL_DNS
-    dns_lookup_family: V4_ONLY
-    lb_policy: ROUND_ROBIN
-    metadata:
-      filter_metadata:
-        com.amazonaws.lambda:
-          egress_gateway: true
-    load_assignment:
-      cluster_name: lambda_egress_gateway # does this have to match? seems redundant
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: lambda.us-west-1.amazonaws.com
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: "*.amazonaws.com"
+.. literalinclude:: _include/aws-lambda-typed-filter.yaml
+    :language: yaml
+    :lines: 39-61
+    :lineno-start: 39
+    :linenos:
+    :caption: :download:`aws-lambda-typed-filter.yaml <_include/aws-lambda-typed-filter.yaml>`
 
 Configuration as an upstream HTTP filter
 ----------------------------------------

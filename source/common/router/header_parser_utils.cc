@@ -53,7 +53,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       new_format = format_or_error.value();
       for (size_t i = 1; i < array_or_error.value().size(); i++) {
         auto string_or_error = array_or_error.value()[i]->asString();
-        if (!format_or_error.status().ok()) {
+        if (!string_or_error.status().ok()) {
           return header_value;
         }
         absl::StrAppend(&new_format, ":", string_or_error.value());
