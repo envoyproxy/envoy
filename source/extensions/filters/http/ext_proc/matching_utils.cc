@@ -25,12 +25,38 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
                            parse_status.status().ToString());
     }
 
+    // Convert to proper Expr type for the new API
+    std::string serialized_expr;
+    if (!parse_status.value().expr().SerializeToString(&serialized_expr)) {
+      throw EnvoyException("Failed to serialize expression");
+    }
+
+    google::api::expr::v1alpha1::Expr v1alpha1_expr;
+    if (!v1alpha1_expr.ParseFromString(serialized_expr)) {
+      throw EnvoyException("Failed to parse expression into v1alpha1 format");
+    }
+
+    // Also need to convert source info properly
+    std::string serialized_source_info;
+    if (!parse_status.value().source_info().SerializeToString(&serialized_source_info)) {
+      throw EnvoyException("Failed to serialize source info");
+    }
+
+    google::api::expr::v1alpha1::SourceInfo v1alpha1_source_info;
+    if (!v1alpha1_source_info.ParseFromString(serialized_source_info)) {
+      throw EnvoyException("Failed to parse source info into v1alpha1 format");
+    }
+
     Filters::Common::Expr::ExpressionPtr expression =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(),
-                                                            parse_status.value().expr());
+        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), v1alpha1_expr);
+
+    // Create a v1alpha1 ParsedExpr to store
+    google::api::expr::v1alpha1::ParsedExpr v1alpha1_parsed_expr;
+    v1alpha1_parsed_expr.mutable_expr()->CopyFrom(v1alpha1_expr);
+    v1alpha1_parsed_expr.mutable_source_info()->CopyFrom(v1alpha1_source_info);
 
     expressions.emplace(
-        matcher, ExpressionManager::CelExpression{parse_status.value(), std::move(expression)});
+        matcher, ExpressionManager::CelExpression{v1alpha1_parsed_expr, std::move(expression)});
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."

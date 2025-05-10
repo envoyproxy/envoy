@@ -88,6 +88,90 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+TEST_F(RateLimitPolicyEntryTest, FormatConversionV1AlphaToDevCel) {
+  const std::string yaml = R"EOF(
+actions:
+- extension:
+    name: custom_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+      descriptor_key: my_descriptor_name
+      text: request.headers[":method"] == "GET"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":method", "GET"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_descriptor_name", "true"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, ExpressionWithDifferentDataTypes) {
+  const std::string yaml = R"EOF(
+actions:
+- extension:
+    name: string_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+      descriptor_key: string_value
+      text: request.headers[":method"]
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":method", "GET"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+
+  EXPECT_EQ(1, descriptors_.size());
+  // Check the descriptor has the correct value
+  EXPECT_EQ("GET", descriptors_[0].entries_[0].value_);
+}
+
+// Test boolean expression evaluation
+TEST_F(RateLimitPolicyEntryTest, BooleanExpressionEvaluation) {
+  const std::string yaml = R"EOF(
+actions:
+- extension:
+    name: boolean_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+      descriptor_key: boolean_value
+      text: request.headers[":method"] == "GET"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":method", "GET"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+
+  EXPECT_EQ(1, descriptors_.size());
+  // Check the descriptor has the correct value - boolean results are converted to strings
+  EXPECT_EQ("true", descriptors_[0].entries_[0].value_);
+}
+
+// Test numeric expression evaluation
+TEST_F(RateLimitPolicyEntryTest, NumericExpressionEvaluation) {
+  const std::string yaml = R"EOF(
+actions:
+- extension:
+    name: number_descriptor
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+      descriptor_key: number_value
+      text: size(request.headers[":method"])
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":method", "GET"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header, stream_info_);
+
+  EXPECT_EQ(1, descriptors_.size());
+  // The numeric result is converted to a string
+  EXPECT_EQ("3", descriptors_[0].entries_[0].value_);
+}
+
 TEST_F(RateLimitPolicyEntryTest, ExpressionTextMalformed) {
   const std::string yaml = R"EOF(
 actions:

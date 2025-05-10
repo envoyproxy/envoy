@@ -177,7 +177,26 @@ getExpr(const ::xds::type::v3::CelExpression& expression) {
 
 ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {
   google::api::expr::v1alpha1::SourceInfo source_info;
-  auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
+
+  // Convert v1alpha1::Expr to cel::expr::Expr
+  std::string serialized_expr;
+  if (!expr.SerializeToString(&serialized_expr)) {
+    throw CelException("Failed to serialize v1alpha1::Expr");
+  }
+
+  cel::expr::Expr cel_expr;
+  if (!cel_expr.ParseFromString(serialized_expr)) {
+    throw CelException("Failed to convert to cel::expr::Expr");
+  }
+
+  // Create a simple source info - we don't need to convert the details
+  cel::expr::SourceInfo cel_source_info;
+
+  // Create warnings vector
+  std::vector<absl::Status> warnings;
+
+  // Call the new CreateExpression API
+  auto cel_expression_status = builder.CreateExpression(&cel_expr, &cel_source_info, &warnings);
   if (!cel_expression_status.ok()) {
     throw CelException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));

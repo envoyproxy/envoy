@@ -32,10 +32,20 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
                          parse_status.status().ToString());
   }
 
+  // Convert to proper Expr type for the old API
+  std::string serialized_expr;
+  if (!parse_status.value().expr().SerializeToString(&serialized_expr)) {
+    throw EnvoyException("Failed to serialize expression");
+  }
+
+  google::api::expr::v1alpha1::Expr v1alpha1_expr;
+  if (!v1alpha1_expr.ParseFromString(serialized_expr)) {
+    throw EnvoyException("Failed to parse expression into v1alpha1 format");
+  }
+
   return std::make_unique<CELAccessLogExtensionFilter>(
       context.serverFactoryContext().localInfo(),
-      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
-      parse_status.value().expr());
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()), v1alpha1_expr);
 #else
   throw EnvoyException("CEL is not available for use in this environment.");
 #endif
