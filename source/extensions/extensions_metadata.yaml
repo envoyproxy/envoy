@@ -108,11 +108,6 @@ envoy.clusters.static:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
-envoy.clusters.strict_dns:
-  categories:
-  - envoy.clusters
-  security_posture: robust_to_untrusted_downstream_and_upstream
-  status: stable
 envoy.clusters.dns:
   categories:
   - envoy.clusters
@@ -137,11 +132,6 @@ envoy.clusters.redis:
   status: stable
   type_urls:
   - envoy.extensions.clusters.redis.v3.RedisClusterConfig
-envoy.clusters.logical_dns:
-  categories:
-  - envoy.clusters
-  security_posture: robust_to_untrusted_downstream_and_upstream
-  status: stable
 envoy.compression.brotli.compressor:
   categories:
   - envoy.compression.compressor

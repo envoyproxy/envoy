@@ -53,9 +53,8 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stream:config",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/http_connection_manager:config",
