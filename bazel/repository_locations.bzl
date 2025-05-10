@@ -912,12 +912,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Google Test",
         project_desc = "Google's C++ test framework",
         project_url = "https://github.com/google/googletest",
-        # Pick up fix for MOCK_METHOD compilation with clang-cl for Windows (resolved after 1.10.0)
-        # see https://github.com/google/googletest/issues/2490
-        version = "52eb8108c5bdec04579160ae17225d66034bd723",
-        sha256 = "745c55415660044610f7fcd3af7a6420d5de16a7dbb9ebfe2e131275676232be",
+        version = "1.17.0",
+        sha256 = "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
         strip_prefix = "googletest-{version}",
-        urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
+        urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
         release_date = "2025-04-30",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:google:google_test:*",
