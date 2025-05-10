@@ -15,7 +15,7 @@
 #include "datadog/dict_reader.h"
 #include "datadog/dict_writer.h"
 #include "datadog/error.h"
-#include "datadog/json.hpp"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,6 +90,8 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
 }
 
 void AgentHTTPClient::drain(std::chrono::steady_clock::time_point) {}
+
+std::string AgentHTTPClient::config() const { return config_json().dump(); }
 
 nlohmann::json AgentHTTPClient::config_json() const {
   return nlohmann::json::object({
