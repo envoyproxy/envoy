@@ -277,7 +277,6 @@ envoy_cc_test(
     rbe_pool = "6gig",
     # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
     tags = [
-        "nofips",
         "skip_on_windows",
     ],
     deps = [

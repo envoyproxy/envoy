@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["quic_lb_test.cc"],
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
     rbe_pool = "6gig",
-    tags = ["nofips"],
     deps = [
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -30,7 +29,6 @@ envoy_extension_cc_test(
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
     rbe_pool = "4core",
-    tags = ["nofips"],
     deps = [
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",
         "//test/integration:http_integration_lib",
