@@ -5822,4 +5822,26 @@ TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison)
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.http1_codec = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  // Sending a request with 4MiB bytes body.
+  const std::string body_sent(4096 * 1024, 's');
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, body_sent, true);
+  // Envoy sends 413: payload_too_large local reply.
+  verifyDownstreamResponse(*response, 413);
+}
+
 } // namespace Envoy

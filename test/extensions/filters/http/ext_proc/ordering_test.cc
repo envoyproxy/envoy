@@ -463,7 +463,7 @@ TEST_F(OrderingTest, ResponseAllDataComesFast) {
   sendResponseHeaders(true);
   // The rest of the data might come in even before the response headers
   // response comes back.
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, true));
 
   // When the response does comes back, we should immediately send the body to the server
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -492,7 +492,7 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(resp_body_1, false));
   sendResponseHeadersReply();
 
   EXPECT_CALL(stream_delegate_, send(_, false));
