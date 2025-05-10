@@ -35,9 +35,11 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
+        "//source/common/network:lc_trie_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",
+        "@envoy_api//envoy/data/ip_tagging/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
 )
