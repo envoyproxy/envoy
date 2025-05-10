@@ -159,6 +159,7 @@ public:
    * @param configuration_key, key provided by this class representing the current configuration.
    * @param drain_connections, request that connections be drained after next DNS resolution.
    */
+  // TODO(abeyad): Remove the `drain_connections` parameter.
   virtual void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) PURE;
 
   /**
