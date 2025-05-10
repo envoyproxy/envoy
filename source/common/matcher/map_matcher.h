@@ -31,13 +31,9 @@ public:
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(absl::get<std::string>(input.data_));
-    if (result) {
-      if (result->matcher_) {
-        return result->matcher_->match(data);
-      } else {
-        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
-      }
+    const absl::optional<OnMatch<DataType>> result = doMatch(absl::get<std::string>(input.data_));
+    if (result.has_value()) {
+      return {MatchState::MatchComplete, *result};
     } else if (input.data_availability_ ==
                DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       // It's possible that we were attempting a lookup with a partial value, so delay matching
@@ -48,7 +44,6 @@ public:
     return {MatchState::MatchComplete, on_no_match_};
   }
 
-protected:
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
   MapMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
              absl::Status& creation_status)

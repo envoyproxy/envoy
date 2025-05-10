@@ -107,6 +107,7 @@ public:
 template <class DataType> struct OnMatch {
   const ActionFactoryCb action_cb_;
   const MatchTreeSharedPtr<DataType> matcher_;
+  bool keep_matching_;
 };
 template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
 
@@ -154,6 +155,9 @@ public:
   struct MatchResult {
     const MatchState match_state_;
     const absl::optional<OnMatch<DataType>> on_match_;
+    // Non-null if the match was completed and the match tree can be re-entered to check for
+    // additional matches from where the initial matching stopped.
+    MatchTreePtr<DataType> matcher_reentrant_ = nullptr;
   };
 
   // Attempts to match against the matching data (which should contain all the data requested via
