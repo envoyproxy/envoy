@@ -261,6 +261,12 @@ public:
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
+   * @return ProtobufMessage::ValidationVistior& validation visitor for configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
    * @return const StatsConfig& the configuration of server stats.
    */
   virtual Configuration::StatsConfig& statsConfig() PURE;
