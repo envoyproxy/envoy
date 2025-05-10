@@ -47,7 +47,7 @@ message GrpcJsonTranscoder {
     ALL_CHARACTERS = 2;
   }
 
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message PrintOptions {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder.PrintOptions";
@@ -74,6 +74,11 @@ message GrpcJsonTranscoder {
 
     // If true, return all streams as newline-delimited JSON messages instead of as a comma-separated array
     bool stream_newline_delimited = 5;
+
+    // If true, enforces Server-Sent Events (SSE) message framing (``data:
+    // <message>\n\n``) and, ``stream_newline_delimited`` is ignored. If false,
+    // message framing is determined by ``stream_newline_delimited``.
+    bool stream_sse_style_delimited = 6;
   }
 
   message RequestValidationOptions {

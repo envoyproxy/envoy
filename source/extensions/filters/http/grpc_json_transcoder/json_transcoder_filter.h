@@ -91,6 +91,10 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool isStreamSSEStyleDelimited() const {
+    return response_translate_options_.stream_sse_style_delimited;
+  }
+
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
 
