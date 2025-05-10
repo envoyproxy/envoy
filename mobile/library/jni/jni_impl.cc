@@ -3,7 +3,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "ares.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/bridge/utility.h"
