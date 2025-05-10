@@ -1,3 +1,4 @@
+#include "filter_manager.h"
 #include "source/common/http/filter_manager.h"
 
 #include <functional>
@@ -1779,6 +1780,11 @@ Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOp
   return parent_.upstream_options_;
 }
 
+bool ActiveStreamDecoderFilter::setDownstreamSocketOption(
+    const Network::Socket::OptionConstSharedPtr option) {
+  return parent_.setDownstreamSocketOption(option);
+}
+
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->responseDataDrained(); },
@@ -1958,6 +1964,15 @@ ActiveStreamDecoderFilter::upstreamOverrideHost() const {
   return Upstream::LoadBalancerContext::OverrideHost{
       absl::string_view(parent_.upstream_override_host_.first),
       parent_.upstream_override_host_.second};
+}
+
+bool FilterManager::setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) {
+  return false;
+}
+
+bool DownstreamFilterManager::setDownstreamSocketOption(
+    const Network::Socket::OptionConstSharedPtr option) {
+  return filter_manager_callbacks_.setSocketOption(option);
 }
 
 } // namespace Http

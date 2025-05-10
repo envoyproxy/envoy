@@ -124,6 +124,10 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
+      bool setSocketOption(Network::Socket::OptionConstSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+        return false;
+      }
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
       Network::DetectedCloseType detectedCloseType() const override {

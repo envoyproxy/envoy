@@ -2578,6 +2578,18 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
+TEST_P(ConnectionImplTest, SetSocketOptionTest) {
+  setUpBasicConnection();
+
+  auto option = std::make_shared<MockSocketOption>();
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+      .WillOnce(Return(true));
+
+  EXPECT_TRUE(client_connection_->setSocketOption(option));
+
+  disconnect(false);
+}
+
 class FakeReadFilter : public Network::ReadFilter {
 public:
   FakeReadFilter() = default;

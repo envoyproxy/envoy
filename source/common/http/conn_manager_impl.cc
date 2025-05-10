@@ -7,6 +7,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
@@ -54,6 +55,7 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "conn_manager_config.h"
 
 namespace Envoy {
 namespace Http {
@@ -767,6 +769,10 @@ void ConnectionManagerImpl::sendGoAwayAndClose() {
   go_away_sent_ = true;
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
                     "forced_goaway");
+}
+
+bool ConnectionManagerImpl::setSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+  return read_callbacks_->connection().setSocketOption(option);
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
@@ -2084,6 +2090,11 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 }
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
+
+bool ConnectionManagerImpl::ActiveStream::setSocketOption(
+    const Network::Socket::OptionConstSharedPtr option) {
+  return connection_manager_.read_callbacks_->connection().setSocketOption(option);
+}
 
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.
