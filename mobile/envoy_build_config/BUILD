@@ -58,10 +58,7 @@ envoy_cc_library(
             "@envoy//source/common/listener_manager:connection_handler_lib",
         ],
         "@envoy",
-    ) + select({
-        "@envoy//bazel:apple": [],
-        "//conditions:default": ["@envoy//source/extensions/network/dns_resolver/cares:config"],
-    }),
+    ),
 )
 
 envoy_cc_library(

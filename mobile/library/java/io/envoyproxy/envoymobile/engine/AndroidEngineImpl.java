@@ -47,10 +47,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
 
   @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    if (envoyConfiguration.useCares) {
-      JniLibrary.initCares(
-          (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE));
-    }
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
 
