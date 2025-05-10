@@ -20,8 +20,6 @@ ggreenway:
   opsgenie: Greg
   slack: U78MBV869
 jmarantz:
-  maintainer: true
-  opsgenie: Joshua
   slack: U80HPLBPG
 KBaichoo:
   maintainer: true
@@ -51,7 +49,8 @@ nezdolik:
   opsgenie: Kateryna
   slack: UDYUWRL13
 paul-r-gall:
-  first-pass: true
+  opsgenie: Paul
+  maintainer: true
   slack: U0246MUEE9F
 phlax:
   maintainer: true
