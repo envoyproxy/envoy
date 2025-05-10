@@ -272,6 +272,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
   void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+  bool consumeDecodeEndStream() override;
   RequestTrailerMap& addDecodedTrailers() override;
   MetadataMapVector& addDecodedMetadata() override;
   void continueDecoding() override;
@@ -364,6 +365,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
   void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+  bool consumeEncodeEndStream() override;
   ResponseTrailerMap& addEncodedTrailers() override;
   void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
   void onEncoderFilterAboveWriteBufferHighWatermark() override;
@@ -974,6 +976,9 @@ protected:
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
     ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
+
+    ActiveStreamDecoderFilter* decode_end_stream_consumer_{};
+    ActiveStreamEncoderFilter* encode_end_stream_consumer_{};
   };
 
   State& state() { return state_; }

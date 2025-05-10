@@ -608,8 +608,27 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * If the calling filter has previosuly consumed end_stream from filter manager,
+   * this call will inject end_stream back into filter manager (e.g. override
+   * observed_decode_end_stream).
+   *
+   * @param data Buffer::Instance supplies the data to be injected.
+   * @param end_stream supplies whether this is the last data frame.
    */
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Consumes decode end stream from filter manager and subsequent filters. This call
+   * will set `observed_decode_end_stream` to false in filter manager.
+   * Filter manager will keep track of which filter has consumed the end stream.
+   * End stream can later be injected into filter manager via
+   * injectDecodedDataToFilterChain(data, true) if current filter has previously consumed the end
+   * stream.
+   *
+   * @return true if end stream was successfuly consumed, false otherwise.
+   */
+  virtual bool consumeDecodeEndStream() PURE;
 
   /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
@@ -1037,8 +1056,27 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addEncodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * If the calling filter has previosuly consumed end_stream from filter manager,
+   * this call will inject end_stream back into filter manager (e.g. override
+   * observed_encode_end_stream).
+   *
+   * @param data Buffer::Instance supplies the data to be injected.
+   * @param end_stream supplies whether this is the last data frame.
    */
   virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Consumes encode end stream from filter manager and subsequent filters. This call
+   * will set `observed_encode_end_stream` to false in filter manager.
+   * Filter manager will keep track of which filter has consumed the end stream.
+   * End stream can later be injected into filter manager via
+   * injectEncodedDataToFilterChain(data, true) if current filter has previously consumed the end
+   * stream.
+   *
+   * @return true if end stream was successfuly consumed, false otherwise.
+   */
+  virtual bool consumeEncodeEndStream() PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.

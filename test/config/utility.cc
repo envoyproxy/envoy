@@ -340,6 +340,18 @@ typed_config:
 )EOF";
 }
 
+std::string ConfigHelper::defaultBandwidthLimitFilter() {
+  return R"EOF(
+name: bandwidth_limit
+typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
+    limit_kbps: 128
+    stat_prefix: rate_limit
+    enable_mode: "REQUEST_AND_RESPONSE"
+    fill_interval: 0.02s
+)EOF";
+}
+
 std::string ConfigHelper::defaultSquashFilter() {
   return R"EOF(
 name: squash
