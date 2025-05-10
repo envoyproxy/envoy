@@ -78,9 +78,7 @@ public:
       config_->custom_filter_ = custom_filter_;
     }
 
-    EXPECT_CALL(context_, getTransportSocketFactoryContext())
-        .WillRepeatedly(testing::ReturnRef(factory_context_));
-    EXPECT_CALL(factory_context_.server_context_, localInfo())
+    EXPECT_CALL(context_.server_factory_context_, localInfo())
         .WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
@@ -450,7 +448,6 @@ settings:
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::shared_ptr<SipFilters::MockDecoderFilter> decoder_filter_;
   Stats::TestUtil::TestStore store_;

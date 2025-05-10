@@ -188,9 +188,6 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
-    return server_.transportSocketFactoryContext();
-  };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Stats::Scope& serverScope() override { return *server_scope_; }

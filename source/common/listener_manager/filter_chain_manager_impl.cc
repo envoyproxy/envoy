@@ -102,11 +102,6 @@ Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFac
   return parent_context_.serverFactoryContext();
 }
 
-Configuration::TransportSocketFactoryContext&
-PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return parent_context_.getTransportSocketFactoryContext();
-}
-
 Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
 
 FilterChainManagerImpl::FilterChainManagerImpl(

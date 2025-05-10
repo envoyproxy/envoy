@@ -42,12 +42,10 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
             envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
   }
   EXPECT_CALL(context, messageValidationVisitor());
-  EXPECT_CALL(context.server_factory_context_, clusterManager());
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context.server_factory_context_, api());
   EXPECT_CALL(context, initManager()).Times(2);
-  EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;

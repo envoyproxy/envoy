@@ -138,7 +138,6 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context, initManager()).Times(2);
-  EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;

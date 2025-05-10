@@ -44,6 +44,7 @@ envoy_cc_contrib_extension(
         ":sxg_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:transport_socket_config_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
     ],
 )

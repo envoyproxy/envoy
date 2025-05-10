@@ -5,6 +5,7 @@
 #include "source/common/config/datasource.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
@@ -125,17 +126,17 @@ QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_v
 
 namespace {
 
-Secret::GenericSecretConfigProviderSharedPtr secretsProvider(
-    const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-    Server::Configuration::TransportSocketFactoryContext& transport_socket_factory_context,
-    Init::Manager& init_manager) {
-  Secret::SecretManager& secret_manager =
-      transport_socket_factory_context.serverFactoryContext().secretManager();
+Secret::GenericSecretConfigProviderSharedPtr
+secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
+                Server::Configuration::ServerFactoryContext& server_context,
+                Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(
+    Server::Configuration::TransportSocketFactoryContextImpl transport_socket_factory_context(
+        server_context, server_context.messageValidationVisitor());
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
         config.sds_config(), config.name(), transport_socket_factory_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 
@@ -254,9 +255,8 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
         return result.value();
       });
 
-  ret->secrets_provider_ =
-      secretsProvider(config.encryption_parameters(), context.getTransportSocketFactoryContext(),
-                      context.initManager());
+  ret->secrets_provider_ = secretsProvider(config.encryption_parameters(),
+                                           context.serverFactoryContext(), context.initManager());
   if (ret->secrets_provider_ == nullptr) {
     return absl::InvalidArgumentError("invalid encryption_parameters config");
   }

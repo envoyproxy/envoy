@@ -185,11 +185,6 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
-
-  /**
    * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
@@ -300,11 +295,6 @@ public:
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
-
-  /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if

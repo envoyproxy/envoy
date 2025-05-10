@@ -4,6 +4,8 @@
 #include "envoy/secret/secret_provider.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/server/transport_socket_config_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -13,14 +15,15 @@ namespace OAuth2 {
 namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::ServerFactoryContext& server_context,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
+    Server::Configuration::TransportSocketFactoryContextImpl transport_socket_factory_context(
+        server_context, server_context.messageValidationVisitor());
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), transport_socket_factory_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 } // namespace
@@ -46,13 +49,9 @@ OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
     const OAuth2& proto_config, const std::string& stats_prefix,
     Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) {
   auto& cluster_manager = context.clusterManager();
-  auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-
   const auto& client_secret_secret = proto_config.client_credentials().client_secret();
 
-  auto client_secret_provider =
-      secretsProvider(client_secret_secret, secret_manager, transport_socket_factory, init_manager);
+  auto client_secret_provider = secretsProvider(client_secret_secret, context, init_manager);
   if (client_secret_provider == nullptr) {
     throw EnvoyException("Invalid oauth2 client secret configuration");
   }
