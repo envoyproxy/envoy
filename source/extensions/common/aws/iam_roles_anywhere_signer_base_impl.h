@@ -67,26 +67,28 @@ protected:
   virtual std::string createCredentialScope(const absl::string_view short_date,
                                             const absl::string_view override_region) const PURE;
 
-  virtual std::string createStringToSign(const X509Credentials x509_credentials,
+  virtual std::string createStringToSign(const X509Credentials& x509_credentials,
                                          const absl::string_view canonical_request,
                                          const absl::string_view long_date,
                                          const absl::string_view credential_scope) const PURE;
 
-  virtual std::string createSignature(const X509Credentials credentials,
-                                      const absl::string_view string_to_sign) const PURE;
+  virtual absl::StatusOr<std::string>
+  createSignature(const X509Credentials& x509_credentials,
+                  const absl::string_view string_to_sign) const PURE;
 
   virtual std::string
-  createAuthorizationHeader(const X509Credentials x509_credentials,
+  createAuthorizationHeader(const X509Credentials& x509_credentials,
                             const absl::string_view credential_scope,
                             const std::map<std::string, std::string>& canonical_headers,
                             const absl::string_view signature) const PURE;
 
-  std::string createAuthorizationCredential(const X509Credentials x509_credentials,
+  std::string createAuthorizationCredential(const X509Credentials& x509_credentials,
                                             absl::string_view credential_scope) const;
 
   void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date);
 
-  void addRequiredCertHeaders(Http::RequestHeaderMap& headers, X509Credentials x509_credentials);
+  void addRequiredCertHeaders(Http::RequestHeaderMap& headers,
+                              const X509Credentials& x509_credentials);
 
   const std::string service_name_;
   const std::string region_;

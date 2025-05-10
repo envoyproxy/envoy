@@ -160,6 +160,12 @@ absl::string_view getErrorDescription(int err);
  */
 std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
 
+/**
+ * Convert epoch time to an ASN1_TIME
+ * @return ASN1_TIME struct containing time of epoch
+ */
+const ASN1_TIME& epochASN1Time();
+
 } // namespace Utility
 } // namespace Tls
 } // namespace TransportSockets
