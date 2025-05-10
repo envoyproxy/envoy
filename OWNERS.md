@@ -28,8 +28,6 @@ routing PRs, questions, etc. to the right place.
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
-* Paul Ogilby ([paul-r-gall ](https://github.com/paul-r-gall )) (pgal@google.com)
-  * Request Mirroning, Data Plane
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
@@ -52,6 +50,8 @@ routing PRs, questions, etc. to the right place.
   * Dynamic modules, API gateway, WASM, Istio.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh) (rohit.agrawal@databricks.com)
   * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+* Paul Ogilby ([paul-r-gall ](https://github.com/paul-r-gall )) (pgal@google.com)
+  * Request mirroning, data plane
 
 # Envoy mobile maintainers
 
