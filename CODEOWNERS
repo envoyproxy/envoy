@@ -284,6 +284,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/access_loggers/file @wbpcode @cpakulski @giantcroc
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
+/*/extensions/http/stateful_session/envelope @wbpcode @adisuissa
 /*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski @adisuissa
 # tracers
