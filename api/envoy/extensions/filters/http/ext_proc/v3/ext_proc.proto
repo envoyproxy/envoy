@@ -339,6 +339,20 @@ message ExternalProcessor {
   // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Retain content length header for STREAMED and FULL_DUPLEX_STREAMED body processing modes.
+  //
+  // If enabled and a content length header is present Envoy will not switch to chunked transfer encoding
+  // for http1 codec. It is the responsibility of the side stream server to ensure a correct content length header is present.
+  //
+  // .. warning::
+  //   Retaining the content length header allows untrusted side stream servers to override the content length header.
+  //   This behavior can introduce serious security vulnerabilities, including HTTP request smuggling attacks.
+  //   Do not enable this feature when interacting with untrusted or potentially malicious side stream servers.
+  //   Use only in controlled environments with fully trusted side stream servers and a complete understanding of the 
+  //   security implications.
+  //
+  bool retain_content_length_header = 24;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
