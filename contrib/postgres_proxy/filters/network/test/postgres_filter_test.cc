@@ -38,7 +38,7 @@ public:
     PostgresFilterConfig::PostgresFilterConfigOptions config_options{
         stat_prefix_, true, false,
         envoy::extensions::filters::network::postgres_proxy::v3alpha::
-            PostgresProxy_SSLMode_DISABLE};
+            PostgresProxy_SSLMode_DISABLE, false};
 
     config_ = std::make_shared<PostgresFilterConfig>(config_options, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
@@ -387,6 +387,8 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
   EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
   EXPECT_CALL(connection_, close(_)).Times(0);
   cb(1);
+  // Make sure client has switched to TLS
+  ASSERT_TRUE(filter_->isSwitchedToTls());
   // Verify stats. This should not count as encrypted or unencrypted session.
   ASSERT_THAT(filter_->getStats().sessions_terminated_ssl_.value(), 1);
   ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 0);
@@ -401,6 +403,71 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
   ASSERT_THAT(filter_->getStats().sessions_encrypted_.value(), 0);
   ASSERT_THAT(filter_->getStats().sessions_unencrypted_.value(), 0);
 }
+
+// Test verifies that filter verifies downstream ssl after ssl negotiation for ssl enabled client
+TEST_F(PostgresFilterTest, RequireDownstreamSsl) {
+  filter_->getConfig()->terminate_ssl_ = true;
+  // require_downstream_ssl_ and terminate_ssl_ must be set to true at the same time
+  filter_->getConfig()->require_downstream_ssl_ = true;
+  // Before ssl negotiation, switched to tls initialized to false
+  ASSERT_FALSE(filter_->isSwitchedToTls());
+
+  // SSL negotiation with downstream
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  Network::Connection::BytesSentCb cb;
+  EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
+  Buffer::OwnedImpl buf;
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillOnce(testing::SaveArg<0>(&buf));
+  data_.writeBEInt<uint32_t>(8);
+  // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
+  data_.writeBEInt<uint32_t>(80877103); // SSL code.
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, true));
+  ASSERT_THAT('S', buf.peekBEInt<char>(0));
+
+  // Now indicate through the callback that 1 bytes has been sent.
+  // Filter should call startSecureTransport and should not close the connection.
+  EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  cb(1);
+  // Make sure client has switched to TLS
+  ASSERT_TRUE(filter_->isSwitchedToTls());
+
+  // connection shouldnt' be closed as client ssl was verified
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  // make sure envoy doesn't send back any error response
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+  // client sends subsequent messseage
+  createInitialPostgresRequest(data_);
+  filter_->onData(data_, true);
+}
+
+
+// Test makes sure that filter verifies downstream ssl for unencrypted request
+TEST_F(PostgresFilterTest, DownstreamUnencryptedRequireSsl) {
+  filter_->getConfig()->terminate_ssl_ = true;
+  // require_downstream_ssl_ and terminate_ssl_ must be set to true at the same time
+  filter_->getConfig()->require_downstream_ssl_ = true;
+  // Before ssl negotiation, switched to tls initialized to false
+  ASSERT_FALSE( filter_->isSwitchedToTls());
+
+  // envoy should send error response when client sends non-ssl init message
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  Buffer::OwnedImpl buf;
+  
+  // envoy is expected to send back error message to client
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillOnce(testing::SaveArg<0>(&buf));
+  // envoy closes client connection
+  EXPECT_CALL(connection_, close(_)).Times(1);
+  
+  createInitialPostgresRequest(data_);
+  filter_->onData(data_, true);
+
+  ASSERT_THAT('E', buf.peekBEInt<char>(0));
+  ASSERT_FALSE(filter_->isSwitchedToTls());
+}
+
 
 TEST_F(PostgresFilterTest, UpstreamSSL) {
   EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));

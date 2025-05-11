@@ -19,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_network_filters_postgres_proxy>`.
 // [#extension: envoy.filters.network.postgres_proxy]
 
+// [#next-free-field: 6]
 message PostgresProxy {
   // Upstream SSL operational modes.
   enum SSLMode {
@@ -59,4 +60,10 @@ message PostgresProxy {
   // :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`.
   // Defaults to ``SSL_DISABLE``.
   SSLMode upstream_ssl = 4;
+
+  // Controls whether to close downstream connections that refuse to upgrade to TLS.
+  // Default is false. If the value is set to true, terminate_ssl must be set to true explicitly
+  // at the same time. If the value is false and terminate_ssl is true, envoy will allow both encrypted
+  // and unencrypted connections.
+  bool require_downstream_ssl = 5;
 }
