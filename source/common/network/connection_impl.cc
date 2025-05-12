@@ -925,6 +925,9 @@ bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstSharedPtr optio
   if (socket_ == nullptr) {
     return false;
   }
+  if (option == nullptr) {
+    return false;
+  }
   return option->setOption(
       *socket_,
       envoy::config::core::v3::SocketOption::SocketState::SocketOption_SocketState_STATE_BOUND);

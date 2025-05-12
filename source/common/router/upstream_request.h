@@ -381,7 +381,7 @@ public:
   }
   bool isHalfCloseEnabled() override { return upstream_request_.enable_half_close_; }
 
-  bool setSocketOption(const Network::Socket::OptionConstSharedPtr) override { return false; }
+  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) override { return false; }
 
   Http::RequestTrailerMapPtr trailers_;
   Http::ResponseHeaderMapPtr informational_headers_;

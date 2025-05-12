@@ -1972,7 +1972,7 @@ bool FilterManager::setDownstreamSocketOption(const Network::Socket::OptionConst
 
 bool DownstreamFilterManager::setDownstreamSocketOption(
     const Network::Socket::OptionConstSharedPtr option) {
-  return filter_manager_callbacks_.setSocketOption(option);
+  return filter_manager_callbacks_.setDownstreamSocketOption(option);
 }
 
 } // namespace Http

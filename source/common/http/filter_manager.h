@@ -596,9 +596,9 @@ public:
   virtual bool isHalfCloseEnabled() PURE;
 
   /**
-   * Sets the provided socket option on the downstream connections socket.
+   * Sets the provided socket option on the downstream connection's socket.
    */
-  virtual bool setSocketOption(const Network::Socket::OptionConstSharedPtr) PURE;
+  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) PURE;
 };
 
 /**
