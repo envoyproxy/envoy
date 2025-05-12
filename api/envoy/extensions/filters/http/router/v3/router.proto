@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.router.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+import "envoy/extensions/outlier_detection_monitors/common/v3/monitor_base.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -46,18 +47,16 @@ message Router {
         [(validate.rules).duration = {gte {nanos: 1000000}}];
   }
 
-  message DestinationMonitor {
-    string monitor_name = 1 [(validate.rules).string = {min_len: 1}];
-  }
-
   message HttpEvents {
-    repeated DestinationMonitor send_to = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated outlier_detection_monitors.common.v3.DestinationMonitor send_to = 1
+        [(validate.rules).repeated = {min_items: 1}];
 
     config.common.matcher.v3.MatchPredicate match = 2 [(validate.rules).message = {required: true}];
   }
 
   message LocallyOriginatedEvents {
-    repeated DestinationMonitor send_to = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated outlier_detection_monitors.common.v3.DestinationMonitor send_to = 1
+        [(validate.rules).repeated = {min_items: 1}];
   }
 
   message OutlierDetection {

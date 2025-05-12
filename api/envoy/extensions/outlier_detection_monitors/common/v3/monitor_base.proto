@@ -24,3 +24,7 @@ message MonitorCommonSettings {
   // ejection or to ramp it up slowly. Defaults to 100.
   google.protobuf.UInt32Value enforcing = 1 [(validate.rules).uint32 = {lte: 100}];
 }
+
+message DestinationMonitor {
+  string monitor_name = 1 [(validate.rules).string = {min_len: 1}];
+}
