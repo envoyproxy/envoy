@@ -163,11 +163,9 @@ public:
     if (grpc_status == Status::WellKnownGrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
     } else if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
-      EXPECT_CALL(*this, onRemoteClose(
-                            testing::AnyOf(
-                                Status::WellKnownGrpcStatus::InvalidCode,
-                                Status::WellKnownGrpcStatus::Unknown),
-                            _))
+      EXPECT_CALL(*this, onRemoteClose(testing::AnyOf(Status::WellKnownGrpcStatus::InvalidCode,
+                                                      Status::WellKnownGrpcStatus::Unknown),
+                                       _))
           .WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
