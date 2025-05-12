@@ -242,7 +242,6 @@ TEST_F(GeoipProviderTest, ValidConfigUsingIspDbSuccessfulLookup) {
       geo_headers_to_add:
         asn: "x-geo-asn"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
-    read_asn_info_from_isp_db: true
   )EOF";
 
   initializeProvider(config_yaml, cb_added_nullopt);
@@ -310,7 +309,7 @@ TEST_F(GeoipProviderTest, ValidConfigUsingAsnDbNotReadingIspDbsSuccessfulLookup)
   expectStats("isp_db", 0, 0, 0);
 }
 
-TEST_F(GeoipProviderTest, ValidConfigUsingIspDbNotReadingAsnDbsSuccessfulLookup) {
+TEST_F(GeoipProviderTest, ValidConfigUsingIspAndAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
@@ -318,7 +317,6 @@ TEST_F(GeoipProviderTest, ValidConfigUsingIspDbNotReadingAsnDbsSuccessfulLookup)
         isp: "x-geo-isp"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-    read_asn_info_from_isp_db: true
   )EOF";
 
   initializeProvider(config_yaml, cb_added_nullopt);
@@ -335,7 +333,7 @@ TEST_F(GeoipProviderTest, ValidConfigUsingIspDbNotReadingAsnDbsSuccessfulLookup)
   const auto& isp_it = captured_lookup_response_.find("x-geo-isp");
   EXPECT_EQ("Telstra Internet", isp_it->second);
   expectStats("isp_db");
-  expectStats("asn_db", 0, 0, 0);
+  expectStats("asn_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
@@ -343,6 +341,7 @@ TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
     common_provider_config:
       geo_headers_to_add:
         isp: "x-geo-isp"
+        asn: "x-geo-asn"
         apple_private_relay: "x-geo-apple-private-relay"
     isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
   )EOF";
@@ -354,12 +353,14 @@ TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(2, captured_lookup_response_.size());
+  EXPECT_EQ(3, captured_lookup_response_.size());
   const auto& isp_it = captured_lookup_response_.find("x-geo-isp");
   EXPECT_EQ("AT&T Services", isp_it->second);
-  expectStats("isp_db");
+  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("7018", asn_it->second);
   const auto& apple_it = captured_lookup_response_.find("x-geo-apple-private-relay");
   EXPECT_EQ("false", apple_it->second);
+  expectStats("isp_db");
 }
 
 TEST_F(GeoipProviderTest, ValidConfigCityLookupError) {

@@ -61,9 +61,6 @@ public:
   static const absl::optional<std::string>& ispHeader(const GeoipProvider& provider) {
     return provider.config_->ispHeader();
   }
-  static bool readAsnInfoFromIspDb(const GeoipProvider& provider) {
-    return provider.config_->readAsnInfoFromIspDb();
-  }
 };
 
 MATCHER_P(HasCityDbPath, expected_db_path, "") {
@@ -198,17 +195,6 @@ MATCHER_P(HasIspHeader, expected_header, "") {
   return false;
 }
 
-MATCHER_P(HasReadAsnInfoFromIspDb, expected_value, "false") {
-  auto provider = std::static_pointer_cast<GeoipProvider>(arg);
-  auto read_asn_info_from_isp_db = GeoipProviderPeer::readAsnInfoFromIspDb(*provider);
-  if ((read_asn_info_from_isp_db ? "true" : "false") == expected_value) {
-    return true;
-  }
-  *result_listener << "expected read_asn_info_from_isp_db=" << expected_value
-                   << " but read_asn_info_from_isp_db was not found in provider config";
-  return false;
-}
-
 std::string genGeoDbFilePath(std::string db_name) {
   return TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/" + db_name);
@@ -260,7 +246,6 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
     city_db_path: %s
     isp_db_path: %s
     anon_db_path: %s
-    read_asn_info_from_isp_db: true
   )EOF";
   MaxmindProviderConfig provider_config;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
@@ -277,8 +262,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
                             HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
                             HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
                             HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
-                            HasAnonHostingHeader("x-anon-hosting"), HasIspHeader("x-geo-isp"),
-                            HasReadAsnInfoFromIspDb("true")));
+                            HasAnonHostingHeader("x-anon-hosting"), HasIspHeader("x-geo-isp")));
 }
 
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
@@ -347,7 +331,6 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
     isp_db_path: %s
     anon_db_path: %s
     asn_db_path: %s
-    read_asn_info_from_isp_db: false
   )EOF";
   MaxmindProviderConfig provider_config;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");

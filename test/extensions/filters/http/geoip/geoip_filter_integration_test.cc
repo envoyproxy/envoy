@@ -75,7 +75,6 @@ const std::string ConfigIspAndAsn = R"EOF(
         city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
         isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
         asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-        read_asn_info_from_isp_db: false
   )EOF";
 
 const std::string ConfigIspAndAsnNotUseAsn = R"EOF(
@@ -98,8 +97,6 @@ const std::string ConfigIspAndAsnNotUseAsn = R"EOF(
               apple_private_relay: "x-geo-apple-private-relay"
           city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
           isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
-          asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-          read_asn_info_from_isp_db: true
   )EOF";
 
 class GeoipFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
