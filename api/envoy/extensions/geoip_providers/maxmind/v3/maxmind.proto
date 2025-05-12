@@ -41,6 +41,6 @@ message MaxMindConfig {
   string isp_db_path = 5 [(validate.rules).string = {pattern: "^$|^.*\\.mmdb$"}];
 
   // Common provider configuration that specifies which geolocation headers will be populated with geolocation data.
-  common.v3.CommonGeoipProviderConfig common_provider_config = 
-      4 [(validate.rules).message = {required: true}];
+  common.v3.CommonGeoipProviderConfig common_provider_config = 4
+      [(validate.rules).message = {required: true}];
 }
