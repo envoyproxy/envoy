@@ -26,6 +26,9 @@ message Mutations {
 
   // The response mutations are applied before the response is sent to the downstream client.
   repeated config.common.mutation_rules.v3.HeaderMutation response_mutations = 2;
+
+  // The response trailer mutations are applied before the response is sent to the downstream client.
+  repeated config.common.mutation_rules.v3.HeaderMutation response_trailers_mutations = 4;
 }
 
 // Per route configuration for the header mutation filter.
