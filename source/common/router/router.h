@@ -591,8 +591,7 @@ private:
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void updateOutlierDetection(Upstream::Outlier::Result result,
-                              Upstream::HostDescriptionConstSharedPtr host,
-                              absl::optional<uint64_t> code);
+                              const Upstream::HostDescription& host, absl::optional<uint64_t> code);
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
                        Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,

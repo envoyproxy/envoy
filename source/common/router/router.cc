@@ -1391,23 +1391,23 @@ void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
                                     UpstreamRequest& upstream_request,
                                     absl::optional<uint64_t> code) {
   if (upstream_request.upstreamHost()) {
-    updateOutlierDetection(result, upstream_request.upstreamHost(), code);
+    updateOutlierDetection(result, upstream_request.upstreamHost().ref(), code);
   }
 }
 
 void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
-                                    Upstream::HostDescriptionConstSharedPtr host,
+                                    const Upstream::HostDescription& host,
                                     absl::optional<uint64_t> code) {
-  host->outlierDetector().putResult(result, code);
+  host.outlierDetector().putResult(result, code);
 
   // Iterate over all monitors where locally originated events should be sent.
   for (const auto& monitor : config_->outlier_detection_locally_originated_events_) {
     if (result == Upstream::Outlier::Result::LocalOriginConnectSuccess) {
       if (!monitor.second) {
-        host->outlierDetector().reportResult(monitor.first, false);
+        host.outlierDetector().reportResult(monitor.first, false);
       }
     } else {
-      host->outlierDetector().reportResult(monitor.first, true);
+      host.outlierDetector().reportResult(monitor.first, true);
     }
   }
 }
@@ -1593,7 +1593,8 @@ void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host
   }
 
   // Forward to extensions.
-  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectSuccess, host, absl::nullopt);
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectSuccess, *host,
+                         absl::nullopt);
 
   if (request_vcluster_) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
