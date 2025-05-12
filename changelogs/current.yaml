@@ -49,6 +49,10 @@ bug_fixes:
     draining. This can result in not enough connections being established for current pending requests. This is most problematic for
     long-lived requests (such as streaming gRPC requests or long-poll requests) because a connection could be in the draining state
     for a long time.
+- area: hcm
+  change: |
+    Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
+    with the lifetime of the codec stream.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -93,6 +97,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: load_balancing
+  change: |
+    Added Override Host Load Balancing policy. See
+    :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
 - area: lua
   change: |
     Added support for accessing filter context.

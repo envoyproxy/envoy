@@ -50,6 +50,8 @@ routing PRs, questions, etc. to the right place.
   * Load balancing, data plane.
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (takeshi@tetrate.io)
   * Dynamic modules, API gateway, WASM, Istio.
+* Rohit Agrawal ([agrawroh](https://github.com/agrawroh) (rohit.agrawal@databricks.com)
+  * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 
 # Envoy mobile maintainers
 

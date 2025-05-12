@@ -411,7 +411,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     cache_manager.forEachThreadLocalCache(reset_status);
   }
   if (!disable_dns_refresh_on_network_change_) {
-    connectivity_manager_->refreshDns(configuration, true);
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  } else if (Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.drain_pools_on_network_change")) {
+    ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+    connectivity_manager_->clusterManager().drainConnections(
+        [](const Upstream::Host&) { return true; });
   }
 }
 

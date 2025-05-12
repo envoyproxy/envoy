@@ -1284,6 +1284,20 @@ envoy.tracers.opentelemetry.samplers.always_on:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+envoy.tracers.opentelemetry.samplers.parent_based:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig
+envoy.tracers.opentelemetry.samplers.trace_id_ratio_based:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
 envoy.tracers.opentelemetry.samplers.dynatrace:
   categories:
   - envoy.tracers.opentelemetry.samplers
@@ -1743,6 +1757,13 @@ envoy.load_balancing_policies.client_side_weighted_round_robin:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
+envoy.load_balancing_policies.override_host:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
