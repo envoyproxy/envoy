@@ -46,6 +46,26 @@ message Router {
         [(validate.rules).duration = {gte {nanos: 1000000}}];
   }
 
+  message DestinationMonitor {
+    string monitor_name = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
+  message HttpEvents {
+    repeated DestinationMonitor send_to = 1 [(validate.rules).repeated = {min_items: 1}];
+
+    config.common.matcher.v3.MatchPredicate match = 2 [(validate.rules).message = {required: true}];
+  }
+
+  message LocallyOriginatedEvents {
+    repeated DestinationMonitor send_to = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  message OutlierDetection {
+    repeated HttpEvents http_events = 1;
+
+    LocallyOriginatedEvents locally_originated_events = 2;
+  }
+
   // Whether the router generates dynamic cluster statistics. Defaults to
   // true. Can be disabled in high performance scenarios.
   google.protobuf.BoolValue dynamic_stats = 1;
@@ -135,25 +155,6 @@ message Router {
   // upstream HTTP filters will count as a final response if hedging is configured.
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
-
-  message DestinationMonitor {
-    string monitor_name = 1 [(validate.rules).string = {min_len: 1}];
-    ;
-  };
-
-  message HttpEvents {
-    repeated DestinationMonitor send_to = 1 [(validate.rules).repeated = {min_items: 1}];
-    config.common.matcher.v3.MatchPredicate match = 2 [(validate.rules).message = {required: true}];
-  };
-
-  message LocallyOriginatedEvents {
-    repeated DestinationMonitor send_to = 1 [(validate.rules).repeated = {min_items: 1}];
-  };
-
-  message OutlierDetection {
-    repeated HttpEvents http_events = 1;
-    LocallyOriginatedEvents locally_originated_events = 2;
-  };
 
   OutlierDetection outlier_detection = 10;
 }
