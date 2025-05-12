@@ -50,8 +50,8 @@ routing PRs, questions, etc. to the right place.
   * Dynamic modules, API gateway, WASM, Istio.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
   * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
-* Paul Ogilby ([paul-r-gall ](https://github.com/paul-r-gall )) (pgal@google.com)
-  * Request mirroning, data plane
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall )) (pgal@google.com)
+  * Request mirroring, data plane
 
 # Envoy mobile maintainers
 
