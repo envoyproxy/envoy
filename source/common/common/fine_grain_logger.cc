@@ -52,7 +52,7 @@ void FineGrainLogContext::initFineGrainLogger(const std::string& key,
   } else {
     target = it->second.get();
   }
-  logger.store(target);
+  logger.store(target, std::memory_order_release);
 }
 
 bool FineGrainLogContext::setFineGrainLogger(absl::string_view key, level_enum log_level)

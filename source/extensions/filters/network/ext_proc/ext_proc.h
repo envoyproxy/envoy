@@ -19,14 +19,43 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
 
+#define ALL_NETWORK_EXT_PROC_FILTER_STATS(COUNTER)                                                 \
+  COUNTER(streams_started)                                                                         \
+  COUNTER(stream_msgs_sent)                                                                        \
+  COUNTER(stream_msgs_received)                                                                    \
+  COUNTER(read_data_sent)                                                                          \
+  COUNTER(write_data_sent)                                                                         \
+  COUNTER(read_data_injected)                                                                      \
+  COUNTER(write_data_injected)                                                                     \
+  COUNTER(empty_response_received)                                                                 \
+  COUNTER(spurious_msgs_received)                                                                  \
+  COUNTER(streams_closed)                                                                          \
+  COUNTER(streams_grpc_error)                                                                      \
+  COUNTER(streams_grpc_close)                                                                      \
+  COUNTER(connections_closed)                                                                      \
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(stream_open_failures)
+
+struct NetworkExtProcStats {
+  ALL_NETWORK_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 /**
  * Global configuration for Network ExtProc filter.
  */
 class Config {
 public:
-  Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config)
+  Config(const envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor& config,
+         Stats::Scope& scope)
       : failure_mode_allow_(config.failure_mode_allow()),
-        processing_mode_(config.processing_mode()), grpc_service_(config.grpc_service()) {};
+        processing_mode_(config.processing_mode()), grpc_service_(config.grpc_service()),
+        untyped_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().untyped().begin(),
+            config.metadata_options().forwarding_namespaces().untyped().end()),
+        typed_forwarding_namespaces_(
+            config.metadata_options().forwarding_namespaces().typed().begin(),
+            config.metadata_options().forwarding_namespaces().typed().end()),
+        stats_(generateStats(config.stat_prefix(), scope)) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -36,10 +65,28 @@ public:
 
   const envoy::config::core::v3::GrpcService& grpcService() const { return grpc_service_; }
 
+  const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
+    return untyped_forwarding_namespaces_;
+  }
+
+  const std::vector<std::string>& typedForwardingMetadataNamespaces() const {
+    return typed_forwarding_namespaces_;
+  }
+
+  const NetworkExtProcStats& stats() const { return stats_; }
+
 private:
+  NetworkExtProcStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    const std::string final_prefix = absl::StrCat("network_ext_proc.", prefix);
+    return {ALL_NETWORK_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+
   const bool failure_mode_allow_;
   const envoy::extensions::filters::network::ext_proc::v3::ProcessingMode processing_mode_;
   const envoy::config::core::v3::GrpcService grpc_service_;
+  const std::vector<std::string> untyped_forwarding_namespaces_;
+  const std::vector<std::string> typed_forwarding_namespaces_;
+  NetworkExtProcStats stats_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -106,6 +153,7 @@ private:
   void closeStream();
 
   void sendRequest(Envoy::Buffer::Instance& data, bool end_stream, bool is_read);
+  void addDynamicMetadata(ProcessingRequest& req);
 
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason);
@@ -114,6 +162,7 @@ private:
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
   const ConfigConstSharedPtr config_;
+  const NetworkExtProcStats& stats_;
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
   const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;

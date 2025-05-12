@@ -80,11 +80,11 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
     absl::string_view listener_name = EMPTY_STRING;
 
     auto onError = [&](std::string error_message) {
-      failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
+      failure_state.emplace_back(envoy::admin::v3::UpdateFailureState());
       auto& state = failure_state.back();
-      state->set_details(error_message);
+      state.set_details(error_message);
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-      state->mutable_failed_configuration()->PackFrom(resource.get().resource());
+      state.mutable_failed_configuration()->PackFrom(resource.get().resource());
 #endif
       absl::StrAppend(&message, listener_name, ": ", error_message, "\n");
     };
