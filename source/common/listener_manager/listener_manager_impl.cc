@@ -72,7 +72,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->PackFrom(listener.config());
+  listener.dumpConfig(*state.mutable_listener());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -384,12 +384,12 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->PackFrom(listener->config());
+      listener->dumpConfig(*static_listener.mutable_listener());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -411,7 +411,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& listener : warming_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     DynamicListener* dynamic_listener =
@@ -421,7 +421,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& draining_listener : draining_listeners_) {
-    if (!name_matcher.match(draining_listener.listener_->config().name())) {
+    if (!name_matcher.match(draining_listener.listener_->configName())) {
       continue;
     }
     const auto& listener = draining_listener.listener_;
@@ -547,7 +547,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // removed.
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->blockUpdate(hash)) {
+      (*existing_active_listener)->blockLdsUpdate(hash)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
@@ -557,9 +557,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->blockUpdate(hash)) ||
+       (*existing_warming_listener)->blockLdsUpdate(hash)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->blockUpdate(hash))) {
+       (*existing_active_listener)->blockLdsUpdate(hash))) {
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }

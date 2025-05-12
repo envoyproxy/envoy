@@ -169,6 +169,9 @@ public:
   const Network::DrainableFilterChainSharedPtr& defaultFilterChain() const {
     return default_filter_chain_;
   }
+  void dumpFcdsFilterChains(envoy::config::listener::v3::Listener&) const {
+    IS_ENVOY_BUG("Unexpected function call: FCDS is not implemented");
+  }
 
 private:
   absl::Status convertIPsToTries();
