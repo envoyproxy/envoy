@@ -767,7 +767,7 @@ TEST_F(FilterManagerTest, SetSocketOptionTest) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(filter_manager_callbacks_, setSocketOption(_)).WillOnce(Return(true));
+  EXPECT_CALL(filter_manager_callbacks_, setDownstreamSocketOption(_)).WillOnce(Return(true));
 
   EXPECT_TRUE(filter_manager_->setDownstreamSocketOption(option));
   filter_manager_->destroyFilters();
