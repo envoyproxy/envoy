@@ -17,7 +17,7 @@ namespace {
 using ::apikeys::ApiKey;
 using ::apikeys::CreateApiKeyRequest;
 
-class IntegrationTest : public HttpProtocolIntegrationTest {
+class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void SetUp() override {
     HttpProtocolIntegrationTest::SetUp();
@@ -80,7 +80,8 @@ apikeys::ApiKey makeCreateApiKeyResponse(absl::string_view pb = R"pb(
   return response;
 }
 
-TEST_P(IntegrationTest, Unary) {
+// Tests that a unary request should passthrough the filter without any errors.
+TEST_P(ProtoApiScrubberIntegrationTest, PassThroughUnary) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
@@ -105,7 +106,7 @@ TEST_P(IntegrationTest, Unary) {
   sendResponse(response.get(), response_data.get());
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, ProtoApiScrubberIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              /*downstream_protocols=*/{Http::CodecType::HTTP2},
                              /*upstream_protocols=*/{Http::CodecType::HTTP2})),

@@ -8,15 +8,33 @@ NOTE: This filter is currently WIP and not ready for use.
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig``.
 
-ProtoApiScrubber filter supports filtering of the request and
-response payloads based on the configured field restrictions and actions.
-The field restrictions and actions can be defined using the unified matcher API.
-The filter evaluates the configured restriction for each field
-to produce the filtered output using the configured actions.
-This filter currently supports only field level restrictions.
-Restriction support for other proto elements (eg, message
-level restriction, method level restriction, etc.) are planned to be
-implemented in future. The design doc for this filter is available
+Terminology
+-----------
+
+1. Restriction
+
+    A restriction is a constraint on a proto element (e.g., field, message,
+    etc.) which can be defined using the unified matcher API. Although, unified
+    matcher API supports a lot of ways to define these constraints, currently,
+    only CEL expressions are supported for this filter.
+
+2. Actions
+
+    An action refers to the specific configuration or behavior that is applied
+    whenever a restriction or constraint is satisfied. This filter adds support
+    for a RemoveFieldAction which removes a field from request/response payload.
+    However, any of the predefined envoy actions can be used as well.
+
+Overview
+--------
+
+ProtoApiScrubber filter supports filtering of the request and response Protobuf
+payloads based on the configured restrictions and actions.
+The filter evaluates the configured restriction for each field to produce the
+filtered output using the configured actions. This filter currently supports
+only field level restrictions. Restriction support for other proto elements
+(e.g., message level restriction, method level restriction, etc.) are planned to
+be added in future. The design doc for this filter is available
 `here <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_
 
 Assumptions
@@ -85,7 +103,15 @@ Consider the following API definition:
       string debug_info = 4;
     }
 
-The filter config for this API would look like below (in JSON):
+The filter config for this API would look like below (in JSON). Note that the
+fields GetBookResponse::debug_info and GetBookResponse::Book::debug_info have
+restrictions set as per the comments specified above. It's configured as a CEL
+expression which uses the request header attributes to match a header value.
+The CEL expression evaluates to ``true`` if the request header ``USER_TYPE``
+does not have the value ``DEV`` and the ``RemoveFieldAction`` is performed for
+that field. Similarly, if the request header ``USER_TYPE`` has the value
+``DEV``, the CEL expression evaluates to ``false`` and the field is not removed,
+which is the expected behavior.
 
 .. code-block:: json
 
