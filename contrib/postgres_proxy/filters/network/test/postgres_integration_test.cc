@@ -31,7 +31,8 @@ public:
   // The first string contains string to enable/disable SSL.
   // The second string contains transport socket configuration.
   // The third string contains require downstream SSL config
-  using SSLConfig = std::tuple<const absl::string_view, const absl::string_view, const absl::string_view>;
+  using SSLConfig =
+      std::tuple<const absl::string_view, const absl::string_view, const absl::string_view>;
 
   // Tuple to store upstream startTLS configuration.
   // The first string contains string to enable/disable SSL.
@@ -56,7 +57,8 @@ public:
     return main_config;
   }
 
-  PostgresBaseIntegrationTest(SSLConfig downstream_ssl_config, UpstreamSSLConfig upstream_ssl_config,
+  PostgresBaseIntegrationTest(SSLConfig downstream_ssl_config,
+                              UpstreamSSLConfig upstream_ssl_config,
                               std::string additional_filters = "")
       : BaseIntegrationTest(GetParam(), postgresConfig(downstream_ssl_config, upstream_ssl_config,
                                                        additional_filters)) {
@@ -67,7 +69,8 @@ public:
 
   static constexpr absl::string_view empty_config_string_{""};
   static constexpr UpstreamSSLConfig NoUpstreamSSL{empty_config_string_, empty_config_string_};
-  static constexpr SSLConfig NoDownstreamSSL{empty_config_string_, empty_config_string_, empty_config_string_};
+  static constexpr SSLConfig NoDownstreamSSL{empty_config_string_, empty_config_string_,
+                                             empty_config_string_};
   FakeRawConnectionPtr fake_upstream_connection_;
 };
 
@@ -208,7 +211,9 @@ class DownstreamSSLWrongConfigPostgresIntegrationTest : public PostgresBaseInteg
 public:
   DownstreamSSLWrongConfigPostgresIntegrationTest()
       // Enable SSL termination but do not configure downstream transport socket.
-      : PostgresBaseIntegrationTest(std::make_tuple("terminate_ssl: true", "", "require_downstream_ssl: true"), NoUpstreamSSL) {}
+      : PostgresBaseIntegrationTest(
+            std::make_tuple("terminate_ssl: true", "", "require_downstream_ssl: true"),
+            NoUpstreamSSL) {}
 };
 
 // Test verifies that Postgres filter closes connection when it is configured to
@@ -547,10 +552,8 @@ public:
                   filename: {}
    )EOF",
                     TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
-                    TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")), 
-                "require_downstream_ssl: true")
-                ){}
-                      
+                    TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")),
+                "require_downstream_ssl: true")) {}
 
   // Method changes IntegrationTcpClient's transport socket to TLS.
   // Sending any traffic to newly attached TLS transport socket will trigger

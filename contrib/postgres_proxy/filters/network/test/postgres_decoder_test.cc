@@ -636,18 +636,17 @@ TEST_F(PostgresProxyDecoderTest, DownstreamSSL) {
   // Set decoder to wait for initial message.
   decoder_->state(DecoderImpl::State::InitState);
 
-  // if message is not requesting SSL, 
-  // verifyDownstreamSSL should be called to check 
+  // if message is not requesting SSL,
+  // verifyDownstreamSSL should be called to check
   // if ssl negotiation is done
   // and if require client ssl is set
-  EXPECT_CALL(callbacks_, verifyDownstreamSSL).Times(1);
+  EXPECT_CALL(callbacks_, verifyDownstreamSSL);
 
   // send a init postgres request that is not ssl init request
   createInitialPostgresRequest(data_);
 
   ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
-
 }
 
 class PostgresProxyUpstreamSSLTest
