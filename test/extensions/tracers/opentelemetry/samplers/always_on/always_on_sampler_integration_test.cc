@@ -35,7 +35,7 @@ public:
         timeout: 0.250s
       service_name: "a_service_name"
       sampler:
-        name: envoy.tracers.opentelemetry.samplers.dynatrace
+        name: envoy.tracers.opentelemetry.samplers.always_on
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
   )EOF";
