@@ -408,7 +408,8 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
 
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(*dispatcher_));
-  EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
+  EXPECT_CALL(secret_context.server_context_, messageValidationVisitor())
+      .WillOnce(ReturnRef(validation_visitor));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
