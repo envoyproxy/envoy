@@ -2091,7 +2091,7 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
-bool ConnectionManagerImpl::ActiveStream::setSocketOption(
+bool ConnectionManagerImpl::ActiveStream::setDownstreamSocketOption(
     const Network::Socket::OptionConstSharedPtr option) {
   return connection_manager_.read_callbacks_->connection().setSocketOption(option);
 }
