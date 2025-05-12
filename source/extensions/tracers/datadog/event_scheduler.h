@@ -39,8 +39,8 @@ public:
   // Implementation of the required config() method from datadog::tracing::EventScheduler
   std::string config() const override;
 
-  // Provides JSON configuration for debug logging
-  nlohmann::json config_json() const;
+  // Provides JSON configuration for debug logging.
+  const nlohmann::json& config_json() const;
 
 private:
   Event::Dispatcher& dispatcher_;

@@ -66,10 +66,11 @@ EventScheduler::schedule_recurring_event(std::chrono::steady_clock::duration int
 
 std::string EventScheduler::config() const { return config_json().dump(); }
 
-nlohmann::json EventScheduler::config_json() const {
-  return nlohmann::json::object({
+const nlohmann::json& EventScheduler::config_json() const {
+  static const nlohmann::json config = nlohmann::json::object({
       {"type", "Envoy::Extensions::Tracers::Datadog::EventScheduler"},
   });
+  return config;
 }
 
 } // namespace Datadog
