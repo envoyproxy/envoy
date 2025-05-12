@@ -19,6 +19,7 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
+  InstanceImpl();
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -35,19 +36,21 @@ private:
   // slot as callbacks drain from workers.
   struct SlotImpl : public Slot {
     SlotImpl(InstanceImpl& parent, uint32_t index);
-    ~SlotImpl() override { parent_.removeSlot(index_); }
-    Event::PostCb wrapCallback(const Event::PostCb& cb);
-    Event::PostCb dataCallback(const UpdateCb& cb);
+    ~SlotImpl() override;
+    std::function<void()> wrapCallback(const std::function<void()>& cb);
+    std::function<void()> dataCallback(const UpdateCb& cb);
     static bool currentThreadRegisteredWorker(uint32_t index);
     static ThreadLocalObjectSharedPtr getWorker(uint32_t index);
 
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     void runOnAllThreads(const UpdateCb& cb) override;
-    void runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) override;
+    void runOnAllThreads(const UpdateCb& cb, const std::function<void()>& complete_cb) override;
     bool currentThreadRegistered() override;
     void set(InitializeCb cb) override;
-    bool isShutdown() const override { return parent_.shutdown_; }
+    bool isShutdown() const override { return isShutdownImpl(); }
+    // We need to call isShutdown inside the destructor, so it must be non-virtual.
+    bool isShutdownImpl() const { return parent_.shutdown_; }
 
     InstanceImpl& parent_;
     const uint32_t index_;
@@ -72,8 +75,8 @@ private:
   };
 
   void removeSlot(uint32_t slot);
-  void runOnAllThreads(Event::PostCb cb);
-  void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback);
+  void runOnAllThreads(std::function<void()> cb);
+  void runOnAllThreads(std::function<void()> cb, std::function<void()> main_callback);
   static void setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object);
 
   static thread_local ThreadLocalData thread_local_data_;

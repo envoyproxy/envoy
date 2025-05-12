@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -22,9 +22,9 @@ generate_rsa_key() {
   openssl genrsa -out "${1}key.pem" 2048
 }
 
-# $1=<certificate name>
+# $1=<certificate name> $2=<curve name>
 generate_ecdsa_key() {
-  openssl ecparam -name secp256r1 -genkey -out "${1}key.pem"
+  openssl ecparam -name "${2}" -genkey -out "${1}key.pem"
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
@@ -68,6 +68,8 @@ generate_info_header() {
         echo "constexpr char ${prefix}_CERT_1_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -outform DER | openssl dgst -sha1 | cut -d" " -f2)\";"
         echo "constexpr char ${prefix}_CERT_SPKI[] = \"$(openssl x509 -in "${1}cert.pem" -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";"
         echo "constexpr char ${prefix}_CERT_SERIAL[] = \"$(openssl x509 -in "${1}cert.pem" -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";"
+        echo "constexpr char ${prefix}_CERT_NOT_BEFORE[] = \"$(openssl x509 -in "${1}cert.pem" -noout -startdate | cut -d"=" -f2)\";"
+        echo "constexpr char ${prefix}_CERT_NOT_AFTER[] = \"$(openssl x509 -in "${1}cert.pem" -noout -enddate | cut -d"=" -f2)\";"
     } > "${1}cert_info.h"
 }
 
@@ -79,16 +81,40 @@ generate_ca intermediate_ca ca
 generate_ca intermediate_ca_2 intermediate_ca
 # Concatenate intermediate and ca certs create valid certificate chain.
 cat cacert.pem intermediate_cacert.pem  intermediate_ca_2cert.pem > intermediate_ca_cert_chain.pem
+# Concatenate ca certs create valid partial certificate chain
+cat intermediate_cacert.pem intermediate_ca_2cert.pem > intermediate_partial_ca_cert_chain.pem
 # Generate RSA cert for the server.
 generate_rsa_key server ca
 generate_x509_cert server ca
 generate_ocsp_response server ca
-# Generate ECDSA cert for the server.
+generate_info_header server
+# Generate RSA cert for the server with extra data for a very large certificate
+generate_rsa_key long_server ca
+generate_x509_cert long_server ca
+generate_ocsp_response long_server ca
+generate_info_header long_server
+# Generate RSA cert for the server with different SAN
+generate_rsa_key server2 ca
+generate_x509_cert server2 ca
+generate_info_header server2
+# Generate ECDSA P-256 cert for the server.
 cp -f servercert.cfg server_ecdsacert.cfg
-generate_ecdsa_key server_ecdsa ca
+generate_ecdsa_key server_ecdsa secp256r1
 generate_x509_cert server_ecdsa ca
 generate_ocsp_response server_ecdsa ca
 rm -f server_ecdsacert.cfg
+# Generate ECDSA P-384 cert for the server.
+cp -f servercert.cfg server_ecdsa_p384cert.cfg
+generate_ecdsa_key server_ecdsa_p384 secp384r1
+generate_x509_cert server_ecdsa_p384 ca
+generate_ocsp_response server_ecdsa_p384 ca
+rm -f server_ecdsa_p384cert.cfg
+# Generate ECDSA P-521 cert for the server.
+cp -f servercert.cfg server_ecdsa_p521cert.cfg
+generate_ecdsa_key server_ecdsa_p521 secp521r1
+generate_x509_cert server_ecdsa_p521 ca
+generate_ocsp_response server_ecdsa_p521 ca
+rm -f server_ecdsa_p521cert.cfg
 # Generate cert for the client.
 generate_rsa_key client
 generate_x509_cert client ca
@@ -97,9 +123,12 @@ generate_rsa_key client2 ca
 generate_x509_cert client2 intermediate_ca_2
 # Generate ECDSA cert for the client.
 cp -f clientcert.cfg client_ecdsacert.cfg
-generate_ecdsa_key client_ecdsa ca
+generate_ecdsa_key client_ecdsa secp256r1
 generate_x509_cert client_ecdsa ca
 rm -f client_ecdsacert.cfg
+
+#  Concatenate intermediate and ca certs create client certificate full chain
+cat client2cert.pem intermediate_ca_2cert.pem intermediate_cacert.pem cacert.pem > client2_chain.pem
 
 # Generate cert for the upstream CA.
 generate_ca upstreamca
@@ -112,6 +141,10 @@ generate_x509_cert upstreamlocalhost upstreamca
 # Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
 generate_rsa_key expired_
 generate_x509_cert expired_ ca -365
+
+# Generate cert has keyUsage extension that is incompatible with the TLS usage
+generate_rsa_key bad_rsa_key_usage
+generate_x509_cert bad_rsa_key_usage ca
 
 rm ./*.csr
 rm ./*.srl

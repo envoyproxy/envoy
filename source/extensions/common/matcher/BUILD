@@ -25,6 +25,10 @@ envoy_cc_extension(
     name = "trie_matcher_lib",
     srcs = ["trie_matcher.cc"],
     hdrs = ["trie_matcher.h"],
+    extra_visibility = [
+        "//source/common/listener_manager:__subpackages__",
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/matcher:matcher_interface",
         "//envoy/network:filter_interface",
@@ -33,6 +37,6 @@ envoy_cc_extension(
         "//source/common/matcher:matcher_lib",
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
-        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

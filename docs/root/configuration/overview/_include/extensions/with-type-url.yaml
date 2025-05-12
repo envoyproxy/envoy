@@ -1,0 +1,52 @@
+node:
+  cluster: envoy_cluster
+  id: envoy_node
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: front-http-proxy
+        typed_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          value:
+            stat_prefix: ingress_http
+            codec_type: AUTO
+            rds:
+              route_config_name: local_route
+              config_source:
+                api_config_source:
+                  api_type: GRPC
+                  grpc_services:
+                  - envoy_grpc:
+                      cluster_name: xds_cluster
+            http_filters:
+            - name: front-router
+              typed_config:
+                "@type": type.googleapis.com/xds.type.v3.TypedStruct
+                type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                value:
+                  dynamic_stats: true
+  clusters:
+  - type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    name: xds_cluster
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: my-control-plane
+                port_value: 18000

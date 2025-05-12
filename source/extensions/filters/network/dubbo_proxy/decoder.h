@@ -71,7 +71,7 @@ public:
   };
 
   DecoderStateMachine(Protocol& protocol, Delegate& delegate)
-      : protocol_(protocol), delegate_(delegate), state_(ProtocolState::OnDecodeStreamHeader) {}
+      : protocol_(protocol), delegate_(delegate) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -93,9 +93,9 @@ public:
 private:
   struct DecoderStatus {
     DecoderStatus() = default;
-    DecoderStatus(ProtocolState next_state) : next_state_(next_state){};
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state) {};
     DecoderStatus(ProtocolState next_state, FilterStatus filter_status)
-        : next_state_(next_state), filter_status_(filter_status){};
+        : next_state_(next_state), filter_status_(filter_status) {};
 
     ProtocolState next_state_;
     absl::optional<FilterStatus> filter_status_;
@@ -112,7 +112,7 @@ private:
   Protocol& protocol_;
   Delegate& delegate_;
 
-  ProtocolState state_;
+  ProtocolState state_{ProtocolState::OnDecodeStreamHeader};
   ActiveStream* active_stream_{nullptr};
 };
 

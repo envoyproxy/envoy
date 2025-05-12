@@ -13,7 +13,7 @@ Sandboxes
    `Pull Request <https://github.com/envoyproxy/envoy/pulls>`_ with the necessary changes
    should you be able to create one.
 
-   :repo:`See the sandbox developer documentation <examples/DEVELOPER.md>` for more information about
+   `See the sandbox developer documentation in the envoyproxy/examples project <https://github.com/envoyproxy/examples/blob/main/DEVELOPER.md>`_ for more information about
    creating your own sandbox.
 
 .. sidebar:: Compatibility
@@ -42,40 +42,4 @@ Before you begin you will need to install the sandbox environment.
 
 The following sandboxes are available:
 
-.. toctree::
-    :maxdepth: 1
-
-    brotli
-    cache
-    cors
-    csrf
-    double-proxy
-    dynamic-configuration-filesystem
-    dynamic-configuration-control-plane
-    ext_authz
-    fault_injection
-    front_proxy
-    grpc_bridge
-    gzip
-    jaeger_native_tracing
-    jaeger_tracing
-    kafka
-    load_reporting_service
-    locality_load_balancing
-    local_ratelimit
-    lua
-    mysql
-    opentelemetry
-    postgres
-    rbac
-    redis
-    skywalking
-    tls-inspector
-    tls-sni
-    tls
-    udp
-    wasm-cc
-    websocket
-    win32_front_proxy
-    zipkin
-    zstd
+.. include:: toctree.rst

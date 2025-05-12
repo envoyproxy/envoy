@@ -12,15 +12,20 @@ envoy_cc_library(
     name = "evaluator_lib",
     srcs = ["evaluator.cc"],
     hdrs = ["evaluator.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":context_lib",
+        "//envoy/singleton:manager_interface",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "//source/common/runtime:runtime_features_lib",
+        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
         "@com_google_cel_cpp//eval/public:cel_expression",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_google_cel_cpp//extensions:regex_functions",
     ],
 )
 
@@ -28,6 +33,7 @@ envoy_cc_library(
     name = "context_lib",
     srcs = ["context.cc"],
     hdrs = ["context.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":cel_state_lib",
         "//source/common/grpc:common_lib",
@@ -51,6 +57,7 @@ envoy_cc_library(
     hdrs = [
         "cel_state.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
         "//source/common/protobuf",

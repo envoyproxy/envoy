@@ -85,7 +85,6 @@ cluster_manager {
   }
   load_stats_config {
     api_type: REST
-    transport_api_version: V3
     refresh_delay {
       seconds: 4611686018427387903
     }
@@ -118,7 +117,6 @@ watchdogs {
 }
 hds_config {
   api_type: REST
-  transport_api_version: V3
 }
 layered_runtime {
 }

@@ -40,9 +40,12 @@ protected:
 
 // Tests should run with all protocols.
 class CrashIntegrationTestAllProtocols : public CrashIntegrationTest {};
-INSTANTIATE_TEST_SUITE_P(Protocols, CrashIntegrationTestAllProtocols,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CrashIntegrationTestAllProtocols,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   const std::string request_kill_config =
@@ -66,8 +69,8 @@ TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   //  - Http(1|2)::ConnectionImpl
   //  - Network::ConnectionImpl
   const std::string death_string = GetParam().downstream_protocol == Http::CodecType::HTTP2
-                                       ? "ActiveStream.*Http2::ConnectionImpl.*ConnectionImpl"
-                                       : "ActiveStream.*Http1::ConnectionImpl.*ConnectionImpl";
+                                       ? "(?s)ActiveStream.*Http2::ConnectionImpl.*ConnectionImpl"
+                                       : "(?s)ActiveStream.*Http1::ConnectionImpl.*ConnectionImpl";
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
                death_string);
 }
@@ -90,7 +93,7 @@ TEST_P(CrashIntegrationTestAllProtocols, ResponseCrashDumpsTheCorrespondingReque
   // Check that we dump the downstream request
   EXPECT_DEATH(
       sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 1024),
-      "Dumping corresponding downstream request.*UpstreamRequest.*request_headers:");
+      "(?s)Dumping corresponding downstream request.*UpstreamRequest.*request_headers:");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueDoesNotAddTrackedObjectIfExists) {
@@ -161,7 +164,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueAddsCrashContextIfNoneExi
   //  - ActiveStream
   //  - Network::ConnectionImpl
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "ActiveStream.*.*ConnectionImpl");
+               "(?s)ActiveStream.*.*ConnectionImpl");
 }
 
 TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueDoesNotAddTrackedObjectIfExists) {
@@ -228,7 +231,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueAddsCrashContextIfNoneExi
   //  - ActiveStream
   //  - Network::ConnectionImpl
   EXPECT_DEATH(sendRequestAndWaitForResponse(default_request_headers_, 0, kill_response_headers, 0),
-               "ActiveStream.*.*ConnectionImpl");
+               "(?s)ActiveStream.*.*ConnectionImpl");
 }
 
 #endif

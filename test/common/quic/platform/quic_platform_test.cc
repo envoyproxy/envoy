@@ -14,7 +14,7 @@
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stats/stat_test_utility.h"
-#include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/common/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
@@ -33,7 +33,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_test.h"
@@ -50,7 +49,6 @@
 using quiche::GetLogger;
 using quiche::getVerbosityLogThreshold;
 using quiche::setVerbosityLogThreshold;
-using testing::_;
 using testing::HasSubstr;
 
 namespace quic {
@@ -111,17 +109,9 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
 
 TEST_F(QuicPlatformTest, QuicExpectBug) {
   auto bug = [](const char* error_message) { QUIC_BUG(bug_id) << error_message; };
-
   auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG(bug_id) << error_message; };
   EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
   EXPECT_QUIC_BUG(bug("bug two is expected"), "bug two");
-#ifdef NDEBUG
-  // The 3rd triggering in release mode should not be logged.
-  EXPECT_LOG_NOT_CONTAINS("error", "bug three", bug("bug three is expected"));
-#else
-  EXPECT_QUIC_BUG(bug("bug three is expected"), "bug three");
-#endif
-
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_1 is expected"), "peer_bug_1");
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_2 is expected"), "peer_bug_2");
 }
@@ -165,7 +155,8 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicThread) {
+// https://github.com/envoyproxy/envoy/issues/26711
+TEST_F(QuicPlatformTest, DISABLED_QuicThread) {
   class AdderThread : public QuicThread {
   public:
     AdderThread(int* value, int increment)
@@ -323,18 +314,21 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
   QUICHE_CHECK(1 == 1);
   QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
-                     "Check failed:.* Supposed to fail in debug mode.");
+  EXPECT_DEBUG_DEATH(
+      { QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
+      "Check failed:.* Supposed to fail in debug mode.");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "Check failed");
 
-  EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
-               "Check failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH(
+      { QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
+      "Check failed:.* Supposed to fail in all modes.");
   EXPECT_DEATH({ QUICHE_CHECK(false); }, "Check failed");
   EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
-                     "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
-                     "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
+  EXPECT_DEBUG_DEATH(
+      { QUICHE_DCHECK_NE(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
+  EXPECT_DEBUG_DEATH(
+      { QUICHE_DCHECK_NE(nullptr, nullptr); },
+      "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
 }
 
 // Test the behaviors of the cross products of
@@ -362,27 +356,6 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #else
   EXPECT_DEATH(QUICHE_NOTREACHED(), "reached unexpected code");
 #endif
-}
-
-TEST_F(QuicPlatformTest, QuicMutex) {
-  QuicMutex mu;
-
-  QuicWriterMutexLock wmu(&mu);
-  mu.AssertReaderHeld();
-  mu.WriterUnlock();
-  {
-    QuicReaderMutexLock rmu(&mu);
-    mu.AssertReaderHeld();
-  }
-  mu.WriterLock();
-}
-
-TEST_F(QuicPlatformTest, QuicNotification) {
-  QuicNotification notification;
-  EXPECT_FALSE(notification.HasBeenNotified());
-  notification.Notify();
-  notification.WaitForNotification();
-  EXPECT_TRUE(notification.HasBeenNotified());
 }
 
 TEST_F(QuicPlatformTest, QuicTestOutput) {
@@ -446,6 +419,12 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 }
 
+TEST_F(QuicPlatformTest, QuicheLogDFatalNoExit) {
+  quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
+  QUIC_LOG(DFATAL) << "This shouldn't call abort()";
+  QUICHE_DCHECK(false) << "This shouldn't call abort()";
+}
+
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
 
@@ -454,20 +433,20 @@ TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
 
   // Flip both flags to a non-default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", true},
-       {"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", false}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_false", true},
+       {"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true", false}});
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip one flag back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", false}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_false", false}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip the other back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", true}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true", true}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
 }
@@ -514,45 +493,6 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // build.
   quiche::QuicheRunSystemEventLoopIteration();
   quiche::QuicheSystemEventLoop("dummy");
-}
-
-TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
-  std::string str(512, 'b');
-  // Fragment needs to out-live buffer.
-  bool fragment_releaser_called = false;
-  Envoy::Buffer::BufferFragmentImpl fragment(
-      str.data(), str.length(),
-      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-        // Used to verify that mem slice release appropriately.
-        fragment_releaser_called = true;
-      });
-  Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0(quiche::QuicheMemSlice::InPlace(), buffer, 0u),
-                     "");
-  std::string str2(1024, 'a');
-  // str2 is copied.
-  buffer.add(str2);
-  EXPECT_EQ(1u, buffer.getRawSlices().size());
-  buffer.addBufferFragment(fragment);
-
-  quiche::QuicheMemSlice slice1(quiche::QuicheMemSlice::InPlace(), buffer, str2.length());
-  EXPECT_EQ(str.length(), buffer.length());
-  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
-  std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
-  // slice1 is released, but str2 should not be affected.
-  slice1.Reset();
-  EXPECT_TRUE(slice1.empty());
-  EXPECT_EQ(nullptr, slice1.data());
-  EXPECT_EQ(str2_old, str2);
-
-  quiche::QuicheMemSlice slice2(quiche::QuicheMemSlice::InPlace(), buffer, str.length());
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_EQ(str.data(), slice2.data());
-  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
-  slice2.Reset();
-  EXPECT_TRUE(slice2.empty());
-  EXPECT_EQ(nullptr, slice2.data());
-  EXPECT_TRUE(fragment_releaser_called);
 }
 
 } // namespace

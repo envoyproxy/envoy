@@ -84,6 +84,11 @@ public:
    * @return bool indicator to flush stats on-demand via the admin interface instead of on a timer.
    */
   virtual bool flushOnAdmin() const PURE;
+
+  /**
+   * @return true if deferred creation of stats is enabled.
+   */
+  virtual bool enableDeferredCreationStats() const PURE;
 };
 
 /**
@@ -131,7 +136,7 @@ public:
   /**
    * @return std::list<AccessLog::InstanceSharedPtr> the list of access loggers.
    */
-  virtual std::list<AccessLog::InstanceSharedPtr> accessLogs() const PURE;
+  virtual AccessLog::InstanceSharedPtrVector accessLogs() const PURE;
 
   /**
    * @return const std::string& profiler output path.

@@ -231,7 +231,6 @@ cluster_manager {
     request_timeout {
       nanos: 14024704
     }
-    transport_api_version: V3
   }
 }
 stats_flush_interval {

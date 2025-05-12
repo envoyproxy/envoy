@@ -19,10 +19,17 @@ namespace Http11Connect {
 class UpstreamHttp11ConnectSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
-  static bool isValidConnectResponse(Buffer::Instance& buffer);
+  // Processes response_payload and returns true if it is a valid connect
+  // response with status code 200.
+  // @param response_payload the HTTP response bytes
+  // @param header_complete will be set to true if the response payload contains complete headers.
+  // @param bytes_processed will return how many bytes of response_payload were processed.
+  static bool isValidConnectResponse(absl::string_view response_payload, bool& headers_complete,
+                                     size_t& bytes_processed);
 
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
-                              Network::TransportSocketOptionsConstSharedPtr options);
+                              Network::TransportSocketOptionsConstSharedPtr options,
+                              std::shared_ptr<const Upstream::HostDescription> host);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -56,7 +63,8 @@ public:
 class SelfContainedParser : public Http::Http1::ParserCallbacks {
 public:
   SelfContainedParser()
-      : parser_(Http::Http1::MessageType::Response, this, 2000, /* enable_trailers = */ false) {}
+      : parser_(Http::Http1::MessageType::Response, this, 2000, /* enable_trailers = */ false,
+                /* allow_custom_methods = */ false) {}
   Http::Http1::CallbackResult onMessageBegin() override {
     return Http::Http1::CallbackResult::Success;
   }

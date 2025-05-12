@@ -85,5 +85,36 @@ public:
 };
 
 } // namespace ConnectionPool
+
+namespace AsyncClient {
+
+class MockAsyncTcpClientCallbacks : public AsyncTcpClientCallbacks {
+public:
+  MockAsyncTcpClientCallbacks() = default;
+  ~MockAsyncTcpClientCallbacks() override = default;
+
+  MOCK_METHOD(void, onData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockAsyncTcpClient : public AsyncTcpClient {
+public:
+  MockAsyncTcpClient() = default;
+  ~MockAsyncTcpClient() override = default;
+
+  MOCK_METHOD(bool, connect, ());
+  MOCK_METHOD(void, close, (Network::ConnectionCloseType type));
+  MOCK_METHOD(Network::DetectedCloseType, detectedCloseType, (), (const));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, setAsyncTcpClientCallbacks, (AsyncTcpClientCallbacks & callbacks));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(bool, connected, ());
+  MOCK_METHOD(OptRef<StreamInfo::StreamInfo>, getStreamInfo, ());
+};
+
+} // namespace AsyncClient
 } // namespace Tcp
 } // namespace Envoy

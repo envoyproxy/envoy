@@ -22,18 +22,12 @@ namespace File {
 
 AccessLog::InstanceSharedPtr StdoutAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr StdoutAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   return AccessLoggers::createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StdoutAccessLog,
-      Filesystem::DestinationType::Stdout>(config, std::move(filter), context);
+      Filesystem::DestinationType::Stdout>(config, std::move(filter), context,
+                                           std::move(command_parsers));
 }
 
 ProtobufTypes::MessagePtr StdoutAccessLogFactory::createEmptyConfigProto() {
@@ -46,23 +40,17 @@ std::string StdoutAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(StdoutAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.stdout_access_log"};
+LEGACY_REGISTER_FACTORY(StdoutAccessLogFactory, AccessLog::AccessLogInstanceFactory,
+                        "envoy.stdout_access_log");
 
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+    Server::Configuration::FactoryContext& context,
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   return createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StderrAccessLog,
-      Filesystem::DestinationType::Stderr>(config, std::move(filter), context);
+      Filesystem::DestinationType::Stderr>(config, std::move(filter), context,
+                                           std::move(command_parsers));
 }
 
 ProtobufTypes::MessagePtr StderrAccessLogFactory::createEmptyConfigProto() {
@@ -75,8 +63,8 @@ std::string StderrAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the `stderr` access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(StderrAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.stderr_access_log"};
+LEGACY_REGISTER_FACTORY(StderrAccessLogFactory, AccessLog::AccessLogInstanceFactory,
+                        "envoy.stderr_access_log");
 
 } // namespace File
 } // namespace AccessLoggers

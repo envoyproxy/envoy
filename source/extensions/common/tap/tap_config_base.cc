@@ -3,9 +3,11 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 
@@ -45,12 +47,14 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& proto_config,
-                                     Common::Tap::Sink* admin_streamer)
+                                     Common::Tap::Sink* admin_streamer,
+                                     Server::Configuration::GenericFactoryContext& context)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
+
   using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
   auto& sinks = proto_config.output_config().sinks();
   ASSERT(sinks.size() == 1);
@@ -61,7 +65,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
 
   switch (sink_type_) {
   case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
-    ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
+    if (admin_streamer == nullptr) {
+      throw EnvoyException(fmt::format("Output sink type BufferedAdmin requires that the admin "
+                                       "output will be configured via admin"));
+    }
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
     // admin stream output with the wrong format.
     RELEASE_ASSERT(
@@ -72,7 +79,10 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     sink_to_use_ = admin_streamer;
     break;
   case ProtoOutputSink::OutputSinkTypeCase::kStreamingAdmin:
-    ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
+    if (admin_streamer == nullptr) {
+      throw EnvoyException(fmt::format("Output sink type StreamingAdmin requires that the admin "
+                                       "output will be configured via admin"));
+    }
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
     // admin stream output with the wrong format.
     // TODO(davidpeet8): Simple change to enable PROTO_BINARY_LENGTH_DELIMITED format -
@@ -86,6 +96,18 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     sink_ = std::make_unique<FilePerTapSink>(sinks[0].file_per_tap());
     sink_to_use_ = sink_.get();
     break;
+  case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
+    TapSinkFactory& tap_sink_factory =
+        Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
+
+    // extract message validation visitor from the context and use it to define config
+    ProtobufTypes::MessagePtr config = Config::Utility::translateAnyToFactoryConfig(
+        sinks[0].custom_sink().typed_config(), context.messageValidationVisitor(),
+        tap_sink_factory);
+    sink_ = tap_sink_factory.createSinkPtr(*config, context);
+    sink_to_use_ = sink_.get();
+    break;
+  }
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:
     PANIC("not implemented");
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::OUTPUT_SINK_TYPE_NOT_SET:
@@ -100,12 +122,17 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     // Fallback to use the deprecated match_config field and upgrade (wire cast) it to the new
     // MatchPredicate which is backward compatible with the old MatchPredicate originally
     // introduced in the Tap filter.
-    MessageUtil::wireCast(proto_config.match_config(), match);
+    if (!match.ParseFromString(proto_config.match_config().SerializeAsString())) {
+      // This should should generally succeed, but if there are malformed UTF-8 strings in a
+      // message, this can fail.
+      throw EnvoyException("Unable to deserialize proto.");
+    }
   } else {
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                      proto_config.DebugString()));
   }
-  buildMatcher(match, matchers_);
+
+  buildMatcher(match, matchers_, context.serverFactoryContext());
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
@@ -194,8 +221,8 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
       path += MessageUtil::FileExtensions::get().ProtoText;
       break;
-    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
       path += MessageUtil::FileExtensions::get().Json;
       break;
     }
@@ -221,10 +248,10 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   }
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
-    output_file_ << trace->DebugString();
+    output_file_ << MessageUtil::toTextProto(*trace);
     break;
-  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
   }

@@ -12,3 +12,6 @@ HTTP tracers
   :maxdepth: 2
 
   v3/*
+  opentelemetry/resource_detectors
+  opentelemetry/samplers
+  ../../extensions/tracers/fluentd/v3/*

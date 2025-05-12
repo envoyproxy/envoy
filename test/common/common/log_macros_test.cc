@@ -32,14 +32,83 @@ public:
     ENVOY_STREAM_LOG(info, "fake message", stream_);
     ENVOY_CONN_LOG(error, "fake error", connection_);
     ENVOY_STREAM_LOG(error, "fake error", stream_);
+    ENVOY_TAGGED_LOG(info, tags_, "fake message {}", "val");
+    ENVOY_TAGGED_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), "fake message {}",
+                     "val");
+    ENVOY_TAGGED_CONN_LOG(info, tags_, connection_, "fake message {}", "val");
+    ENVOY_TAGGED_CONN_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), connection_,
+                          "fake message {}", "val");
+    ENVOY_TAGGED_STREAM_LOG(info, tags_, stream_, "fake message {}", "val");
+    ENVOY_TAGGED_STREAM_LOG(info, (std::map<std::string, std::string>{{"key", "val"}}), stream_,
+                            "fake message {}", "val");
+  }
+
+  void logConnTraceMessage() { ENVOY_CONN_LOG(trace, "fake trace message", connection_); }
+
+  void logStreamTraceMessage() { ENVOY_STREAM_LOG(trace, "fake trace message", stream_); }
+
+  void logEventTraceMessage() {
+    ENVOY_CONN_LOG_EVENT(trace, "fake_event", "fake message", connection_);
   }
 
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
 
 private:
+  std::map<std::string, std::string> tags_{{"key", "val"}};
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
 };
+
+TEST(Logger, StreamFineGrainLoggerRegistration) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
+  Logger::Context::enableFineGrainLogger();
+  TestFilterLog filter;
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+
+  // Make sure fine-grain logger is initialized even the log level is trace.
+  filter.logStreamTraceMessage();
+  filter.logStreamTraceMessage();
+  filter.logStreamTraceMessage();
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
+
+TEST(Logger, EventFineGrainLoggerRegistration) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
+  Logger::Context::enableFineGrainLogger();
+  TestFilterLog filter;
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+
+  // Make sure fine-grain logger is initialized even the log level is trace.
+  filter.logEventTraceMessage();
+  filter.logEventTraceMessage();
+  filter.logEventTraceMessage();
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
+
+TEST(Logger, ConnFineGrainLoggerRegistration) {
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
+  Logger::Context::enableFineGrainLogger();
+  TestFilterLog filter;
+  getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
+
+  // Make sure fine-grain logger is initialized even the log level is trace.
+  filter.logConnTraceMessage();
+  filter.logConnTraceMessage();
+  filter.logConnTraceMessage();
+  SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::warn);
+}
 
 TEST(Logger, All) {
   // This test exists just to ensure all macros compile and run with the expected arguments provided
@@ -203,6 +272,23 @@ public:
       ENVOY_LOG_PERIODIC(error, 1s, "foo7 '{}'", evaluations()++);
     }
   }
+
+  void logOnceIf(bool condition) {
+    if (use_misc_macros_) {
+      ENVOY_LOG_ONCE_MISC_IF(error, condition, "foo8 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_ONCE_IF(error, condition, "foo8 '{}'", evaluations()++);
+    }
+  }
+
+  void logSomethingThriceIf(bool condition) {
+    if (use_misc_macros_) {
+      ENVOY_LOG_FIRST_N_MISC_IF(error, 3, condition, "foo9 '{}'", evaluations()++);
+    } else {
+      ENVOY_LOG_FIRST_N_IF(error, 3, condition, "foo9 '{}'", evaluations()++);
+    }
+  }
+
   std::atomic<int32_t>& evaluations() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<int32_t>); };
 
   const bool use_misc_macros_;
@@ -261,6 +347,26 @@ TEST_P(SparseLogMacrosTest, All) {
   // We shouldn't observe additional argument evaluations for log lines below the configured
   // log level.
   EXPECT_EQ(29, evaluations());
+
+  spamCall([this]() { logSomethingThriceIf(false); }, kNumThreads);
+  // As the condition was false the logs didn't evaluate.
+  EXPECT_EQ(29, evaluations());
+  spamCall([this]() { logOnceIf(false); }, kNumThreads);
+  // As the condition was false the logs didn't evaluate.
+  EXPECT_EQ(29, evaluations());
+
+  spamCall([this]() { logOnceIf(true); }, kNumThreads);
+  // First call evaluates.
+  EXPECT_EQ(30, evaluations());
+
+  // First and last call evaluates as the condition holds.
+  logSomethingThriceIf(true);
+  logSomethingThriceIf(false);
+  logSomethingThriceIf(true);
+  EXPECT_EQ(32, evaluations());
+  spamCall([this]() { logSomethingThriceIf(true); }, kNumThreads);
+  // Only one remaining log was left.
+  EXPECT_EQ(33, evaluations());
 }
 
 TEST(RegistryTest, LoggerWithName) {
@@ -334,11 +440,28 @@ TEST(FineGrainLog, Iteration) {
   FINE_GRAIN_LOG(info, "Info: iteration test begins.");
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
   std::string output = getFineGrainLogContext().listFineGrainLoggers();
-  EXPECT_THAT(output, HasSubstr("  " __FILE__ ": 2"));
+  EXPECT_THAT(output, HasSubstr("  " __FILE__ ": info"));
   getFineGrainLogContext().setFineGrainLogger(__FILE__, spdlog::level::err);
 
   FINE_GRAIN_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
   FINE_GRAIN_LOG(warn, getFineGrainLogContext().listFineGrainLoggers());
+}
+
+TEST(FineGrainLog, ListIteration) {
+  FINE_GRAIN_LOG(info, "Info: iteration test begins.");
+  const absl::flat_hash_map<spdlog::level::level_enum, std::string> log_level_strings = {
+      {spdlog::level::trace, "trace"}, {spdlog::level::debug, "debug"},
+      {spdlog::level::info, "info"},   {spdlog::level::warn, "warn"},
+      {spdlog::level::err, "error"},   {spdlog::level::critical, "critical"},
+      {spdlog::level::off, "off"},
+  };
+
+  std::string output;
+  for (const auto& [level, level_str] : log_level_strings) {
+    getFineGrainLogContext().setAllFineGrainLoggers(level);
+    output = getFineGrainLogContext().listFineGrainLoggers();
+    EXPECT_THAT(output, HasSubstr("  " __FILE__ ": " + level_str));
+  }
 }
 
 TEST(FineGrainLog, Context) {

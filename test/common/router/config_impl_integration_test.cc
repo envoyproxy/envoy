@@ -6,6 +6,7 @@
 #include "source/common/common/base64.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -23,11 +24,11 @@ public:
   public:
     FakeClusterSpecifierPlugin(absl::string_view cluster) : cluster_name_(cluster) {}
 
-    RouteConstSharedPtr route(const RouteEntry& parent,
+    RouteConstSharedPtr route(RouteConstSharedPtr parent,
                               const Http::RequestHeaderMap&) const override {
-      ASSERT(dynamic_cast<const RouteEntryImplBase*>(&parent) != nullptr);
+      ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
       return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
-          dynamic_cast<const RouteEntryImplBase*>(&parent), cluster_name_);
+          dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster_name_);
     }
 
     const std::string cluster_name_;

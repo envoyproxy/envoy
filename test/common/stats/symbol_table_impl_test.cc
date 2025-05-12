@@ -5,6 +5,7 @@
 #include "source/common/memory/stats.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -287,7 +288,7 @@ TEST_F(StatNameTest, TestSameValueOnPartialFree) {
   StatNameStorage stat_foobar_1("foo.bar", table_);
   SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.statName());
   stat_foobar_1.free(table_);
-  StatName stat_foobar_2(makeStat("foo.bar"));
+  StatName stat_foobar_2(makeStat("foo.bar")); // NOLINT(clang-analyzer-unix.Malloc)
   SymbolVec stat_foobar_2_symbols = getSymbols(stat_foobar_2);
 
   EXPECT_EQ(stat_foobar_1_symbols[0],
@@ -337,7 +338,7 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   size_t table_size_0 = table_.numSymbols();
 
   auto make_stat_storage = [this](absl::string_view name) -> StatNameStorage {
-    return StatNameStorage(name, table_);
+    return {name, table_};
   };
 
   StatNameStorage stat_a(make_stat_storage("a"));
@@ -362,7 +363,7 @@ TEST_F(StatNameTest, TestShrinkingExpectation) {
   stat_ace.free(table_);
   EXPECT_EQ(table_size_4, table_.numSymbols());
 
-  stat_acd.free(table_);
+  stat_acd.free(table_); // NOLINT(clang-analyzer-unix.Malloc)
   EXPECT_EQ(table_size_3, table_.numSymbols());
 
   stat_ac.free(table_);
@@ -586,7 +587,7 @@ TEST_F(StatNameTest, MutexContentionOnExistingSymbols) {
           accesses.DecrementCount();
 
           wait.wait();
-        }));
+        })); // NOLINT(clang-analyzer-unix.Malloc)
   }
   creation.setReady();
   creates.Wait();
@@ -652,12 +653,40 @@ TEST_F(StatNameTest, StatNameSet) {
 }
 
 TEST_F(StatNameTest, StorageCopy) {
-  StatName a = pool_.add("stat.name");
+  const StatName a = pool_.add("stat.name");
   StatNameStorage b_storage(a, table_);
-  StatName b = b_storage.statName();
+  const StatName b = b_storage.statName();
   EXPECT_EQ(a, b);
   EXPECT_NE(a.data(), b.data());
   b_storage.free(table_);
+
+  const StatName c = pool_.add(a);
+  EXPECT_EQ(a, c);
+  EXPECT_NE(a.data(), c.data());
+}
+
+TEST_F(StatNameTest, AddingToPoolViaStatNamePreservesDynamicSegments) {
+  const StatNameDynamicStorage tag_name("tag", table_);
+  const StatNameDynamicStorage tag_value("value", table_);
+  const StatNameTagVector tag_vector{{tag_name.statName(), tag_value.statName()}};
+
+  const StatName empty_prefix = pool_.add("");
+  const StatName basename = pool_.add("stat.name");
+
+  TagUtility::TagStatNameJoiner joiner(empty_prefix, basename, tag_vector, table_);
+  const StatName tagged_name = joiner.nameWithTags();
+
+  const StatName copy_via_statname = pool_.add(tagged_name);
+  EXPECT_EQ(tagged_name, copy_via_statname);
+  EXPECT_NE(tagged_name.data(), copy_via_statname.data());
+
+  // When adding the statname via strings it will be encoded in the symbol
+  // table. It will not be comparable to the statname that is a mix of
+  // encoded symbols from the symbol table and dynamic strings.
+  const std::string tagged_name_str = table_.toString(tagged_name);
+  const StatName copy_via_string = pool_.add(tagged_name_str);
+  EXPECT_NE(tagged_name, copy_via_string);
+  EXPECT_EQ(table_.toString(tagged_name), table_.toString(copy_via_string));
 }
 
 TEST_F(StatNameTest, RecentLookups) {
@@ -725,7 +754,7 @@ TEST_F(StatNameTest, SupportsAbslHash) {
 TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
-    TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     TestUtil::forEachSampleStat(1000, true, fn);
     return memory_test.consumedBytes();
   };
@@ -744,7 +773,7 @@ TEST(SymbolTableTest, Memory) {
     };
     symbol_table_mem_used = test_memory_usage(record_stat);
     for (StatNameStorage& name : names) {
-      name.free(table);
+      name.free(table); // NOLINT(clang-analyzer-unix.Malloc)
     }
   }
 

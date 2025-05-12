@@ -47,6 +47,7 @@ public:
                                 Event::Dispatcher& dispatcher) override;
   void unregisterPrivateKeyMethod(SSL* ssl) override;
   bool checkFips() override;
+  bool isAvailable() override;
   Ssl::BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() override;
 
 private:
@@ -56,6 +57,7 @@ private:
   Api::Api& api_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
   LibQatCryptoSharedPtr libqat_{};
+  bool initialized_{};
 };
 
 } // namespace Qat

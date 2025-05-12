@@ -10,6 +10,12 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
           stat_prefix: testfilter
+          id_based_broker_address_rewrite_spec:
+            rules:
+            - id: 0
+              host: 127.0.0.1
+              port: {{ data['kafka_envoy_port'] }}
+            # More ids go here if we add brokers to the test cluster.
       - name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy

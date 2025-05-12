@@ -18,8 +18,8 @@ envoy_extension_cc_test_library(
     srcs = ["dns_filter_test_utils.cc"],
     hdrs = ["dns_filter_test_utils.h"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    external_deps = ["ares"],
     deps = [
+        "//bazel/foreign_cc:ares",
         "//source/common/common:random_generator_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -31,11 +31,8 @@ envoy_extension_cc_test_library(
 envoy_extension_cc_test(
     name = "dns_filter_test",
     srcs = ["dns_filter_test.cc"],
-    args = [
-        # Force creation of c-ares DnsResolverImpl when running test on macOS.
-        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
-    ],
     extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "6gig",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
@@ -51,8 +48,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "dns_filter_integration_test",
+    size = "large",
     srcs = ["dns_filter_integration_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "6gig",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:config",
@@ -66,6 +65,7 @@ envoy_extension_cc_test(
     name = "dns_filter_utils_test",
     srcs = ["dns_filter_utils_test.cc"],
     extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "6gig",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:config",
@@ -79,6 +79,7 @@ envoy_cc_fuzz_test(
     name = "dns_filter_fuzz_test",
     srcs = ["dns_filter_fuzz_test.cc"],
     corpus = "dns_filter_corpus",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/fuzz:utility_lib",

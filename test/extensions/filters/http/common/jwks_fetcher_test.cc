@@ -10,6 +10,7 @@
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
@@ -54,8 +55,10 @@ class JwksFetcherTest : public testing::Test {
 public:
   void setupFetcher(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, remote_jwks_);
-    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
-    fetcher_ = JwksFetcher::create(mock_factory_ctx_.cluster_manager_, remote_jwks_);
+    mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"pubkey_cluster"});
+    fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
+                                   remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -69,7 +72,8 @@ public:
 TEST_F(JwksFetcherTest, TestGetSuccess) {
   // Setup
   setupFetcher(config);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           publicKey);
   MockJwksReceiver receiver;
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_));
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
@@ -78,10 +82,33 @@ TEST_F(JwksFetcherTest, TestGetSuccess) {
   fetcher_->fetch(parent_span_, receiver);
 }
 
+TEST_F(JwksFetcherTest, TestMessageHeader) {
+  // Setup
+  setupFetcher(config);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           publicKey);
+  MockJwksReceiver receiver;
+
+  // Expectations for message
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
+              send_(_, _, _))
+      .WillOnce(Invoke([](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ(message->headers().getUserAgentValue(),
+                  Http::Headers::get().UserAgentValues.GoBrowser);
+        return nullptr;
+      }));
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
 TEST_F(JwksFetcherTest, TestGet400) {
   // Setup
   setupFetcher(config);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "400", "invalid");
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "400",
+                           "invalid");
   MockJwksReceiver receiver;
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network));
@@ -93,7 +120,7 @@ TEST_F(JwksFetcherTest, TestGet400) {
 TEST_F(JwksFetcherTest, TestGetNoBody) {
   // Setup
   setupFetcher(config);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", "");
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200", "");
   MockJwksReceiver receiver;
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network));
@@ -105,7 +132,8 @@ TEST_F(JwksFetcherTest, TestGetNoBody) {
 TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
   // Setup
   setupFetcher(config);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", "invalid");
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           "invalid");
   MockJwksReceiver receiver;
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks));
@@ -117,7 +145,7 @@ TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
 TEST_F(JwksFetcherTest, TestHttpFailure) {
   // Setup
   setupFetcher(config);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_,
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_,
                            Http::AsyncClient::FailureReason::Reset);
   MockJwksReceiver receiver;
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
@@ -130,9 +158,9 @@ TEST_F(JwksFetcherTest, TestHttpFailure) {
 TEST_F(JwksFetcherTest, TestCancel) {
   // Setup
   setupFetcher(config);
-  Http::MockAsyncClientRequest request(
-      &(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_));
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, &request);
+  Http::MockAsyncClientRequest request(&(mock_factory_ctx_.server_factory_context_.cluster_manager_
+                                             .thread_local_cluster_.async_client_));
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, &request);
   MockJwksReceiver receiver;
   EXPECT_CALL(request, cancel());
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
@@ -149,11 +177,13 @@ TEST_F(JwksFetcherTest, TestCancel) {
 TEST_F(JwksFetcherTest, TestSpanPassedDown) {
   // Setup
   setupFetcher(config);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           publicKey);
   NiceMock<MockJwksReceiver> receiver;
 
   // Expectations for span
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
               send_(_, _, _))
       .WillOnce(Invoke(
           [this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
@@ -182,8 +212,10 @@ class JwksFetcherRetryingTest : public testing::TestWithParam<RetryingParameters
 public:
   void setupFetcher(const std::string& config_str) {
     TestUtility::loadFromYaml(config_str, remote_jwks_);
-    mock_factory_ctx_.cluster_manager_.initializeThreadLocalClusters({"pubkey_cluster"});
-    fetcher_ = JwksFetcher::create(mock_factory_ctx_.cluster_manager_, remote_jwks_);
+    mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"pubkey_cluster"});
+    fetcher_ = JwksFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
+                                   remote_jwks_);
     EXPECT_TRUE(fetcher_ != nullptr);
   }
 
@@ -231,14 +263,16 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
 
   // Setup
   setupFetcher(GetParam().config_);
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           publicKey);
   NiceMock<MockJwksReceiver> receiver;
 
   // Expectations for envoy.config.core.v3.RetryPolicy to envoy.config.route.v3.RetryPolicy
   // used by async client.
   // execution deep down in async_client_'s route entry implementation
   // is not exercised here, just the configuration adaptation.
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_.thread_local_cluster_.async_client_,
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
               send_(_, _, _))
       .WillOnce(Invoke(
           [](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
@@ -276,6 +310,110 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
 
             return nullptr;
           }));
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderHttps) {
+  // Setup
+  setupFetcher(R"(
+    http_uri:
+      uri: https://pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect the :scheme header to be 'https' according to the configured uri.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_THAT(message->headers(),
+                        HeaderHasValueRef(Http::Headers::get().Scheme, "https"));
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderHttp) {
+  // Setup
+  setupFetcher(R"(
+    http_uri:
+      uri: http://pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect the :scheme header to be 'http' according to the configured uri.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_THAT(message->headers(), HeaderHasValueRef(Http::Headers::get().Scheme, "http"));
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderLegacy) {
+  // Setup
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri", "false"}});
+  setupFetcher(R"(
+    http_uri:
+      uri: https://pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect no :scheme header due to the disabled runtime guard.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_TRUE(message->headers().get(Http::Headers::get().Scheme).empty());
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestSchemeHeaderUriWithoutScheme) {
+  // Setup
+  setupFetcher(R"(
+    http_uri:
+      uri: pubkey_server/pubkey_path
+      cluster: pubkey_cluster
+    )");
+  auto& cm = mock_factory_ctx_.server_factory_context_.cluster_manager_;
+  Http::MockAsyncClientRequest request(&cm.thread_local_cluster_.async_client_);
+
+  // Expect no :scheme header since the configured URI does not have a scheme.
+  EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+             const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_TRUE(message->headers().get(Http::Headers::get().Scheme).empty());
+            return nullptr;
+          }));
+
+  MockJwksReceiver receiver;
 
   // Act
   fetcher_->fetch(parent_span_, receiver);

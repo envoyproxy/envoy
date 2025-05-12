@@ -2,10 +2,10 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/connection_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
@@ -89,11 +89,11 @@ public:
       read_callbacks_ = &callbacks;
     }
 
-    std::weak_ptr<StartTlsSwitchFilter> parent_{};
+    std::weak_ptr<StartTlsSwitchFilter> parent_;
     Network::ReadFilterCallbacks* read_callbacks_{};
   };
 
-  // Helper read filter inserted into downstream filter chain. The filter reacts to
+  // Helper read filter inserted into downstream network filter chain. The filter reacts to
   // SwitchViaFilterManager string and signals to the filter manager to signal to the terminal
   // filter to switch upstream connection to secure mode.
   struct DownstreamReadFilter : public Network::ReadFilter {
@@ -118,17 +118,17 @@ private:
                        Network::ConnectionCallbacks* upstream_callbacks)
       : upstream_connection_cb_(upstream_callbacks), cluster_manager_(cluster_manager) {}
 
-  std::weak_ptr<StartTlsSwitchFilter> self_{};
+  std::weak_ptr<StartTlsSwitchFilter> self_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
-  Network::ClientConnectionPtr upstream_connection_{};
+  Network::ClientConnectionPtr upstream_connection_;
   Network::ConnectionCallbacks* upstream_connection_cb_;
   Upstream::ClusterManager& cluster_manager_;
 };
 
 Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto c = cluster_manager_.getThreadLocalCluster("cluster_0");
-  auto h = c->loadBalancer().chooseHost(nullptr);
+  auto h = c->loadBalancer().chooseHost(nullptr).host;
   upstream_connection_ =
       h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
   upstream_connection_->addConnectionCallbacks(*upstream_connection_cb_);
@@ -180,8 +180,8 @@ public:
       // Inject two filters into downstream connection: first is helper read filter and then
       // terminal filter.
       filter_manager.addReadFilter(std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
-      filter_manager.addReadFilter(
-          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
+      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(
+          context.serverFactoryContext().clusterManager(), upstream_callbacks_));
     };
   }
 
@@ -199,7 +199,7 @@ class StartTlsIntegrationTest : public testing::TestWithParam<StartTlsTestParams
 public:
   StartTlsIntegrationTest()
       : BaseIntegrationTest(GetParam().first, ConfigHelper::baseConfig()),
-        stream_info_(timeSystem(), nullptr) {}
+        stream_info_(timeSystem(), nullptr, StreamInfo::FilterState::LifeSpan::Connection) {}
   void initialize() override;
 
   NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
@@ -249,8 +249,8 @@ void StartTlsIntegrationTest::initialize() {
   // Setup factory and context for tls transport socket.
   // The tls transport socket will be inserted into fake_upstream when
   // upstream starttls transport socket is converted to secure mode.
-  tls_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext downstream_tls_context;
 
@@ -269,13 +269,13 @@ void StartTlsIntegrationTest::initialize() {
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), downstream_tls_context);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  ON_CALL(mock_factory_ctx, api()).WillByDefault(testing::ReturnRef(*api_));
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      downstream_tls_context, mock_factory_ctx);
+  ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      downstream_tls_context, mock_factory_ctx, false);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
-          std::move(cfg), *tls_context_manager_, *client_stats_store, {})};
+      *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+          std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope(), {})};
 
   BaseIntegrationTest::initialize();
 }

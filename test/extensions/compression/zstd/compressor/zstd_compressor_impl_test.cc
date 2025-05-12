@@ -40,7 +40,7 @@ protected:
     drainBuffer(buffer);
 
     Stats::IsolatedStoreImpl stats_store{};
-    Zstd::Decompressor::ZstdDecompressorImpl decompressor{stats_store, "test.",
+    Zstd::Decompressor::ZstdDecompressorImpl decompressor{*stats_store.rootScope(), "test.",
                                                           default_ddict_manager_, 4096};
 
     decompressor.decompress(accumulation_buffer, buffer);
@@ -134,8 +134,9 @@ TEST_F(ZstdCompressorImplTest, IllegalConfig) {
   }
 })EOF";
   TestUtility::loadFromJson(json, zstd);
-  EXPECT_DEATH({ lib_factory.createCompressorFactoryFromProto(zstd, mock_context); },
-               "assert failure: id != 0. Details: Illegal Zstd dictionary");
+  EXPECT_DEATH(
+      { lib_factory.createCompressorFactoryFromProto(zstd, mock_context); },
+      "assert failure: id != 0. Details: Illegal Zstd dictionary");
 }
 
 } // namespace

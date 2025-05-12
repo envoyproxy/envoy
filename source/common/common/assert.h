@@ -135,6 +135,9 @@ void resetEnvoyBugCountersForTest();
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
                           "assert failure: {}.{}{}", CONDITION_STR,                                \
                           details.empty() ? "" : " Details: ", details);                           \
+      Envoy::Assert::EnvoyBugStackTrace st;                                                        \
+      st.capture();                                                                                \
+      st.logStackTrace();                                                                          \
       ACTION;                                                                                      \
     }                                                                                              \
   } while (false)
@@ -161,6 +164,16 @@ void resetEnvoyBugCountersForTest();
  * new uses of RELEASE_ASSERT should supply a verbose explanation of what went wrong.
  */
 #define RELEASE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, ::abort(), DETAILS)
+
+/**
+ * Assert macro intended for Envoy Mobile. It creates enforcement for mobile
+ * clients but has no effect for Envoy as a server.
+ */
+#if TARGET_OS_IOS || defined(__ANDROID_API__)
+#define MOBILE_RELEASE_ASSERT(X, DETAILS) RELEASE_ASSERT(X, DETAILS)
+#else
+#define MOBILE_RELEASE_ASSERT(X, DETAILS)
+#endif
 
 /**
  * Assert macro intended for security guarantees. It has the same functionality

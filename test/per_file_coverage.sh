@@ -1,101 +1,74 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.0"
-"source/common/api:82.2"
-"source/common/api/posix:81.3"
-"source/common/common:96.2"
-"source/common/common/posix:92.7"
-"source/common/config:96.5"
-"source/common/crypto:0.0"
-"source/common/event:94.1" # Emulated edge events guards don't report LCOV
-"source/common/filesystem/posix:95.5"
-"source/common/http:96.3"
-"source/common/http/http2:96.4"
-"source/common/io:98.0"
-"source/common/json:89.8"
-"source/common/matcher:92.0"
+"source/common:96.4"
+"source/common/common/posix:96.2" # flaky due to posix: be careful adjusting
+"source/common/config:96.4"
+"source/common/crypto:95.5"
+"source/common/event:95.6" # Emulated edge events guards don't report LCOV
+"source/common/filesystem/posix:96.3" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
+"source/common/http/http2:96.1"
+"source/common/json:95.2"
+"source/common/matcher:94.7"
+"source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
-"source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/protobuf:94.8"
-"source/common/quic:92.6"
-"source/common/router:95.8" # Bump to 96.3 after 22879 is addressed
-"source/common/runtime:96.4"
-"source/common/secret:94.9"
-"source/common/signal:86.9" # Death tests don't report LCOV
-"source/common/singleton:95.7"
-"source/common/stats:96.5"
-"source/common/tcp:90.6"
+"source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
+"source/common/quic:93.0"
+"source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
-"source/common/tracing:96.1"
-"source/common/upstream:96.0"
+"source/common/tls:94.4" # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
+"source/common/tls/cert_validator:94.7"
+"source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:92.6"
-"source/extensions/common:95.8"
-"source/extensions/common/tap:92.9"
-"source/extensions/common/wasm:94.7" # flaky: be careful adjusting
+"source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/extensions/common/aws:96.3"
+"source/extensions/common/aws/credential_providers:94.4"
+"source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
+"source/extensions/common/tap:94.6"
+"source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
-"source/extensions/filters/common:96.1"
-"source/extensions/filters/common/expr:96.2"
 "source/extensions/filters/common/fault:94.5"
-"source/extensions/filters/common/lua:96.5"
-"source/extensions/filters/common/rbac:88.1"
-"source/extensions/filters/http/aws_lambda:96.2"
-"source/extensions/filters/http/cache:93.4"
-"source/extensions/filters/http/cache/simple_http_cache:96.0"
-"source/extensions/filters/http/grpc_json_transcoder:94.7"
-"source/extensions/filters/http/ip_tagging:87.0"
+"source/extensions/filters/common/rbac:92.6"
+"source/extensions/filters/http/cache:95.9"
+"source/extensions/filters/http/dynamic_forward_proxy:94.3"
+"source/extensions/filters/http/decompressor:95.9"
+"source/extensions/filters/http/ext_proc:96.5"
+"source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8"
+"source/extensions/filters/http/grpc_json_transcoder:94.0" # TODO(#28232)
+"source/extensions/filters/http/ip_tagging:90.6"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
-"source/extensions/filters/http/lua:96.4"
-"source/extensions/filters/http/oauth2:96.0"
-"source/extensions/filters/http/wasm:95.8"
-"source/extensions/filters/listener:95.9"
-"source/extensions/filters/listener/http_inspector:95.8"
-"source/extensions/filters/listener/original_dst:82.4"
+"source/extensions/filters/http/oauth2:96.4"
 "source/extensions/filters/listener/original_src:92.1"
-"source/extensions/filters/listener/tls_inspector:92.3"
-"source/extensions/filters/network/common:96.0"
-"source/extensions/filters/network/common/redis:96.2"
-"source/extensions/filters/network/mongo_proxy:95.5"
+"source/extensions/filters/network/dubbo_proxy:96.2"
+"source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"
-"source/extensions/filters/network/sni_dynamic_forward_proxy:95.2"
-"source/extensions/filters/network/thrift_proxy/router:96.4"
-"source/extensions/filters/network/wasm:95.7"
-"source/extensions/filters/udp:96.4"
-"source/extensions/filters/udp/dns_filter:96.1"
-"source/extensions/health_checkers:95.7"
-"source/extensions/health_checkers/redis:95.7"
-"source/extensions/io_socket:96.2"
-"source/extensions/io_socket/user_space:96.2"
-"source/extensions/network/dns_resolver/getaddrinfo:96.3"
-"source/extensions/rate_limit_descriptors:95.5"
-"source/extensions/rate_limit_descriptors/expr:95.5"
-"source/extensions/stat_sinks/common:96.4"
-"source/extensions/stat_sinks/common/statsd:96.4"
-"source/extensions/stat_sinks/graphite_statsd:75.0"
-"source/extensions/stat_sinks/statsd:76.9"
-"source/extensions/tracers:95.0"
-"source/extensions/tracers/common:73.7"
-"source/extensions/tracers/common/ot:71.7"
-"source/extensions/tracers/opencensus:93.2"
-"source/extensions/tracers/xray:96.2"
+"source/extensions/internal_redirect:86.2"
+"source/extensions/internal_redirect/safe_cross_scheme:81.2"
+"source/extensions/internal_redirect/allow_listed_routes:85.7"
+"source/extensions/internal_redirect/previous_routes:89.3"
+"source/extensions/load_balancing_policies/maglev:90.7"
+"source/extensions/load_balancing_policies/ring_hash:96.2"
+"source/extensions/rate_limit_descriptors:95.0"
+"source/extensions/rate_limit_descriptors/expr:95.0"
+"source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
+"source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:95.2"
-"source/extensions/transport_sockets/tls:94.2"
-"source/extensions/transport_sockets/tls/cert_validator:94.9"
-"source/extensions/transport_sockets/tls/ocsp:96.5"
-"source/extensions/transport_sockets/tls/private_key:77.8"
+"source/extensions/transport_sockets/proxy_protocol:96.2"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
-"source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
+"source/extensions/listener_managers:77.3"
+"source/extensions/listener_managers/validation_listener_manager:77.3"
 "source/extensions/watchdog/profile_action:83.3"
-"source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:97.5"
-"source/server/admin:profiler-lib:83"
-"source/server/config_validation:74.8"
+"source/server:91.0" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
+"source/server/config_validation:92.3"
+"source/extensions/health_checkers:96.1"
+"source/extensions/health_checkers/http:93.9"
+"source/extensions/health_checkers/grpc:92.1"
+"source/extensions/config_subscription/rest:94.8"
+"source/extensions/matching/input_matchers/cel_matcher:91.3" #Death tests don't report LCOV
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
@@ -122,10 +95,11 @@ get_coverage_target() {
 # Make sure that for each directory with code, coverage doesn't dip
 # below the default coverage threshold.
 SOURCES=$(find source/* -type d)
+HIGH_COVERAGE_STRING=""
 while read -r DIRECTORY
 do
   get_coverage_target "$DIRECTORY"
-  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
+  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4 | tr -d '\n')
   COVERAGE_VALUE=${COVERAGE_VALUE%?}
   # If the coverage number is 'n' (no data found) there is 0% coverage. This is
   # probably a directory without source code, so we skip checks.
@@ -139,9 +113,23 @@ do
   fi;
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-    echo "Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})"
+    echo "ERROR: Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})" >&2
     FAILED=1
   fi
+  COVERAGE_HIGH=$(echo "${COVERAGE_VALUE}>${DIRECTORY_THRESHOLD}" | bc)
+  if [[ (${DIRECTORY_THRESHOLD} != "${DEFAULT_COVERAGE_THRESHOLD}") && "${COVERAGE_HIGH}" -eq 1 ]]; then
+    HIGH_COVERAGE_STRING+="\"${DIRECTORY}:${COVERAGE_VALUE} (${DIRECTORY_THRESHOLD})\"\n"
+  fi
+  if [[ -n ${VERBOSE} && ${COVERAGE_VALUE} > ${DIRECTORY_THRESHOLD} ]]; then
+    if [[ ${DIRECTORY_THRESHOLD} < $DEFAULT_COVERAGE_THRESHOLD ]]; then
+      echo "Code coverage for ${DIRECTORY} is now ${COVERAGE_VALUE} (previously ${DIRECTORY_THRESHOLD})"
+    fi
+  fi
+
 done <<< "$SOURCES"
+
+if [[ ${FAILED} != 1 && -n "${HIGH_COVERAGE_STRING}" ]]; then
+  echo -e "WARNING: Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}" >&2
+fi
 
 exit $FAILED

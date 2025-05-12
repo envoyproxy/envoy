@@ -28,7 +28,13 @@ public:
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::OwnedImpl& response, AdminFilter& filter)>;
 
-  AdminFilter(Admin::GenRequestFn admin_handler_func);
+  /**
+   * Instantiates an AdminFilter.
+   *
+   * @param admin the admin context from which to create the filter. This is used
+   *        to create a request object based on the path.
+   */
+  AdminFilter(const Admin& admin);
 
   // Http::StreamFilterBase
   // Handlers relying on the reference should use addOnDestroyCallback()
@@ -51,14 +57,14 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
-  Http::Utility::QueryParams queryParams() const override;
+  Http::Utility::QueryParamsMulti queryParams() const override;
 
 private:
   /**
    * Called when an admin request has been completely received.
    */
   void onComplete();
-  Admin::GenRequestFn admin_handler_fn_;
+  const Admin& admin_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;

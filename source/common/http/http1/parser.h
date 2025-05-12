@@ -130,10 +130,8 @@ public:
   // Returns a ParserStatus representing the internal state of the parser.
   virtual ParserStatus getStatus() const PURE;
 
-  // Returns an integer representing the status code stored in the parser structure. For responses
-  // only.
-  // TODO(asraa): Return Envoy::Http::Code.
-  virtual uint16_t statusCode() const PURE;
+  // Returns the status code stored in the parser structure. For responses only.
+  virtual Http::Code statusCode() const PURE;
 
   // Returns whether HTTP version is 1.1.
   virtual bool isHttp11() const PURE;

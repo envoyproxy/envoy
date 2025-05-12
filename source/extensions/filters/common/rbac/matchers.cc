@@ -5,6 +5,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
+#include "source/extensions/filters/common/rbac/principal_extension.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,14 +14,15 @@ namespace Common {
 namespace RBAC {
 
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      Server::Configuration::CommonFactoryContext& context) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v3::Permission::RuleCase::kAndRules:
-    return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor);
+    return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kOrRules:
-    return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor);
+    return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
-    return std::make_shared<const HeaderMatcher>(permission.header());
+    return std::make_shared<const HeaderMatcher>(permission.header(), context);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
@@ -31,13 +33,27 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
-    return std::make_shared<const MetadataMatcher>(permission.metadata());
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(permission.metadata(), context),
+        envoy::config::rbac::v3::MetadataSource::DYNAMIC);
+  case envoy::config::rbac::v3::Permission::RuleCase::kSourcedMetadata:
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(permission.sourced_metadata().metadata_matcher(), context),
+        permission.sourced_metadata().metadata_source());
   case envoy::config::rbac::v3::Permission::RuleCase::kNotRule:
-    return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor);
+    return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
-    return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
+    return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name(),
+                                                              context);
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
-    return std::make_shared<const PathMatcher>(permission.url_path());
+    return std::make_shared<const PathMatcher>(permission.url_path(), context);
+  case envoy::config::rbac::v3::Permission::RuleCase::kUriTemplate: {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(permission.uri_template());
+    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        permission.uri_template().typed_config(), validation_visitor, factory);
+    return std::make_shared<const UriTemplateMatcher>(factory.createPathMatcher(*config));
+  }
   case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
     auto& factory =
         Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
@@ -49,14 +65,15 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& principal,
+                                      Server::Configuration::CommonFactoryContext& context) {
   switch (principal.identifier_case()) {
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAndIds:
-    return std::make_shared<const AndMatcher>(principal.and_ids());
+    return std::make_shared<const AndMatcher>(principal.and_ids(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kOrIds:
-    return std::make_shared<const OrMatcher>(principal.or_ids());
+    return std::make_shared<const OrMatcher>(principal.or_ids(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAuthenticated:
-    return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
+    return std::make_shared<const AuthenticatedMatcher>(principal.authenticated(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp:
     return std::make_shared<const IPMatcher>(principal.source_ip(),
                                              IPMatcher::Type::ConnectionRemote);
@@ -67,15 +84,26 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const IPMatcher>(principal.remote_ip(),
                                              IPMatcher::Type::DownstreamRemote);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
-    return std::make_shared<const HeaderMatcher>(principal.header());
+    return std::make_shared<const HeaderMatcher>(principal.header(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:
-    return std::make_shared<const MetadataMatcher>(principal.metadata());
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(principal.metadata(), context),
+        envoy::config::rbac::v3::MetadataSource::DYNAMIC);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kSourcedMetadata:
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(principal.sourced_metadata().metadata_matcher(), context),
+        principal.sourced_metadata().metadata_source());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kNotId:
-    return std::make_shared<const NotMatcher>(principal.not_id());
+    return std::make_shared<const NotMatcher>(principal.not_id(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
-    return std::make_shared<const PathMatcher>(principal.url_path());
+    return std::make_shared<const PathMatcher>(principal.url_path(), context);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterState:
+    return std::make_shared<const FilterStateMatcher>(principal.filter_state(), context);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kCustom:
+    return Config::Utility::getAndCheckFactory<PrincipalExtensionFactory>(principal.custom())
+        .create(principal.custom(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::IDENTIFIER_NOT_SET:
     break; // Fall through to PANIC.
   }
@@ -83,15 +111,17 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
 }
 
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
-                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       Server::Configuration::CommonFactoryContext& context) {
   for (const auto& rule : set.rules()) {
-    matchers_.push_back(Matcher::create(rule, validation_visitor));
+    matchers_.push_back(Matcher::create(rule, validation_visitor, context));
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set,
+                       Server::Configuration::CommonFactoryContext& context) {
   for (const auto& id : set.ids()) {
-    matchers_.push_back(Matcher::create(id));
+    matchers_.push_back(Matcher::create(id, context));
   }
 }
 
@@ -108,15 +138,17 @@ bool AndMatcher::matches(const Network::Connection& connection,
 }
 
 OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
-                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+                     ProtobufMessage::ValidationVisitor& validation_visitor,
+                     Server::Configuration::CommonFactoryContext& context) {
   for (const auto& rule : rules) {
-    matchers_.push_back(Matcher::create(rule, validation_visitor));
+    matchers_.push_back(Matcher::create(rule, validation_visitor, context));
   }
 }
 
-OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids) {
+OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids,
+                     Server::Configuration::CommonFactoryContext& context) {
   for (const auto& id : ids) {
-    matchers_.push_back(Matcher::create(id));
+    matchers_.push_back(Matcher::create(id, context));
   }
 }
 
@@ -141,7 +173,7 @@ bool NotMatcher::matches(const Network::Connection& connection,
 bool HeaderMatcher::matches(const Network::Connection&,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
-  return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
+  return header_->matchesHeaders(headers);
 }
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
@@ -230,7 +262,21 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                               const StreamInfo::StreamInfo& info) const {
+  if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::ROUTE) {
+    // Return false if there's no route since we can't match its metadata
+    return info.route() ? matcher_.match(info.route()->metadata()) : false;
+  }
   return matcher_.match(info.dynamicMetadata());
+}
+
+FilterStateMatcher::FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                                       Server::Configuration::CommonFactoryContext& context)
+    : matcher_(THROW_OR_RETURN_VALUE(Envoy::Matchers::FilterStateMatcher::create(matcher, context),
+                                     Envoy::Matchers::FilterStateMatcherPtr)) {}
+
+bool FilterStateMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                                 const StreamInfo::StreamInfo& info) const {
+  return matcher_->match(info.filterState());
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,
@@ -253,6 +299,12 @@ bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::Request
     return false;
   }
   return path_matcher_.match(headers.getPathValue());
+}
+
+bool UriTemplateMatcher::matches(const Network::Connection&,
+                                 const Envoy::Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo&) const {
+  return uri_template_matcher_->match(headers.getPathValue());
 }
 
 } // namespace RBAC

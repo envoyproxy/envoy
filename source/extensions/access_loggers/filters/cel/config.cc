@@ -15,13 +15,11 @@ namespace Filters {
 namespace CEL {
 
 Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
-    const envoy::config::accesslog::v3::ExtensionFilter& config, Runtime::Loader&,
-    Random::RandomGenerator&) {
+    const envoy::config::accesslog::v3::ExtensionFilter& config,
+    Server::Configuration::FactoryContext& context) {
 
-  // TODO(douglas-reid): use factory_context validation. likely needs update to
-  // createFilter signature to pass in validation visitor.
-  auto factory_config = Config::Utility::translateToFactoryConfig(
-      config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
+  auto factory_config =
+      Config::Utility::translateToFactoryConfig(config, context.messageValidationVisitor(), *this);
 
 #if defined(USE_CEL_PARSER)
   envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter cel_config =
@@ -34,8 +32,10 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
                          parse_status.status().ToString());
   }
 
-  return std::make_unique<CELAccessLogExtensionFilter>(getOrCreateBuilder(),
-                                                       parse_status.value().expr());
+  return std::make_unique<CELAccessLogExtensionFilter>(
+      context.serverFactoryContext().localInfo(),
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
+      parse_status.value().expr());
 #else
   throw EnvoyException("CEL is not available for use in this environment.");
 #endif
@@ -43,14 +43,6 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
 
 ProtobufTypes::MessagePtr CELAccessLogExtensionFilterFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter>();
-}
-
-Extensions::Filters::Common::Expr::Builder&
-CELAccessLogExtensionFilterFactory::getOrCreateBuilder() {
-  if (expr_builder_ == nullptr) {
-    expr_builder_ = Extensions::Filters::Common::Expr::createBuilder(nullptr);
-  }
-  return *expr_builder_;
 }
 
 /**

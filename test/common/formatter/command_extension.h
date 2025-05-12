@@ -13,23 +13,26 @@ namespace Formatter {
 class TestFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class TestCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
-                             absl::optional<size_t>& max_length) const override;
+  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
+                             absl::optional<size_t> max_length) const override;
 };
 
 class TestCommandFactory : public CommandParserFactory {
 public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
@@ -38,23 +41,26 @@ public:
 class AdditionalFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(const std::string& command, const std::string& subcommand,
-                             absl::optional<size_t>& max_length) const override;
+  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
+                             absl::optional<size_t> max_length) const override;
 };
 
 class AdditionalCommandFactory : public CommandParserFactory {
 public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
@@ -62,7 +68,9 @@ public:
 
 class FailCommandFactory : public CommandParserFactory {
 public:
-  CommandParserPtr createCommandParserFromProto(const Protobuf::Message&) override;
+  CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   std::set<std::string> configTypes() override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;

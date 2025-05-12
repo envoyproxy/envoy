@@ -33,7 +33,7 @@ public:
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)) {
       validation_clusters = context.clusterManager().clusters();
     }
-    route_matcher_ = std::make_unique<RouteMatcher>(config, validation_clusters);
+    route_matcher_ = std::make_unique<RouteMatcher>(config, validation_clusters, context);
   }
 
   // Config

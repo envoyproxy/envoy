@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/config/v2_link_hacks.h"
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -12,21 +12,42 @@ using Envoy::Http::HeaderValueOf;
 namespace Envoy {
 namespace {
 
-class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                           public HttpIntegrationTest {
+class LuaIntegrationTest : public UpstreamDownstreamIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
-
   void createUpstreams() override {
+    fake_upstreams_count_ = 3;
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(Http::CodecType::HTTP1);
-    addFakeUpstream(Http::CodecType::HTTP1);
+
     // Create the xDS upstream.
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
+  static std::vector<std::tuple<HttpProtocolTestParams, bool>>
+  getDefaultTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                           {
+                               Http::CodecType::HTTP1,
+                               Http::CodecType::HTTP2,
+                           },
+                       const std::vector<Http::CodecType>& upstream_protocols = {
+                           Http::CodecType::HTTP1,
+                           Http::CodecType::HTTP2,
+                       }) {
+    std::vector<std::tuple<HttpProtocolTestParams, bool>> ret;
+    std::vector<HttpProtocolTestParams> protocol_defaults =
+        HttpProtocolIntegrationTest::getProtocolTestParams(downstream_protocols,
+                                                           upstream_protocols);
+    const std::vector<bool> testing_downstream_filter_values{true, false};
+
+    for (auto& param : protocol_defaults) {
+      for (bool testing_downstream_filter : testing_downstream_filter_values) {
+        ret.push_back(std::make_tuple(param, testing_downstream_filter));
+      }
+    }
+    return ret;
+  }
+
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
-    config_helper_.prependFilter(filter_config);
+    config_helper_.prependFilter(filter_config, testing_downstream_filter_);
 
     // Create static clusters.
     createClusters();
@@ -72,11 +93,15 @@ public:
               ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
         });
 
+    // This filter is not compatible with the async load balancer, as httpCall with data will
+    // always hit the `router_.awaitingHost()` check in `AsyncStreamImpl::sendData`.
+    async_lb_ = false;
+
     initialize();
   }
 
   void initializeWithYaml(const std::string& filter_config, const std::string& route_config) {
-    config_helper_.prependFilter(filter_config);
+    config_helper_.prependFilter(filter_config, testing_downstream_filter_);
 
     createClusters();
     config_helper_.addConfigModifier(
@@ -90,22 +115,42 @@ public:
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lua_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      // make sure upstream filter config only present in the first cluster, otherwise we will end
+      // up in an infinite loop of httpCall()s
       lua_cluster->set_name("lua_cluster");
+      clearUpstreamFilters(lua_cluster);
 
       auto* alt_cluster = bootstrap.mutable_static_resources()->add_clusters();
       alt_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       alt_cluster->set_name("alt_cluster");
+      clearUpstreamFilters(alt_cluster);
 
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
       ConfigHelper::setHttp2(*xds_cluster);
+      xds_cluster->clear_transport_socket();
+      clearUpstreamFilters(xds_cluster);
     });
+  }
+
+  static void clearUpstreamFilters(envoy::config::cluster::v3::Cluster* cluster) {
+    ConfigHelper::HttpProtocolOptions old_protocol_options;
+    if (cluster->typed_extension_protocol_options().contains(
+            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+          (*cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      old_protocol_options.clear_http_filters();
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(old_protocol_options);
+    }
   }
 
   void initializeWithRds(const std::string& filter_config, const std::string& route_config_name,
                          const std::string& initial_route_config) {
-    config_helper_.prependFilter(filter_config);
+    config_helper_.prependFilter(filter_config, testing_downstream_filter_);
 
     // Create static clusters.
     createClusters();
@@ -143,6 +188,8 @@ public:
               initial_route_config)},
           "1");
     };
+    // async lb doesn't seem to work for xds.
+    async_lb_ = false;
     initialize();
     registerTestServerPorts({"http"});
   }
@@ -153,7 +200,7 @@ public:
     Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
                                                    {":path", "/test/long/url"},
                                                    {":scheme", "http"},
-                                                   {":authority", "host"},
+                                                   {":authority", "foo.lyft.com"},
                                                    {"x-forwarded-for", "10.0.0.1"}};
 
     auto encoder_decoder = codec_client_->startRequest(request_headers);
@@ -222,17 +269,37 @@ public:
     }
   }
 
+  const char* expectedDownStreamProtocol() const {
+    switch (downstream_protocol_) {
+    case Http::CodecType::HTTP1:
+      return "HTTP/1.1";
+    case Http::CodecType::HTTP2:
+      return "HTTP/2";
+    case Http::CodecType::HTTP3:
+      return "HTTP/3";
+    default:
+      return "";
+    }
+  }
+
   FakeHttpConnectionPtr fake_lua_connection_;
   FakeStreamPtr lua_request_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, LuaIntegrationTest,
+                         testing::ValuesIn(LuaIntegrationTest::getDefaultTestParams()),
+                         UpstreamDownstreamIntegrationTest::testParamsToString);
 
 // Regression test for pulling route info during early local replies using the Lua filter
 // metadata() API. Covers both the upgrade required and no authority cases.
 TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This is a raw test that only supports http1";
+  }
+
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: lua
@@ -250,11 +317,8 @@ typed_config:
   initializeFilter(FILTER_AND_CODE, "foo");
   std::string response;
 
-#ifndef ENVOY_ENABLE_UHV
-  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
-#endif
 
   response = "";
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
@@ -308,10 +372,14 @@ typed_config:
         end
         request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
         request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
+        request_handle:headers():add("request_downstream_direct_local_address_value",
+          request_handle:streamInfo():downstreamDirectLocalAddress())
         request_handle:headers():add("request_downstream_local_address_value",
           request_handle:streamInfo():downstreamLocalAddress())
         request_handle:headers():add("request_downstream_directremote_address_value",
           request_handle:streamInfo():downstreamDirectRemoteAddress())
+        request_handle:headers():add("request_downstream_remote_address_value",
+          request_handle:streamInfo():downstreamRemoteAddress())
         request_handle:headers():add("request_requested_server_name",
           request_handle:streamInfo():requestedServerName())
       end
@@ -329,20 +397,34 @@ typed_config:
 
   initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},      {":path", "/test/long/url"},     {":scheme", "http"},
-      {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
-      {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1,3;2,5;"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                 {"x-test-header", "foo"},
+                                                 {"x-test-header", "bar"},
+                                                 {"set-cookie", "foo;bar;"},
+                                                 {"set-cookie", "1,3;2,5;"}};
 
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  Http::StreamEncoder& encoder = encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl request_data1("hello");
-  encoder.encodeData(request_data1, false);
-  Buffer::OwnedImpl request_data2("world");
-  encoder.encodeData(request_data2, true);
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "log test"},
+                                                         {"debug", "log test"},
+                                                         {"info", "log test"},
+                                                         {"warn", "log test"},
+                                                         {"error", "log test"},
+                                                         {"critical", "log test"}}),
+                             {
+                               auto encoder_decoder = codec_client_->startRequest(request_headers);
+                               Http::StreamEncoder& encoder = encoder_decoder.first;
+                               response = std::move(encoder_decoder.second);
+                               Buffer::OwnedImpl request_data1("hello");
+                               encoder.encodeData(request_data1, false);
+                               Buffer::OwnedImpl request_data2("world");
+                               encoder.encodeData(request_data2, true);
 
-  waitForNextUpstreamRequest();
+                               waitForNextUpstreamRequest();
+                             });
   EXPECT_EQ("foo", upstream_request_->headers()
                        .get(Http::LowerCaseString("test_header_value_0"))[0]
                        ->value()
@@ -392,39 +474,57 @@ typed_config:
                        .get(Http::LowerCaseString("request_metadata_baz"))[0]
                        ->value()
                        .getStringView());
-  EXPECT_EQ("false", upstream_request_->headers()
-                         .get(Http::LowerCaseString("request_secure"))[0]
-                         ->value()
-                         .getStringView());
+  EXPECT_EQ(downstream_protocol_ == Http::CodecType::HTTP3 ? "true" : "false",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("request_secure"))[0]
+                ->value()
+                .getStringView());
 
-  EXPECT_EQ("HTTP/1.1", upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_protocol"))[0]
-                            ->value()
-                            .getStringView());
+  EXPECT_EQ(expectedDownStreamProtocol(), upstream_request_->headers()
+                                              .get(Http::LowerCaseString("request_protocol"))[0]
+                                              ->value()
+                                              .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
                        .get(Http::LowerCaseString("request_dynamic_metadata_value"))[0]
                        ->value()
                        .getStringView());
 
-  EXPECT_TRUE(
-      absl::StrContains(upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_downstream_local_address_value"))[0]
-                            ->value()
-                            .getStringView(),
-                        GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+  EXPECT_TRUE(absl::StrContains(
+      upstream_request_->headers()
+          .get(Http::LowerCaseString("request_downstream_direct_local_address_value"))[0]
+          ->value()
+          .getStringView(),
+      std::get<0>(GetParam()).version == Network::Address::IpVersion::v4 ? "127.0.0.1:"
+                                                                         : "[::1]:"));
+
+  EXPECT_TRUE(absl::StrContains(
+      upstream_request_->headers()
+          .get(Http::LowerCaseString("request_downstream_local_address_value"))[0]
+          ->value()
+          .getStringView(),
+      std::get<0>(GetParam()).version == Network::Address::IpVersion::v4 ? "127.0.0.1:"
+                                                                         : "[::1]:"));
 
   EXPECT_TRUE(absl::StrContains(
       upstream_request_->headers()
           .get(Http::LowerCaseString("request_downstream_directremote_address_value"))[0]
           ->value()
           .getStringView(),
-      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+      std::get<0>(GetParam()).version == Network::Address::IpVersion::v4 ? "127.0.0.1:"
+                                                                         : "[::1]:"));
 
-  EXPECT_EQ("", upstream_request_->headers()
-                    .get(Http::LowerCaseString("request_requested_server_name"))[0]
-                    ->value()
-                    .getStringView());
+  EXPECT_EQ("10.0.0.1:0",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("request_downstream_remote_address_value"))[0]
+                ->value()
+                .getStringView());
+
+  EXPECT_EQ(downstream_protocol_ == Http::CodecType::HTTP3 ? "lyft.com" : "",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("request_requested_server_name"))[0]
+                ->value()
+                .getStringView());
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -447,10 +547,10 @@ typed_config:
                        .get(Http::LowerCaseString("response_metadata_baz"))[0]
                        ->value()
                        .getStringView());
-  EXPECT_EQ("HTTP/1.1", response->headers()
-                            .get(Http::LowerCaseString("request_protocol"))[0]
-                            ->value()
-                            .getStringView());
+  EXPECT_EQ(expectedDownStreamProtocol(), response->headers()
+                                              .get(Http::LowerCaseString("request_protocol"))[0]
+                                              ->value()
+                                              .getStringView());
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("foo")).empty());
 
   cleanup();
@@ -471,7 +571,7 @@ typed_config:
         {
           [":method"] = "POST",
           [":path"] = "/",
-          [":authority"] = "lua_cluster"
+          [":authority"] = "foo.lyft.com"
         },
         "hello world",
         5000)
@@ -487,7 +587,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
@@ -517,6 +617,10 @@ typed_config:
 
 // Test whether the 'response_headers_to_add' is valid for the Lua 'respond' method.
 TEST_P(LuaIntegrationTest, Respond) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: lua
@@ -537,7 +641,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/alt/route"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
@@ -567,7 +671,7 @@ typed_config:
         {
           [":method"] = "POST",
           [":path"] = "/",
-          [":authority"] = "lua_cluster"
+          [":authority"] = "foo.lyft.com"
         },
         "hello world",
         5000)
@@ -585,7 +689,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
@@ -618,7 +722,7 @@ typed_config:
         {
           [":method"] = "POST",
           [":path"] = "/",
-          [":authority"] = "lua_cluster"
+          [":authority"] = "foo.lyft.com"
         },
         "hello world",
         5000,
@@ -632,7 +736,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
@@ -656,6 +760,9 @@ typed_config:
 
 // Filter alters headers and changes route.
 TEST_P(LuaIntegrationTest, ChangeRoute) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "Changing routes only works with downstream filters";
+  }
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: lua
@@ -675,7 +782,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
@@ -709,7 +816,7 @@ typed_config:
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
-                                                 {":authority", "host"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
 
   for (uint32_t i = 0; i < 30; ++i) {
@@ -799,10 +906,15 @@ typed_config:
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "https"},
-      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"message", "hello"},
-      {"keyid", "foo"},       {"signature", signature},        {"hash", "sha256"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "https"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                 {"message", "hello"},
+                                                 {"keyid", "foo"},
+                                                 {"signature", signature},
+                                                 {"hash", "sha256"}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
@@ -854,42 +966,42 @@ const std::string INITIAL_ROUTE_CONFIG =
 name: basic_lua_routes
 virtual_hosts:
 - name: rds_vhost_1
-  domains: ["lua.per.route"]
+  domains: ["foo.lyft.com"]
   routes:
   - match:
       prefix: "/lua/per/route/default"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
   - match:
       prefix: "/lua/per/route/disabled"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         disabled: true
   - match:
       prefix: "/lua/per/route/hello"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: hello.lua
   - match:
       prefix: "/lua/per/route/byebye"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: byebye.lua
   - match:
       prefix: "/lua/per/route/inline"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -899,9 +1011,9 @@ virtual_hosts:
   - match:
       prefix: "/lua/per/route/nocode"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         name: nocode.lua
 )EOF";
@@ -911,14 +1023,14 @@ const std::string UPDATE_ROUTE_CONFIG =
 name: basic_lua_routes
 virtual_hosts:
 - name: rds_vhost_1
-  domains: ["lua.per.route"]
+  domains: ["foo.lyft.com"]
   routes:
   - match:
       prefix: "/lua/per/route/hello"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -928,9 +1040,9 @@ virtual_hosts:
   - match:
       prefix: "/lua/per/route/inline"
     route:
-      cluster: lua_cluster
+      cluster: cluster_0
     typed_per_filter_config:
-      envoy.filters.http.lua:
+      lua:
         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
         source_code:
           inline_string: |
@@ -949,10 +1061,11 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   auto check_request = [this](Http::TestRequestHeaderMapImpl request_headers,
                               std::string expected_value) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    waitForNextUpstreamRequest(1);
+    waitForNextUpstreamRequest(0);
 
     auto entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
     if (!expected_value.empty()) {
+      EXPECT_FALSE(entry.empty()) << "no header found. expected value: " << expected_value;
       EXPECT_EQ(expected_value, entry[0]->value().getStringView());
     } else {
       EXPECT_TRUE(entry.empty());
@@ -969,7 +1082,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
                                                  {":path", "/lua/per/route/default"},
                                                  {":scheme", "http"},
-                                                 {":authority", "lua.per.route"},
+                                                 {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
   check_request(default_headers, "code_from_global");
 
@@ -977,7 +1090,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   Http::TestRequestHeaderMapImpl disabled_headers{{":method", "GET"},
                                                   {":path", "/lua/per/route/disabled"},
                                                   {":scheme", "http"},
-                                                  {":authority", "lua.per.route"},
+                                                  {":authority", "foo.lyft.com"},
                                                   {"x-forwarded-for", "10.0.0.1"}};
   check_request(disabled_headers, "");
 
@@ -985,14 +1098,14 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   Http::TestRequestHeaderMapImpl hello_headers{{":method", "GET"},
                                                {":path", "/lua/per/route/hello"},
                                                {":scheme", "http"},
-                                               {":authority", "lua.per.route"},
+                                               {":authority", "foo.lyft.com"},
                                                {"x-forwarded-for", "10.0.0.1"}};
   check_request(hello_headers, "code_from_hello");
 
   Http::TestRequestHeaderMapImpl byebye_headers{{":method", "GET"},
                                                 {":path", "/lua/per/route/byebye"},
                                                 {":scheme", "http"},
-                                                {":authority", "lua.per.route"},
+                                                {":authority", "foo.lyft.com"},
                                                 {"x-forwarded-for", "10.0.0.1"}};
   check_request(byebye_headers, "code_from_byebye");
 
@@ -1000,7 +1113,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   Http::TestRequestHeaderMapImpl inline_headers{{":method", "GET"},
                                                 {":path", "/lua/per/route/inline"},
                                                 {":scheme", "http"},
-                                                {":authority", "lua.per.route"},
+                                                {":authority", "foo.lyft.com"},
                                                 {"x-forwarded-for", "10.0.0.1"}};
   check_request(inline_headers, "inline_code_from_inline");
 
@@ -1008,7 +1121,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   Http::TestRequestHeaderMapImpl nocode_headers{{":method", "GET"},
                                                 {":path", "/lua/per/route/nocode"},
                                                 {":scheme", "http"},
-                                                {":authority", "lua.per.route"},
+                                                {":authority", "foo.lyft.com"},
                                                 {"x-forwarded-for", "10.0.0.1"}};
 
   check_request(nocode_headers, "");
@@ -1016,6 +1129,9 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
 }
 
 TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "Direct response only works with downstream filters";
+  }
   const std::string filter_config =
       R"EOF(
   name: lua
@@ -1092,7 +1208,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
   auto check_request = [this](Http::TestRequestHeaderMapImpl request_headers,
                               std::string expected_value) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    waitForNextUpstreamRequest(1);
+    waitForNextUpstreamRequest(0);
 
     auto entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
     if (!expected_value.empty()) {
@@ -1111,14 +1227,14 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
   Http::TestRequestHeaderMapImpl hello_headers{{":method", "GET"},
                                                {":path", "/lua/per/route/hello"},
                                                {":scheme", "http"},
-                                               {":authority", "lua.per.route"},
+                                               {":authority", "foo.lyft.com"},
                                                {"x-forwarded-for", "10.0.0.1"}};
   check_request(hello_headers, "code_from_hello");
 
   Http::TestRequestHeaderMapImpl inline_headers{{":method", "GET"},
                                                 {":path", "/lua/per/route/inline"},
                                                 {":scheme", "http"},
-                                                {":authority", "lua.per.route"},
+                                                {":authority", "foo.lyft.com"},
                                                 {"x-forwarded-for", "10.0.0.1"}};
   check_request(inline_headers, "inline_code_from_inline");
 
@@ -1180,6 +1296,9 @@ typed_config:
 // Rewrite response buffer, without original upstream response body
 // and don't always wrap body.
 TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutUpstreamBodyAndDisableWrapBody) {
+  if (std::get<0>(GetParam()).http2_implementation == Http2Impl::Nghttp2) {
+    GTEST_SKIP() << "This test fails with nghttp2";
+  }
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: lua
@@ -1241,6 +1360,12 @@ typed_config:
 
 // Test whether setting the HTTP1 reason phrase
 TEST_P(LuaIntegrationTest, Http1ReasonPhrase) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "sendRaw only works with http1";
+  }
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
   const std::string FILTER_AND_CODE =
       R"EOF(
 name: lua
@@ -1258,6 +1383,55 @@ typed_config:
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 400 Slow Down\r\n") == 0);
+}
+
+// Test sending local reply due to too much data. HTTP2 is needed as it
+// will propagate the end stream from the downstream in the same decodeData
+// call the filter receives the downstream request body.
+TEST_P(LuaIntegrationTest, LocalReplyWhenWaitingForBodyFollowedByHttpRequest) {
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This test does not work on http1";
+  }
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local initial_req_body = request_handle:body()
+        local headers, body = request_handle:httpCall(
+        "lua_cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "lua_cluster"
+        },
+        "hello world",
+        1000)
+        request_handle:headers():replace("x-code", headers["code"] or "")
+      end
+)EOF";
+
+  // Set low buffer limits to allow us to trigger local reply easy.
+  const int buffer_limit = 65535;
+  config_helper_.setBufferLimits(buffer_limit, buffer_limit);
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder, buffer_limit + 1, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
 }
 
 } // namespace

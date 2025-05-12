@@ -7,6 +7,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -15,26 +17,55 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-bool UpstreamHttp11ConnectSocket::isValidConnectResponse(Buffer::Instance& buffer) {
+bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view response_payload,
+                                                         bool& headers_complete,
+                                                         size_t& bytes_processed) {
   SelfContainedParser parser;
-  while (parser.parser().getStatus() == Http::Http1::ParserStatus::Ok &&
-         !parser.headersComplete() && buffer.length() != 0) {
-    auto slice = buffer.frontSlice();
-    int parsed = parser.parser().execute(static_cast<const char*>(slice.mem_), slice.len_);
-    buffer.drain(parsed);
-  }
+
+  bytes_processed = parser.parser().execute(response_payload.data(), response_payload.length());
+  headers_complete = parser.headersComplete();
+
   return parser.parser().getStatus() != Http::Http1::ParserStatus::Error &&
-         parser.headersComplete() && parser.parser().statusCode() == 200;
+         parser.headersComplete() && parser.parser().statusCode() == Http::Code::OK;
 }
 
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
-    Network::TransportSocketOptionsConstSharedPtr options)
+    Network::TransportSocketOptionsConstSharedPtr options,
+    std::shared_ptr<const Upstream::HostDescription> host)
     : PassthroughSocket(std::move(transport_socket)), options_(options) {
-  if (options_ && options_->http11ProxyInfo() && transport_socket_->ssl()) {
-    header_buffer_.add(
-        absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
-    need_to_strip_connect_response_ = true;
+  // If the filter state metadata has populated the relevant entries in the transport socket
+  // options, we want to maintain the original behavior of this transport socket.
+  if (options_ && options_->http11ProxyInfo()) {
+    if (transport_socket_->ssl()) {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_ssl_port")) {
+        header_buffer_.add(absl::StrCat(
+            "CONNECT ", options_->http11ProxyInfo()->hostname,
+            Http::HeaderUtility::hostHasPort(options_->http11ProxyInfo()->hostname) ? "" : ":443",
+            " HTTP/1.1\r\n\r\n"));
+      } else {
+        header_buffer_.add(absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname,
+                                        ":443 HTTP/1.1\r\n\r\n"));
+      }
+      need_to_strip_connect_response_ = true;
+    }
+    return;
+  }
+
+  // The absence of proxy info from the transport socket options means that we should use the host
+  // address of the provided HostDescription if it has the appropriate metadata set.
+  for (auto& metadata : {host->metadata(), host->localityMetadata()}) {
+    if (metadata == nullptr) {
+      continue;
+    }
+
+    const bool has_proxy_addr = metadata->typed_filter_metadata().contains(
+        Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
+    if (has_proxy_addr) {
+      header_buffer_.add(
+          absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+      need_to_strip_connect_response_ = true;
+    }
   }
 }
 
@@ -67,27 +98,36 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
       return {Network::PostIoAction::Close, 0, false};
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
-    size_t index = peek_data.find("\r\n\r\n");
-    if (index == absl::string_view::npos) {
-      if (result.return_value_ == MAX_RESPONSE_HEADER_SIZE) {
+    size_t bytes_processed = 0;
+    bool headers_complete = false;
+    bool is_valid_connect_response =
+        isValidConnectResponse(peek_data, headers_complete, bytes_processed);
+
+    if (!headers_complete) {
+      if (peek_data.size() == MAX_RESPONSE_HEADER_SIZE) {
         ENVOY_CONN_LOG(trace, "failed to receive CONNECT headers within {} bytes",
                        callbacks_->connection(), MAX_RESPONSE_HEADER_SIZE);
         return {Network::PostIoAction::Close, 0, false};
       }
+      ENVOY_CONN_LOG(trace, "Incomplete CONNECT header: {} bytes received",
+                     callbacks_->connection(), peek_data.size());
       return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
     }
-    result = callbacks_->ioHandle().read(buffer, index + 4);
-    if (!result.ok() || result.return_value_ != index + 4) {
-      ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
-      return {Network::PostIoAction::Close, 0, false};
-    }
-    // Make sure the response is a valid connect response and all the data is consumed.
-    if (!isValidConnectResponse(buffer) || buffer.length() != 0) {
+    if (!is_valid_connect_response) {
       ENVOY_CONN_LOG(trace, "Response does not appear to be a successful CONNECT upgrade",
                      callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
-    ENVOY_CONN_LOG(trace, "Successfully stripped CONNECT header", callbacks_->connection());
+
+    result = callbacks_->ioHandle().read(buffer, bytes_processed);
+    if (!result.ok() || result.return_value_ != bytes_processed) {
+      ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
+      return {Network::PostIoAction::Close, 0, false};
+    }
+    buffer.drain(bytes_processed);
+
+    ENVOY_CONN_LOG(trace, "Successfully stripped {} bytes of CONNECT header",
+                   callbacks_->connection(), bytes_processed);
     need_to_strip_connect_response_ = false;
   }
   return transport_socket_->doRead(buffer);
@@ -130,7 +170,7 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options);
+  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host);
 }
 
 void UpstreamHttp11ConnectSocketFactory::hashKey(

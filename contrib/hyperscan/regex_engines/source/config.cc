@@ -18,7 +18,8 @@ Config::createEngine(const Protobuf::Message& config,
 #ifdef HYPERSCAN_DISABLED
   throw EnvoyException("X86_64 architecture is required for Hyperscan.");
 #else
-  return std::make_shared<HyperscanEngine>(server_factory_context.threadLocal());
+  return std::make_shared<HyperscanEngine>(server_factory_context.mainThreadDispatcher(),
+                                           server_factory_context.threadLocal());
 #endif
 }
 

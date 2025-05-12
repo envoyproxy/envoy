@@ -8,8 +8,12 @@ The :ref:`overload manager <arch_overview_overload_manager>` is configured in th
 field.
 
 An example configuration of the overload manager is shown below. It shows a
-configuration to drain HTTP/X connections when heap memory usage reaches 95%
-and to stop accepting requests when heap memory usage reaches 99%.
+configuration to drain HTTP/X connections when heap memory usage reaches 92%
+(configured via ``envoy.overload_actions.disable_http_keepalive``), to stop
+accepting requests when heap memory usage reaches 95% (configured via
+``envoy.overload_actions.stop_accepting_requests``) and to stop accepting new
+TCP connections when memory usage reaches 95% (configured via
+``envoy.load_shed_points.tcp_listener_accept``).
 
 .. code-block:: yaml
 
@@ -26,12 +30,18 @@ and to stop accepting requests when heap memory usage reaches 99%.
        triggers:
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
-             value: 0.95
+             value: 0.92
      - name: "envoy.overload_actions.stop_accepting_requests"
        triggers:
          - name: "envoy.resource_monitors.fixed_heap"
            threshold:
-             value: 0.99
+             value: 0.95
+    loadshed_points:
+      - name: "envoy.load_shed_points.tcp_listener_accept"
+        triggers:
+          - name: "envoy.resource_monitors.fixed_heap"
+            threshold:
+              value: 0.95
 
 Resource monitors
 -----------------
@@ -39,6 +49,43 @@ Resource monitors
 The overload manager uses Envoy's :ref:`extension <extending>` framework for defining
 resource monitors. Envoy's builtin resource monitors are listed
 :ref:`here <v3_config_resource_monitors>`.
+
+.. _config_overload_manager_cgroup_memory:
+
+Cgroup Memory
+^^^^^^^^^^^^^
+
+The cgroup memory resource monitor tracks memory pressure by reading memory usage and limits from the cgroup memory subsystem.
+This monitor supports both cgroup v1 and cgroup v2.
+
+The monitor reports memory pressure as a ratio of current memory usage to the memory limit. The limit is determined by:
+
+1. The cgroup memory limit as reported by the monitor. This is the typical case.
+2. If max_memory_bytes is configured, the minimum between the configured max_memory_bytes value and the cgroup memory limit.
+   In this case, max_memory_bytes serves as an upper bound on the memory limit used for pressure calculations.
+
+When no memory limit is set in cgroup (indicated by -1 in v1 or "max" in v2), the pressure is reported as 0.
+
+Example configuration:
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "envoy.resource_monitors.cgroup_memory"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig
+         max_memory_bytes: 1073741824  # 1GB
+
+This can be combined with actions to shed load when memory pressure increases:
+
+.. code-block:: yaml
+
+   actions:
+     - name: "envoy.overload_actions.stop_accepting_requests"
+       triggers:
+         - name: "envoy.resource_monitors.cgroup_memory"
+           threshold:
+             value: 0.95  # Trigger at 95% memory utilization
 
 .. _config_overload_manager_triggers:
 
@@ -102,6 +149,69 @@ The following overload actions are supported:
     - Envoy will reset expensive streams to terminate them. See
       :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
 
+
+Load Shed Points
+----------------
+
+Load Shed Points are similar to overload actions as they are dependent on a
+given trigger to activate which determines whether Envoy ends up shedding load at
+the given point in a connection or stream lifecycle.
+
+For a given request on a newly created connection, we can think of the
+configured load shed points as a decision tree at key junctions of a connection
+/ stream lifecycle. While a connection / stream might pass one junction, it
+is possible that later on the conditions might change causing Envoy to shed load
+at a later junction.
+
+In comparision to analogous overload actions, Load Shed Points are more
+reactive to changing conditions, especially in cases of large traffic spikes.
+Overload actions can be better suited in cases where Envoy is deciding to shed load
+but the worker threads aren't actively processing the connections or streams that
+Envoy wants to shed. For example
+``envoy.overload_actions.reset_high_memory_stream`` can reset streams that are
+using a lot of memory even if those streams aren't actively making progress.
+
+Compared to overload actions, Load Shed Points are also more flexible to
+integrate custom (e.g. company inteneral) Load Shed Points as long as the extension
+has access to the Overload Manager to request the custom Load Shed Point.
+
+The following core load shed points are supported:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 2
+
+  * - Name
+    - Description
+
+  * - envoy.load_shed_points.tcp_listener_accept
+    - Envoy will reject (close) new TCP connections. This occurs before the
+      :ref:`Listener Filter Chain <life_of_a_request>` is created.
+
+  * - envoy.load_shed_points.http_connection_manager_decode_headers
+    - Envoy will reject new HTTP streams by sending a local reply. This occurs
+      right after the http codec has finished parsing headers but before the
+      :ref:`HTTP Filter Chain is instantiated <life_of_a_request>`.
+
+  * - envoy.load_shed_points.http1_server_abort_dispatch
+    - Envoy will reject processing HTTP1 at the codec level. If a response has
+      not yet started, Envoy will send a local reply. Envoy will then close the
+      connection.
+
+  * - envoy.load_shed_points.http2_server_go_away_on_dispatch
+    - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
+      level which will eventually drain the HTTP/2 connection.
+
+  * - envoy.load_shed_points.hcm_ondata_creating_codec
+    - Envoy will close the connections before creating codec if Envoy is under
+      pressure, typically memory. This happens once geting data from the
+      connection.
+
+  * - envoy.load_shed_points.http_downstream_filter_check
+    - Envoy will send local reply directly before creating an upstream request in
+      the router if Envoy is under resource pressure, typically memory. This change
+      makes load shed check availabe in HTTP decoder filters.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
@@ -150,11 +260,26 @@ again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s 
 Limiting Active Connections
 ---------------------------
 
-Currently, the only supported way to limit the total number of active connections allowed across all
-listeners is via specifying an integer through the runtime key
-``overload.global_downstream_max_connections``. The connection limit is recommended to be less than
+To limit the total number of active downstream connections allowed across all
+listeners configure :ref:`downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` in Overload Manager:
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "envoy.resource_monitors.global_downstream_max_connections"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
+         max_active_downstream_connections: 1000
+
+:ref:`Downstream connections monitor <envoy_v3_api_msg_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig>` does not
+support runtime updates for the configured value of :ref:`max_active_downstream_connections
+<envoy_v3_api_field_extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig.max_active_downstream_connections>`
+One could also set this limit via specifying an integer through the runtime key
+``overload.global_downstream_max_connections``, though this key is deprecated and will be removed in future.
+The connection limit is recommended to be less than
 half of the system's file descriptor limit, to account for upstream connections, files, and other
 usage of file descriptors.
+
 If the value is unspecified, there is no global limit on the number of active downstream connections
 and Envoy will emit a warning indicating this at startup. To disable the warning without setting a
 limit on the number of active downstream connections, the runtime value may be set to a very large
@@ -265,6 +390,51 @@ It's expected that the first few gradations shouldn't trigger anything, unless
 there's something seriously wrong e.g. in this example streams using ``>=
 128MiB`` in buffers.
 
+CPU Intensive Workload Brownout Protection
+------------------------------------------
+
+The ``envoy.overload_actions.stop_accepting_requests`` overload action can be used
+to protect workloads from browning-out when an unexpected spike in the number of
+requests the workload receives that causes the CPU to become saturated. This overload
+action when used in conjunction with the ``envoy.resource_monitors.cpu_utilization``
+resource monitor can reduce the pressure on the CPU by cheaply rejecting new requests.
+While the real mitigation for such request spikes are horizantally scaling the workload,
+this overload action can be used to ensure the fleet does not get into a cascading failure
+mode.
+Some platform owners may choose to install this overload action by default to protect the fleet,
+since it is easier to configure a target CPU utilization percentage than to configure a request rate per
+workload. This supports monitoring both HOST CPU Utilization and K8s Container CPU Utilization.
+By default it's using ``mode: HOST``, to trigger overload actions on Container CPU usage,
+use ``mode: CONTAINER`` to set the calculation strategy to evaluate Container CPU stats.
+
+.. literalinclude:: _include/cpu_utilization_monitor_overload.yaml
+    :language: yaml
+    :lines: 43-55
+    :emphasize-lines: 3-13
+    :linenos:
+    :caption: :download:`cpu_utilization_monitor_overload.yaml <_include/cpu_utilization_monitor_overload.yaml>`
+
+Loadshedding in K8s environment
+-------------------------------
+
+In a Kubernetes environment, where Envoy workloads often share node resources with other applications, configuring this
+overload action with a target container CPU utilization percentage offers a more adaptable approach than defining a fixed
+request rate. This ensures that Envoy workloads can dynamically manage their CPU usage based on container-level metrics
+without impacting other co-located workloads.
+
+The ``envoy.overload_actions.stop_accepting_requests`` overload action can be utilized to safeguard Envoy workloads
+in a Kubernetes environment from experiencing degraded performance during unexpected spikes in incoming requests
+that saturate the container's allocated CPU resources. When combined with the ``envoy.resource_monitors.cpu_utilization``
+resource monitor, this overload action can effectively reduce Container CPU pressure by rejecting new requests at a minimal
+computational cost.
+
+.. literalinclude:: _include/container_cpu_utilization_monitor_overload.yaml
+    :language: yaml
+    :lines: 1-14
+    :emphasize-lines: 3-14
+    :linenos:
+    :caption: :download:`container_cpu_utilization_monitor_overload.yaml <_include/container_cpu_utilization_monitor_overload.yaml>`
+
 
 Statistics
 ----------
@@ -279,6 +449,7 @@ with the following statistics:
   pressure, Gauge, Resource pressure as a percent
   failed_updates, Counter, Total failed attempts to update the resource pressure
   skipped_updates, Counter, Total skipped attempts to update the resource pressure due to a pending update
+  refresh_interval_delay, Histogram, Latencies for the delay between overload manager resource refresh loops
 
 Each configured overload action has a statistics tree rooted at *overload.<name>.*
 with the following statistics:
@@ -289,3 +460,13 @@ with the following statistics:
 
   active, Gauge, "Active state of the action (0=scaling, 1=saturated)"
   scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+
+Each configured Load Shed Point has a statistics tree rooted at *overload.<name>.*
+with the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  scale_percent, Gauge, "Scaled value of the action as a percent (0-99=scaling, 100=saturated)"
+  shed_load_count, Counter, "Total count the load is sheded"

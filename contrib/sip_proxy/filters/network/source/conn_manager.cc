@@ -31,7 +31,15 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
 void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const std::string& val,
     const absl::optional<TraContextMap> context) {
-  if (cache_manager_[type][key] != val) {
+
+  bool should_update_tra = true;
+
+  auto cached_value = cache_manager_.at(type, key);
+  if (cached_value.has_value() && cached_value.value().get() == val) {
+    should_update_tra = false;
+  }
+
+  if (should_update_tra) {
     cache_manager_.insertCache(type, key, val);
     if (traClient()) {
       traClient()->updateTrafficRoutingAssistant(
@@ -44,28 +52,30 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
-  if (cache_manager_.contains(type, key)) {
-    host = cache_manager_[type][key];
+
+  host = {};
+
+  auto cached_value = cache_manager_.at(type, key);
+  if (cached_value.has_value()) {
+    host = cached_value.value().get();
     return QueryStatus::Continue;
   }
 
   if (activetrans.metadata()->affinityIteration()->query()) {
-    parent_.pushIntoPendingList(type, key, activetrans, [&]() {
-      if (traClient()) {
+    if (traClient()) {
+      parent_.pushIntoPendingList(type, key, activetrans, [&]() {
         traClient()->retrieveTrafficRoutingAssistant(type, key, context,
                                                      Tracing::NullSpan::instance(), stream_info_);
-      }
-    });
-    host = "";
-    return QueryStatus::Pending;
+      });
+      return QueryStatus::Pending;
+    }
   }
-  host = "";
   return QueryStatus::Stop;
 }
 
 void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
-  cache_manager_[type].erase(key);
+  cache_manager_.erase(type, key);
   if (traClient()) {
     traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
                                                stream_info_);
@@ -102,7 +112,11 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
         parent_.onResponseHandleForPendingList(
             message_type, item.first,
             [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-              cache_manager_[message_type].emplace(item.first, item.second);
+              // TODO For x-skey case, no need to add to local cache. This will be controlled by
+              // config cache->add_query_to_cache.
+              if (message_type != "x-skey") {
+                cache_manager_.insertCache(message_type, item.first, item.second);
+              }
               metadata->setDestination(item.second);
               return parent_.continueHandling(metadata, decoder_event_handler);
             });
@@ -131,8 +145,13 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             .data();
     for (auto& item : data) {
       ENVOY_LOG(debug, "TRA UPDATE {}: {}={}", message_type, item.first, item.second);
-      cache_manager_[message_type].emplace(item.first, item.second);
+      cache_manager_.insertCache(message_type, item.first, item.second);
     }
+    break;
+  }
+  case TrafficRoutingAssistant::ResponseType::FailureResp: {
+    ENVOY_LOG(trace, "TRA === FailureResp");
+    break;
   }
   default:
     break;
@@ -155,11 +174,12 @@ void TrafficRoutingAssistantHandler::doSubscribe(
   }
 }
 
-ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+ConnectionManager::ConnectionManager(const ConfigSharedPtr& config,
+                                     Random::RandomGenerator& random_generator,
                                      TimeSource& time_source,
                                      Server::Configuration::FactoryContext& context,
                                      std::shared_ptr<Router::TransactionInfos> transaction_infos)
-    : config_(config), stats_(config_.stats()), decoder_(std::make_unique<Decoder>(*this)),
+    : config_(config), stats_(config_->stats()), decoder_(std::make_unique<Decoder>(*this)),
       random_generator_(random_generator), time_source_(time_source), context_(context),
       transaction_infos_(transaction_infos) {}
 
@@ -281,7 +301,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   default:
     PANIC("not reached");
   }
-  stats_.counterFromElements("", "local-generated-response").inc();
+  stats_.response_local_generated_.inc();
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
@@ -318,9 +338,10 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
   read_callbacks_->connection().enableHalfClose(true);
 
   auto stream_info = StreamInfo::StreamInfoImpl(
-      time_source_, read_callbacks_->connection().connectionInfoProviderSharedPtr());
+      time_source_, read_callbacks_->connection().connectionInfoProviderSharedPtr(),
+      StreamInfo::FilterState::LifeSpan::Connection);
   tra_handler_ = std::make_shared<TrafficRoutingAssistantHandler>(
-      *this, read_callbacks_->connection().dispatcher(), config_.settings()->traServiceConfig(),
+      *this, read_callbacks_->connection().dispatcher(), config_->settings()->traServiceConfig(),
       context_, stream_info);
 }
 
@@ -330,7 +351,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+  stats_.sipMethodCounter(metadata->methodType(), SipMethodStatsSuffix::RequestReceived).inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
@@ -395,7 +416,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
-  cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
+  cm.stats_.sipMethodCounter(metadata_->methodType(), SipMethodStatsSuffix::ResponseProxied).inc();
 
   return FilterStatus::Continue;
 }
@@ -484,7 +505,7 @@ FilterStatus ConnectionManager::ActiveTrans::messageEnd() {
 }
 
 void ConnectionManager::ActiveTrans::createFilterChain() {
-  parent_.config_.filterFactory().createFilterChain(*this);
+  parent_.config_->filterFactory().createFilterChain(*this);
 }
 
 void ConnectionManager::ActiveTrans::onReset() { parent_.doDeferredTransDestroy(*this); }
@@ -506,7 +527,7 @@ const Network::Connection* ConnectionManager::ActiveTrans::connection() const {
 Router::RouteConstSharedPtr ConnectionManager::ActiveTrans::route() {
   if (!cached_route_) {
     if (metadata_ != nullptr) {
-      Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
+      Router::RouteConstSharedPtr route = parent_.config_->routerConfig().route(*metadata_);
       cached_route_ = std::move(route);
     } else {
       cached_route_ = nullptr;

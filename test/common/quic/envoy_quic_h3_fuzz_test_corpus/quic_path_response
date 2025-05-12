@@ -1,0 +1,8 @@
+frames {
+  qframe {
+    path_response {
+      control_frame_id: 0,
+      data: "\000",
+    }
+  }
+}

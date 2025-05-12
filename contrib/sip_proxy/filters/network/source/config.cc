@@ -1,12 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/config.h"
 
-#include <string>
-
-#include "envoy/network/connection.h"
-#include "envoy/registry/registry.h"
-
-#include "source/common/config/utility.h"
-
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"
@@ -61,7 +54,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.sip_cluster", cluster));
     auto transaction_info_ptr = std::make_shared<Router::TransactionInfo>(
-        cluster, context.threadLocal(),
+        cluster, context.serverFactoryContext().threadLocal(),
         static_cast<std::chrono::milliseconds>(
             PROTOBUF_GET_MS_OR_DEFAULT(proto_config.settings(), transaction_timeout, 32000)));
     transaction_info_ptr->init();
@@ -71,8 +64,9 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   return
       [filter_config, &context, transaction_infos](Network::FilterManager& filter_manager) -> void {
         filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-            *filter_config, context.api().randomGenerator(),
-            context.mainThreadDispatcher().timeSource(), context, transaction_infos));
+            filter_config, context.serverFactoryContext().api().randomGenerator(),
+            context.serverFactoryContext().mainThreadDispatcher().timeSource(), context,
+            transaction_infos));
       };
 }
 

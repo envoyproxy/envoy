@@ -1,6 +1,7 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -10,9 +11,12 @@ struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
+  Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
-  bool defer_processing_backedup_streams;
+  bool use_universal_header_validator;
 };
+
+absl::string_view http2ImplementationToString(Http2Impl impl);
 
 // Allows easy testing of Envoy code for HTTP/HTTP2 upstream/downstream.
 //
@@ -40,11 +44,24 @@ public:
   //
   // Upstream and downstream protocols may be changed via the input vectors.
   // Address combinations are propagated from TestEnvironment::getIpVersionsForTest()
-  static std::vector<HttpProtocolTestParams> getProtocolTestParams(
-      const std::vector<Http::CodecType>& downstream_protocols = {Http::CodecType::HTTP1,
-                                                                  Http::CodecType::HTTP2},
-      const std::vector<Http::CodecType>& upstream_protocols = {Http::CodecType::HTTP1,
-                                                                Http::CodecType::HTTP2});
+  static std::vector<HttpProtocolTestParams>
+  getProtocolTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                            {
+                                Http::CodecType::HTTP1,
+                                Http::CodecType::HTTP2,
+                                Http::CodecType::HTTP3,
+                            },
+                        const std::vector<Http::CodecType>& upstream_protocols = {
+                            Http::CodecType::HTTP1,
+                            Http::CodecType::HTTP2,
+                            Http::CodecType::HTTP3,
+                        });
+
+  static std::vector<HttpProtocolTestParams> getProtocolTestParamsWithoutHTTP3() {
+    return getProtocolTestParams(
+        /*downstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+        /*upstream_protocols = */ {Http::CodecType::HTTP1, Http::CodecType::HTTP2});
+  }
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
@@ -52,14 +69,16 @@ public:
   protocolTestParamsToString(const ::testing::TestParamInfo<HttpProtocolTestParams>& p);
 
   HttpProtocolIntegrationTest()
-      : HttpIntegrationTest(
-            GetParam().downstream_protocol, GetParam().version,
-            ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
-                                          Http::CodecType::HTTP3)) {
-    setupHttp2Overrides(GetParam().http2_implementation);
-    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                      GetParam().defer_processing_backedup_streams ? "true"
-                                                                                   : "false");
+      : HttpProtocolIntegrationTest(ConfigHelper::httpProxyConfig(
+            /*downstream_is_quic=*/GetParam().downstream_protocol == Http::CodecType::HTTP3)) {}
+
+  HttpProtocolIntegrationTest(const std::string config)
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, config),
+        use_universal_header_validator_(GetParam().use_universal_header_validator) {
+    setupHttp1ImplOverrides(GetParam().http1_implementation);
+    setupHttp2ImplOverrides(GetParam().http2_implementation);
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      GetParam().use_universal_header_validator ? "true" : "false");
   }
 
   void SetUp() override {
@@ -67,13 +86,19 @@ public:
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
 
-  bool skipForH2Uhv() {
-#ifdef ENVOY_ENABLE_UHV
-    // Validation of upstream responses is not wired up yet
-    return GetParam().http2_implementation == Http2Impl::Oghttp2;
-#endif
-    return false;
+  void initialize() override {
+    if (async_lb_) {
+      config_helper_.setAsyncLb();
+    }
+    HttpIntegrationTest::initialize();
   }
+
+  void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
+  void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
+
+protected:
+  const bool use_universal_header_validator_{false};
+  bool async_lb_ = true;
 };
 
 class UpstreamDownstreamIntegrationTest
@@ -85,10 +110,11 @@ public:
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(std::get<0>(GetParam()).downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    setupHttp2Overrides(std::get<0>(GetParam()).http2_implementation);
+    setupHttp1ImplOverrides(std::get<0>(GetParam()).http1_implementation);
+    setupHttp2ImplOverrides(std::get<0>(GetParam()).http2_implementation);
     config_helper_.addRuntimeOverride(
-        Runtime::defer_processing_backedup_streams,
-        std::get<0>(GetParam()).defer_processing_backedup_streams ? "true" : "false");
+        "envoy.reloadable_features.enable_universal_header_validator",
+        std::get<0>(GetParam()).use_universal_header_validator ? "true" : "false");
   }
   static std::string testParamsToString(
       const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
@@ -99,18 +125,28 @@ public:
         std::get<1>(params.param) ? "DownstreamFilter" : "UpstreamFilter");
   }
 
-  static std::vector<std::tuple<HttpProtocolTestParams, bool>> getDefaultTestParams(
-      const std::vector<Http::CodecType>& downstream_protocols = {Http::CodecType::HTTP1,
-                                                                  Http::CodecType::HTTP2},
-      const std::vector<Http::CodecType>& upstream_protocols = {Http::CodecType::HTTP1,
-                                                                Http::CodecType::HTTP2}) {
+  static std::vector<std::tuple<HttpProtocolTestParams, bool>>
+  getDefaultTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                           {
+                               Http::CodecType::HTTP1,
+                               Http::CodecType::HTTP2,
+                               Http::CodecType::HTTP3,
+                           },
+                       const std::vector<Http::CodecType>& upstream_protocols = {
+                           Http::CodecType::HTTP1,
+                           Http::CodecType::HTTP2,
+                           Http::CodecType::HTTP3,
+                       }) {
     std::vector<std::tuple<HttpProtocolTestParams, bool>> ret;
     std::vector<HttpProtocolTestParams> protocol_defaults =
         HttpProtocolIntegrationTest::getProtocolTestParams(downstream_protocols,
                                                            upstream_protocols);
+    const std::vector<bool> testing_downstream_filter_values{true, false};
+
     for (auto& param : protocol_defaults) {
-      ret.push_back(std::make_tuple(param, true));
-      ret.push_back(std::make_tuple(param, false));
+      for (bool testing_downstream_filter : testing_downstream_filter_values) {
+        ret.push_back(std::make_tuple(param, testing_downstream_filter));
+      }
     }
     return ret;
   }
@@ -121,7 +157,15 @@ public:
     testing_downstream_filter_ = std::get<1>(GetParam());
   }
 
+  void initialize() override {
+    if (async_lb_) {
+      config_helper_.setAsyncLb();
+    }
+    HttpIntegrationTest::initialize();
+  }
+
   bool testing_downstream_filter_;
+  bool async_lb_ = true;
 };
 
 } // namespace Envoy

@@ -8,6 +8,8 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -119,6 +121,8 @@ public:
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
     bool disableOnEtagHeader() const { return disable_on_etag_header_; }
     bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
+    bool areAllResponseCodesCompressible() const;
+    bool isResponseCodeCompressible(uint32_t response_code) const;
 
   private:
     static ResponseCompressorStats generateResponseStats(const std::string& prefix,
@@ -133,6 +137,7 @@ public:
 
     const bool disable_on_etag_header_;
     const bool remove_accept_encoding_header_;
+    const absl::flat_hash_set<uint32_t> uncompressible_response_codes_;
     const ResponseCompressorStats response_stats_;
   };
 
@@ -160,6 +165,21 @@ private:
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
+class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  CompressorPerRouteFilterConfig(
+      const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config);
+
+  // If a value is present, that value overrides
+  // ResponseDirectionConfig::compressionEnabled.
+  absl::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
+  absl::optional<bool> removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
+
+private:
+  absl::optional<bool> response_compression_enabled_;
+  absl::optional<bool> remove_accept_encoding_header_;
+};
+
 /**
  * A filter that compresses data dispatched from the upstream upon client request.
  */
@@ -181,6 +201,10 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
+  bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config,
+                          const CompressorPerRouteFilterConfig* per_route_config) const;
+  bool removeAcceptEncodingHeader(const CompressorFilterConfig::ResponseDirectionConfig& config,
+                                  const CompressorPerRouteFilterConfig* per_route_config) const;
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;

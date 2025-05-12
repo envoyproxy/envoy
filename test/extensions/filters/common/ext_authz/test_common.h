@@ -47,20 +47,21 @@ public:
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
                     const std::string& body = std::string{},
                     const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
-                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{});
+                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{},
+                    const absl::optional<Grpc::Status::GrpcStatus>& grpc_status = absl::nullopt);
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
+  static bool compareHeaderVector(const UnsafeHeaderVector& lhs, const UnsafeHeaderVector& rhs);
   static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
                                        const Http::Utility::QueryParamsVector& rhs);
-  static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
-                                        const std::vector<Http::LowerCaseString>& rhs);
+  static bool compareVectorOfHeaderName(const std::vector<std::string>& lhs,
+                                        const std::vector<std::string>& rhs);
   static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
                                               const std::vector<std::string>& rhs);
 };
 
-MATCHER_P(AuthzErrorResponse, status, "") {
+MATCHER_P(AuthzErrorResponse, response, "") {
   // These fields should be always empty when the status is an error.
   if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
     return false;
@@ -69,10 +70,11 @@ MATCHER_P(AuthzErrorResponse, status, "") {
   if (arg->status_code != Http::Code::Forbidden) {
     return false;
   }
-  return arg->status == status;
+  return arg->status == response.status;
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
+  const bool equal_grpc_status = arg->grpc_status == response.grpc_status;
   const bool equal_status = arg->status == response.status;
   const bool equal_metadata =
       TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata);
@@ -84,10 +86,13 @@ MATCHER_P(AuthzResponseNoAttributes, response, "") {
                      << arg->dynamic_metadata.DebugString()
                      << "=======================================================================\n";
   }
-  return equal_status && equal_metadata;
+  return equal_grpc_status && equal_status && equal_metadata;
 }
 
 MATCHER_P(AuthzDeniedResponse, response, "") {
+  if (arg->grpc_status != response.grpc_status) {
+    return false;
+  }
   if (arg->status != response.status) {
     return false;
   }
@@ -103,6 +108,10 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
 
 MATCHER_P(AuthzOkResponse, response, "") {
   if (arg->status != response.status) {
+    return false;
+  }
+
+  if (arg->grpc_status != response.grpc_status) {
     return false;
   }
 

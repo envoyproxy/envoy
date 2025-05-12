@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/watchdog/v3/abort_action.pb.h"
 
@@ -24,6 +25,8 @@ public:
 
   using AbortActionConfig = envoy::watchdog::v3::AbortActionConfig;
 };
+
+DECLARE_FACTORY(AbortActionFactory);
 
 } // namespace Watchdog
 } // namespace Envoy

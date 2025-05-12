@@ -15,23 +15,41 @@ ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBas
 Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
                                                    Buffer::Instance& response,
                                                    AdminStream& admin_query) {
-  const Http::Utility::QueryParams params = admin_query.queryParams();
+  const Http::Utility::QueryParamsMulti params = admin_query.queryParams();
 
   ListenerManager::StopListenersType stop_listeners_type =
-      params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
-                                                 : ListenerManager::StopListenersType::All;
+      params.getFirstValue("inboundonly").has_value()
+          ? ListenerManager::StopListenersType::InboundOnly
+          : ListenerManager::StopListenersType::All;
 
-  const bool graceful = params.find("graceful") != params.end();
+  const bool graceful = params.getFirstValue("graceful").has_value();
+  const bool skip_exit = params.getFirstValue("skip_exit").has_value();
+  if (skip_exit && !graceful) {
+    response.add("skip_exit requires graceful\n");
+    return Http::Code::BadRequest;
+  }
   if (graceful) {
-    // Ignore calls to /drain_listeners?graceful if the drain sequence has
-    // already started.
-    if (!server_.drainManager().draining()) {
-      server_.drainManager().startDrainSequence([this, stop_listeners_type]() {
-        server_.listenerManager().stopListeners(stop_listeners_type);
-      });
+    auto direction = Network::DrainDirection::All;
+    if (stop_listeners_type == ListenerManager::StopListenersType::InboundOnly) {
+      direction = Network::DrainDirection::InboundOnly;
     }
+    // If draining(direction) returns true, it means:
+    // 1. we are already draining
+    // 2. That drain includes the direction we're being asked to drain
+    // We should just return a 200
+    if (const bool duplicate_drain = server_.drainManager().draining(direction); duplicate_drain) {
+      response.add("OK\n");
+      return Http::Code::OK;
+    }
+    // This means either we aren't draining or we still have to do some work
+    // (e.g. we were draining inbound only but now we're being asked to drain all)
+    server_.drainManager().startDrainSequence(direction, [this, stop_listeners_type, skip_exit]() {
+      if (!skip_exit) {
+        server_.listenerManager().stopListeners(stop_listeners_type, {});
+      }
+    });
   } else {
-    server_.listenerManager().stopListeners(stop_listeners_type);
+    server_.listenerManager().stopListeners(stop_listeners_type, {});
   }
 
   response.add("OK\n");
@@ -41,7 +59,7 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
 Http::Code ListenersHandler::handlerListenerInfo(Http::ResponseHeaderMap& response_headers,
                                                  Buffer::Instance& response,
                                                  AdminStream& admin_query) {
-  const Http::Utility::QueryParams query_params = admin_query.queryParams();
+  const Http::Utility::QueryParamsMulti query_params = admin_query.queryParams();
   const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {

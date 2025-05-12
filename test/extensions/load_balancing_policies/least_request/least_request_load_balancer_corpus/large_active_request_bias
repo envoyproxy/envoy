@@ -1,0 +1,19 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 59
+      random_bytestring: 9
+    }
+    seed_for_prng: 4
+  }
+  random_bytestring_for_weights: "!A"
+}
+least_request_lb_config {
+  active_request_bias {
+    default_value: 34816
+    runtime_key: "*"
+  }
+}
+random_bytestring_for_requests: "+"

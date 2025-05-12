@@ -76,16 +76,22 @@ public:
     return response_decoder;
   }
 
-  std::function<void()>
-  simulateUpstreamResponse(const Http::TestResponseHeaderMapImpl& headers,
-                           OptRef<const std::string> body,
-                           OptRef<const Http::TestResponseTrailerMapImpl> trailers) {
+  // split_body allows us to test the behavior when encodeData is in more than one part.
+  std::function<void()> simulateUpstreamResponse(
+      const Http::TestResponseHeaderMapImpl& headers, OptRef<const std::string> body,
+      OptRef<const Http::TestResponseTrailerMapImpl> trailers, bool split_body = false) {
     return [this, headers = std::move(headers), body = std::move(body),
-            trailers = std::move(trailers)]() {
+            trailers = std::move(trailers), split_body]() {
       waitForNextUpstreamRequest();
       upstream_request_->encodeHeaders(headers, /*end_stream=*/!body);
       if (body.has_value()) {
-        upstream_request_->encodeData(body.ref(), !trailers.has_value());
+        if (split_body) {
+          upstream_request_->encodeData(body.ref().substr(0, body.ref().size() / 2), false);
+          upstream_request_->encodeData(body.ref().substr(body.ref().size() / 2),
+                                        !trailers.has_value());
+        } else {
+          upstream_request_->encodeData(body.ref(), !trailers.has_value());
+        }
       }
       if (trailers.has_value()) {
         upstream_request_->encodeTrailers(trailers.ref());
@@ -101,16 +107,18 @@ public:
     typed_config:
         "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig"
         typed_config:
-           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
+           "@type": "type.googleapis.com/envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   OptRef<const std::string> empty_body_;
   OptRef<const Http::TestResponseTrailerMapImpl> empty_trailers_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CacheIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CacheIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CacheIntegrationTest, MissInsertHit) {
   initializeFilter(default_config);
@@ -122,10 +130,11 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
 
   // Send first request, and get response from upstream.
+  // use split_body to cover multipart body responses.
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body),
+                                                  empty_trailers_, true));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
@@ -454,10 +463,7 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
     EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 
-  // Advance time, to verify the original date header is preserved.
-  simTime().advanceTimeWait(Seconds(10));
-
-  // Send GET request, and get response from cache.
+  // Send GET request, and get response from upstream.
   {
     // Include test name and params in URL to make each test's requests unique.
     const Http::TestRequestHeaderMapImpl request_headers =
@@ -468,7 +474,11 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
   }
 }
 

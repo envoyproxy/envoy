@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/router/router.h"
 
@@ -36,6 +37,12 @@ public:
   MOCK_METHOD(SipFilterStats&, stats, ());
   MOCK_METHOD(Router::Config&, routerConfig, ());
   MOCK_METHOD(std::shared_ptr<SipSettings>, settings, ());
+};
+
+class MockRouterFilterConfig : public Router::RouterFilterConfig {
+public:
+  // Router::RouterFilterConfig
+  MOCK_METHOD(Router::RouterStats&, stats, ());
 };
 
 class MockDecoderEventHandler : public DecoderEventHandler {
@@ -203,18 +210,23 @@ public:
   MOCK_METHOD(void, deleteTrafficRoutingAssistant,
               (const std::string&, const std::string&, const absl::optional<TraContextMap>), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
-  MOCK_METHOD(void, complete,
-              (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
-              ());
   MOCK_METHOD(void, doSubscribe,
               (const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity),
               ());
+
+  // TODO(wbpcode): mock this method will cause the clang-tidy error. To avoid this error and
+  // updating the source code, we will not mock this method for now. It is OK because this method is
+  // not used in the unit test. If someone wants to mock this method, please update the source code
+  // to avoid using the absl::any.
+  void complete(const TrafficRoutingAssistant::ResponseType&, const std::string&,
+                const absl::any&) override {}
+
   ~MockTrafficRoutingAssistantHandler() override;
 };
 
 class MockConnectionManager : public ConnectionManager {
 public:
-  MockConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+  MockConnectionManager(const ConfigSharedPtr& config, Random::RandomGenerator& random_generator,
                         TimeSource& time_system, Server::Configuration::FactoryContext& context,
                         std::shared_ptr<Router::TransactionInfos> transaction_infos)
       : ConnectionManager(config, random_generator, time_system, context, transaction_infos) {}
@@ -237,9 +249,12 @@ public:
 
 class MockRequestCallbacks : public TrafficRoutingAssistant::RequestCallbacks {
 public:
-  MOCK_METHOD(void, complete,
-              (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
-              ());
+  // TODO(wbpcode): mock this method will cause the clang-tidy error. To avoid this error and
+  // updating the source code, we will not mock this method for now. It is OK because this method is
+  // not used in the unit test. If someone wants to mock this method, please update the source code
+  // to avoid using the absl::any.
+  void complete(const TrafficRoutingAssistant::ResponseType&, const std::string&,
+                const absl::any&) override {}
 };
 
 } // namespace SipProxy

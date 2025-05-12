@@ -20,6 +20,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -36,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 51]
+// [#next-free-field: 59]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -57,9 +58,8 @@ message HttpConnectionManager {
     // Prior knowledge is allowed).
     HTTP2 = 2;
 
-    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
-    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
-    // to distinguish HTTP1 and HTTP2 traffic.
+    // The connection manager will assume that the client is speaking HTTP/3.
+    // This needs to be consistent with listener and transport socket config.
     HTTP3 = 3;
   }
 
@@ -129,7 +129,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -149,7 +149,7 @@ message HttpConnectionManager {
     // Target percentage of requests managed by this HTTP connection manager that will be force
     // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
     // header is set. This field is a direct analog for the runtime variable
-    // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+    // 'tracing.client_enabled' in the :ref:`HTTP Connection Manager
     // <config_http_conn_man_runtime>`.
     // Default: 100%
     type.v3.Percent client_sampling = 3;
@@ -185,15 +185,28 @@ message HttpConnectionManager {
 
     // Configuration for an external tracing provider.
     // If not specified, no tracing will be performed.
-    //
-    // .. attention::
-    //   Please be aware that ``envoy.tracers.opencensus`` provider can only be configured once
-    //   in Envoy lifetime.
-    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
-    //   will be rejected.
-    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
-    //   on OpenCensus side.
     config.trace.v3.Tracing.Http provider = 9;
+
+    // Create separate tracing span for each upstream request if true. And if this flag is set to true,
+    // the tracing provider will assume that Envoy will be independent hop in the trace chain and may
+    // set span type to client or server based on this flag.
+    // This will deprecate the
+    // :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    // in the router.
+    //
+    // Users should set appropriate value based on their tracing provider and actual scenario:
+    //
+    // * If Envoy is used as sidecar and users want to make the sidecar and its application as only one
+    //   hop in the trace chain, this flag should be set to false. And please also make sure the
+    //   :ref:`start_child_span <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
+    //   in the router is not set to true.
+    // * If Envoy is used as gateway or independent proxy, or users want to make the sidecar and its
+    //   application as different hops in the trace chain, this flag should be set to true.
+    // * If tracing provider that has explicit requirements on span creation (like SkyWalking),
+    //   this flag should be set to true.
+    //
+    // The default value is false for now for backward compatibility.
+    google.protobuf.BoolValue spawn_upstream_span = 10;
   }
 
   message InternalAddressConfig {
@@ -355,6 +368,29 @@ message HttpConnectionManager {
     }
   }
 
+  message HcmAccessLogOptions {
+    // The interval to flush the above access logs. By default, the HCM will flush exactly one access log
+    // on stream close, when the HTTP request is complete. If this field is set, the HCM will flush access
+    // logs periodically at the specified interval. This is especially useful in the case of long-lived
+    // requests, such as CONNECT and Websockets. Final access logs can be detected via the
+    // ``requestComplete()`` method of ``StreamInfo`` in access log filters, or through the ``%DURATION%`` substitution
+    // string.
+    // The interval must be at least 1 millisecond.
+    google.protobuf.Duration access_log_flush_interval = 1
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // If set to true, HCM will flush an access log when a new HTTP request is received, after request
+    // headers have been evaluated, before iterating through the HTTP filter chain.
+    // This log record, if enabled, does not depend on periodic log records or request completion log.
+    // Details related to upstream cluster, such as upstream host, will not be available for this log.
+    bool flush_access_log_on_new_request = 2;
+
+    // If true, the HCM will flush an access log when a tunnel is successfully established. For example,
+    // this could be when an upstream has successfully returned 101 Switching Protocols, or when the proxy
+    // has returned 200 to a CONNECT request.
+    bool flush_log_on_tunnel_successfully_established = 3;
+  }
+
   reserved 27, 11;
 
   reserved "idle_timeout";
@@ -402,6 +438,21 @@ message HttpConnectionManager {
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
+  // If set to true, Envoy will not start a drain timer for downstream HTTP1 connections after
+  // :ref:`common_http_protocol_options.max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` passes.
+  // Instead, Envoy will wait for the next downstream request, add connection:close to the response
+  // headers, then close the connection after the stream ends.
+  //
+  // This behavior is compliant with `RFC 9112 section 9.6 <https://www.rfc-editor.org/rfc/rfc9112#name-tear-down>`_
+  //
+  // If set to false, ``max_connection_duration`` will cause Envoy to enter the normal drain
+  // sequence for HTTP1 with Envoy eventually closing the connection (once there are no active
+  // streams).
+  //
+  // Has no effect if ``max_connection_duration`` is unset. Defaults to false.
+  bool http1_safe_max_connection_duration = 58;
+
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   // [#comment:TODO: The following fields are ignored when the
   // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
@@ -414,7 +465,6 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/3 settings that are passed directly to the HTTP/3 codec.
-  // [#not-implemented-hide:]
   config.core.v3.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server
@@ -435,7 +485,12 @@ message HttpConnectionManager {
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
+  // The default value can be overridden by setting runtime key ``envoy.reloadable_features.max_request_headers_size_kb``.
   // Requests that exceed this limit will receive a 431 response.
+  //
+  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
+  //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   HTTP/3 limits a single header to around 1024kb.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
@@ -502,9 +557,10 @@ message HttpConnectionManager {
   // race with the final GOAWAY frame. During this grace period, Envoy will
   // continue to accept new streams. After the grace period, a final GOAWAY
   // frame is sent and Envoy will start refusing new streams. Draining occurs
-  // both when a connection hits the idle timeout or during general server
-  // draining. The default grace period is 5000 milliseconds (5 seconds) if this
-  // option is not specified.
+  // either when a connection hits the idle timeout, when :ref:`max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
+  // is reached, or during general server draining. The default grace period is
+  // 5000 milliseconds (5 seconds) if this option is not specified.
   google.protobuf.Duration drain_timeout = 12;
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
@@ -543,6 +599,39 @@ message HttpConnectionManager {
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
 
+  // The interval to flush the above access logs.
+  //
+  // .. attention::
+  //
+  //   This field is deprecated in favor of
+  //   :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
+  //   Note that if both this field and :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
+  //   are specified, the former (deprecated field) is ignored.
+  google.protobuf.Duration access_log_flush_interval = 54 [
+    deprecated = true,
+    (validate.rules).duration = {gte {nanos: 1000000}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // If set to true, HCM will flush an access log once when a new HTTP request is received, after the request
+  // headers have been evaluated, and before iterating through the HTTP filter chain.
+  //
+  // .. attention::
+  //
+  //   This field is deprecated in favor of
+  //   :ref:`flush_access_log_on_new_request
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
+  //   Note that if both this field and :ref:`flush_access_log_on_new_request
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
+  //   are specified, the former (deprecated field) is ignored.
+  bool flush_access_log_on_new_request = 55
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Additional access log options for HTTP connection manager.
+  HcmAccessLogOptions access_log_options = 56;
+
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating
   // various headers. If set to false or absent, the connection manager will use the
@@ -579,10 +668,47 @@ message HttpConnectionManager {
   // [#extension-category: envoy.http.original_ip_detection]
   repeated config.core.v3.TypedExtensionConfig original_ip_detection_extensions = 46;
 
+  // The configuration for the early header mutation extensions.
+  //
+  // When configured the extensions will be called before any routing, tracing, or any filter processing.
+  // Each extension will be applied in the order they are configured.
+  // If the same header is mutated by multiple extensions, then the last extension will win.
+  //
+  // [#extension-category: envoy.http.early_header_mutation]
+  repeated config.core.v3.TypedExtensionConfig early_header_mutation_extensions = 52;
+
   // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
   // See the documentation for :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information about internal/external addresses.
+  //
+  // .. warning::
+  //     As of Envoy 1.33.0 no IP addresses will be considered trusted. If you have tooling such as probes
+  //     on your private network which need to be treated as trusted (e.g. changing arbitrary x-envoy headers)
+  //     you will have to manually include those addresses or CIDR ranges like:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.network.http_connection_manager.v3.InternalAddressConfig
+  //
+  //   cidr_ranges:
+  //       address_prefix: 10.0.0.0
+  //       prefix_len: 8
+  //   cidr_ranges:
+  //       address_prefix: 192.168.0.0
+  //       prefix_len: 16
+  //   cidr_ranges:
+  //       address_prefix: 172.16.0.0
+  //       prefix_len: 12
+  //   cidr_ranges:
+  //       address_prefix: 127.0.0.1
+  //       prefix_len: 32
+  //   cidr_ranges:
+  //       address_prefix: fd00::
+  //       prefix_len: 8
+  //   cidr_ranges:
+  //       address_prefix: ::1
+  //       prefix_len: 128
+  //
   InternalAddressConfig internal_address_config = 25;
 
   // If set, Envoy will not append the remote address to the
@@ -784,7 +910,7 @@ message HttpConnectionManager {
   // normalization for request attributes, such as URI path.
   // If the typed_header_validation_config is present it overrides the following options:
   // ``normalize_path``, ``merge_slashes``, ``path_with_escaped_slashes_action``
-  // ``http_protocol_options.allow_chunked_length``.
+  // ``http_protocol_options.allow_chunked_length``, ``common_http_protocol_options.headers_with_underscores_action``.
   //
   // The default UHV checks the following:
   //
@@ -802,6 +928,19 @@ message HttpConnectionManager {
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig typed_header_validation_config = 50;
+
+  // Append the ``x-forwarded-port`` header with the port value client used to connect to Envoy. It
+  // will be ignored if the ``x-forwarded-port`` header has been set by any trusted proxy in front of Envoy.
+  bool append_x_forwarded_port = 51;
+
+  // Append the :ref:`config_http_conn_man_headers_x-envoy-local-overloaded` HTTP header in the scenario where
+  // the Overload Manager has been triggered.
+  bool append_local_overload = 57;
+
+  // Whether the HCM will add ProxyProtocolFilterState to the Connection lifetime filter state. Defaults to ``true``.
+  // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
+  // actual client address, for example, if there's another proxy in front of the Envoy.
+  google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
 }
 
 // The configuration to customize local reply returned by Envoy.
@@ -965,7 +1104,9 @@ message ScopedRoutes {
         // .. note::
         //
         //   If the header appears multiple times only the first value is used.
-        string name = 1 [(validate.rules).string = {min_len: 1}];
+        string name = 1 [
+          (validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+        ];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
         // Default: empty string. This causes the entirety of the header field to be extracted.
@@ -1041,7 +1182,7 @@ message ScopedRds {
   string srds_resources_locator = 2;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
@@ -1077,8 +1218,15 @@ message HttpFilter {
   // If true, clients that do not support this filter may ignore the
   // filter but otherwise accept the config.
   // Otherwise, clients that do not support this filter must reject the config.
-  // This is also same with typed per filter config.
   bool is_optional = 6;
+
+  // If true, the filter is disabled by default and must be explicitly enabled by setting
+  // per filter configuration in the route configuration.
+  // See :ref:`route based filter chain <arch_overview_http_filters_route_based_filter_chain>`
+  // for more details.
+  //
+  // Terminal filters (e.g. ``envoy.filters.http.router``) cannot be marked as disabled.
+  bool disabled = 7;
 }
 
 message RequestIDExtension {

@@ -1,55 +1,31 @@
 # Generic network-level filter fuzzers overview
 
-Network filters need to be fuzzed. Filters come in two flavors, each with their own fuzzer. Read filters should be added into the [Generic ReadFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/network_readfilter_fuzz_test.cc). Write Filters should added into the [Generic WriteFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/network_writefilter_fuzz_test.cc). Some filters are both raed and write filters: They should be added into both fuzzers.
+Network filters need to be fuzzed. Filters come in two flavors, each with their own fuzzer. Read filters should be added into the [Generic ReadFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/network_readfilter_fuzz_test.cc). Write Filters should added into the [Generic WriteFilter Fuzzer](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/network_writefilter_fuzz_test.cc). Some filters are both read and write filters: They should be added into both fuzzers.
 
 Before adding the new filter into the fuzzers, please make sure the filter is designed to accept untrusted inputs, or ready to be hardened to accept untrusted inputs.
 
 
 # Add a new ReadFilter into Generic Readfilter Fuzzer
-## Step1. Make sure the filter can be linked into the fuzzer
-There are two ways to link it into the fuzzer.
-* [Recommended] In the file [extensions_build_config.bzl](https://github.com/envoyproxy/envoy/blob/main/source/extensions/extensions_build_config.bzl), the name of the filter should have a prefix `envoy.filters.network`. If it has such a prefix, the filter will be automatically linked into Generic ReadFilter Fuzzer.
-* [Not recommended]If for some reasons the filter's name doesn't have such a prefix, the config of the filter must be added into the `deps` field of `network_readfilter_fuzz_test` module in the file [BUILD](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/BUILD).
-### Step2. Add the filter name into supported_filter_names
-In [uber_per_readfilter.cc](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc), add the filter name into the vector `supported_filter_names` in method `UberFilterFuzzer::filterNames()`.
+Only one step is needed to add a new filter to the fuzzer:
+* In the file [config.bzl](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/config.bzl) the name of the filter has to be added to the `READFILTER_FUZZ_FILTERS` list. The fuzz test will figure the available filters from the factories.
 ```
-const std::vector<absl::string_view> supported_filter_names = {
-...
-NetworkFilterNames::get().ExtAuthorization, NetworkFilterNames::get().TheNewFilterCreatedByYou,
-...
-};
+READFILTER_FUZZ_FILTERS = [
+    "envoy.filters.network.client_ssl_auth",
+    "envoy.filters.network.ext_authz",
+    "envoy.filters.network.envoy_mobile_http_connection_manager",
+    # A dedicated http_connection_manager fuzzer can be found in
+    # test/common/http/conn_manager_impl_fuzz_test.cc
+    "envoy.filters.network.http_connection_manager",
+    "envoy.filters.network.local_ratelimit",
+    "envoy.filters.network.rbac",
+    # TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
+    # "envoy.filters.network.tcp_proxy",
+    "the_new_filter_created_by_you", // <---Add the filter name here
+]
 ```
 
 # Add a new WriteFilter into Generic Writefilter Fuzzer
-## Step 1. Make sure the filter can be linked into the fuzzer
-For WriteFilter, the config of the filter must be added into the `deps` field of `network_writefilter_fuzz_test` module in the file [BUILD](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/BUILD).
-```
-envoy_cc_fuzz_test(
-    name = "network_writefilter_fuzz_test",
-    srcs = ["network_writefilter_fuzz_test.cc"],
-    corpus = "network_writefilter_corpus",
-    # All Envoy network filters must be linked to the test in order for the fuzzer to pick
-    # these up via the NamedNetworkFilterConfigFactory.
-    deps = [
-        ":uber_writefilter_lib",
-        "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/mongo_proxy:config",
-        "//contrib/mysql_proxy/filters/network/source:config",
-        "//source/extensions/filters/network/zookeeper_proxy:config",
-        "//source/extensions/filters/network/the_new_filter_created_by_you:config", // <---Add the filter config module here
-        "//test/config:utility_lib",
-    ],
-)
-```
-## Step 2. Add the filter name into supported_filter_names
-In [uber_per_writefilter.cc](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/uber_per_writefilter.cc), add the filter name into the vector `supported_filter_names` in method `UberWriteFilterFuzzer::filterNames()`.
-```
-const std::vector<absl::string_view> supported_filter_names = {
-      ...
-      NetworkFilterNames::get().ExtAuthorization, NetworkFilterNames::get().TheNewFilterCreatedByYou,
-      ...
-    };
-```
+For WriteFilter, the name of the filter must be added into the `WRITEFILTER_FUZZ_FILTERS` list of the file [BUILD](https://github.com/envoyproxy/envoy/blob/main/test/extensions/filters/network/common/fuzz/BUILD).
 
 # Add test cases into corpus
 Good test cases can provide good examples for fuzzers to find more paths in the code, increase the coverage and help find bugs more efficiently.

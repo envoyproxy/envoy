@@ -136,8 +136,25 @@ TEST_P(ConnectionLimitIntegrationTest, TestListenerLimit) {
   doTest(init_func, "downstream_cx_overflow");
 }
 
+TEST_P(ConnectionLimitIntegrationTest, TestDeprecationWarningForGlobalCxRuntimeLimit) {
+  std::function<void()> init_func = [this]() {
+    setGlobalLimit(4);
+    initialize();
+  };
+  const std::string log_line =
+      "Usage of the deprecated runtime key overload.global_downstream_max_connections, "
+      "consider switching to `envoy.resource_monitors.global_downstream_max_connections` instead."
+      "This runtime key will be removed in future.";
+  EXPECT_LOG_CONTAINS("warn", log_line, { init_func(); });
+}
+
+// TODO (nezdolik) move this test to overload manager test suite, once runtime key is fully
+// deprecated.
 TEST_P(ConnectionLimitIntegrationTest, TestEmptyGlobalCxRuntimeLimit) {
-  const std::string log_line = "no configured limit to the number of allowed active connections.";
+  const std::string log_line =
+      "There is no configured limit to the number of allowed active downstream connections. "
+      "Configure a "
+      "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.";
   EXPECT_LOG_CONTAINS("warn", log_line, { initialize(); });
 }
 
@@ -180,6 +197,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestBothLimits) {
 }
 
 TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
+  DISABLE_IF_ADMIN_DISABLED; // Requires admin config.
   // Includes 4 connections because the tracking is performed regardless of whether a specific
   // listener has opted out. Since the fake upstream has a listener, we need to keep value at 4 so
   // it can accept connections. (2 downstream listener conns + 2 upstream listener conns)

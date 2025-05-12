@@ -48,10 +48,11 @@ envoy_cc_test(
     data = [
         "//contrib/qat/private_key_providers/test/test_data:certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":test_fake_factory",
         "//source/common/common:random_generator_lib",
-        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//source/common/tls/private_key:private_key_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -70,9 +71,10 @@ envoy_cc_test(
     data = [
         "//contrib/qat/private_key_providers/test/test_data:certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":test_fake_factory",
-        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//source/common/tls/private_key:private_key_manager_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",

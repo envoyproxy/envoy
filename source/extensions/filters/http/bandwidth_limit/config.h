@@ -14,17 +14,18 @@ namespace BandwidthLimitFilter {
  * Config registration for the bandwidth limit filter. @see NamedHttpFilterConfigFactory.
  */
 class BandwidthLimitFilterConfig
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit> {
 public:
-  BandwidthLimitFilterConfig() : FactoryBase("envoy.filters.http.bandwidth_limit") {}
+  BandwidthLimitFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.bandwidth_limit") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };

@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -15,9 +16,11 @@
 
 #include "absl/types/optional.h"
 
+#ifdef ENVOY_ENABLE_QUIC
 namespace quic {
 class QuicCryptoClientConfig;
 }
+#endif
 
 namespace Envoy {
 
@@ -37,6 +40,15 @@ enum class ConnectionEvent;
  * Result of each I/O event.
  */
 struct IoResult {
+  IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read)
+      : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
+        err_code_(absl::nullopt) {}
+
+  IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read,
+           absl::optional<Api::IoError::IoErrorCode> err_code)
+      : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
+        err_code_(err_code) {}
+
   PostIoAction action_;
 
   /**
@@ -49,6 +61,11 @@ struct IoResult {
    * can only be true for read operations.
    */
   bool end_stream_read_;
+
+  /**
+   * The underlying I/O error code.
+   */
+  absl::optional<Api::IoError::IoErrorCode> err_code_;
 };
 
 /**
@@ -329,10 +346,12 @@ public:
    */
   virtual OptRef<const Ssl::ClientContextConfig> clientContextConfig() const { return {}; }
 
+#ifdef ENVOY_ENABLE_QUIC
   /*
    * @return the QuicCryptoClientConfig or nullptr for non-QUIC factories.
    */
   virtual std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() { return nullptr; }
+#endif
 };
 
 /**

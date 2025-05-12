@@ -3,7 +3,9 @@
 # for the underlying protos mentioned in this file. See
 # https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
+import importlib
 import logging
+import os
 import sys
 from collections import defaultdict
 from functools import cached_property, lru_cache
@@ -16,8 +18,6 @@ from udpa.annotations import security_pb2
 from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
-
-from envoy.code.check.checker import BackticksCheck
 
 from tools.api_proto_plugin import annotations, constants, plugin, visitor
 from tools.protodoc import jinja
@@ -140,8 +140,8 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     @cached_property
-    def backticks_check(self) -> BackticksCheck:
-        return BackticksCheck()
+    def backticks_check(self):
+        return importlib.import_module("envoy.code.check.checker").BackticksCheck()
 
     @property
     def contrib_extension_category_data(self):
@@ -253,7 +253,7 @@ class RstFormatVisitor(visitor.Visitor):
         if msg_proto.options.map_entry or self._hide(ctx.leading_comment.annotations):
             return ''
         name = normalize_type_context_name(ctx.name)
-        return self.tpl_content.render(
+        message = self.tpl_content.render(
             header=self.tpl_header.render(
                 anchor=message_cross_ref_label(name),
                 title=name,
@@ -268,6 +268,15 @@ class RstFormatVisitor(visitor.Visitor):
                 msgs=self._messages(ctx, msg_proto),
                 nested_msgs=nested_msgs,
                 nested_enums=nested_enums))
+
+        if not os.environ.get("DOCS_RST_CHECK"):
+            return message
+        if error := self.backticks_check(message):
+            error_message = f"Bad RST ({msg_proto.name}): {error}"
+            if ctx.name.startswith("envoy."):
+                raise ProtodocError(error_message)
+            logger.warning(error_message)
+        return message
 
     @lru_cache
     def _comment(self, comment, show_wip_warning=False):

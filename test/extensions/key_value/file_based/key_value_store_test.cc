@@ -149,6 +149,22 @@ TEST_F(KeyValueStoreTest, Persist) {
   EXPECT_FALSE(store_->get("bar").has_value());
 }
 
+TEST_F(KeyValueStoreTest, PersistWithTTL) {
+  test_time_.setSystemTime(std::chrono::milliseconds(0));
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(2));
+  store_->addOrUpdate("ee", "ba", std::chrono::seconds(1));
+  flush_timer_->invokeCallback(); // flush manually
+  test_time_.setSystemTime(std::chrono::milliseconds(1000));
+  // Keys should expire based on the absolute time.
+  // 'ee' should expire on load because it's been 1 second.
+  createStore();
+  EXPECT_EQ("bar", store_->get("foo").value());
+  EXPECT_EQ(absl::nullopt, store_->get("ee"));
+  test_time_.setMonotonicTime(std::chrono::milliseconds(2000));
+  ttl_timer_->invokeCallback();
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));
+}
+
 TEST_F(KeyValueStoreTest, Iterate) {
   store_->addOrUpdate("foo", "bar", absl::nullopt);
   store_->addOrUpdate("baz", "eep", absl::nullopt);

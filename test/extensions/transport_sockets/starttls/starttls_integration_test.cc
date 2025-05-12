@@ -4,6 +4,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
@@ -70,7 +71,7 @@ Network::FilterStatus StartTlsSwitchFilter::onCommand(Buffer::Instance& buf, boo
   if (message == "switch") {
     buf.drain(buf.length());
     buf.add("usetls");
-    read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+    read_callbacks_->connection().addBytesSentCallback([=, this](uint64_t bytes) -> bool {
       // Wait until 6 bytes long "usetls" has been sent.
       if (bytes >= 6) {
         read_callbacks_->connection().startSecureTransport();
@@ -204,11 +205,11 @@ void StartTlsIntegrationTest::initialize() {
   auto factory =
       std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();
   cleartext_context_ = Network::UpstreamTransportSocketFactoryPtr{
-      factory->createTransportSocketFactory(*config, factory_context_)};
+      factory->createTransportSocketFactory(*config, factory_context_).value()};
 
   // Setup factories and contexts for tls transport socket.
-  tls_context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 
@@ -273,7 +274,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   // StartTlsSwitchFilter will switch transport socket on the
   // receiver side upon receiving "switch" message and send
   // back the message "usetls".
-  payload_reader_->set_data_to_wait_for("usetls");
+  payload_reader_->setDataToWaitFor("usetls");
   buffer.add("switch");
   conn_->write(buffer, false);
 
@@ -344,7 +345,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
   ASSERT_TRUE(fake_upstream_connection->write(data, false));
 
   // Wait for confirmation
-  payload_reader_->set_data_to_wait_for("usetls");
+  payload_reader_->setDataToWaitFor("usetls");
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.

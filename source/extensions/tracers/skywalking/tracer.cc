@@ -12,8 +12,8 @@ static constexpr absl::string_view StatusCodeTag = "status_code";
 static constexpr absl::string_view UrlTag = "url";
 } // namespace
 
-const Http::LowerCaseString& skywalkingPropagationHeaderKey() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "sw8");
+const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey() {
+  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "sw8");
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
@@ -42,19 +42,20 @@ void Span::setSampled(bool do_sample) {
 void Span::log(SystemTime, const std::string& event) { span_entity_->addLog(EMPTY_STRING, event); }
 
 void Span::finishSpan() {
+  span_entity_->setSpanLayer(skywalking::v3::SpanLayer::Http);
   span_entity_->endSpan();
   parent_tracer_.sendSegment(tracing_context_);
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Upstream::HostDescriptionConstSharedPtr& upstream) {
+                         const Tracing::UpstreamContext& upstream) {
   absl::string_view remote_address =
-      upstream != nullptr ? upstream->address()->asStringView() : trace_context.authority();
+      upstream.host_.has_value() ? upstream.host_->address()->asStringView() : trace_context.host();
 
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});
   if (sw8_header.has_value()) {
-    trace_context.setByReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
+    skywalkingPropagationHeaderKey().setRefKey(trace_context, sw8_header.value());
 
     // Rewrite operation name with latest upstream request path for the EXIT span.
     absl::string_view upstream_request_path = trace_context.path();
@@ -70,7 +71,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string&, Sy
 
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
 
-void Tracer::sendSegment(TracingContextPtr segment_context) {
+void Tracer::sendSegment(TracingContextSharedPtr segment_context) {
   ASSERT(reporter_);
   if (segment_context->readyToSend()) {
     reporter_->report(std::move(segment_context));
@@ -78,7 +79,7 @@ void Tracer::sendSegment(TracingContextPtr segment_context) {
 }
 
 Tracing::SpanPtr Tracer::startSpan(absl::string_view name, absl::string_view protocol,
-                                   TracingContextPtr tracing_context) {
+                                   TracingContextSharedPtr tracing_context) {
   return std::make_unique<Span>(name, protocol, tracing_context, *this);
 }
 } // namespace SkyWalking

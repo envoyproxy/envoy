@@ -1,6 +1,8 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 
+#include "test/test_common/utility.h"
+
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -294,6 +296,71 @@ static void headerMapImplRemovePrefix(benchmark::State& state) {
   benchmark::DoNotOptimize(headers->size());
 }
 BENCHMARK(headerMapImplRemovePrefix)->Arg(0)->Arg(1)->Arg(5)->Arg(10)->Arg(50);
+
+class StaticLookupBenchmarker {
+public:
+  explicit StaticLookupBenchmarker(std::unique_ptr<HeaderMapImpl> impl)
+      : header_map_(std::move(impl)) {}
+  absl::optional<HeaderMapImpl::StaticLookupResponse> lookup(absl::string_view key) {
+    return header_map_->staticLookup(key);
+  }
+
+private:
+  std::unique_ptr<HeaderMapImpl> header_map_;
+};
+
+static void headerMapImplStaticLookups(benchmark::State& state,
+                                       std::unique_ptr<HeaderMapImpl> header_map,
+                                       const std::vector<std::string>& keys) {
+  int i = keys.size();
+  StaticLookupBenchmarker benchmarker{std::move(header_map)};
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    auto result = benchmarker.lookup(keys[--i]);
+    if (i == 0) {
+      i = keys.size();
+    }
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+static std::vector<std::string> makeMismatchedHeaders() {
+  return {
+      "x-envoy-banana",
+      "some-unknown-header",
+      "what-is-this-header",
+      "nobody-expects-this-header",
+      "another-unexpected-header",
+      "x-is-a-letter",
+      "x-y-problems-are-the-worst",
+  };
+}
+
+// Macro is used in the two functions below to populate an array of the common
+// set of keys, to use for benchmarking. The INLINE_REQ_HEADERS and
+// INLINE_RESP_HEADERS macros do a macro "callback" with just one argument, so
+// we can't parameterize `keys` into the macro.
+#define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
+static void bmHeaderMapImplRequestStaticLookupHits(benchmark::State& state) {
+  std::vector<std::string> keys;
+  INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
+  headerMapImplStaticLookups(state, RequestHeaderMapImpl::create(), keys);
+}
+static void bmHeaderMapImplResponseStaticLookupHits(benchmark::State& state) {
+  std::vector<std::string> keys;
+  INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
+  headerMapImplStaticLookups(state, ResponseHeaderMapImpl::create(), keys);
+}
+static void bmHeaderMapImplRequestStaticLookupMisses(benchmark::State& state) {
+  headerMapImplStaticLookups(state, RequestHeaderMapImpl::create(), makeMismatchedHeaders());
+}
+static void bmHeaderMapImplResponseStaticLookupMisses(benchmark::State& state) {
+  headerMapImplStaticLookups(state, ResponseHeaderMapImpl::create(), makeMismatchedHeaders());
+}
+BENCHMARK(bmHeaderMapImplRequestStaticLookupHits);
+BENCHMARK(bmHeaderMapImplResponseStaticLookupHits);
+BENCHMARK(bmHeaderMapImplRequestStaticLookupMisses);
+BENCHMARK(bmHeaderMapImplResponseStaticLookupMisses);
 
 } // namespace Http
 } // namespace Envoy

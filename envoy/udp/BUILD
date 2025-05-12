@@ -11,8 +11,8 @@ envoy_package()
 envoy_cc_library(
     name = "hash_policy_interface",
     hdrs = ["hash_policy.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/network:address_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )

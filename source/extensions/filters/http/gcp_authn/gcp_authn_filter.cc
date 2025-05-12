@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
 #include <memory>
+#include <string>
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
@@ -13,9 +14,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
-void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str) {
-  std::string id_token = absl::StrCat("Bearer ", token_str);
-  hdrs.setCopy(authorizationHeaderKey(), id_token);
+void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str,
+                       const envoy::extensions::filters::http::gcp_authn::v3::TokenHeader& header) {
+  if (header.ByteSizeLong() == 0) {
+    std::string id_token = absl::StrCat("Bearer ", token_str);
+    hdrs.setCopy(authorizationHeaderKey(), id_token);
+  } else {
+    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
+    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
+  }
 }
 } // namespace
 
@@ -35,7 +42,8 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
   initiating_call_ = true;
 
   Envoy::Upstream::ThreadLocalCluster* cluster =
-      context_.clusterManager().getThreadLocalCluster(route->routeEntry()->clusterName());
+      context_.serverFactoryContext().clusterManager().getThreadLocalCluster(
+          route->routeEntry()->clusterName());
 
   if (cluster != nullptr) {
     // The `audience` is passed to filter through cluster metadata.
@@ -43,7 +51,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     const auto filter_it = filter_metadata.find(std::string(FilterName));
     if (filter_it != filter_metadata.end()) {
       envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
-      MessageUtil::unpackTo(filter_it->second, audience);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_it->second, audience));
       audience_str_ = audience.url();
     }
   }
@@ -54,7 +62,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       if (token != nullptr) {
         // If token is found in the cache, we add the token string to the request directly and
         // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token->jwt_);
+        addTokenToRequest(hdrs, token->jwt_, filter_config_->token_header());
         return FilterHeadersStatus::Continue;
       }
     }
@@ -66,8 +74,12 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
     // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
     // with real audience string from the config.
-    std::string final_url =
-        absl::StrReplaceAll(filter_config_->http_uri().uri(), {{"[AUDIENCE]", audience_str_}});
+
+    std::string final_url = absl::StrReplaceAll(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.gcp_authn_use_fixed_url")
+            ? UrlString
+            : filter_config_->http_uri().uri(),
+        {{"[AUDIENCE]", audience_str_}});
     client_->fetchToken(*this, buildRequest(final_url));
     initiating_call_ = false;
   } else {
@@ -91,11 +103,11 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
   state_ = State::Complete;
   if (!initiating_call_) {
     if (response != nullptr) {
-      // Modify the request header to include the ID token in an `Authorization: Bearer ID_TOKEN`
-      // header.
+      // Modify the request header to include the ID token in a header (by default, the
+      // `Authorization: Bearer ID_TOKEN` header).
       std::string token_str = response->bodyAsString();
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_str);
+        addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

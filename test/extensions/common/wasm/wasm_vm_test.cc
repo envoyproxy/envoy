@@ -1,9 +1,11 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,6 +18,7 @@ using proxy_wasm::WasmCallVoid; // NOLINT
 using proxy_wasm::WasmCallWord; // NOLINT
 using proxy_wasm::Word;         // NOLINT
 using testing::HasSubstr;       // NOLINT
+using testing::IsEmpty;         // NOLINT
 using testing::Return;          // NOLINT
 
 namespace Envoy {
@@ -23,6 +26,17 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 namespace {
+
+TEST(EnvoyWasmVmIntegrationTest, EnvoyWasmVmIntegrationTest) {
+  {
+    EnvoyWasmVmIntegration wasm_vm_integration;
+    for (const auto l : {spdlog::level::trace, spdlog::level::debug, spdlog::level::info,
+                         spdlog::level::warn, spdlog::level::err, spdlog::level::critical}) {
+      Logger::Registry::getLog(Logger::Id::wasm).set_level(l);
+      EXPECT_EQ(wasm_vm_integration.getLogLevel(), static_cast<proxy_wasm::LogLevel>(l));
+    }
+  }
+}
 
 class TestNullVmPlugin : public proxy_wasm::NullVmPlugin {
 public:
@@ -39,6 +53,28 @@ proxy_wasm::RegisterNullVmPluginFactory register_test_null_vm_plugin("test_null_
   test_null_vm_plugin_ = plugin.get();
   return plugin;
 });
+
+class ClearWasmRuntimeFactories {
+public:
+  ClearWasmRuntimeFactories() {
+    saved_factories_ = Registry::FactoryRegistry<WasmRuntimeFactory>::factories();
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories().clear();
+    Registry::InjectFactory<WasmRuntimeFactory>::resetTypeMappings();
+  }
+
+  ~ClearWasmRuntimeFactories() {
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories() = saved_factories_;
+    Registry::InjectFactory<WasmRuntimeFactory>::resetTypeMappings();
+  }
+
+private:
+  absl::flat_hash_map<std::string, WasmRuntimeFactory*> saved_factories_;
+};
+
+TEST(WasmEngineTest, NoAvailableEngine) {
+  ClearWasmRuntimeFactories clear_factories;
+  EXPECT_THAT(getFirstAvailableWasmEngineName(), IsEmpty());
+}
 
 class BaseVmTest : public testing::Test {
 public:

@@ -10,8 +10,9 @@
 
 namespace Envoy {
 
-// A filter that buffers the entire request/response, then doubles
-// the content of the filter buffer.
+// A filter triggers above watermark when it receives request headers from
+// the downstream, and triggers below watermark when the response body has
+// passed through the filter or when the filter is being destroyed.
 class BackpressureFilter : public Http::PassThroughFilter {
 public:
   void onDestroy() override {
@@ -41,15 +42,15 @@ class BackpressureConfig : public Extensions::HttpFilters::Common::EmptyHttpFilt
 public:
   BackpressureConfig() : EmptyHttpFilterConfig("backpressure-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::BackpressureFilter>());
     };
   }
 };
 
-// perform static registration
+// Perform static registration
 static Registry::RegisterFactory<BackpressureConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package envoy_mobile.extensions.cert_validator.platform_bridge;
+
+import "google/protobuf/wrappers.proto";
+
+// Configuration for the platform bridge cert validator.
+message PlatformBridgeCertValidator {
+  // The thread priority that will be set on the thread that is created to execute platform cert
+  // validation. The exact values and meaning of the thread priority is OS dependent. For example,
+  // on Android, the values range from -20 to 19. On iOS, supply a value between 1 to 100, which
+  // will be divided by 100 to provide a value to the OS in the range of 0 to 1.
+  //
+  // If this field is not set, the platform-specific default thread priorities will be used.
+  google.protobuf.Int32Value thread_priority = 1;
+}

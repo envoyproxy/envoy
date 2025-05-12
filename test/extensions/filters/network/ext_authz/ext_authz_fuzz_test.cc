@@ -9,6 +9,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -61,18 +62,28 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   }
 
   Stats::TestUtil::TestStore stats_store;
-  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store, bootstrap);
-  std::unique_ptr<Filter> filter =
-      std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+  // Create a mock client and immediately pack it into a unique_ptr. This way if the ConfigSharedPtr
+  // constructor fails the client will not get leaked.
+  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
+  auto client_ptr = Filters::Common::ExtAuthz::ClientPtr{client};
+
+  ConfigSharedPtr config;
+  try {
+    config = std::make_shared<Config>(proto_config, *stats_store.rootScope(), context);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
+
+  auto filter = std::make_unique<Filter>(config, std::move(client_ptr));
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
   static Network::Address::InstanceConstSharedPtr addr =
-      std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+      *Network::Address::PipeInstance::create("/test/test.sock");
 
   filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       addr);

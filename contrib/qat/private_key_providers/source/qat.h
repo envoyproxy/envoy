@@ -60,8 +60,8 @@ private:
 };
 
 /**
- * QatSection represents a section definition in QAT configuration. Its main purpose is to initalize
- * HW and load balance operations to the QAT handles.
+ * QatSection represents a section definition in QAT configuration. Its main purpose is to
+ * initialize HW and load balance operations to the QAT handles.
  */
 class QatSection : public Logger::Loggable<Logger::Id::connection> {
 public:
@@ -93,8 +93,11 @@ public:
   static int connectionIndex();
   static int contextIndex();
 
+  bool checkQatDevice();
+
 private:
   LibQatCryptoSharedPtr libqat_{};
+  bool qat_is_supported_{true};
 };
 
 /**
@@ -128,12 +131,12 @@ private:
                          CpaCyRsaDecryptOpData** dec_op_data, CpaFlatBuffer** output_buffer);
 
   QatHandle& handle_;
-  CpaStatus last_status_;
+  CpaStatus last_status_{CPA_STATUS_RETRY};
   unsigned char decrypted_data_[QAT_BUFFER_SIZE];
-  int decrypted_data_length_;
+  int decrypted_data_length_{0};
   // Pipe for passing the message that the operation is completed.
-  int read_fd_;
-  int write_fd_;
+  int read_fd_{-1};
+  int write_fd_{-1};
 };
 
 } // namespace Qat

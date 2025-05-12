@@ -36,6 +36,8 @@ Third, an upstream cluster must include an endpoint with an internal address ref
             envoy_internal_address:
               server_listener_name: internal_listener
 
+.. _config_internal_upstream_transport:
+
 Internal upstream transport
 ---------------------------
 
@@ -90,7 +92,7 @@ Decapsulate the CONNECT requests
 
 There are some complicated GET-in-CONNECT requests across services or edges.
 In order to proxy the GET request within Envoy, two layer of :ref:`HTTP connection manager <config_http_conn_man>`
-is demanded. The first HHTTP connection manager layer extract the TCP stream from a CONNECT request and redirect the TCP stream to the second
+is demanded. The first HTTP connection manager layer extract the TCP stream from a CONNECT request and redirect the TCP stream to the second
 HTTP connection manager layer to parse the common GET requests.
 
 A sample config can be found :repo:`here <configs/terminate_http_in_http2_connect.yaml>`

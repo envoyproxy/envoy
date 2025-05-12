@@ -17,6 +17,7 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -40,11 +41,11 @@ public:
   void initialize(std::string yaml) {
     envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
-    config_ = std::make_shared<Config>(proto_config, stats_store_, bootstrap_);
+    config_ = std::make_shared<Config>(proto_config, *stats_store_.rootScope(), context_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
-    addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+    addr_ = *Network::Address::PipeInstance::create("/test/test.sock");
 
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
@@ -61,7 +62,7 @@ public:
 
   ~ExtAuthzFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
+      EXPECT_EQ(0U, gauge->value()) << "guage name: " << gauge->name();
     }
   }
 
@@ -95,7 +96,7 @@ public:
 
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-    response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+    response.headers_to_set = Filters::Common::ExtAuthz::UnsafeHeaderVector{{"foo", "bar"}};
 
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");
@@ -133,14 +134,13 @@ public:
 
   Stats::TestUtil::TestStore stats_store_;
   ConfigSharedPtr config_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
   const std::string default_yaml_string_ = R"EOF(
-transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -149,7 +149,6 @@ failure_mode_allow: true
 stat_prefix: name
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
-transport_api_version: V3
 grpc_service:
   envoy_grpc:
     cluster_name: ext_authz_server
@@ -167,7 +166,6 @@ filter_enabled_metadata:
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(
-transport_api_version: V3
 grpc_service: {}
 stat_prefix: name
   )EOF";
@@ -214,9 +212,9 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
       1U,
       stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_CALL(
       filter_callbacks_.connection_.stream_info_,
       setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied));
@@ -288,10 +286,10 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_CALL(
       filter_callbacks_.connection_.stream_info_,
       setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError));
@@ -463,7 +461,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
       }));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_CALL(
       filter_callbacks_.connection_.stream_info_,
       setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied));

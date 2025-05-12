@@ -12,9 +12,12 @@
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
@@ -25,7 +28,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::HasSubstr;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
@@ -48,7 +50,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Test upstream writing before downstream downstream does.
+// Test upstream writing before downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -161,46 +163,6 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
                                                    "UPSTREAM_WIRE_BYTES_SENT=10 "
                                                    "UPSTREAM_WIRE_BYTES_RECEIVED=5"
                                                    "\r?.*")));
-}
-
-TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
-  autonomous_upstream_ = true;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    for (int i = 0; i < static_resources->clusters_size(); ++i) {
-      auto* cluster = static_resources->mutable_clusters(i);
-      auto* thresholds = cluster->mutable_circuit_breakers()->add_thresholds();
-      thresholds->mutable_max_connections()->set_value(1027);
-      thresholds->mutable_max_pending_requests()->set_value(1027);
-    }
-  });
-  initialize();
-// The large number of connection is meant to regression test
-// https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
-// TODO(alyssawilk) debug.
-#if defined(__APPLE__)
-  const int num_connections = 50;
-#else
-  const int num_connections = 1026;
-#endif
-  std::vector<IntegrationTcpClientPtr> clients(num_connections);
-
-  for (int i = 0; i < num_connections; ++i) {
-    clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-  }
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
-  for (int i = 0; i < num_connections; ++i) {
-    IntegrationTcpClientPtr& tcp_client = clients[i];
-    // The autonomous upstream is an HTTP upstream, so send raw HTTP.
-    // This particular request will result in the upstream sending a response,
-    // and flush-closing due to the 'close_after_response' header.
-    ASSERT_TRUE(tcp_client->write(
-        "GET / HTTP/1.1\r\nHost: foo\r\nclose_after_response: yes\r\ncontent-length: 0\r\n\r\n",
-        false));
-    tcp_client->waitForHalfClose();
-    tcp_client->close();
-    EXPECT_THAT(tcp_client->data(), HasSubstr("aaaaaaaaaa"));
-  }
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyRandomBehavior) {
@@ -547,6 +509,110 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
+TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_connected(true);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%ACCESS_LOG_TYPE%-%UPSTREAM_CONNECTION_ID%\n");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  auto log_result = waitForAccessLog(access_log_path);
+  std::vector<std::string> access_log_parts = absl::StrSplit(log_result, '-');
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
+            access_log_parts[0]);
+  uint32_t upstream_connection_id;
+  ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
+  EXPECT_GT(upstream_connection_id, 0);
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+  test_server_.reset();
+
+  log_result = waitForAccessLog(access_log_path, 1);
+  access_log_parts = absl::StrSplit(log_result, '-');
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd), access_log_parts[0]);
+  ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
+  EXPECT_GT(upstream_connection_id, 0);
+}
+
+TEST_P(TcpProxyIntegrationTest, PeriodicAccessLog) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_access_log_options()->mutable_access_log_flush_interval()->set_nanos(
+        100000000); // 0.1 seconds
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "ACCESS_LOG_TYPE=%ACCESS_LOG_TYPE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(
+      absl::StrCat("ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpPeriodic)),
+      log_result);
+
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(tcp_client->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+  test_server_.reset();
+}
+
 // Make sure no bytes are logged when no data is sent.
 TEST_P(TcpProxyIntegrationTest, TcpProxyNoDataBytesMeter) {
   setupByteMeterAccessLog();
@@ -590,11 +656,11 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyBidirectionalBytesMeter) {
 
   std::vector<IntegrationTcpClientPtr> clients{client_count};
   std::vector<FakeRawConnectionPtr> fake_connections{upstream_count};
-  const auto indicies = std::vector<uint64_t>({0, 1, 2});
+  const auto indices = std::vector<uint64_t>({0, 1, 2});
 
   for (int i = 0; i < client_count; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
-    waitForNextRawUpstreamConnection(indicies, fake_connections[i]);
+    waitForNextRawUpstreamConnection(indices, fake_connections[i]);
   }
 
   ASSERT_TRUE(clients[0]->write("hello")); // send initial client data
@@ -680,6 +746,47 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->waitForDisconnect();
+}
+
+TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
+  autonomous_upstream_ = true;
+
+  enableHalfClose(false);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
+      auto& cluster_protocol_options = *cluster->mutable_typed_extension_protocol_options();
+      envoy::extensions::upstreams::tcp::v3::TcpProtocolOptions tcp_options;
+      tcp_options.mutable_idle_timeout()->set_nanos(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+              .count());
+      cluster_protocol_options["envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions"].PackFrom(
+          tcp_options);
+
+      // two more connections which are going to be closed by the per-client idle timers
+      cluster->mutable_preconnect_policy()->mutable_predictive_preconnect_ratio()->set_value(2);
+
+      auto* load_assignment = cluster->mutable_load_assignment();
+      load_assignment->clear_endpoints();
+      for (int i = 0; i < 5; ++i) {
+        auto locality = load_assignment->add_endpoints();
+        locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+            ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
+      }
+    }
+  });
+  setUpstreamCount(5);
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  // Platforms could prevent ActiveTcpClient construction unless we explicitly wait for it.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+
+  tcp_client->close();
+
+  // Two pre-connections are closed by idle timers.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
@@ -888,6 +995,46 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(TcpProxyIntegrationTest, RecordsUpstreamConnectionTimeLatency) {
+  FakeAccessLogFactory factory;
+  factory.setLogCallback([](const Formatter::HttpFormatterContext&,
+                            const StreamInfo::StreamInfo& stream_info) {
+    EXPECT_TRUE(
+        stream_info.upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency().has_value());
+  });
+
+  Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("testaccesslog");
+    test::integration::accesslog::FakeAccessLog access_log_config;
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("ping", true));
+  ASSERT_TRUE(fake_upstream_connection->write("pong", true));
+
+  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
@@ -1253,8 +1400,8 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
 
   expectEndpointToMatchRoute([](IntegrationTcpClient& tcp_client) -> std::string {
     // Break the write into two; validate that the first is received before sending the second. This
-    // validates that a downstream filter can use this functionality, even if it can't make a
-    // decision after the first `onData()`.
+    // validates that a downstream network filter can use this functionality, even if it can't make
+    // a decision after the first `onData()`.
     EXPECT_TRUE(tcp_client.write("p", false));
     tcp_client.waitForData("p");
     tcp_client.clearData();
@@ -1287,8 +1434,8 @@ void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 }
 
@@ -1348,7 +1495,7 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
 
   // Now send data downstream and make sure it arrives.
   ASSERT_TRUE(fake_upstream_connection_->write(data_to_send_downstream));
-  payload_reader_->set_data_to_wait_for(data_to_send_downstream);
+  payload_reader_->setDataToWaitFor(data_to_send_downstream);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
   // Clean up.
@@ -1385,7 +1532,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   const std::string data("data");
   ASSERT_TRUE(fake_upstream_connection_->write(data, false));
-  payload_reader_->set_data_to_wait_for(data);
+  payload_reader_->setDataToWaitFor(data);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(payload_reader_->readLastByte());
 
@@ -1425,7 +1572,7 @@ class FakeMysqlUpstream : public FakeUpstream {
   using FakeUpstream::FakeUpstream;
 
   bool createNetworkFilterChain(Network::Connection& connection,
-                                const std::vector<Network::FilterFactoryCb>& cb) override {
+                                const Filter::NetworkFilterFactoriesList& cb) override {
     Buffer::OwnedImpl to_write("P");
     connection.write(to_write, false);
     return FakeUpstream::createNetworkFilterChain(connection, cb);
@@ -1570,4 +1717,178 @@ TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+class PauseFilter : public Network::ReadFilter {
+public:
+  explicit PauseFilter(int data_size_before_continue)
+      : data_size_before_continue_(data_size_before_continue) {}
+
+  Network::FilterStatus onData(Buffer::Instance& buffer, bool) override {
+    // Once the initial buffer size is reached, the filter chain will be continued.
+    should_continue_ = should_continue_ || buffer.length() >= data_size_before_continue_;
+    return should_continue_ ? Network::FilterStatus::Continue
+                            : Network::FilterStatus::StopIteration;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    // Stop Iteration as more data is needed before filter chain can be continued.
+    return Network::FilterStatus::StopIteration;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+
+    // Pass ReceiveBeforeConnect state to TCP_PROXY so that it does not read disable
+    // the connection.
+    read_callbacks_->connection().streamInfo().filterState()->setData(
+        TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  // Whether the filter chain should be continued.
+  bool should_continue_{false};
+  // The number of bytes to receive before the filter chain is continued.
+  uint64_t data_size_before_continue_{};
+  Network::ReadFilterCallbacks* read_callbacks_{};
+};
+
+class PauseFilterFactory : public Extensions::NetworkFilters::Common::FactoryBase<
+                               test::integration::tcp_proxy::PauseFilterConfig> {
+public:
+  PauseFilterFactory() : FactoryBase("test.pause_iteration") {}
+
+private:
+  Network::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::PauseFilterConfig& cfg,
+                                    Server::Configuration::FactoryContext&) override {
+    int data_size_before_continue = cfg.data_size_before_continue();
+    return [data_size_before_continue = std::move(data_size_before_continue)](
+               Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<PauseFilter>(data_size_before_continue));
+    };
+  }
+};
+
+class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTest {
+public:
+  void addPauseFilter(uint32_t data_size_before_continue) {
+    config_helper_.addNetworkFilter(fmt::format(R"EOF(
+      name: test.pause_iteration
+      typed_config:
+        "@type": type.googleapis.com/test.integration.tcp_proxy.PauseFilterConfig
+        data_size_before_continue: {}
+)EOF",
+                                                data_size_before_continue));
+  }
+
+  PauseFilterFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> register_factory_{
+      factory_};
+};
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyReceiveBeforeConnectIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyData) {
+  uint32_t data_size_before_continue = 6;
+  addPauseFilter(data_size_before_continue);
+
+  initialize();
+  FakeRawConnectionPtr fake_upstream_connection;
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // Until total data size > 6 is received, the PauseFilter stops the iteration. Downstream counter
+  // is incremented, but no connection attempt to upstream is made.
+  ASSERT_TRUE(tcp_client->write("hello"));
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  ASSERT_TRUE(tcp_client->write("world"));
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  // Once the connection is established, the early data will be flushed to the upstream.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("helloworld")));
+  ASSERT_TRUE(fake_upstream_connection->write("response"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark) {
+  /* This test validates that no inconsistent state happens when the downstream is read disabled
+   * twice, once when the early data is received and next when the upstream buffer hits high
+   * watermark.
+   */
+  const uint32_t data_size_before_continue = 512;
+  addPauseFilter(data_size_before_continue);
+
+  const uint32_t upstream_buffer_limit = 512;
+  const uint32_t downstream_buffer_limit = 1024;
+  const uint32_t data_size = 16 * downstream_buffer_limit;
+
+  config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
+  std::string data;
+  for (uint32_t i = 0; i < data_size / 4; i++)
+    data += "abcd";
+
+  initialize();
+  FakeRawConnectionPtr fake_upstream_connection;
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // PauseFilter stops the iteration until sufficient data is received.
+  ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit - 1)));
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  // Downstream sends more data. PauseFilter allows the iteration to continue, upstream connection
+  // is established. The buffered early data is sent to the upstream.
+  ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit - 1)));
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  // At this point, the downstream is already read disabled, waiting for early data flush. Another
+  // downstream read disable is triggered as the early data is pushed to the upstream buffer and the
+  // buffer hits the high watermark. Downstream read disable counter will be 2. After the early data
+  // is pushed, downstream is read enabled once. Downstream read disable counter will be 1. After
+  // the upstream buffer is flushed to the upstream, it comes below the watermark and downstream is
+  // read enabled.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch(data.c_str())));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data_size));
+  ASSERT_TRUE(fake_upstream_connection->write("response"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+
+  uint32_t upstream_pauses =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
+          ->value();
+  uint32_t upstream_resumes =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
+          ->value();
+
+  uint32_t downstream_pauses =
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_paused_reading_total")
+          ->value();
+  uint32_t downstream_resumes =
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_resumed_reading_total")
+          ->value();
+
+  EXPECT_EQ(upstream_pauses, upstream_resumes);
+  EXPECT_EQ(upstream_resumes, 0);
+
+  // Since we are receiving early data, downstream connection will already be read
+  // disabled so downstream pause metric is not emitted when upstream buffer hits high
+  // watermark. When the upstream buffer watermark goes down, downstream will be read
+  // enabled and downstream resume metric will be emitted.
+  EXPECT_EQ(downstream_pauses, 0);
+  EXPECT_EQ(downstream_resumes, 1);
+}
+
 } // namespace Envoy

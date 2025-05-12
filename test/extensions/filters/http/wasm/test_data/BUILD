@@ -1,7 +1,7 @@
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
@@ -15,7 +15,7 @@ wasm_rust_binary(
     srcs = ["async_call_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -24,7 +24,7 @@ wasm_rust_binary(
     srcs = ["body_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -33,7 +33,7 @@ wasm_rust_binary(
     srcs = ["close_stream_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -43,7 +43,7 @@ wasm_rust_binary(
     deps = [
         "//bazel/external/cargo:protobuf",
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -53,7 +53,7 @@ wasm_rust_binary(
     deps = [
         "//bazel/external/cargo:protobuf",
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -63,7 +63,7 @@ wasm_rust_binary(
     wasi = True,
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -72,7 +72,7 @@ wasm_rust_binary(
     srcs = ["metadata_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -81,7 +81,7 @@ wasm_rust_binary(
     srcs = ["panic_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -90,7 +90,7 @@ wasm_rust_binary(
     srcs = ["resume_call_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -99,7 +99,7 @@ wasm_rust_binary(
     srcs = ["shared_data_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -108,11 +108,11 @@ wasm_rust_binary(
     srcs = ["shared_queue_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_cpp_plugin",
     srcs = [
         "test_async_call_cpp.cc",
@@ -129,12 +129,12 @@ envoy_cc_library(
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
         ":test_cc_proto",
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/common/wasm/ext:envoy_null_plugin",
+        "@com_google_absl//absl/container:node_hash_map",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
@@ -158,6 +158,7 @@ envoy_wasm_cc_binary(
         ":test_cc_proto",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
+        "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )
@@ -177,22 +178,3 @@ cc_proto_library(
     name = "test_cc_proto",
     deps = [":test_proto"],
 )
-
-# TODO: FIXME
-#
-#filegroup(
-#    name = "wavm_binary",
-#    srcs = ["//bazel/foreign_cc:wavm"],
-#    output_group = "wavm",
-#)
-#
-#genrule(
-#    name = "test_cpp_wavm_compile",
-#    srcs = [":test_cpp.wasm"],
-#    outs = ["test_cpp.wavm_compiled.wasm"],
-#    cmd = "./$(location wavm_binary) compile $(location test_cpp.wasm) $(location test_cpp.wavm_compiled.wasm)",
-#    tools = [
-#        ":test_cpp.wasm",
-#        ":wavm_binary",
-#    ],
-#)

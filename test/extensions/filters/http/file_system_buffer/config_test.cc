@@ -52,7 +52,7 @@ public:
   captureConfigFromProto(const ProtoFileSystemBufferFilterConfig& proto_config) {
     NiceMock<Server::Configuration::MockFactoryContext> context;
     Http::FilterFactoryCb cb =
-        factory()->createFilterFactoryFromProto(proto_config, "stats", context);
+        factory()->createFilterFactoryFromProto(proto_config, "stats", context).value();
     Http::MockFilterChainFactoryCallbacks filter_callback;
     std::shared_ptr<FileSystemBufferFilterConfig> config;
     EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(Invoke(captureConfig(&config)));
@@ -64,8 +64,10 @@ public:
   makeRouteConfig(const ProtoFileSystemBufferFilterConfig& route_proto_config) {
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
     return std::dynamic_pointer_cast<const FileSystemBufferFilterConfig>(
-        factory()->createRouteSpecificFilterConfig(route_proto_config, context,
-                                                   ProtobufMessage::getNullValidationVisitor()));
+        factory()
+            ->createRouteSpecificFilterConfig(route_proto_config, context,
+                                              ProtobufMessage::getNullValidationVisitor())
+            .value());
   }
 };
 

@@ -40,6 +40,10 @@ namespace BandwidthLimitFilter {
   GAUGE(response_incoming_size, Accumulate)                                                        \
   GAUGE(request_allowed_size, Accumulate)                                                          \
   GAUGE(response_allowed_size, Accumulate)                                                         \
+  COUNTER(request_incoming_total_size)                                                             \
+  COUNTER(response_incoming_total_size)                                                            \
+  COUNTER(request_allowed_total_size)                                                              \
+  COUNTER(response_allowed_total_size)                                                             \
   HISTOGRAM(request_transfer_duration, Milliseconds)                                               \
   HISTOGRAM(response_transfer_duration, Milliseconds)
 
@@ -58,10 +62,11 @@ class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   using EnableMode =
       envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
+  static absl::StatusOr<std::shared_ptr<FilterConfig>>
+  create(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
+         Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+         bool per_route = false);
 
-  FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
-               bool per_route = false);
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   BandwidthLimitStats& stats() const { return stats_; }
@@ -74,10 +79,20 @@ public:
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
   const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
   const Http::LowerCaseString& responseDelayTrailer() const { return response_delay_trailer_; }
+  const Http::LowerCaseString& requestFilterDelayTrailer() const {
+    return request_filter_delay_trailer_;
+  }
+  const Http::LowerCaseString& responseFilterDelayTrailer() const {
+    return response_filter_delay_trailer_;
+  }
   bool enableResponseTrailers() const { return enable_response_trailers_; }
 
 private:
   friend class FilterTest;
+
+  FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
+               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+               bool per_route, absl::Status& creation_status);
 
   static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -92,6 +107,8 @@ private:
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
   const Http::LowerCaseString request_delay_trailer_;
   const Http::LowerCaseString response_delay_trailer_;
+  const Http::LowerCaseString request_filter_delay_trailer_;
+  const Http::LowerCaseString response_filter_delay_trailer_;
   const bool enable_response_trailers_;
 };
 
@@ -116,8 +133,8 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;
@@ -138,6 +155,7 @@ public:
 private:
   friend class FilterTest;
   const FilterConfig& getConfig() const;
+  const std::chrono::milliseconds zero_milliseconds_ = std::chrono::milliseconds(0);
 
   void updateStatsOnDecodeFinish();
   void updateStatsOnEncodeFinish();
@@ -149,7 +167,9 @@ private:
   std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   Stats::TimespanPtr request_latency_;
   Stats::TimespanPtr response_latency_;
-  std::chrono::milliseconds request_duration_;
+  std::chrono::milliseconds request_duration_ = zero_milliseconds_;
+  std::chrono::milliseconds request_delay_ = zero_milliseconds_;
+  std::chrono::milliseconds response_delay_ = zero_milliseconds_;
   Http::ResponseTrailerMap* trailers_;
 };
 

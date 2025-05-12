@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package test.extensions.filters.udp.udp_proxy.session_filters;
+
+message PerSessionClusterSetterFilterConfig {
+  string cluster = 1;
+}

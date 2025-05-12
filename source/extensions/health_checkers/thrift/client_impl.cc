@@ -109,7 +109,7 @@ bool ClientImpl::sendRequest() {
 
 void ClientImpl::close() {
   ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl close", *connection_);
-  connection_->close(Network::ConnectionCloseType::NoFlush);
+  connection_->close(Network::ConnectionCloseType::Abort);
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {

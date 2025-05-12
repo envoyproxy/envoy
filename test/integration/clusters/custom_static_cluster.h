@@ -22,16 +22,18 @@
 
 namespace Envoy {
 
+template <class ConfigType> class CustomStaticClusterFactoryBase;
+
 class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
-  CustomStaticCluster(Server::Configuration::ServerFactoryContext& server_context,
-                      const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                      Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                      Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, uint32_t priority,
-                      std::string address, uint32_t port)
-      : ClusterImplBase(server_context, cluster, runtime, factory_context, std::move(stats_scope),
-                        added_via_api, factory_context.mainThreadDispatcher().timeSource()),
-        priority_(priority), address_(std::move(address)), port_(port), host_(makeHost()) {}
+  CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                      Upstream::ClusterFactoryContext& context, uint32_t priority,
+                      std::string address, uint32_t port, absl::Status& creation_status)
+      : ClusterImplBase(cluster, context, creation_status), priority_(priority),
+        address_(std::move(address)), port_(port) {
+    THROW_IF_NOT_OK_REF(creation_status);
+    host_ = makeHost();
+  }
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
@@ -46,43 +48,45 @@ private:
   const uint32_t priority_;
   const std::string address_;
   const uint32_t port_;
-  const Upstream::HostSharedPtr host_;
+  Upstream::HostSharedPtr host_;
 
-  friend class CustomStaticClusterFactoryBase;
+  friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1>;
+  friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig2>;
 };
 
-class CustomStaticClusterFactoryBase : public Upstream::ConfigurableClusterFactoryBase<
-                                           test::integration::clusters::CustomStaticConfig> {
+template <class ConfigProto>
+class CustomStaticClusterFactoryBase
+    : public Upstream::ConfigurableClusterFactoryBase<ConfigProto> {
 protected:
   CustomStaticClusterFactoryBase(const std::string& name, bool create_lb)
-      : ConfigurableClusterFactoryBase(name), create_lb_(create_lb) {}
+      : Upstream::ConfigurableClusterFactoryBase<ConfigProto>(name), create_lb_(create_lb) {}
 
 private:
-  std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
-  createClusterWithConfig(
-      Server::Configuration::ServerFactoryContext& server_context,
-      const envoy::config::cluster::v3::Cluster& cluster,
-      const test::integration::clusters::CustomStaticConfig& proto_config,
-      Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopeSharedPtr&& stats_scope) override {
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
+                          const ConfigProto& proto_config,
+                          Upstream::ClusterFactoryContext& context) override {
+    absl::Status creation_status = absl::OkStatus();
     auto new_cluster = std::make_shared<CustomStaticCluster>(
-        server_context, cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
-        context.addedViaApi(), proto_config.priority(), proto_config.address(),
-        proto_config.port_value());
+        cluster, context, proto_config.priority(), proto_config.address(),
+        proto_config.port_value(), creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     return std::make_pair(new_cluster, create_lb_ ? new_cluster->threadAwareLb() : nullptr);
   }
 
   const bool create_lb_;
 };
 
-class CustomStaticClusterFactoryNoLb : public CustomStaticClusterFactoryBase {
+class CustomStaticClusterFactoryNoLb
+    : public CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1> {
 public:
   CustomStaticClusterFactoryNoLb()
-      : CustomStaticClusterFactoryBase("envoy.clusters.custom_static", false) {}
+      : CustomStaticClusterFactoryBase("envoy.clusters.custom_static", false) {};
 };
 
-class CustomStaticClusterFactoryWithLb : public CustomStaticClusterFactoryBase {
+class CustomStaticClusterFactoryWithLb
+    : public CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig2> {
 public:
   CustomStaticClusterFactoryWithLb()
       : CustomStaticClusterFactoryBase("envoy.clusters.custom_static_with_lb", true) {}

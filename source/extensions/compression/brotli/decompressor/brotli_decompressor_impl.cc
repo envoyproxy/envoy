@@ -60,26 +60,47 @@ void BrotliDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
 }
 
 bool BrotliDecompressorImpl::process(Common::BrotliContext& ctx, Buffer::Instance& output_buffer) {
-  BrotliDecoderResult result;
-  result = BrotliDecoderDecompressStream(state_.get(), &ctx.avail_in_, &ctx.next_in_,
-                                         &ctx.avail_out_, &ctx.next_out_, nullptr);
-  if (result == BROTLI_DECODER_RESULT_ERROR) {
-    // TODO(rojkov): currently the Brotli library doesn't specify possible errors in its API. Add
-    // more detailed stats when they are documented.
+  BrotliDecoderResult result = BrotliDecoderDecompressStream(
+      state_.get(), &ctx.avail_in_, &ctx.next_in_, &ctx.avail_out_, &ctx.next_out_, nullptr);
+
+  switch (result) {
+  case BROTLI_DECODER_RESULT_SUCCESS:
+    // The decompression is done successfully but there is still some input left.
+    // We treat this as an error and stop the decompression directly to avoid
+    // possible endless loop.
+    if (ctx.avail_in_ > 0) {
+      stats_.brotli_error_.inc();
+      stats_.brotli_redundant_input_.inc();
+      return false;
+    }
+    // The decompression is done successfully and fall through to the next case
+    // to check if the output buffer is full and flush chunk to the output buffer.
+    FALLTHRU;
+  case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+    ASSERT(ctx.avail_in_ == 0);
+    FALLTHRU;
+  case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT:
+    // Check if the output buffer is full first. If it is full then we treat it
+    // as an error and stop the decompression directly to avoid possible decompression
+    // bomb.
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_compression_bomb_protection") &&
+        (output_buffer.length() > ctx.max_output_size_)) {
+      stats_.brotli_error_.inc();
+      stats_.brotli_output_overflow_.inc();
+      return false;
+    }
+
+    // If current chunk is full then flush it to the output buffer and reset
+    // the chunk or do nothing.
+    ctx.updateOutput(output_buffer);
+    return true;
+  case BROTLI_DECODER_RESULT_ERROR:
     stats_.brotli_error_.inc();
     return false;
   }
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_compression_bomb_protection") &&
-      (output_buffer.length() > ctx.max_output_size_)) {
-    stats_.brotli_error_.inc();
-    return false;
-  }
-
-  ctx.updateOutput(output_buffer);
-
-  return true;
+  PANIC("Unexpected BrotliDecoderResult");
 }
 
 } // namespace Decompressor

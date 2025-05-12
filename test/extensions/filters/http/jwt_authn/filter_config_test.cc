@@ -7,13 +7,14 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
-using testing::ReturnRef;
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace Extensions {
@@ -165,37 +166,24 @@ rules:
     provider_name: provider1
 )";
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  // Make sure that the thread callbacks are not invoked inline.
-  server_context.thread_local_.defer_data_ = true;
-  {
-    // Scope in all the things that the filter depends on, so they are destroyed as we leave the
-    // scope.
-    NiceMock<Server::Configuration::MockFactoryContext> context;
-    // The threadLocal, dispatcher and api that are used by the filter config, actually belong to
-    // the server factory context that who's lifetime is longer. We simulate that by returning
-    // their instances from outside the scope.
-    ON_CALL(context, mainThreadDispatcher())
-        .WillByDefault(ReturnRef(server_context.mainThreadDispatcher()));
-    ON_CALL(context, api()).WillByDefault(ReturnRef(server_context.api()));
-    ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.server_factory_context_.thread_local_.defer_data_ = true;
 
-    JwtAuthentication proto_config;
-    TestUtility::loadFromYaml(config, proto_config);
-    auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
-  }
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   // Even though filter_conf is now de-allocated, using a reference to it might still work, as its
   // memory was not cleared. This leads to a false positive in this test when run normally. The
   // test should fail under asan if the code uses invalid reference.
 
   // Make sure the filter scheduled a callback
-  EXPECT_EQ(1, server_context.thread_local_.deferred_data_.size());
+  EXPECT_EQ(1, context.server_factory_context_.thread_local_.deferred_data_.size());
 
   // Simulate a situation where the callback is called after the filter config is destroyed.
   // call the tls callback. we want to make sure that it doesn't depend on objects
   // that are out of scope.
-  EXPECT_NO_THROW(server_context.thread_local_.call());
+  EXPECT_NO_THROW(context.server_factory_context_.thread_local_.call());
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, FindByFilterState) {
@@ -309,6 +297,106 @@ requirement_map:
       filter_conf->findPerRouteVerifier(PerRouteFilterConfig(per_route));
   EXPECT_EQ(verifier, nullptr);
   EXPECT_EQ(error_msg, "Wrong requirement_name: wrong-name. It should be one of [r1,r2]");
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksDurationVeryBig) {
+  // remote_jwks.duration.seconds should be less than half of:
+  // 9223372036 = max_int64 / 1e9, which is about 300 years.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      cache_duration:
+        seconds: 5223372036
+      http_uri:
+        uri: http://www.google.com
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("Duration out-of-range"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUri) {
+  // Invalid URI should fail config validation.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.not\nvalid.com
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("invalid URI"));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksInvalidUriValidationDisabled) {
+  // Disabling this runtime feature should allow invalid URIs.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_authn_validate_uri", "false"}});
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.not\nvalid.com
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_NO_THROW(FilterConfigImpl(proto_config, "", context));
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksValidUri) {
+  // Valid URI should not fail config validation.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      http_uri:
+        uri: http://www.valid.com/resource
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  FilterConfigImpl(proto_config, "", context);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, RemoteJwksAsyncFetchRefetchDurationVeryBig) {
+  // failed_refetch_duration.duration.seconds should be less than:
+  // 9223372036 = max_int64 / 1e9, which is about 300 years.
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    remote_jwks:
+      async_fetch:
+        failed_refetch_duration:
+          seconds: 9223372136
+)";
+
+  JwtAuthentication proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT_THROWS_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
+                             HasSubstr("Duration out-of-range"));
 }
 
 } // namespace

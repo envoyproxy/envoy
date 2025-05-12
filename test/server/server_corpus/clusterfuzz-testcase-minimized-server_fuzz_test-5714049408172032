@@ -1,7 +1,6 @@
 cluster_manager {
   load_stats_config {
     api_type: GRPC
-    transport_api_version: V3
     grpc_services {
       google_grpc {
         target_uri: "18446744073709551617"

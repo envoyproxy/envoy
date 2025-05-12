@@ -12,20 +12,24 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
-    : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
-                                POOL_COUNTER_PREFIX(scope, "load_reporter."))},
+    : cm_(cluster_manager),
+      stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void {
+    stats_.retries_.inc();
+    establishNewStream();
+  });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
 }
 
 void LoadStatsReporter::setRetryTimer() {
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
@@ -69,8 +73,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    if (cluster.info()->edsServiceName().has_value()) {
-      cluster_stats->set_cluster_service_name(cluster.info()->edsServiceName().value());
+    if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
+      cluster_stats->set_cluster_service_name(name);
     }
     for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
@@ -103,7 +107,12 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             }
           }
         }
-        if (rq_success + rq_error + rq_active != 0) {
+        bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.report_load_with_rq_issued")) {
+          should_send_locality_stats = rq_issued != 0;
+        }
+        if (should_send_locality_stats) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
           locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
           locality_stats->set_priority(host_set->priority());
@@ -123,6 +132,14 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     }
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+    const uint64_t drop_overload_count =
+        cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+    if (drop_overload_count > 0) {
+      auto* dropped_request = cluster_stats->add_dropped_requests();
+      dropped_request->set_category(cluster.dropCategory());
+      dropped_request->set_dropped_count(drop_overload_count);
+    }
+
     const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
@@ -142,8 +159,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
 }
 
 void LoadStatsReporter::handleFailure() {
-  ENVOY_LOG(warn, "Load reporter stats stream/connection failure, will retry in {} ms.",
-            RETRY_DELAY_MS);
   stats_.errors_.inc();
   setRetryTimer();
 }
@@ -214,6 +229,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
       }
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+    cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
   };
   if (message_->send_all_clusters()) {
     for (const auto& p : all_clusters.active_clusters_) {
@@ -234,10 +250,17 @@ void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& 
 }
 
 void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   response_timer_->disableTimer();
   stream_ = nullptr;
-  handleFailure();
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
+    handleFailure();
+  } else {
+    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(),
+              message);
+    setRetryTimer();
+  }
 }
 
 } // namespace Upstream

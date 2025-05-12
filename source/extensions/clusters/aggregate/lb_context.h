@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

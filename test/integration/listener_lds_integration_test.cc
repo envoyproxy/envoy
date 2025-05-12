@@ -8,11 +8,13 @@
 #include "envoy/network/connection.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/config/api_version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
@@ -433,7 +435,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -480,6 +482,170 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 }
 
+#ifdef __linux__
+TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndSocketOpts) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    auto* socket_option = listener_config_.add_socket_options();
+    socket_option->set_level(IPPROTO_IP);
+    socket_option->set_name(IP_TOS);
+    socket_option->set_int_value(8); // IPTOS_THROUGHPUT
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+    auto* additional_socket_option = listener_config_.mutable_additional_addresses(0)
+                                         ->mutable_socket_options()
+                                         ->add_socket_options();
+    additional_socket_option->set_level(IPPROTO_IP);
+    additional_socket_option->set_name(IP_TOS);
+    additional_socket_option->set_int_value(4); // IPTOS_RELIABILITY
+    additional_socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"address1", "address2"});
+
+  constexpr absl::string_view route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Request is sent to cluster_0.
+
+  int response_size = 800;
+  int request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  codec_client_->close();
+  // Wait for the client to be disconnected.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  codec_client_ = makeHttpConnection(lookupPort("address2"));
+  auto response2 = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response2), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  // Verify first address.
+  EXPECT_TRUE(getSocketOption("testing-listener-0", IPPROTO_IP, IP_TOS, &opt_value, &opt_len, 0));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(8, opt_value);
+  // Verify second address.
+  EXPECT_TRUE(getSocketOption("testing-listener-0", IPPROTO_IP, IP_TOS, &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(4, opt_value);
+}
+#endif
+
+#ifdef __linux__
+TEST_P(ListenerMultiAddressesIntegrationTest,
+       BasicSuccessWithSocketOptionsOnlySetOnAdditionalAddress) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    auto* additional_socket_option = listener_config_.mutable_additional_addresses(0)
+                                         ->mutable_socket_options()
+                                         ->add_socket_options();
+    additional_socket_option->set_level(IPPROTO_IP);
+    additional_socket_option->set_name(IP_TOS);
+    additional_socket_option->set_int_value(4); // IPTOS_RELIABILITY
+    additional_socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"address1", "address2"});
+
+  constexpr absl::string_view route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Request is sent to cluster_0.
+
+  int response_size = 800;
+  int request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  codec_client_->close();
+  // Wait for the client to be disconnected.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  codec_client_ = makeHttpConnection(lookupPort("address2"));
+  auto response2 = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response2), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  // Verify second address.
+  EXPECT_TRUE(getSocketOption("testing-listener-0", IPPROTO_IP, IP_TOS, &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(4, opt_value);
+}
+#endif
+
 // Tests that a LDS adding listener works as expected.
 TEST_P(ListenerIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() {
@@ -495,7 +661,7 @@ TEST_P(ListenerIntegrationTest, BasicSuccess) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -546,7 +712,7 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -566,6 +732,12 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  // Ensure Envoy has accepted the connection before starting reloads.
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterGe("listener.127.0.0.1_0.downstream_cx_total", 1);
+  } else {
+    test_server_->waitForCounterGe("listener.[__1]_0.downstream_cx_total", 1);
+  }
 
   for (int version = 2; version <= 10; version++) {
     // Touch the metadata to get a different hash.
@@ -606,6 +778,10 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
     createRdsStream(route_table_name_);
   };
   initialize();
+// https://github.com/envoyproxy/envoy/issues/26336
+#if defined(__aarch64__)
+  return;
+#endif
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
@@ -613,7 +789,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest,
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -694,7 +870,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, MultipleAddressesListenerInPlaceUp
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({"address1", "address2"});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -771,7 +947,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -821,16 +997,18 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  auto codec1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  // The socket are closed asynchronously, so waiting the connection closed here.
-  ASSERT_TRUE(codec1->waitForDisconnect());
-
-  // Test the connection again to ensure the socket is closed.
-  auto codec2 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  EXPECT_FALSE(codec2->connected());
-  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+  while (true) {
+    auto codec =
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+    // The socket are closed asynchronously, if the socket is connected directly, it means
+    // the listener socket isn't closed yet, we will try next connection.
+    if (codec->connected()) {
+      ASSERT_TRUE(codec->waitForDisconnect());
+      continue;
+    }
+    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+    break;
+  }
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
@@ -854,7 +1032,7 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -913,16 +1091,18 @@ TEST_P(ListenerIntegrationTest, RemoveListenerAfterMultipleInPlaceUpdate) {
 
   // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
-  auto codec1 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  // The socket are closed asynchronously, so waiting the connection closed here.
-  ASSERT_TRUE(codec1->waitForDisconnect());
-
-  // Test the connection again to ensure the socket is closed.
-  auto codec2 =
-      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
-  EXPECT_FALSE(codec2->connected());
-  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+  while (true) {
+    auto codec =
+        makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+    // The socket are closed asynchronously, if the socket is connected directly, it means
+    // the listener socket isn't closed yet, we will try next connection.
+    if (codec->connected()) {
+      ASSERT_TRUE(codec->waitForDisconnect());
+      continue;
+    }
+    EXPECT_THAT(codec->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+    break;
+  }
 
   // Ensure the old listener is still in filter chain draining.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 2);
@@ -942,7 +1122,7 @@ TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
   EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
   registerTestServerPorts({listener_name_});
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -1017,6 +1197,16 @@ public:
     // Missing stat tag-extraction rule for stat
     // 'listener_manager.lds.grpc.lds_cluster.streams_closed_1' and stat_prefix 'lds_cluster'.
     skip_tag_extraction_rule_check_ = true;
+  }
+
+  ~ListenerFilterIntegrationTest() override {
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      lds_connection_.reset();
+    }
   }
 
   void createLdsStream() {
@@ -1356,6 +1546,164 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   tcp_client3->close();
 }
 
+#ifdef __linux__
+TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    auto* socket_option = listener_config_.add_socket_options();
+    socket_option->set_level(IPPROTO_IP);
+    socket_option->set_name(IP_TOS);
+    socket_option->set_int_value(8); // IPTOS_THROUGHPUT
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+    ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  EXPECT_TRUE(getSocketOption("listener_foo", IPPROTO_IP, IP_TOS, &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(8, opt_value);
+
+  listener_config_.mutable_socket_options(0)->set_int_value(4);
+  ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // We want to test update listener with same address but different socket options. But
+  // the test is using zero port address. It turns out when create a new socket on zero
+  // port address, kernel will generate new port for it. So we have to register the
+  // port again here. IPTOS_RELIABILITY	= 4.
+  registerTestServerPorts({"test_listener"});
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+
+  int opt_value2 = 0;
+  socklen_t opt_len2 = sizeof(opt_value);
+  EXPECT_TRUE(getSocketOption("listener_foo", IPPROTO_IP, IP_TOS, &opt_value2, &opt_len2));
+  EXPECT_EQ(opt_len2, sizeof(opt_value2));
+  EXPECT_EQ(4, opt_value2);
+}
+#endif
+
+TEST_P(ListenerFilterIntegrationTest,
+       UpdateListenerWithDifferentSocketOptionsWhenReusePortDisabled) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    listener_config_.set_stat_prefix("listener_stat");
+    listener_config_.mutable_enable_reuse_port()->set_value(false);
+
+    // Set random port manually for test. 0 port means the kernel will generate a random port
+    // and envoy will skip the port conflict check.
+    const uint32_t random_port = Random::RandomUtility::random() % 10000 + 10000;
+    listener_config_.mutable_address()->mutable_socket_address()->set_port_value(random_port);
+
+    ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  test_server_->waitForGaugeEq("listener.listener_stat.downstream_cx_active", 0);
+
+  auto* socket_option = listener_config_.add_socket_options();
+  socket_option->set_level(IPPROTO_IP);
+  socket_option->set_name(IP_TOS);
+  socket_option->set_int_value(8); // IPTOS_THROUGHPUT
+  socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "gRPC config for type.googleapis.com/envoy.config.listener.v3.Listener rejected: Error "
+      "adding/updating listener(s) listener_foo: error adding listener: 'listener_foo' has "
+      "duplicate address",
+      {
+        sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+        test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+        IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+        ASSERT_TRUE(tcp_client2->write(data));
+        FakeRawConnectionPtr fake_upstream_connection2;
+        ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+        ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+        tcp_client2->close();
+        ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+      });
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
@@ -1389,8 +1737,9 @@ public:
           src_listener_config.mutable_use_original_dst()->set_value(true);
           // Note that the below original_dst is replaced by FakeOriginalDstListenerFilter at the
           // link time.
-          src_listener_config.add_listener_filters()->set_name(
-              "envoy.filters.listener.original_dst");
+          auto& filter = *src_listener_config.add_listener_filters();
+          filter.set_name("envoy.filters.listener.original_dst");
+          filter.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);
@@ -1423,8 +1772,11 @@ public:
       connections.emplace_back();
       connections.back().client_conn_ =
           createConnectionAndWrite("dummy", connections.back().response_);
-      connections.back().client_conn_->waitForConnection();
+      ASSERT_TRUE(connections.back().client_conn_->waitForConnection());
       ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+      std::string data;
+      EXPECT_TRUE(connections.back().upstream_conn_->waitForData(5, &data));
+      EXPECT_EQ("dummy", data);
     }
     for (auto& conn : connections) {
       conn.client_conn_->close();
@@ -1452,8 +1804,7 @@ TEST_P(RebalancerTest, BindToPortUpdate) {
   concurrency_ = 2;
   initialize();
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
 
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {

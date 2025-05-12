@@ -48,8 +48,8 @@ public:
   }
 };
 
-Http::FilterFactoryCb StreamTeeFilterConfig::createFilter(const std::string&,
-                                                          Server::Configuration::FactoryContext&) {
+absl::StatusOr<Http::FilterFactoryCb>
+StreamTeeFilterConfig::createFilter(const std::string&, Server::Configuration::FactoryContext&) {
   return [this](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<StreamTeeFilter>();
     // TODO(kbaichoo): support multiple connections.

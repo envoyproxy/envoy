@@ -5,7 +5,7 @@
 namespace Envoy {
 
 PlatformImpl::PlatformImpl()
-    : thread_factory_(std::make_unique<Thread::ThreadFactoryImplPosix>()),
+    : thread_factory_(Thread::PosixThreadFactory::create()),
       file_system_(std::make_unique<Filesystem::InstanceImplPosix>()) {}
 
 PlatformImpl::~PlatformImpl() = default;

@@ -11,9 +11,14 @@ namespace Matcher {
  */
 template <class DataType> class ExactMapMatcher : public MapMatcher<DataType> {
 public:
-  ExactMapMatcher(DataInputPtr<DataType>&& data_input,
-                  absl::optional<OnMatch<DataType>> on_no_match)
-      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match)) {}
+  static absl::StatusOr<std::unique_ptr<ExactMapMatcher>>
+  create(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::unique_ptr<ExactMapMatcher<DataType>>(
+        new ExactMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status));
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return ret;
+  }
 
   void addChild(std::string value, OnMatch<DataType>&& on_match) override {
     const auto itr_and_exists = children_.emplace(value, std::move(on_match));
@@ -21,6 +26,12 @@ public:
   }
 
 protected:
+  template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
+
+  ExactMapMatcher(DataInputPtr<DataType>&& data_input,
+                  absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
+
   absl::optional<OnMatch<DataType>> doMatch(const std::string& data) override {
     const auto itr = children_.find(data);
     if (itr != children_.end()) {

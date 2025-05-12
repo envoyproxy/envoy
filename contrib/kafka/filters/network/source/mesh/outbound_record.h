@@ -26,13 +26,12 @@ struct OutboundRecord {
   const std::vector<Header> headers_;
 
   // These fields will get updated when delivery to upstream Kafka cluster finishes.
-  int16_t error_code_;
-  uint32_t saved_offset_;
+  int16_t error_code_{0};
+  uint32_t saved_offset_{0};
 
   OutboundRecord(const std::string& topic, const int32_t partition, const absl::string_view key,
                  const absl::string_view value, const std::vector<Header>& headers)
-      : topic_{topic}, partition_{partition}, key_{key}, value_{value}, headers_{headers},
-        error_code_{0}, saved_offset_{0} {};
+      : topic_{topic}, partition_{partition}, key_{key}, value_{value}, headers_{headers} {};
 };
 
 } // namespace Mesh

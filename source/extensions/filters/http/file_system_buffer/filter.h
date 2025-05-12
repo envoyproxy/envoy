@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 #include <string>
 
@@ -41,8 +43,7 @@ struct BufferedStreamState {
 
 class FileSystemBufferFilter : public Http::StreamFilter,
                                public Http::DownstreamWatermarkCallbacks,
-                               public Logger::Loggable<Logger::Id::http2>,
-                               public std::enable_shared_from_this<FileSystemBufferFilter> {
+                               public Logger::Loggable<Logger::Id::http2> {
 public:
   explicit FileSystemBufferFilter(std::shared_ptr<FileSystemBufferFilterConfig> base_config);
 
@@ -59,7 +60,7 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
@@ -67,6 +68,12 @@ public:
   void onDestroy() override;
 
 private:
+  // This is captured so that callbacks can alter their behavior (and avoid nullptr)
+  // if the filter has been destroyed since the callback was queued.
+  // We use this rather than shared_from_this because onDestroy happens potentially
+  // significantly earlier than the destructor, and we want to abort callbacks after
+  // onDestroy.
+  std::shared_ptr<bool> is_destroyed_ = std::make_shared<bool>(false);
   // Merges any per-route config with the default config. Returns false if the config lacked
   // a file manager.
   bool initPerRouteConfig();
@@ -95,14 +102,15 @@ private:
   // These operations are asynchronous; the impacted buffer fragments are in an unusable state until
   // the operation completes.
   bool maybeStorage(BufferedStreamState& state, Http::StreamFilterCallbacks& callbacks);
-  std::function<void(absl::Status)> getOnFileActionCompleted();
+  absl::AnyInvocable<void(absl::Status)> getOnFileActionCompleted();
 
   // Called if an unrecoverable error occurs in the filter (e.g. a file operation fails). Internal
   // server error.
   void filterError(absl::string_view err);
 
-  // Returns a safe dispatch function that aborts if the filter has been destroyed.
-  std::function<void(std::function<void()>)> getSafeDispatch();
+  // Dispatch a callback wrapped such that it is not called if the filter has been destroyed
+  // by the time it pops off the dispatch queue.
+  void safeDispatch(absl::AnyInvocable<void()> fn);
 
   // Queue an onStateChange in the dispatcher. This is used to get the next piece of work back
   // into the Envoy thread from an AsyncFiles thread, or to queue work that may not be allowed

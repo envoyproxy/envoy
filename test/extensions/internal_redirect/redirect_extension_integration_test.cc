@@ -16,6 +16,17 @@ constexpr char kTestHeaderKey[] = "test-header";
 
 class RedirectExtensionIntegrationTest : public HttpProtocolIntegrationTest {
 public:
+  void TearDown() override {
+    for (auto& fake_upstream_connection : upstream_connections_) {
+      AssertionResult result = fake_upstream_connection->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fake_upstream_connection.reset();
+    }
+    cleanupUpstreamAndDownstream();
+  }
+
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
@@ -292,8 +303,10 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSch
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
 
-INSTANTIATE_TEST_SUITE_P(Protocols, RedirectExtensionIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, RedirectExtensionIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace Envoy

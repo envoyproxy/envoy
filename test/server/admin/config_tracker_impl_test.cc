@@ -14,11 +14,11 @@ public:
     EXPECT_TRUE(cbs_map.empty());
     test_cb = [this](const Matchers::StringMatcher&) {
       called = true;
-      return test_msg();
+      return testMsg();
     };
   }
 
-  ProtobufTypes::MessagePtr test_msg() { return std::make_unique<ProtobufWkt::Any>(); }
+  ProtobufTypes::MessagePtr testMsg() { return std::make_unique<ProtobufWkt::Any>(); }
 
   ~ConfigTrackerImplTest() override = default;
 
@@ -65,9 +65,9 @@ TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
   owner1 = tracker.add("test_key", [&](const Matchers::StringMatcher&) {
     owner2 = tracker.add("test_key2", [&](const Matchers::StringMatcher&) {
       owner1.reset();
-      return test_msg();
+      return testMsg();
     });
-    return test_msg();
+    return testMsg();
   });
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_NE(nullptr, owner1);

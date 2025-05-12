@@ -16,7 +16,7 @@ DubboFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTy
     const envoy::extensions::filters::network::dubbo_proxy::router::v3::Router&, const std::string&,
     Server::Configuration::FactoryContext& context) {
   return [&context](DubboFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addFilter(std::make_shared<Router>(context.clusterManager()));
+    callbacks.addFilter(std::make_shared<Router>(context.serverFactoryContext().clusterManager()));
   };
 }
 

@@ -5,7 +5,7 @@ admin:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
       path: "{{ null_device_path }}"
     filter:
-      not_health_check_filter:  {}
+      not_health_check_filter: {}
   address:
     socket_address:
       address: "{{ ntop_ip_loopback_address }}"

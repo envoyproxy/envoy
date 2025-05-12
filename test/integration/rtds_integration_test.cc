@@ -56,10 +56,8 @@ layered_runtime:
     rtds_layer:
       name: some_rtds_layer
       rtds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: {}
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
@@ -89,10 +87,11 @@ public:
                                         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
                                     ? "GRPC"
                                     : "DELTA_GRPC")) {
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
@@ -130,9 +129,9 @@ public:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = loader->getObject("entries").value();
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return entries->getObject(key).value()->getString("final_value").value();
     }
     return "";
   }
@@ -264,6 +263,40 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(0, test_server_->counter("runtime.update_failure")->value());
   EXPECT_EQ(initial_load_success_ + 2, test_server_->counter("runtime.load_success")->value());
   EXPECT_EQ(2, test_server_->counter("runtime.update_success")->value());
+  EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
+  EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
+}
+
+// Test Rtds update with Resource wrapper.
+TEST_P(RtdsIntegrationTest, RtdsUpdate) {
+  initialize();
+  acceptXdsConnection();
+
+  EXPECT_EQ("whatevs", getRuntimeKey("foo"));
+  EXPECT_EQ("yar", getRuntimeKey("bar"));
+  EXPECT_EQ("", getRuntimeKey("baz"));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+                                      {"some_rtds_layer"}, {}, true));
+  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_layer
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+
+  // Use the Resource wrapper no matter if it is Sotw or Delta.
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
+      {{"test", ProtobufWkt::Any()}});
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+
+  EXPECT_EQ("bar", getRuntimeKey("foo"));
+  EXPECT_EQ("yar", getRuntimeKey("bar"));
+  EXPECT_EQ("meh", getRuntimeKey("baz"));
+
+  EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(initial_load_success_ + 1, test_server_->counter("runtime.load_success")->value());
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 }

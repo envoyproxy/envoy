@@ -100,35 +100,33 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   EXPECT_EQ(RequestData(3, 3), tlc_.requestCounts());
 }
 
-// Test for function: averageRps.
+// Verify the average RPS is calculated properly.
 TEST_F(ThreadLocalControllerTest, AverageRps) {
-  // Validate that historical_data_ is empty.
+  // Sample window is 5s by default in these tests.
+  constexpr auto test_window = std::chrono::seconds(5);
+  EXPECT_EQ(test_window, tlc_.samplingWindow());
+
+  // We expect the RPS to be 0 after instantiation.
   EXPECT_EQ(0, tlc_.averageRps());
 
-  // Validate that global_data_.requests equals to zero.
-  tlc_.requestCounts();
-  EXPECT_EQ(0, tlc_.averageRps());
-
-  // Validate the value in one second.
+  // Validate the average RPS value is calculated over the entire sample window.
   tlc_.recordSuccess();
   tlc_.recordFailure();
-  EXPECT_EQ(2, tlc_.averageRps());
-
-  // Validate that the sampling window is not full.
-  time_system_.advanceTimeWait(std::chrono::seconds(1));
+  // We had 2 requests, so this would be 0.4 RPS over the full window.
+  EXPECT_EQ(2, tlc_.requestCounts().requests);
+  EXPECT_EQ(0, tlc_.averageRps());
+  // At 5 requests, this should be 1 RPS even if 0s have elapsed.
   tlc_.recordSuccess();
-  EXPECT_EQ(3, tlc_.averageRps());
+  tlc_.recordFailure();
+  tlc_.recordSuccess();
+  EXPECT_EQ(5, tlc_.requestCounts().requests);
+  EXPECT_EQ(1, tlc_.averageRps());
 
-  // Now clean up the sampling window to validate that the sampling window is full.
-  time_system_.advanceTimeWait(std::chrono::seconds(10));
-  for (int tick = 0; tick < window_.count(); ++tick) {
-    // 1 + 3 + 5 + 7 + 9
-    for (int record_count = 0; record_count <= tick * 2; ++record_count) {
-      tlc_.recordSuccess();
-    }
-    time_system_.advanceTimeWait(std::chrono::seconds(1));
-  }
-  EXPECT_EQ(5, tlc_.averageRps());
+  // After enough time, the requests that are outside the window should not count towards the
+  // average RPS calculation.
+  time_system_.advanceTimeWait(test_window);
+  EXPECT_EQ(0, tlc_.requestCounts().requests);
+  EXPECT_EQ(0, tlc_.averageRps());
 }
 
 } // namespace

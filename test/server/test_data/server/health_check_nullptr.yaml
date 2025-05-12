@@ -19,5 +19,4 @@ clusterManager:
   loadStatsConfig:
     apiType: GRPC
     requestTimeout: 0.014024704s
-    transportApiVersion: V3
 statsFlushInterval: 0.002097152s

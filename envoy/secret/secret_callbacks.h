@@ -12,7 +12,7 @@ class SecretCallbacks {
 public:
   virtual ~SecretCallbacks() = default;
 
-  virtual void onAddOrUpdateSecret() PURE;
+  virtual absl::Status onAddOrUpdateSecret() PURE;
 };
 
 } // namespace Secret

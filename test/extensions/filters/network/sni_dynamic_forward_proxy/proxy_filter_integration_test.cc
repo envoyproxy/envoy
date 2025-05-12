@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -35,12 +35,12 @@ public:
       bootstrap.mutable_dynamic_resources()
           ->mutable_cds_config()
           ->mutable_path_config_source()
-          ->set_path(cds_helper_.cds_path());
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
           fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: envoy.filters.network.sni_dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:

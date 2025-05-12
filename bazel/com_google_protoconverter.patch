@@ -1,0 +1,2220 @@
+diff --git a/src/google/protobuf/stubs/BUILD.bazel b/src/google/protobuf/stubs/BUILD.bazel
+index a7b8c82..4f66827 100644
+--- a/src/google/protobuf/stubs/BUILD.bazel
++++ b/src/google/protobuf/stubs/BUILD.bazel
+@@ -27,13 +27,11 @@ cc_library(
+     name = "lite",
+     srcs = [
+         "bytestream.cc",
+-        "common.cc",
+         "strutil.cc",
+     ],
+     hdrs = [
+         "bytestream.h",
+         "callback.h",
+-        "common.h",
+         "platform_macros.h",
+         "port.h",
+         "status_macros.h",
+@@ -43,7 +41,7 @@ cc_library(
+     include_prefix = "google/protobuf/stubs",
+     linkopts = LINK_OPTS,
+     deps = [
+-        "//src/google/protobuf/util/converter:port_def",
++        "@com_google_absl//absl/base:core_headers",
+         "@com_google_absl//absl/log:absl_check",
+         "@com_google_absl//absl/log:absl_log",
+         "@com_google_absl//absl/status",
+@@ -62,14 +60,12 @@ cc_library(
+     include_prefix = "google/protobuf/stubs",
+     textual_hdrs = [
+         "callback.h",
+-        "common.h",
+         "platform_macros.h",
+         "port.h",
+         "status_macros.h",
+     ],
+     deps = [
+         ":lite",
+-        "//src/google/protobuf/util/converter:port_def",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/status:statusor",
+         "@com_google_absl//absl/strings",
+@@ -80,7 +76,6 @@ cc_test(
+     name = "stubs_test",
+     srcs = [
+         "bytestream_unittest.cc",
+-        "common_unittest.cc",
+         "strutil_unittest.cc",
+     ],
+     copts = COPTS + select({
+diff --git a/src/google/protobuf/stubs/bytestream.h b/src/google/protobuf/stubs/bytestream.h
+index 9d08463..e3372cb 100644
+--- a/src/google/protobuf/stubs/bytestream.h
++++ b/src/google/protobuf/stubs/bytestream.h
+@@ -43,10 +43,6 @@
+ #include "absl/log/absl_check.h"
+ #include "absl/log/absl_log.h"
+ #include "absl/strings/string_view.h"
+-#include "google/protobuf/stubs/common.h"
+-
+-// Must be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
+ 
+ class CordByteSink;
+ 
+@@ -65,7 +61,7 @@ namespace strings {
+ //   sink->Append(my_data.data(), my_data.size());
+ //   sink->Flush();
+ //
+-class PROTOBUF_EXPORT ByteSink {
++class ByteSink {
+  public:
+   ByteSink() {}
+   ByteSink(const ByteSink&) = delete;
+@@ -93,7 +89,7 @@ class PROTOBUF_EXPORT ByteSink {
+ //     source->Skip(data.length());
+ //   }
+ //
+-class PROTOBUF_EXPORT ByteSource {
++class ByteSource {
+  public:
+   ByteSource() {}
+   ByteSource(const ByteSource&) = delete;
+@@ -149,7 +145,7 @@ class PROTOBUF_EXPORT ByteSource {
+ //   sink.Append("hi", 2);    // OK
+ //   sink.Append(data, 100);  // WOOPS! Overflows buf[10].
+ //
+-class PROTOBUF_EXPORT UncheckedArrayByteSink : public ByteSink {
++class UncheckedArrayByteSink : public ByteSink {
+  public:
+   UncheckedArrayByteSink(const UncheckedArrayByteSink&) = delete;
+   UncheckedArrayByteSink& operator=(const UncheckedArrayByteSink&) = delete;
+@@ -178,7 +174,7 @@ class PROTOBUF_EXPORT UncheckedArrayByteSink : public ByteSink {
+ //   sink.Append("hi", 2);    // OK
+ //   sink.Append(data, 100);  // Will only write 8 more bytes
+ //
+-class PROTOBUF_EXPORT CheckedArrayByteSink : public ByteSink {
++class CheckedArrayByteSink : public ByteSink {
+  public:
+   CheckedArrayByteSink(char* outbuf, size_t capacity);
+   CheckedArrayByteSink(const CheckedArrayByteSink&) = delete;
+@@ -215,7 +211,7 @@ class PROTOBUF_EXPORT CheckedArrayByteSink : public ByteSink {
+ //   const char* buf = sink.GetBuffer();  // Ownership transferred
+ //   delete[] buf;
+ //
+-class PROTOBUF_EXPORT GrowingArrayByteSink : public strings::ByteSink {
++class GrowingArrayByteSink : public strings::ByteSink {
+  public:
+   explicit GrowingArrayByteSink(size_t estimated_size);
+   GrowingArrayByteSink(const GrowingArrayByteSink&) = delete;
+@@ -246,7 +242,7 @@ class PROTOBUF_EXPORT GrowingArrayByteSink : public strings::ByteSink {
+ //   sink.Append("World", 5);
+ //   assert(dest == "Hello World");
+ //
+-class PROTOBUF_EXPORT StringByteSink : public ByteSink {
++class StringByteSink : public ByteSink {
+  public:
+   explicit StringByteSink(std::string* dest) : dest_(dest) {}
+   StringByteSink(const StringByteSink&) = delete;
+@@ -264,7 +260,7 @@ class PROTOBUF_EXPORT StringByteSink : public ByteSink {
+ //   NullByteSink sink;
+ //   sink.Append(data, data.size());  // All data ignored.
+ //
+-class PROTOBUF_EXPORT NullByteSink : public ByteSink {
++class NullByteSink : public ByteSink {
+  public:
+   NullByteSink() {}
+   NullByteSink(const NullByteSink&) = delete;
+@@ -285,7 +281,7 @@ class PROTOBUF_EXPORT NullByteSink : public ByteSink {
+ //   assert(source.Available() == 5);
+ //   assert(source.Peek() == "Hello");
+ //
+-class PROTOBUF_EXPORT ArrayByteSource : public ByteSource {
++class ArrayByteSource : public ByteSource {
+  public:
+   explicit ArrayByteSource(absl::string_view s) : input_(s) {}
+   ArrayByteSource(const ArrayByteSource&) = delete;
+@@ -317,7 +313,7 @@ class PROTOBUF_EXPORT ArrayByteSource : public ByteSource {
+ //   assert(limit.Available() == 5);
+ //   assert(limit.Peek() == "Hello");
+ //
+-class PROTOBUF_EXPORT LimitByteSource : public ByteSource {
++class LimitByteSource : public ByteSource {
+  public:
+   // Returns at most "limit" bytes from "source".
+   LimitByteSource(ByteSource* source, size_t limit);
+@@ -339,6 +335,4 @@ class PROTOBUF_EXPORT LimitByteSource : public ByteSource {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"  // NOLINT
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_BYTESTREAM_H_
+\ No newline at end of file
+diff --git a/src/google/protobuf/stubs/callback.h b/src/google/protobuf/stubs/callback.h
+index 112dfca..daa6901 100644
+--- a/src/google/protobuf/stubs/callback.h
++++ b/src/google/protobuf/stubs/callback.h
+@@ -19,8 +19,6 @@
+ 
+ #include <type_traits>
+ 
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ // ===================================================================
+ // emulates google3/base/callback.h
+ 
+@@ -84,7 +82,7 @@ namespace protobuf {
+ //   std::string my_str;
+ //   NewCallback(&Foo, my_str);  // WON'T WORK:  Can't use references.
+ // However, correctly-typed pointers will work just fine.
+-class PROTOBUF_EXPORT Closure {
++class Closure {
+  public:
+   Closure() {}
+   Closure(const Closure&) = delete;
+@@ -106,7 +104,7 @@ class ResultCallback {
+ };
+ 
+ template <typename R, typename A1>
+-class PROTOBUF_EXPORT ResultCallback1 {
++class ResultCallback1 {
+  public:
+   ResultCallback1() {}
+   ResultCallback1(const ResultCallback1&) = delete;
+@@ -117,7 +115,7 @@ class PROTOBUF_EXPORT ResultCallback1 {
+ };
+ 
+ template <typename R, typename A1, typename A2>
+-class PROTOBUF_EXPORT ResultCallback2 {
++class ResultCallback2 {
+  public:
+   ResultCallback2() {}
+   ResultCallback2(const ResultCallback2&) = delete;
+@@ -129,7 +127,7 @@ class PROTOBUF_EXPORT ResultCallback2 {
+ 
+ namespace internal {
+ 
+-class PROTOBUF_EXPORT FunctionClosure0 : public Closure {
++class FunctionClosure0 : public Closure {
+  public:
+   typedef void (*FunctionType)();
+ 
+@@ -583,11 +581,9 @@ inline ResultCallback2<R, A1, A2>* NewPermanentCallback(
+ 
+ // A function which does nothing.  Useful for creating no-op callbacks, e.g.:
+ //   Closure* nothing = NewCallback(&DoNothing);
+-void PROTOBUF_EXPORT DoNothing();
++void DoNothing();
+ 
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_CALLBACK_H_
+diff --git a/src/google/protobuf/stubs/port.h b/src/google/protobuf/stubs/port.h
+index ad033a1..88690fa 100644
+--- a/src/google/protobuf/stubs/port.h
++++ b/src/google/protobuf/stubs/port.h
+@@ -27,9 +27,6 @@
+ 
+ #include "google/protobuf/stubs/platform_macros.h"
+ 
+-// Must be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
+-
+ #undef PROTOBUF_LITTLE_ENDIAN
+ #ifdef _WIN32
+   // Assuming windows is always little-endian.
+@@ -217,7 +214,7 @@ static inline uint64_t bswap_64(uint64_t x) {
+ 
+ // ===================================================================
+ // from google3/util/endian/endian.h
+-PROTOBUF_EXPORT uint32_t ghtonl(uint32_t x);
++uint32_t ghtonl(uint32_t x);
+ 
+ class BigEndian {
+  public:
+@@ -278,6 +275,4 @@ class BigEndian {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_PORT_H_
+diff --git a/src/google/protobuf/stubs/status_macros.h b/src/google/protobuf/stubs/status_macros.h
+index 46e65eb..5faaf5c 100644
+--- a/src/google/protobuf/stubs/status_macros.h
++++ b/src/google/protobuf/stubs/status_macros.h
+@@ -19,12 +19,9 @@
+ #ifndef GOOGLE_PROTOBUF_STUBS_STATUS_MACROS_H_
+ #define GOOGLE_PROTOBUF_STUBS_STATUS_MACROS_H_
+ 
++#include "absl/base/optimization.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+-#include "google/protobuf/stubs/common.h"
+-
+-// Needs to be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
+ 
+ namespace google {
+ namespace protobuf {
+@@ -39,7 +36,7 @@ namespace util {
+   do {                                                                       \
+     /* Using _status below to avoid capture problems if expr is "status". */ \
+     const absl::Status _status = (expr);                                     \
+-    if (PROTOBUF_PREDICT_FALSE(!_status.ok())) return _status;               \
++    if (ABSL_PREDICT_FALSE(!_status.ok())) return _status;                   \
+   } while (0)
+ 
+ // Internal helper for concatenating macro values.
+@@ -56,7 +53,7 @@ absl::Status DoAssignOrReturn(T& lhs, absl::StatusOr<T> result) {
+ 
+ #define ASSIGN_OR_RETURN_IMPL(status, lhs, rexpr)       \
+   absl::Status status = DoAssignOrReturn(lhs, (rexpr)); \
+-  if (PROTOBUF_PREDICT_FALSE(!status.ok())) return status;
++  if (ABSL_PREDICT_FALSE(!status.ok())) return status;
+ 
+ // Executes an expression that returns a util::StatusOr, extracting its value
+ // into the variable defined by lhs (or returning on error).
+@@ -75,6 +72,4 @@ absl::Status DoAssignOrReturn(T& lhs, absl::StatusOr<T> result) {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"  // NOLINT
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_STATUS_H_
+diff --git a/src/google/protobuf/stubs/strutil.h b/src/google/protobuf/stubs/strutil.h
+index 82882f4..4d09bad 100644
+--- a/src/google/protobuf/stubs/strutil.h
++++ b/src/google/protobuf/stubs/strutil.h
+@@ -17,15 +17,13 @@
+ #ifndef GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
+ #define GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
+ 
+-#include <google/protobuf/stubs/common.h>
+-#include <stdlib.h>
+-
++#include <cstdlib>
+ #include <cstring>
+-#include <google/protobuf/util/converter/port_def.inc>
+ #include <vector>
+ 
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/str_join.h"
++#include "google/protobuf/stubs/port.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -138,10 +136,9 @@ inline std::string StripSuffixString(const std::string& str,
+ // StripWhitespace
+ //    Removes whitespaces from both ends of the given string.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void ReplaceCharacters(std::string* s, const char* remove,
+-                                       char replacewith);
++void ReplaceCharacters(std::string* s, const char* remove, char replacewith);
+ 
+-PROTOBUF_EXPORT void StripWhitespace(std::string* s);
++void StripWhitespace(std::string* s);
+ 
+ // ----------------------------------------------------------------------
+ // LowerString()
+@@ -185,10 +182,8 @@ inline std::string ToUpper(const std::string& s) {
+ //    happened or not.
+ // ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT std::string StringReplace(const std::string& s,
+-                                          const std::string& oldsub,
+-                                          const std::string& newsub,
+-                                          bool replace_all);
++std::string StringReplace(const std::string& s, const std::string& oldsub,
++                          const std::string& newsub, bool replace_all);
+ 
+ // ----------------------------------------------------------------------
+ // SplitStringUsing()
+@@ -196,8 +191,8 @@ PROTOBUF_EXPORT std::string StringReplace(const std::string& s,
+ //    to 'result'.  If there are consecutive delimiters, this function skips
+ //    over all of them.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void SplitStringUsing(absl::string_view full, const char* delim,
+-                                      std::vector<std::string>* res);
++void SplitStringUsing(absl::string_view full, const char* delim,
++                      std::vector<std::string>* res);
+ 
+ // Split a string using one or more byte delimiters, presented
+ // as a nul-terminated c string. Append the components to 'result'.
+@@ -207,9 +202,8 @@ PROTOBUF_EXPORT void SplitStringUsing(absl::string_view full, const char* delim,
+ //
+ // If "full" is the empty string, yields an empty string as the only value.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void SplitStringAllowEmpty(absl::string_view full,
+-                                           const char* delim,
+-                                           std::vector<std::string>* result);
++void SplitStringAllowEmpty(absl::string_view full, const char* delim,
++                           std::vector<std::string>* result);
+ 
+ // ----------------------------------------------------------------------
+ // Split()
+@@ -234,8 +228,8 @@ inline std::vector<std::string> Split(absl::string_view full, const char* delim,
+ //    another takes a pointer to the target string. In the latter case the
+ //    target string is cleared and overwritten.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void JoinStrings(const std::vector<std::string>& components,
+-                                 const char* delim, std::string* result);
++void JoinStrings(const std::vector<std::string>& components, const char* delim,
++                 std::string* result);
+ 
+ inline std::string JoinStrings(const std::vector<std::string>& components,
+                                const char* delim) {
+@@ -275,9 +269,9 @@ inline std::string JoinStrings(const std::vector<std::string>& components,
+ //    processed.
+ //    ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT int UnescapeCEscapeSequences(const char* source, char* dest);
+-PROTOBUF_EXPORT int UnescapeCEscapeSequences(const char* source, char* dest,
+-                                             std::vector<std::string>* errors);
++int UnescapeCEscapeSequences(const char* source, char* dest);
++int UnescapeCEscapeSequences(const char* source, char* dest,
++                             std::vector<std::string>* errors);
+ 
+ // ----------------------------------------------------------------------
+ // UnescapeCEscapeString()
+@@ -294,12 +288,10 @@ PROTOBUF_EXPORT int UnescapeCEscapeSequences(const char* source, char* dest,
+ //    the third call, the new string is returned.
+ // ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT int UnescapeCEscapeString(const std::string& src,
+-                                          std::string* dest);
+-PROTOBUF_EXPORT int UnescapeCEscapeString(const std::string& src,
+-                                          std::string* dest,
+-                                          std::vector<std::string>* errors);
+-PROTOBUF_EXPORT std::string UnescapeCEscapeString(const std::string& src);
++int UnescapeCEscapeString(const std::string& src, std::string* dest);
++int UnescapeCEscapeString(const std::string& src, std::string* dest,
++                          std::vector<std::string>* errors);
++std::string UnescapeCEscapeString(const std::string& src);
+ 
+ // ----------------------------------------------------------------------
+ // CEscape()
+@@ -308,21 +300,21 @@ PROTOBUF_EXPORT std::string UnescapeCEscapeString(const std::string& src);
+ //
+ //    Escaped chars: \n, \r, \t, ", ', \, and !isprint().
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string CEscape(const std::string& src);
++std::string CEscape(const std::string& src);
+ 
+ // ----------------------------------------------------------------------
+ // CEscapeAndAppend()
+ //    Escapes 'src' using C-style escape sequences, and appends the escaped
+ //    string to 'dest'.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void CEscapeAndAppend(absl::string_view src, std::string* dest);
++void CEscapeAndAppend(absl::string_view src, std::string* dest);
+ 
+ namespace strings {
+ // Like CEscape() but does not escape bytes with the upper bit set.
+-PROTOBUF_EXPORT std::string Utf8SafeCEscape(const std::string& src);
++std::string Utf8SafeCEscape(const std::string& src);
+ 
+ // Like CEscape() but uses hex (\x) escapes instead of octals.
+-PROTOBUF_EXPORT std::string CHexEscape(const std::string& src);
++std::string CHexEscape(const std::string& src);
+ }  // namespace strings
+ 
+ // ----------------------------------------------------------------------
+@@ -335,10 +327,8 @@ PROTOBUF_EXPORT std::string CHexEscape(const std::string& src);
+ //    platforms, so using these is safer, from the point of view of
+ //    overflow behavior, than using the standard libc functions.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int32_t strto32_adaptor(const char* nptr, char** endptr,
+-                                        int base);
+-PROTOBUF_EXPORT uint32_t strtou32_adaptor(const char* nptr, char** endptr,
+-                                          int base);
++int32_t strto32_adaptor(const char* nptr, char** endptr, int base);
++uint32_t strtou32_adaptor(const char* nptr, char** endptr, int base);
+ 
+ inline int32_t strto32(const char* nptr, char** endptr, int base) {
+   if (sizeof(int32_t) == sizeof(long))
+@@ -377,10 +367,10 @@ inline uint64_t strtou64(const char* nptr, char** endptr, int base) {
+ // safe_strtof()
+ // safe_strtod()
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT bool safe_strtob(absl::string_view str, bool* value);
++bool safe_strtob(absl::string_view str, bool* value);
+ 
+-PROTOBUF_EXPORT bool safe_strto32(const std::string& str, int32_t* value);
+-PROTOBUF_EXPORT bool safe_strtou32(const std::string& str, uint32_t* value);
++bool safe_strto32(const std::string& str, int32_t* value);
++bool safe_strtou32(const std::string& str, uint32_t* value);
+ inline bool safe_strto32(const char* str, int32_t* value) {
+   return safe_strto32(std::string(str), value);
+ }
+@@ -394,8 +384,8 @@ inline bool safe_strtou32(absl::string_view str, uint32_t* value) {
+   return safe_strtou32(std::string(str), value);
+ }
+ 
+-PROTOBUF_EXPORT bool safe_strto64(const std::string& str, int64_t* value);
+-PROTOBUF_EXPORT bool safe_strtou64(const std::string& str, uint64_t* value);
++bool safe_strto64(const std::string& str, int64_t* value);
++bool safe_strtou64(const std::string& str, uint64_t* value);
+ inline bool safe_strto64(const char* str, int64_t* value) {
+   return safe_strto64(std::string(str), value);
+ }
+@@ -409,8 +399,8 @@ inline bool safe_strtou64(absl::string_view str, uint64_t* value) {
+   return safe_strtou64(std::string(str), value);
+ }
+ 
+-PROTOBUF_EXPORT bool safe_strtof(const char* str, float* value);
+-PROTOBUF_EXPORT bool safe_strtod(const char* str, double* value);
++bool safe_strtof(const char* str, float* value);
++bool safe_strtod(const char* str, double* value);
+ inline bool safe_strtof(const std::string& str, float* value) {
+   return safe_strtof(str.c_str(), value);
+ }
+@@ -450,13 +440,13 @@ inline bool safe_strtod(absl::string_view str, double* value) {
+ // DoubleToBuffer() and FloatToBuffer().
+ static const int kFastToBufferSize = 32;
+ 
+-PROTOBUF_EXPORT char* FastInt32ToBuffer(int32_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastInt64ToBuffer(int64_t i, char* buffer);
++char* FastInt32ToBuffer(int32_t i, char* buffer);
++char* FastInt64ToBuffer(int64_t i, char* buffer);
+ char* FastUInt32ToBuffer(uint32_t i, char* buffer);  // inline below
+ char* FastUInt64ToBuffer(uint64_t i, char* buffer);  // inline below
+-PROTOBUF_EXPORT char* FastHexToBuffer(int i, char* buffer);
+-PROTOBUF_EXPORT char* FastHex64ToBuffer(uint64_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastHex32ToBuffer(uint32_t i, char* buffer);
++char* FastHexToBuffer(int i, char* buffer);
++char* FastHex64ToBuffer(uint64_t i, char* buffer);
++char* FastHex32ToBuffer(uint32_t i, char* buffer);
+ 
+ // at least 22 bytes long
+ inline char* FastIntToBuffer(int i, char* buffer) {
+@@ -492,10 +482,10 @@ inline char* FastULongToBuffer(unsigned long i, char* buffer) {
+ // terminating the string).
+ // ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT char* FastInt32ToBufferLeft(int32_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastUInt32ToBufferLeft(uint32_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastInt64ToBufferLeft(int64_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastUInt64ToBufferLeft(uint64_t i, char* buffer);
++char* FastInt32ToBufferLeft(int32_t i, char* buffer);
++char* FastUInt32ToBufferLeft(uint32_t i, char* buffer);
++char* FastInt64ToBufferLeft(int64_t i, char* buffer);
++char* FastUInt64ToBufferLeft(uint64_t i, char* buffer);
+ 
+ // Just define these in terms of the above.
+ inline char* FastUInt32ToBuffer(uint32_t i, char* buffer) {
+@@ -515,12 +505,12 @@ inline std::string SimpleBtoa(bool value) { return value ? "true" : "false"; }
+ //
+ //    Return value: string
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string SimpleItoa(int i);
+-PROTOBUF_EXPORT std::string SimpleItoa(unsigned int i);
+-PROTOBUF_EXPORT std::string SimpleItoa(long i);
+-PROTOBUF_EXPORT std::string SimpleItoa(unsigned long i);
+-PROTOBUF_EXPORT std::string SimpleItoa(long long i);
+-PROTOBUF_EXPORT std::string SimpleItoa(unsigned long long i);
++std::string SimpleItoa(int i);
++std::string SimpleItoa(unsigned int i);
++std::string SimpleItoa(long i);
++std::string SimpleItoa(unsigned long i);
++std::string SimpleItoa(long long i);
++std::string SimpleItoa(unsigned long long i);
+ 
+ // ----------------------------------------------------------------------
+ // SimpleDtoa()
+@@ -541,11 +531,11 @@ PROTOBUF_EXPORT std::string SimpleItoa(unsigned long long i);
+ //
+ //    Return value: string
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string SimpleDtoa(double value);
+-PROTOBUF_EXPORT std::string SimpleFtoa(float value);
++std::string SimpleDtoa(double value);
++std::string SimpleFtoa(float value);
+ 
+-PROTOBUF_EXPORT char* DoubleToBuffer(double i, char* buffer);
+-PROTOBUF_EXPORT char* FloatToBuffer(float i, char* buffer);
++char* DoubleToBuffer(double i, char* buffer);
++char* FloatToBuffer(float i, char* buffer);
+ 
+ // In practice, doubles should never need more than 24 bytes and floats
+ // should never need more than 14 (including null terminators), but we
+@@ -563,7 +553,7 @@ using Hex = absl::Hex;
+ // ToHex()
+ //    Return a lower-case hex string representation of the given integer.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string ToHex(uint64_t num);
++std::string ToHex(uint64_t num);
+ 
+ // ----------------------------------------------------------------------
+ // GlobalReplaceSubstring()
+@@ -572,9 +562,8 @@ PROTOBUF_EXPORT std::string ToHex(uint64_t num);
+ //
+ //    NOTE: The string pieces must not overlap s.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int GlobalReplaceSubstring(const std::string& substring,
+-                                           const std::string& replacement,
+-                                           std::string* s);
++int GlobalReplaceSubstring(const std::string& substring,
++                           const std::string& replacement, std::string* s);
+ 
+ // ----------------------------------------------------------------------
+ // Base64Unescape()
+@@ -582,7 +571,7 @@ PROTOBUF_EXPORT int GlobalReplaceSubstring(const std::string& substring,
+ //    writes it to "dest". If src contains invalid characters, dest is cleared
+ //    and the function returns false. Returns true on success.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT bool Base64Unescape(absl::string_view src, std::string* dest);
++bool Base64Unescape(absl::string_view src, std::string* dest);
+ 
+ // ----------------------------------------------------------------------
+ // WebSafeBase64Unescape()
+@@ -595,18 +584,16 @@ PROTOBUF_EXPORT bool Base64Unescape(absl::string_view src, std::string* dest);
+ //    returns false (with dest empty) if src contains invalid chars; for
+ //    this version src and dest must be different strings.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int WebSafeBase64Unescape(const char* src, int slen, char* dest,
+-                                          int szdest);
+-PROTOBUF_EXPORT bool WebSafeBase64Unescape(absl::string_view src,
+-                                           std::string* dest);
++int WebSafeBase64Unescape(const char* src, int slen, char* dest, int szdest);
++bool WebSafeBase64Unescape(absl::string_view src, std::string* dest);
+ 
+ // Return the length to use for the output buffer given to the base64 escape
+ // routines. Make sure to use the same value for do_padding in both.
+ // This function may return incorrect results if given input_len values that
+ // are extremely high, which should happen rarely.
+-PROTOBUF_EXPORT int CalculateBase64EscapedLen(int input_len, bool do_padding);
++int CalculateBase64EscapedLen(int input_len, bool do_padding);
+ // Use this version when calling Base64Escape without a do_padding arg.
+-PROTOBUF_EXPORT int CalculateBase64EscapedLen(int input_len);
++int CalculateBase64EscapedLen(int input_len);
+ 
+ // ----------------------------------------------------------------------
+ // Base64Escape()
+@@ -620,24 +607,20 @@ PROTOBUF_EXPORT int CalculateBase64EscapedLen(int input_len);
+ //    to escape them.  It also has an extra parameter "do_padding",
+ //    which when set to false will prevent padding with "=".
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int Base64Escape(const unsigned char* src, int slen, char* dest,
+-                                 int szdest);
+-PROTOBUF_EXPORT int WebSafeBase64Escape(const unsigned char* src, int slen,
+-                                        char* dest, int szdest,
+-                                        bool do_padding);
++int Base64Escape(const unsigned char* src, int slen, char* dest, int szdest);
++int WebSafeBase64Escape(const unsigned char* src, int slen, char* dest,
++                        int szdest, bool do_padding);
+ // Encode src into dest with padding.
+-PROTOBUF_EXPORT void Base64Escape(absl::string_view src, std::string* dest);
++void Base64Escape(absl::string_view src, std::string* dest);
+ // Encode src into dest web-safely without padding.
+-PROTOBUF_EXPORT void WebSafeBase64Escape(absl::string_view src,
+-                                         std::string* dest);
++void WebSafeBase64Escape(absl::string_view src, std::string* dest);
+ // Encode src into dest web-safely with padding.
+-PROTOBUF_EXPORT void WebSafeBase64EscapeWithPadding(absl::string_view src,
+-                                                    std::string* dest);
++void WebSafeBase64EscapeWithPadding(absl::string_view src, std::string* dest);
+ 
+-PROTOBUF_EXPORT void Base64Escape(const unsigned char* src, int szsrc,
+-                                  std::string* dest, bool do_padding);
+-PROTOBUF_EXPORT void WebSafeBase64Escape(const unsigned char* src, int szsrc,
+-                                         std::string* dest, bool do_padding);
++void Base64Escape(const unsigned char* src, int szsrc, std::string* dest,
++                  bool do_padding);
++void WebSafeBase64Escape(const unsigned char* src, int szsrc, std::string* dest,
++                         bool do_padding);
+ 
+ inline bool IsValidCodePoint(uint32_t code_point) {
+   return code_point < 0xD800 ||
+@@ -651,13 +634,13 @@ static const int UTFmax = 4;
+ //  in any external dependencies. The output buffer must be as least 4 bytes
+ //  large.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int EncodeAsUTF8Char(uint32_t code_point, char* output);
++int EncodeAsUTF8Char(uint32_t code_point, char* output);
+ 
+ // ----------------------------------------------------------------------
+ // UTF8FirstLetterNumBytes()
+ //   Length of the first UTF-8 character.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int UTF8FirstLetterNumBytes(const char* src, int len);
++int UTF8FirstLetterNumBytes(const char* src, int len);
+ 
+ // From google3/third_party/absl/strings/escaping.h
+ 
+@@ -693,13 +676,11 @@ PROTOBUF_EXPORT int UTF8FirstLetterNumBytes(const char* src, int len);
+ //
+ //       (1) determines the presence of LF (first one is ok)
+ //       (2) if yes, removes any CR, else convert every CR to LF
+-PROTOBUF_EXPORT void CleanStringLineEndings(const std::string& src,
+-                                            std::string* dst,
+-                                            bool auto_end_last_line);
++void CleanStringLineEndings(const std::string& src, std::string* dst,
++                            bool auto_end_last_line);
+ 
+ // Same as above, but transforms the argument in place.
+-PROTOBUF_EXPORT void CleanStringLineEndings(std::string* str,
+-                                            bool auto_end_last_line);
++void CleanStringLineEndings(std::string* str, bool auto_end_last_line);
+ 
+ namespace strings {
+ inline bool EndsWith(absl::string_view text, absl::string_view suffix) {
+@@ -720,6 +701,5 @@ double NoLocaleStrtod(const char* str, char** endptr);
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include <google/protobuf/util/converter/port_undef.inc>
+ 
+ #endif  // GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
+\ No newline at end of file
+diff --git a/src/google/protobuf/util/converter/BUILD.bazel b/src/google/protobuf/util/converter/BUILD.bazel
+index bff9574..bcfa7ea 100644
+--- a/src/google/protobuf/util/converter/BUILD.bazel
++++ b/src/google/protobuf/util/converter/BUILD.bazel
+@@ -28,8 +28,7 @@ cc_library(
+     hdrs = ["constants.h"],
+     strip_include_prefix = "/src",
+     deps = [
+-        "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+     ],
+ )
+ 
+@@ -42,19 +41,16 @@ cc_library(
+     deps = [
+         ":constants",
+         ":utility",
+-        "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+         "@com_google_absl//absl/strings",
+         "@com_google_protobuf//:protobuf",
+     ],
+ )
+ 
+ cc_library(
+-    name = "port_def",
++    name = "port",
+     hdrs = [
+         "port.h",
+-        "port_def.inc",
+-        "port_undef.inc",
+     ],
+     strip_include_prefix = "/src",
+     visibility = [
+@@ -78,7 +74,7 @@ cc_library(
+         ":type_info",
+         ":utility",
+         "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+     ],
+ )
+ 
+@@ -133,7 +129,7 @@ cc_library(
+         ":object_writer",
+         ":utility",
+         "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/strings",
+         "@com_google_protobuf//:protobuf",
+diff --git a/src/google/protobuf/util/converter/constants.h b/src/google/protobuf/util/converter/constants.h
+index ff75f92..3843aa2 100644
+--- a/src/google/protobuf/util/converter/constants.h
++++ b/src/google/protobuf/util/converter/constants.h
+@@ -19,8 +19,6 @@
+ 
+ #include <cstdint>
+ 
+-#include "google/protobuf/stubs/common.h"
+-
+ // This file contains constants used by //net/proto2/util/converter.
+ 
+ namespace google {
+diff --git a/src/google/protobuf/util/converter/datapiece.cc b/src/google/protobuf/util/converter/datapiece.cc
+index 3acd35d..c7c12ef 100644
+--- a/src/google/protobuf/util/converter/datapiece.cc
++++ b/src/google/protobuf/util/converter/datapiece.cc
+@@ -18,18 +18,17 @@
+ #include <cstdint>
+ #include <limits>
+ 
+-#include "google/protobuf/struct.pb.h"
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/descriptor.h"
+ #include "absl/status/status.h"
+ #include "absl/strings/ascii.h"
+ #include "absl/strings/cord.h"
+ #include "absl/strings/escaping.h"
++#include "absl/strings/match.h"
+ #include "absl/strings/str_cat.h"
+-#include "google/protobuf/util/converter/utility.h"
+-#include "google/protobuf/stubs/strutil.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/struct.pb.h"
+ #include "google/protobuf/stubs/strutil.h"
+-#include "absl/strings/match.h"
++#include "google/protobuf/type.pb.h"
++#include "google/protobuf/util/converter/utility.h"
+ 
+ namespace google {
+ namespace protobuf {
+diff --git a/src/google/protobuf/util/converter/datapiece.h b/src/google/protobuf/util/converter/datapiece.h
+index 68b6b0e..fc25a7a 100644
+--- a/src/google/protobuf/util/converter/datapiece.h
++++ b/src/google/protobuf/util/converter/datapiece.h
+@@ -20,15 +20,10 @@
+ #include <cstdint>
+ #include <string>
+ 
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/type.pb.h"
+ #include "absl/log/absl_log.h"
+-
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/type.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -46,7 +41,7 @@ class ProtoWriter;
+ // storage for the actual string or Cord, so it is the user's responsibility to
+ // guarantee that the underlying storage is still valid when the DataPiece is
+ // accessed.
+-class PROTOBUF_EXPORT DataPiece {
++class DataPiece {
+  public:
+   // Identifies data type of the value.
+   // These are the types supported by DataPiece.
+@@ -107,8 +102,7 @@ class PROTOBUF_EXPORT DataPiece {
+ 
+   static DataPiece NullData() { return DataPiece(TYPE_NULL, 0); }
+ 
+-  virtual ~DataPiece() {
+-  }
++  virtual ~DataPiece() {}
+ 
+   // Accessors
+   Type type() const { return type_; }
+@@ -120,7 +114,6 @@ class PROTOBUF_EXPORT DataPiece {
+     return str_;
+   }
+ 
+-
+   // Parses, casts or converts the value stored in the DataPiece into an int32.
+   absl::StatusOr<int32_t> ToInt32() const;
+ 
+@@ -206,6 +199,4 @@ class PROTOBUF_EXPORT DataPiece {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_DATAPIECE_H_
+diff --git a/src/google/protobuf/util/converter/default_value_objectwriter.h b/src/google/protobuf/util/converter/default_value_objectwriter.h
+index 0b253c8..4538fc7 100644
+--- a/src/google/protobuf/util/converter/default_value_objectwriter.h
++++ b/src/google/protobuf/util/converter/default_value_objectwriter.h
+@@ -31,9 +31,6 @@
+ #include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -45,7 +42,7 @@ namespace converter {
+ // ObjectWriter when EndObject() is called on the root object. It also writes
+ // out all non-repeated primitive fields that haven't been explicitly rendered
+ // with their default values (0 for numbers, "" for strings, etc).
+-class PROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
++class DefaultValueObjectWriter : public ObjectWriter {
+  public:
+   // A Callback function to check whether a field needs to be scrubbed.
+   //
+@@ -134,7 +131,7 @@ class PROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
+ 
+   // "Node" represents a node in the tree that holds the input of
+   // DefaultValueObjectWriter.
+-  class PROTOBUF_EXPORT Node {
++  class Node {
+    public:
+     Node(const std::string& name, const google::protobuf::Type* type,
+          NodeKind kind, const DataPiece& data, bool is_placeholder,
+@@ -312,6 +309,4 @@ class PROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_DEFAULT_VALUE_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/error_listener.h b/src/google/protobuf/util/converter/error_listener.h
+index 2d671a5..04c4df6 100644
+--- a/src/google/protobuf/util/converter/error_listener.h
++++ b/src/google/protobuf/util/converter/error_listener.h
+@@ -22,21 +22,17 @@
+ #include <string>
+ #include <vector>
+ 
+-#include "google/protobuf/stubs/callback.h"
+-#include "google/protobuf/stubs/common.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/stubs/callback.h"
+ #include "google/protobuf/util/converter/location_tracker.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+ // Interface for error listener.
+-class PROTOBUF_EXPORT ErrorListener {
++class ErrorListener {
+  public:
+   ErrorListener(const ErrorListener&) = delete;
+   ErrorListener& operator=(const ErrorListener&) = delete;
+@@ -61,7 +57,7 @@ class PROTOBUF_EXPORT ErrorListener {
+ };
+ 
+ // An error listener that ignores all errors.
+-class PROTOBUF_EXPORT NoopErrorListener : public ErrorListener {
++class NoopErrorListener : public ErrorListener {
+  public:
+   NoopErrorListener() {}
+   NoopErrorListener(const NoopErrorListener&) = delete;
+@@ -80,12 +76,9 @@ class PROTOBUF_EXPORT NoopErrorListener : public ErrorListener {
+                     absl::string_view /* missing_name */) override {}
+ };
+ 
+-
+ }  // namespace converter
+ }  // namespace util
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_ERROR_LISTENER_H_
+diff --git a/src/google/protobuf/util/converter/field_mask_utility.cc b/src/google/protobuf/util/converter/field_mask_utility.cc
+index 03736d7..c3a8ec2 100644
+--- a/src/google/protobuf/util/converter/field_mask_utility.cc
++++ b/src/google/protobuf/util/converter/field_mask_utility.cc
+@@ -17,11 +17,8 @@
+ #include "absl/status/status.h"
+ #include "absl/strings/match.h"
+ #include "absl/strings/str_cat.h"
+-#include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/stubs/status_macros.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/util/converter/utility.h"
+ 
+ namespace google {
+ namespace protobuf {
+diff --git a/src/google/protobuf/util/converter/json_objectwriter.h b/src/google/protobuf/util/converter/json_objectwriter.h
+index e3caf4d..4069682 100644
+--- a/src/google/protobuf/util/converter/json_objectwriter.h
++++ b/src/google/protobuf/util/converter/json_objectwriter.h
+@@ -21,20 +21,15 @@
+ #include <memory>
+ #include <string>
+ 
++#include "google/protobuf/io/coded_stream.h"
+ #include "google/protobuf/stubs/bytestream.h"
+ #include "google/protobuf/util/converter/structured_objectwriter.h"
+-#include "google/protobuf/io/coded_stream.h"
+-
+-// clang-format off
+-#include "google/protobuf/util/converter/port_def.inc"
+-// clang-format on
+ 
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ // An ObjectWriter implementation that outputs JSON. This ObjectWriter
+ // supports writing a compact form or a pretty printed form.
+ //
+@@ -74,7 +69,7 @@ namespace converter {
+ // uint64 would lose precision if rendered as numbers.
+ //
+ // JsonObjectWriter is thread-unsafe.
+-class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
++class JsonObjectWriter : public StructuredObjectWriter {
+  public:
+   JsonObjectWriter(absl::string_view indent_string, io::CodedOutputStream* out)
+       : element_(new Element(/*parent=*/nullptr, /*is_json_object=*/false)),
+@@ -127,7 +122,7 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
+   }
+ 
+  protected:
+-  class PROTOBUF_EXPORT Element : public BaseElement {
++  class Element : public BaseElement {
+    public:
+     Element(Element* parent, bool is_json_object)
+         : BaseElement(parent),
+@@ -158,7 +153,7 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
+   Element* element() override { return element_.get(); }
+ 
+  private:
+-  class PROTOBUF_EXPORT ByteSinkWrapper : public strings::ByteSink {
++  class ByteSinkWrapper : public strings::ByteSink {
+    public:
+     explicit ByteSinkWrapper(io::CodedOutputStream* stream) : stream_(stream) {}
+     ByteSinkWrapper(const ByteSinkWrapper&) = delete;
+@@ -260,6 +255,4 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_JSON_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/json_stream_parser.h b/src/google/protobuf/util/converter/json_stream_parser.h
+index ed30e3a..3cc40a4 100644
+--- a/src/google/protobuf/util/converter/json_stream_parser.h
++++ b/src/google/protobuf/util/converter/json_stream_parser.h
+@@ -21,22 +21,15 @@
+ #include <stack>
+ #include <string>
+ 
+-#include "google/protobuf/stubs/common.h"
+ #include "absl/status/status.h"
+-#include "absl/types/optional.h"
+-
+ #include "absl/strings/string_view.h"
+-
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "absl/types/optional.h"
+ 
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ class ObjectWriter;
+ 
+ // A JSON parser that can parse a stream of JSON chunks rather than needing the
+@@ -59,7 +52,7 @@ class ObjectWriter;
+ //
+ // This parser is thread-compatible as long as only one thread is calling a
+ // Parse() method at a time.
+-class PROTOBUF_EXPORT JsonStreamParser {
++class JsonStreamParser {
+  public:
+   // Creates a JsonStreamParser that will write to the given ObjectWriter.
+   explicit JsonStreamParser(ObjectWriter* ow);
+@@ -74,14 +67,12 @@ class PROTOBUF_EXPORT JsonStreamParser {
+   // string snippet of the error with type_url kParseErrorSnippetUrl.
+   absl::Status Parse(absl::string_view json);
+ 
+-
+   // Finish parsing the JSON string. If the returned status is non-ok, the
+   // status might contain a payload ParseErrorType with type_url
+   // kParseErrorTypeUrl and a payload containing string snippet of the error
+   // with type_url kParseErrorSnippetUrl.
+   absl::Status FinishParse();
+ 
+-
+   // Sets the max recursion depth of JSON message to be deserialized. JSON
+   // messages over this depth will fail to be deserialized.
+   // Default value is 100.
+@@ -331,6 +322,4 @@ class PROTOBUF_EXPORT JsonStreamParser {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_JSON_STREAM_PARSER_H_
+diff --git a/src/google/protobuf/util/converter/legacy_json_util.cc b/src/google/protobuf/util/converter/legacy_json_util.cc
+index 6f37aa5..0ea7e3c 100644
+--- a/src/google/protobuf/util/converter/legacy_json_util.cc
++++ b/src/google/protobuf/util/converter/legacy_json_util.cc
+@@ -18,26 +18,22 @@
+ 
+ #include "absl/base/call_once.h"
+ #include "absl/status/status.h"
+-#include "google/protobuf/stubs/bytestream.h"
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_sink.h"
++#include "google/protobuf/io/zero_copy_stream.h"
++#include "google/protobuf/stubs/bytestream.h"
++#include "google/protobuf/stubs/status_macros.h"
+ #include "google/protobuf/util/converter/default_value_objectwriter.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/json_objectwriter.h"
+ #include "google/protobuf/util/converter/json_stream_parser.h"
+ #include "google/protobuf/util/converter/protostream_objectsource.h"
+ #include "google/protobuf/util/converter/protostream_objectwriter.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_sink.h"
+-#include "google/protobuf/io/zero_copy_stream.h"
+ #include "google/protobuf/util/type_resolver.h"
+ #include "google/protobuf/util/type_resolver_util.h"
+-#include "google/protobuf/stubs/status_macros.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+ 
+-namespace google {
+ namespace protobuf {
+ namespace util {
+ using ::google::protobuf::io::zc_sink_internal::ZeroCopyStreamByteSink;
+diff --git a/src/google/protobuf/util/converter/legacy_json_util.h b/src/google/protobuf/util/converter/legacy_json_util.h
+index 3399da0..44c0d07 100644
+--- a/src/google/protobuf/util/converter/legacy_json_util.h
++++ b/src/google/protobuf/util/converter/legacy_json_util.h
+@@ -24,9 +24,6 @@
+ #include "google/protobuf/message.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -57,27 +54,27 @@ struct JsonPrintOptions {
+ 
+ typedef JsonPrintOptions JsonOptions;
+ 
+-PROTOBUF_EXPORT absl::Status MessageToJsonString(const Message& message,
+-                                                 std::string* output,
+-                                                 const JsonOptions& options);
++absl::Status MessageToJsonString(const Message& message, std::string* output,
++                                 const JsonOptions& options);
+ 
+ inline absl::Status MessageToJsonString(const Message& message,
+                                         std::string* output) {
+   return MessageToJsonString(message, output, JsonOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status JsonStringToMessage(
+-    absl::string_view input, Message* message, const JsonParseOptions& options);
++absl::Status JsonStringToMessage(absl::string_view input, Message* message,
++                                 const JsonParseOptions& options);
+ 
+ inline absl::Status JsonStringToMessage(absl::string_view input,
+                                         Message* message) {
+   return JsonStringToMessage(input, message, JsonParseOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status BinaryToJsonStream(
+-    TypeResolver* resolver, const std::string& type_url,
+-    io::ZeroCopyInputStream* binary_input,
+-    io::ZeroCopyOutputStream* json_output, const JsonPrintOptions& options);
++absl::Status BinaryToJsonStream(TypeResolver* resolver,
++                                const std::string& type_url,
++                                io::ZeroCopyInputStream* binary_input,
++                                io::ZeroCopyOutputStream* json_output,
++                                const JsonPrintOptions& options);
+ 
+ inline absl::Status BinaryToJsonStream(TypeResolver* resolver,
+                                        const std::string& type_url,
+@@ -87,10 +84,11 @@ inline absl::Status BinaryToJsonStream(TypeResolver* resolver,
+                             JsonPrintOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status BinaryToJsonString(
+-    TypeResolver* resolver, const std::string& type_url,
+-    const std::string& binary_input, std::string* json_output,
+-    const JsonPrintOptions& options);
++absl::Status BinaryToJsonString(TypeResolver* resolver,
++                                const std::string& type_url,
++                                const std::string& binary_input,
++                                std::string* json_output,
++                                const JsonPrintOptions& options);
+ 
+ inline absl::Status BinaryToJsonString(TypeResolver* resolver,
+                                        const std::string& type_url,
+@@ -100,10 +98,11 @@ inline absl::Status BinaryToJsonString(TypeResolver* resolver,
+                             JsonPrintOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status JsonToBinaryStream(
+-    TypeResolver* resolver, const std::string& type_url,
+-    io::ZeroCopyInputStream* json_input,
+-    io::ZeroCopyOutputStream* binary_output, const JsonParseOptions& options);
++absl::Status JsonToBinaryStream(TypeResolver* resolver,
++                                const std::string& type_url,
++                                io::ZeroCopyInputStream* json_input,
++                                io::ZeroCopyOutputStream* binary_output,
++                                const JsonParseOptions& options);
+ 
+ inline absl::Status JsonToBinaryStream(
+     TypeResolver* resolver, const std::string& type_url,
+@@ -113,10 +112,11 @@ inline absl::Status JsonToBinaryStream(
+                             JsonParseOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status JsonToBinaryString(
+-    TypeResolver* resolver, const std::string& type_url,
+-    absl::string_view json_input, std::string* binary_output,
+-    const JsonParseOptions& options);
++absl::Status JsonToBinaryString(TypeResolver* resolver,
++                                const std::string& type_url,
++                                absl::string_view json_input,
++                                std::string* binary_output,
++                                const JsonParseOptions& options);
+ 
+ inline absl::Status JsonToBinaryString(TypeResolver* resolver,
+                                        const std::string& type_url,
+@@ -130,6 +130,4 @@ inline absl::Status JsonToBinaryString(TypeResolver* resolver,
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_JSON_LEGACY_UTIL_H_
+diff --git a/src/google/protobuf/util/converter/legacy_json_util_test.cc b/src/google/protobuf/util/converter/legacy_json_util_test.cc
+index eda760a..c95abe9 100644
+--- a/src/google/protobuf/util/converter/legacy_json_util_test.cc
++++ b/src/google/protobuf/util/converter/legacy_json_util_test.cc
+@@ -14,6 +14,9 @@
+ 
+ #include "google/protobuf/util/converter/legacy_json_util.h"
+ 
++#include <gmock/gmock.h>
++#include <gtest/gtest.h>
++
+ #include <algorithm>
+ #include <cstdint>
+ #include <list>
+@@ -21,29 +24,24 @@
+ #include <string>
+ #include <vector>
+ 
+-#include "google/protobuf/duration.pb.h"
+-#include "google/protobuf/field_mask.pb.h"
+-#include "google/protobuf/struct.pb.h"
+-#include "google/protobuf/timestamp.pb.h"
+-#include "google/protobuf/wrappers.pb.h"
+-#include <gmock/gmock.h>
+-#include <gtest/gtest.h>
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
+-#include "google/protobuf/util/converter/testdata/maps.pb.h"
+ #include "google/protobuf/descriptor_database.h"
++#include "google/protobuf/duration.pb.h"
+ #include "google/protobuf/dynamic_message.h"
++#include "google/protobuf/field_mask.pb.h"
+ #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
++#include "google/protobuf/struct.pb.h"
++#include "google/protobuf/stubs/status_macros.h"
++#include "google/protobuf/timestamp.pb.h"
++#include "google/protobuf/unittest.pb.h"
++#include "google/protobuf/util/converter/testdata/maps.pb.h"
+ #include "google/protobuf/util/json_format.pb.h"
+ #include "google/protobuf/util/json_format_proto3.pb.h"
+-#include "google/protobuf/unittest.pb.h"
+ #include "google/protobuf/util/type_resolver.h"
+ #include "google/protobuf/util/type_resolver_util.h"
+-#include "google/protobuf/stubs/status_macros.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/wrappers.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -257,7 +255,6 @@ TEST_P(JsonTest, TestPreserveProtoFieldNames) {
+   JsonPrintOptions options;
+   options.preserve_proto_field_names = true;
+   EXPECT_THAT(ToJson(m, options), IsOkAndHolds("{\"message_value\":{}}"));
+-
+ }
+ 
+ TEST_P(JsonTest, Camels) {
+@@ -971,7 +968,6 @@ TEST_P(JsonTest, TestOverwriteRepeated) {
+   EXPECT_THAT(m.repeated_int32_value(), ElementsAre(1, 2, 3));
+ }
+ 
+-
+ TEST_P(JsonTest, TestDuration) {
+   auto m = ToProto<proto3::TestDuration>(R"json(
+     {
+diff --git a/src/google/protobuf/util/converter/location_tracker.h b/src/google/protobuf/util/converter/location_tracker.h
+index 1246114..5c896f2 100644
+--- a/src/google/protobuf/util/converter/location_tracker.h
++++ b/src/google/protobuf/util/converter/location_tracker.h
+@@ -19,9 +19,6 @@
+ 
+ #include <string>
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -29,7 +26,7 @@ namespace converter {
+ 
+ // LocationTrackerInterface is an interface for classes that track
+ // the location information for the purpose of error reporting.
+-class PROTOBUF_EXPORT LocationTrackerInterface {
++class LocationTrackerInterface {
+  public:
+   LocationTrackerInterface(const LocationTrackerInterface&) = delete;
+   LocationTrackerInterface& operator=(const LocationTrackerInterface&) = delete;
+@@ -50,6 +47,4 @@ class PROTOBUF_EXPORT LocationTrackerInterface {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_LOCATION_TRACKER_H_
+diff --git a/src/google/protobuf/util/converter/object_source.h b/src/google/protobuf/util/converter/object_source.h
+index 6a780d5..6d048aa 100644
+--- a/src/google/protobuf/util/converter/object_source.h
++++ b/src/google/protobuf/util/converter/object_source.h
+@@ -20,10 +20,6 @@
+ #include "absl/status/status.h"
+ #include "absl/strings/string_view.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -37,7 +33,7 @@ class ObjectWriter;
+ // example, a character stream, or protobuf.
+ //
+ // Derived classes could be thread-unsafe.
+-class PROTOBUF_EXPORT ObjectSource {
++class ObjectSource {
+  public:
+   ObjectSource(const ObjectSource&) = delete;
+   ObjectSource& operator=(const ObjectSource&) = delete;
+@@ -63,6 +59,4 @@ class PROTOBUF_EXPORT ObjectSource {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_OBJECT_SOURCE_H_
+diff --git a/src/google/protobuf/util/converter/object_writer.h b/src/google/protobuf/util/converter/object_writer.h
+index 499d9c0..5a7df8e 100644
+--- a/src/google/protobuf/util/converter/object_writer.h
++++ b/src/google/protobuf/util/converter/object_writer.h
+@@ -19,19 +19,13 @@
+ 
+ #include <cstdint>
+ 
+-#include "google/protobuf/stubs/common.h"
+-
+ #include "absl/strings/string_view.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ class DataPiece;
+ 
+ // An ObjectWriter is an interface for writing a stream of events
+@@ -48,7 +42,7 @@ class DataPiece;
+ //
+ // TODO(xinb): seems like a prime candidate to apply the RAII paradigm
+ // and get rid the need to call EndXXX().
+-class PROTOBUF_EXPORT ObjectWriter {
++class ObjectWriter {
+  public:
+   ObjectWriter(const ObjectWriter&) = delete;
+   ObjectWriter& operator=(const ObjectWriter&) = delete;
+@@ -83,7 +77,6 @@ class PROTOBUF_EXPORT ObjectWriter {
+   virtual ObjectWriter* RenderUint64(absl::string_view name,
+                                      uint64_t value) = 0;
+ 
+-
+   // Renders a double value.
+   virtual ObjectWriter* RenderDouble(absl::string_view name, double value) = 0;
+   // Renders a float value.
+@@ -100,12 +93,10 @@ class PROTOBUF_EXPORT ObjectWriter {
+   // Renders a Null value.
+   virtual ObjectWriter* RenderNull(absl::string_view name) = 0;
+ 
+-
+   // Renders a DataPiece object to a ObjectWriter.
+   static void RenderDataPieceTo(const DataPiece& data, absl::string_view name,
+                                 ObjectWriter* ow);
+ 
+-
+   // Indicates whether this ObjectWriter has completed writing the root message,
+   // usually this means writing of one complete object. Subclasses must override
+   // this behavior appropriately.
+@@ -133,6 +124,4 @@ class PROTOBUF_EXPORT ObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_OBJECT_WRITER_H_
+diff --git a/src/google/protobuf/util/converter/proto_writer.cc b/src/google/protobuf/util/converter/proto_writer.cc
+index 2683c08..f1f718e 100644
+--- a/src/google/protobuf/util/converter/proto_writer.cc
++++ b/src/google/protobuf/util/converter/proto_writer.cc
+@@ -34,10 +34,6 @@
+ #include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/wire_format_lite.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -45,7 +41,6 @@ namespace converter {
+ using ::google::protobuf::internal::WireFormatLite;
+ using ::google::protobuf::io::CodedOutputStream;
+ 
+-
+ ProtoWriter::ProtoWriter(TypeResolver* type_resolver,
+                          const google::protobuf::Type& type,
+                          strings::ByteSink* output, ErrorListener* listener)
+@@ -437,8 +432,7 @@ void ProtoWriter::MissingField(absl::string_view missing_name) {
+   listener_->MissingField(location(), missing_name);
+ }
+ 
+-ProtoWriter* ProtoWriter::StartObject(
+-    absl::string_view name) {
++ProtoWriter* ProtoWriter::StartObject(absl::string_view name) {
+   // Starting the root message. Create the root ProtoElement and return.
+   if (element_ == nullptr) {
+     if (!name.empty()) {
+@@ -470,7 +464,6 @@ ProtoWriter* ProtoWriter::StartObject(
+   return StartObjectField(*field, *type);
+ }
+ 
+-
+ ProtoWriter* ProtoWriter::EndObject() {
+   if (invalid_depth_ > 0) {
+     --invalid_depth_;
+@@ -481,7 +474,6 @@ ProtoWriter* ProtoWriter::EndObject() {
+     element_.reset(element_->pop());
+   }
+ 
+-
+   // If ending the root element,
+   // then serialize the full message with calculated sizes.
+   if (element_ == nullptr) {
+@@ -490,9 +482,7 @@ ProtoWriter* ProtoWriter::EndObject() {
+   return this;
+ }
+ 
+-ProtoWriter* ProtoWriter::StartList(
+-    absl::string_view name) {
+-
++ProtoWriter* ProtoWriter::StartList(absl::string_view name) {
+   const google::protobuf::Field* field = BeginNamed(name, true);
+ 
+   if (field == nullptr) return this;
+@@ -513,7 +503,6 @@ ProtoWriter* ProtoWriter::StartList(
+   return StartListField(*field, *type);
+ }
+ 
+-
+ ProtoWriter* ProtoWriter::EndList() {
+   if (invalid_depth_ > 0) {
+     --invalid_depth_;
+@@ -523,8 +512,8 @@ ProtoWriter* ProtoWriter::EndList() {
+   return this;
+ }
+ 
+-ProtoWriter* ProtoWriter::RenderDataPiece(
+-    absl::string_view name, const DataPiece& data) {
++ProtoWriter* ProtoWriter::RenderDataPiece(absl::string_view name,
++                                          const DataPiece& data) {
+   absl::Status status;
+   if (invalid_depth_ > 0) return this;
+ 
+@@ -568,7 +557,7 @@ bool ProtoWriter::IsRepeated(const google::protobuf::Field& field) {
+ 
+ ProtoWriter* ProtoWriter::StartObjectField(const google::protobuf::Field& field,
+                                            const google::protobuf::Type& type) {
+-    WriteTag(field);
++  WriteTag(field);
+   element_.reset(new ProtoElement(element_.release(), &field, type, false));
+   return this;
+ }
+@@ -803,7 +792,6 @@ void ProtoWriter::WriteTag(const google::protobuf::Field& field) {
+   stream_->WriteTag(WireFormatLite::MakeTag(field.number(), wire_type));
+ }
+ 
+-
+ }  // namespace converter
+ }  // namespace util
+ }  // namespace protobuf
+diff --git a/src/google/protobuf/util/converter/proto_writer.h b/src/google/protobuf/util/converter/proto_writer.h
+index dd28102..bce0d4a 100644
+--- a/src/google/protobuf/util/converter/proto_writer.h
++++ b/src/google/protobuf/util/converter/proto_writer.h
+@@ -22,29 +22,24 @@
+ #include <string>
+ #include <vector>
+ 
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/descriptor.h"
+ #include "absl/container/flat_hash_set.h"
+ #include "absl/status/status.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/stubs/bytestream.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/datapiece.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/structured_objectwriter.h"
+ #include "google/protobuf/util/converter/type_info.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ class ObjectLocationTracker;
+ 
+ // An ObjectWriter that can write protobuf bytes directly from writer events.
+@@ -53,9 +48,9 @@ class ObjectLocationTracker;
+ // special types by inheriting from it or by wrapping it.
+ //
+ // It also supports streaming.
+-class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
++class ProtoWriter : public StructuredObjectWriter {
+  public:
+-// Constructor. Does not take ownership of any parameter passed in.
++  // Constructor. Does not take ownership of any parameter passed in.
+   ProtoWriter(TypeResolver* type_resolver, const google::protobuf::Type& type,
+               strings::ByteSink* output, ErrorListener* listener);
+   ProtoWriter() = delete;
+@@ -105,13 +100,11 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+     return RenderDataPiece(name, DataPiece::NullData());
+   }
+ 
+-
+   // Renders a DataPiece 'value' into a field whose wire type is determined
+   // from the given field 'name'.
+   virtual ProtoWriter* RenderDataPiece(absl::string_view name,
+                                        const DataPiece& data);
+ 
+-
+   // Returns the location tracker to use for tracking locations for errors.
+   const LocationTrackerInterface& location() {
+     return element_ != nullptr ? *element_ : *tracker_;
+@@ -156,8 +149,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+   }
+ 
+  protected:
+-  class PROTOBUF_EXPORT ProtoElement : public BaseElement,
+-                                       public LocationTrackerInterface {
++  class ProtoElement : public BaseElement, public LocationTrackerInterface {
+    public:
+     // Constructor for the root element. No parent nor field.
+     ProtoElement(const TypeInfo* typeinfo, const google::protobuf::Type& type,
+@@ -278,7 +270,6 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+   // Helper method to write proto tags based on the given field.
+   void WriteTag(const google::protobuf::Field& field);
+ 
+-
+   // Returns true if the field for type_ can be set as a oneof. If field is not
+   // a oneof type, this function does nothing and returns true.
+   // If another field for this oneof is already set, this function returns
+@@ -371,6 +362,4 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTO_WRITER_H_
+diff --git a/src/google/protobuf/util/converter/protostream_objectsource.cc b/src/google/protobuf/util/converter/protostream_objectsource.cc
+index fa4fe38..fa64ccd 100644
+--- a/src/google/protobuf/util/converter/protostream_objectsource.cc
++++ b/src/google/protobuf/util/converter/protostream_objectsource.cc
+@@ -18,10 +18,6 @@
+ #include <utility>
+ #include <vector>
+ 
+-#include "google/protobuf/descriptor.h"
+-#include "google/protobuf/unknown_field_set.h"
+-#include "google/protobuf/stubs/strutil.h"
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/base/call_once.h"
+ #include "absl/base/casts.h"
+ #include "absl/container/btree_map.h"
+@@ -32,19 +28,17 @@
+ #include "absl/strings/str_format.h"
+ #include "absl/strings/string_view.h"
+ #include "absl/time/time.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl.h"
++#include "google/protobuf/stubs/status_macros.h"
++#include "google/protobuf/stubs/strutil.h"
++#include "google/protobuf/unknown_field_set.h"
+ #include "google/protobuf/util/converter/constants.h"
+ #include "google/protobuf/util/converter/field_mask_utility.h"
+ #include "google/protobuf/util/converter/utility.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/wire_format.h"
+ #include "google/protobuf/wire_format_lite.h"
+-#include "google/protobuf/stubs/status_macros.h"
+-
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ 
+ namespace google {
+ namespace protobuf {
+@@ -94,7 +88,6 @@ absl::StatusOr<std::string> MapKeyDefaultValueAsString(
+ }
+ }  // namespace
+ 
+-
+ ProtoStreamObjectSource::ProtoStreamObjectSource(
+     io::CodedInputStream* stream, TypeResolver* type_resolver,
+     const google::protobuf::Type& type, const RenderOptions& render_options)
+@@ -162,7 +155,6 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+     const google::protobuf::Type& type, absl::string_view name,
+     const uint32_t end_tag, bool include_start_and_end,
+     ObjectWriter* ow) const {
+-
+   const TypeRenderer* type_renderer = FindTypeRenderer(type.name());
+   if (type_renderer != nullptr) {
+     return (*type_renderer)(this, type, name, ow);
+@@ -174,7 +166,6 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+   uint32_t tag = stream_->ReadTag(), last_tag = tag + 1;
+   UnknownFieldSet unknown_fields;
+ 
+-
+   if (include_start_and_end) {
+     ow->StartObject(name);
+   }
+@@ -193,9 +184,7 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+     if (field == nullptr) {
+       // If we didn't find a field, skip this unknown tag.
+       // TODO(wpoon): Check return boolean value.
+-      WireFormat::SkipField(
+-          stream_, tag,
+-                                                nullptr);
++      WireFormat::SkipField(stream_, tag, nullptr);
+       tag = stream_->ReadTag();
+       continue;
+     }
+@@ -215,7 +204,6 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+     }
+   }
+ 
+-
+   if (include_start_and_end) {
+     ow->EndObject();
+   }
+@@ -323,12 +311,7 @@ absl::Status ProtoStreamObjectSource::RenderTimestamp(
+   std::string formatted_seconds =
+       absl::FormatTime(kRfc3339TimeFormat, tm, absl::UTCTimeZone());
+   std::string formatted_time = absl::StrFormat(
+-      "%s%sZ", formatted_seconds.c_str(),
+-      FormatNanos(
+-          nanos,
+-          false
+-          )
+-          .c_str());
++      "%s%sZ", formatted_seconds.c_str(), FormatNanos(nanos, false).c_str());
+   ow->RenderString(field_name, formatted_time);
+   return absl::Status();
+ }
+@@ -366,11 +349,7 @@ absl::Status ProtoStreamObjectSource::RenderDuration(
+   }
+   std::string formatted_duration = absl::StrFormat(
+       "%s%lld%ss", sign.c_str(), static_cast<long long>(seconds),  // NOLINT
+-      FormatNanos(
+-          nanos,
+-          false
+-          )
+-          .c_str());
++      FormatNanos(nanos, false).c_str());
+   ow->RenderString(field_name, formatted_duration);
+   return absl::Status();
+ }
+@@ -665,12 +644,10 @@ absl::Status ProtoStreamObjectSource::RenderFieldMask(
+   return absl::Status();
+ }
+ 
+-
+ absl::flat_hash_map<std::string, ProtoStreamObjectSource::TypeRenderer>*
+     ProtoStreamObjectSource::renderers_ = nullptr;
+ absl::once_flag source_renderers_init_;
+ 
+-
+ void ProtoStreamObjectSource::InitRendererMap() {
+   renderers_ = new absl::flat_hash_map<std::string,
+                                        ProtoStreamObjectSource::TypeRenderer>();
+@@ -866,10 +843,10 @@ absl::Status ProtoStreamObjectSource::RenderNonMessageField(
+             ow->RenderString(field_name, enum_value->name());
+           }
+         } else {
+-            ow->RenderInt32(field_name, buffer32);
++          ow->RenderInt32(field_name, buffer32);
+         }
+       } else {
+-          ow->RenderInt32(field_name, buffer32);
++        ow->RenderInt32(field_name, buffer32);
+       }
+       break;
+     }
+diff --git a/src/google/protobuf/util/converter/protostream_objectsource.h b/src/google/protobuf/util/converter/protostream_objectsource.h
+index b962707..fb10442 100644
+--- a/src/google/protobuf/util/converter/protostream_objectsource.h
++++ b/src/google/protobuf/util/converter/protostream_objectsource.h
+@@ -23,21 +23,16 @@
+ #include <stack>
+ #include <string>
+ 
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/type.pb.h"
+ #include "absl/container/flat_hash_map.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/object_source.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+ #include "google/protobuf/util/converter/type_info.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -58,9 +53,8 @@ class TypeInfo;
+ //                              <your message google::protobuf::Type>);
+ //
+ //   Status status = os.WriteTo(<some ObjectWriter>);
+-class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
++class ProtoStreamObjectSource : public ObjectSource {
+  public:
+-
+   struct RenderOptions {
+     // Sets whether or not to use lowerCamelCase casing for enum values. If set
+     // to false, enum values are output without any case conversions.
+@@ -94,7 +88,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+ 
+     // Whether to preserve proto field names
+     bool preserve_proto_field_names = false;
+-
+   };
+ 
+   ProtoStreamObjectSource(io::CodedInputStream* stream,
+@@ -158,7 +151,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+   std::string ReadFieldValueAsString(
+       const google::protobuf::Field& field) const;
+ 
+-
+   // Returns the input stream.
+   io::CodedInputStream* stream() const { return stream_; }
+ 
+@@ -266,7 +258,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+                                      absl::string_view field_name,
+                                      ObjectWriter* ow) const;
+ 
+-
+   // Utility function to detect proto maps. The 'field' MUST be repeated.
+   bool IsMap(const google::protobuf::Field& field) const;
+ 
+@@ -295,7 +286,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+   // google::protobuf::Type of the message source.
+   const google::protobuf::Type& type_;
+ 
+-
+   const RenderOptions render_options_;
+ 
+   // Tracks current recursion depth.
+@@ -310,6 +300,4 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTSOURCE_H_
+diff --git a/src/google/protobuf/util/converter/protostream_objectwriter.cc b/src/google/protobuf/util/converter/protostream_objectwriter.cc
+index 5489063..cfe426b 100644
+--- a/src/google/protobuf/util/converter/protostream_objectwriter.cc
++++ b/src/google/protobuf/util/converter/protostream_objectwriter.cc
+@@ -18,7 +18,6 @@
+ #include <functional>
+ #include <stack>
+ 
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/base/call_once.h"
+ #include "absl/log/absl_check.h"
+ #include "absl/log/absl_log.h"
+@@ -28,16 +27,13 @@
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/strip.h"
+ #include "absl/time/time.h"
++#include "google/protobuf/stubs/strutil.h"
+ #include "google/protobuf/util/converter/constants.h"
+ #include "google/protobuf/util/converter/field_mask_utility.h"
+ #include "google/protobuf/util/converter/object_location_tracker.h"
+ #include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/wire_format_lite.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -47,7 +43,6 @@ using ::absl::Status;
+ using ::google::protobuf::internal::WireFormatLite;
+ using std::placeholders::_1;
+ 
+-
+ ProtoStreamObjectWriter::ProtoStreamObjectWriter(
+     TypeResolver* type_resolver, const google::protobuf::Type& type,
+     strings::ByteSink* output, ErrorListener* listener,
+@@ -482,7 +477,6 @@ bool ProtoStreamObjectWriter::Item::InsertMapKeyIfNotPresent(
+   return map_keys_.insert(std::string(map_key)).second;
+ }
+ 
+-
+ ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartObject(
+     absl::string_view name) {
+   if (invalid_depth() > 0) {
+@@ -678,7 +672,6 @@ ProtoStreamObjectWriter* ProtoStreamObjectWriter::EndObject() {
+   return this;
+ }
+ 
+-
+ ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartList(
+     absl::string_view name) {
+   if (invalid_depth() > 0) {
+@@ -924,8 +917,7 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
+         absl::StatusOr<int32_t> int_value = data.ToInt32();
+         if (int_value.ok()) {
+           ow->ProtoWriter::RenderDataPiece(
+-              "string_value",
+-              DataPiece(SimpleDtoa(int_value.value()), true));
++              "string_value", DataPiece(SimpleDtoa(int_value.value()), true));
+           return Status();
+         }
+       }
+@@ -937,8 +929,7 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
+         absl::StatusOr<uint32_t> int_value = data.ToUint32();
+         if (int_value.ok()) {
+           ow->ProtoWriter::RenderDataPiece(
+-              "string_value",
+-              DataPiece(SimpleDtoa(int_value.value()), true));
++              "string_value", DataPiece(SimpleDtoa(int_value.value()), true));
+           return Status();
+         }
+       }
+@@ -978,8 +969,7 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
+         absl::StatusOr<float> float_value = data.ToFloat();
+         if (float_value.ok()) {
+           ow->ProtoWriter::RenderDataPiece(
+-              "string_value",
+-              DataPiece(SimpleDtoa(float_value.value()), true));
++              "string_value", DataPiece(SimpleDtoa(float_value.value()), true));
+           return Status();
+         }
+       }
+@@ -1368,9 +1358,9 @@ bool ProtoStreamObjectWriter::ValidMapKey(absl::string_view unnormalized_name) {
+   return true;
+ }
+ 
+-void ProtoStreamObjectWriter::Push(
+-    absl::string_view name, Item::ItemType item_type, bool is_placeholder,
+-    bool is_list) {
++void ProtoStreamObjectWriter::Push(absl::string_view name,
++                                   Item::ItemType item_type,
++                                   bool is_placeholder, bool is_list) {
+   is_list ? ProtoWriter::StartList(name) : ProtoWriter::StartObject(name);
+ 
+   // invalid_depth == 0 means it is a successful StartObject or StartList.
+diff --git a/src/google/protobuf/util/converter/protostream_objectwriter.h b/src/google/protobuf/util/converter/protostream_objectwriter.h
+index c9a93f7..92fcc0f 100644
+--- a/src/google/protobuf/util/converter/protostream_objectwriter.h
++++ b/src/google/protobuf/util/converter/protostream_objectwriter.h
+@@ -20,25 +20,21 @@
+ #include <deque>
+ #include <string>
+ 
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/descriptor.h"
+ #include "absl/container/flat_hash_set.h"
+ #include "absl/status/status.h"
+-#include "google/protobuf/stubs/bytestream.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl.h"
++#include "google/protobuf/stubs/bytestream.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/datapiece.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/proto_writer.h"
+ #include "google/protobuf/util/converter/structured_objectwriter.h"
+ #include "google/protobuf/util/converter/type_info.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -51,7 +47,7 @@ class ObjectLocationTracker;
+ // the ProtoWriter class to write raw proto bytes.
+ //
+ // It also supports streaming.
+-class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
++class ProtoStreamObjectWriter : public ProtoWriter {
+  public:
+   // Options that control ProtoStreamObjectWriter class's behavior.
+   struct Options {
+@@ -158,7 +154,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+                                        const DataPiece&);
+ 
+   // Handles writing Anys out using nested object writers and the like.
+-  class PROTOBUF_EXPORT AnyWriter {
++  class AnyWriter {
+    public:
+     explicit AnyWriter(ProtoStreamObjectWriter* parent);
+     ~AnyWriter();
+@@ -183,7 +179,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+    private:
+     // Before the "@type" field is encountered, we store all incoming data
+     // into this Event struct and replay them after we get the "@type" field.
+-    class PROTOBUF_EXPORT Event {
++    class Event {
+      public:
+       enum Type {
+         START_OBJECT = 0,
+@@ -272,7 +268,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+ 
+   // Represents an item in a stack of items used to keep state between
+   // ObjectWrier events.
+-  class PROTOBUF_EXPORT Item : public BaseElement {
++  class Item : public BaseElement {
+    public:
+     // Indicates the type of item.
+     enum ItemType {
+@@ -405,7 +401,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+   void Push(absl::string_view name, Item::ItemType item_type,
+             bool is_placeholder, bool is_list);
+ 
+-
+   // Pops items from the stack. All placeholder items are popped until a
+   // non-placeholder item is found.
+   void Pop();
+@@ -435,6 +430,4 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/structured_objectwriter.h b/src/google/protobuf/util/converter/structured_objectwriter.h
+index ada20d6..656ab13 100644
+--- a/src/google/protobuf/util/converter/structured_objectwriter.h
++++ b/src/google/protobuf/util/converter/structured_objectwriter.h
+@@ -21,10 +21,7 @@
+ 
+ #include "absl/base/casts.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+-
+-// Must be included last.
+ #include "google/protobuf/util/converter/port.h"
+-#include "google/protobuf/util/converter/port_def.inc"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -42,7 +39,7 @@ namespace converter {
+ // StructuredObjectWriter and its use.
+ //
+ // Derived classes could be thread-unsafe.
+-class PROTOBUF_EXPORT StructuredObjectWriter : public ObjectWriter {
++class StructuredObjectWriter : public ObjectWriter {
+  public:
+   StructuredObjectWriter(const StructuredObjectWriter&) = delete;
+   StructuredObjectWriter& operator=(const StructuredObjectWriter&) = delete;
+@@ -54,7 +51,7 @@ class PROTOBUF_EXPORT StructuredObjectWriter : public ObjectWriter {
+   // StructuredObjectWriter behaves as a visitor. BaseElement represents a node
+   // in the input tree. Implementation of StructuredObjectWriter should also
+   // extend BaseElement to keep track of the location in the input tree.
+-  class PROTOBUF_EXPORT BaseElement {
++  class BaseElement {
+    public:
+     // Takes ownership of the parent Element.
+     explicit BaseElement(BaseElement* parent)
+@@ -105,6 +102,4 @@ class PROTOBUF_EXPORT StructuredObjectWriter : public ObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_STRUCTURED_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/type_info.h b/src/google/protobuf/util/converter/type_info.h
+index f1caf90..8884e5f 100644
+--- a/src/google/protobuf/util/converter/type_info.h
++++ b/src/google/protobuf/util/converter/type_info.h
+@@ -17,23 +17,19 @@
+ #ifndef GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_H_
+ #define GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_H_
+ 
+-#include "google/protobuf/type.pb.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ // Internal helper class for type resolving. Note that this class is not
+ // thread-safe and should only be accessed in one thread.
+-class PROTOBUF_EXPORT TypeInfo {
++class TypeInfo {
+  public:
+   TypeInfo() {}
+   TypeInfo(const TypeInfo&) = delete;
+@@ -77,6 +73,4 @@ class PROTOBUF_EXPORT TypeInfo {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_H_
+diff --git a/src/google/protobuf/util/converter/utility.cc b/src/google/protobuf/util/converter/utility.cc
+index 0770b0a..4007424 100644
+--- a/src/google/protobuf/util/converter/utility.cc
++++ b/src/google/protobuf/util/converter/utility.cc
+@@ -20,22 +20,17 @@
+ #include <iterator>
+ #include <limits>
+ 
+-#include "google/protobuf/stubs/callback.h"
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/wrappers.pb.h"
+-#include "google/protobuf/descriptor.pb.h"
+-#include "google/protobuf/descriptor.h"
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/container/flat_hash_set.h"
+ #include "absl/strings/ascii.h"
+ #include "absl/strings/cord.h"
+ #include "absl/strings/match.h"
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/descriptor.pb.h"
++#include "google/protobuf/stubs/strutil.h"
+ #include "google/protobuf/util/converter/constants.h"
+-
+-// must be last
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/wrappers.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+diff --git a/src/google/protobuf/util/converter/utility.h b/src/google/protobuf/util/converter/utility.h
+index a98793b..f00ad3a 100644
+--- a/src/google/protobuf/util/converter/utility.h
++++ b/src/google/protobuf/util/converter/utility.h
+@@ -22,19 +22,13 @@
+ #include <string>
+ #include <utility>
+ 
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/any.pb.h"
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/repeated_field.h"
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
+-
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/any.pb.h"
++#include "google/protobuf/repeated_field.h"
++#include "google/protobuf/type.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -47,25 +41,25 @@ static const int64_t kTypeUrlSize = 19;
+ // Finds the tech option identified by option_name. Parses the boolean value and
+ // returns it.
+ // When the option with the given name is not found, default_value is returned.
+-PROTOBUF_EXPORT bool GetBoolOptionOrDefault(
++bool GetBoolOptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, bool default_value);
+ 
+ // Returns int64 option value. If the option isn't found, returns the
+ // default_value.
+-PROTOBUF_EXPORT int64_t GetInt64OptionOrDefault(
++int64_t GetInt64OptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, int64_t default_value);
+ 
+ // Returns double option value. If the option isn't found, returns the
+ // default_value.
+-PROTOBUF_EXPORT double GetDoubleOptionOrDefault(
++double GetDoubleOptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, double default_value);
+ 
+ // Returns string option value. If the option isn't found, returns the
+ // default_value.
+-PROTOBUF_EXPORT std::string GetStringOptionOrDefault(
++std::string GetStringOptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, absl::string_view default_value);
+ 
+@@ -73,21 +67,20 @@ PROTOBUF_EXPORT std::string GetStringOptionOrDefault(
+ // TODO(skarvaje): Make these utilities dealing with Any types more generic,
+ // add more error checking and move to a more public/shareable location so
+ // others can use.
+-PROTOBUF_EXPORT bool GetBoolFromAny(const google::protobuf::Any& any);
++bool GetBoolFromAny(const google::protobuf::Any& any);
+ 
+ // Returns int64 value contained in Any type.
+-PROTOBUF_EXPORT int64_t GetInt64FromAny(const google::protobuf::Any& any);
++int64_t GetInt64FromAny(const google::protobuf::Any& any);
+ 
+ // Returns double value contained in Any type.
+-PROTOBUF_EXPORT double GetDoubleFromAny(const google::protobuf::Any& any);
++double GetDoubleFromAny(const google::protobuf::Any& any);
+ 
+ // Returns string value contained in Any type.
+-PROTOBUF_EXPORT std::string GetStringFromAny(const google::protobuf::Any& any);
++std::string GetStringFromAny(const google::protobuf::Any& any);
+ 
+ // Returns the type string without the url prefix. e.g.: If the passed type is
+ // 'type.googleapis.com/tech.type.Bool', the returned value is 'tech.type.Bool'.
+-PROTOBUF_EXPORT absl::string_view GetTypeWithoutUrl(
+-    absl::string_view type_url);
++absl::string_view GetTypeWithoutUrl(absl::string_view type_url);
+ 
+ // Returns the simple_type with the base type url (kTypeServiceBaseUrl)
+ // prefixed.
+@@ -95,8 +88,7 @@ PROTOBUF_EXPORT absl::string_view GetTypeWithoutUrl(
+ // E.g:
+ // GetFullTypeWithUrl("google.protobuf.Timestamp") returns the string
+ // "type.googleapis.com/google.protobuf.Timestamp".
+-PROTOBUF_EXPORT std::string GetFullTypeWithUrl(
+-    absl::string_view simple_type);
++std::string GetFullTypeWithUrl(absl::string_view simple_type);
+ 
+ // Finds and returns option identified by name and option_name within the
+ // provided map. Returns nullptr if none found.
+@@ -136,31 +128,31 @@ const google::protobuf::EnumValue* FindEnumValueByNameWithoutUnderscoreOrNull(
+     const google::protobuf::Enum* enum_type, absl::string_view enum_name);
+ 
+ // Converts input to camel-case and returns it.
+-PROTOBUF_EXPORT std::string ToCamelCase(const absl::string_view input);
++std::string ToCamelCase(const absl::string_view input);
+ 
+ // Converts enum name string to camel-case and returns it.
+ std::string EnumValueNameToLowerCamelCase(const absl::string_view input);
+ 
+ // Converts input to snake_case and returns it.
+-PROTOBUF_EXPORT std::string ToSnakeCase(absl::string_view input);
++std::string ToSnakeCase(absl::string_view input);
+ 
+ // Returns true if type_name represents a well-known type.
+-PROTOBUF_EXPORT bool IsWellKnownType(const std::string& type_name);
++bool IsWellKnownType(const std::string& type_name);
+ 
+ // Returns true if 'bool_string' represents a valid boolean value. Only "true",
+ // "false", "0" and "1" are allowed.
+-PROTOBUF_EXPORT bool IsValidBoolString(absl::string_view bool_string);
++bool IsValidBoolString(absl::string_view bool_string);
+ 
+ // Returns true if "field" is a protobuf map field based on its type.
+-PROTOBUF_EXPORT bool IsMap(const google::protobuf::Field& field,
+-                           const google::protobuf::Type& type);
++bool IsMap(const google::protobuf::Field& field,
++           const google::protobuf::Type& type);
+ 
+ // Returns true if the given type has special MessageSet wire format.
+ bool IsMessageSetWireFormat(const google::protobuf::Type& type);
+ 
+ // Infinity/NaN-aware conversion to string.
+-PROTOBUF_EXPORT std::string DoubleAsString(double value);
+-PROTOBUF_EXPORT std::string FloatAsString(float value);
++std::string DoubleAsString(double value);
++std::string FloatAsString(float value);
+ 
+ // Convert from int32, int64, uint32, uint64, double or float to string.
+ template <typename T>
+@@ -180,13 +172,11 @@ inline std::string ValueAsString(double value) {
+ 
+ // Converts a string to float. Unlike safe_strtof, conversion will fail if the
+ // value fits into double but not float (e.g., DBL_MAX).
+-PROTOBUF_EXPORT bool SafeStrToFloat(absl::string_view str, float* value);
++bool SafeStrToFloat(absl::string_view str, float* value);
+ 
+ }  // namespace converter
+ }  // namespace util
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_UTILITY_H_

@@ -1,8 +1,11 @@
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
@@ -15,9 +18,8 @@ struct FormatterOnEnvoyHeadersTestParams {
 
 std::string formatterOnEnvoyHeadersTestParamsToString(
     const ::testing::TestParamInfo<FormatterOnEnvoyHeadersTestParams>& p) {
-  return fmt::format("{}_{}",
-                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                     p.param.formatter_type_on_envoy_headers);
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     static_cast<int>(p.param.formatter_type_on_envoy_headers));
 }
 
 std::vector<FormatterOnEnvoyHeadersTestParams> getFormatterOnEnvoyHeadersTestParams() {
@@ -79,7 +81,7 @@ public:
           auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
                                                    preserve_case::v3::PreserveCaseFormatterConfig>(
               fmt::format("formatter_type_on_envoy_headers: {}",
-                          GetParam().formatter_type_on_envoy_headers));
+                          static_cast<int>(GetParam().formatter_type_on_envoy_headers)));
           typed_extension_config->mutable_typed_config()->PackFrom(config);
         });
 
@@ -90,10 +92,10 @@ public:
                                         ->mutable_header_key_format()
                                         ->mutable_stateful_formatter();
       typed_extension_config->set_name("preserve_case");
-      auto config =
-          TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
-                                     PreserveCaseFormatterConfig>(fmt::format(
-              "formatter_type_on_envoy_headers: {}", GetParam().formatter_type_on_envoy_headers));
+      auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
+                                               preserve_case::v3::PreserveCaseFormatterConfig>(
+          fmt::format("formatter_type_on_envoy_headers: {}",
+                      static_cast<int>(GetParam().formatter_type_on_envoy_headers)));
       typed_extension_config->mutable_typed_config()->PackFrom(config);
       ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                        protocol_options);

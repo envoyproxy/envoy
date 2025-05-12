@@ -5,7 +5,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/compression/zstd/common/base.h"
+#include "source/common/compression/zstd/common/base.h"
 #include "source/extensions/compression/zstd/common/dictionary_manager.h"
 
 #include "zstd_errors.h"
@@ -39,7 +39,7 @@ struct ZstdDecompressorStats {
 /**
  * Implementation of decompressor's interface.
  */
-class ZstdDecompressorImpl : public Common::Base,
+class ZstdDecompressorImpl : public Envoy::Compression::Zstd::Common::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression>,
                              NonCopyable {

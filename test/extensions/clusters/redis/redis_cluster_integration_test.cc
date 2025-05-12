@@ -367,7 +367,7 @@ protected:
   // This method encodes a fake upstream's IP address and TCP port in the
   // same format as one would expect from a Redis server in
   // an ask/moved redirection error.
-  std::string redisAddressAndPort(FakeUpstreamPtr& upstream) {
+  std::string redisAddressAndPortNoThrow(FakeUpstreamPtr& upstream) {
     std::stringstream result;
     if (version_ == Network::Address::IpVersion::v4) {
       result << "127.0.0.1"
@@ -509,7 +509,7 @@ TEST_P(RedisClusterIntegrationTest, ClusterSlotRequestAfterRedirection) {
   std::string request = makeBulkStringArray({"get", "foo"});
   // The actual moved redirection error that redirects to the fake_upstreams_[1] server.
   std::string redirection_response =
-      "-MOVED 12182 " + redisAddressAndPort(fake_upstreams_[1]) + "\r\n";
+      "-MOVED 12182 " + redisAddressAndPortNoThrow(fake_upstreams_[1]) + "\r\n";
   // The "get foo" response from fake_upstreams_[1].
   std::string response = "$3\r\nbar\r\n";
   std::string cluster_slots_request = makeBulkStringArray({"CLUSTER", "SLOTS"});

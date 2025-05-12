@@ -85,6 +85,7 @@ public:
               (os_fd_t fd, const void* buffer, size_t length, off_t offset), (const));
   MOCK_METHOD(SysCallSizeResult, pread, (os_fd_t fd, void* buffer, size_t length, off_t offset),
               (const));
+  MOCK_METHOD(SysCallSizeResult, send, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recv, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags));
   MOCK_METHOD(SysCallIntResult, recvmmsg,
@@ -94,6 +95,7 @@ public:
   MOCK_METHOD(SysCallPtrResult, mmap,
               (void* addr, size_t length, int prot, int flags, int fd, off_t offset));
   MOCK_METHOD(SysCallIntResult, stat, (const char* name, struct stat* stat));
+  MOCK_METHOD(SysCallIntResult, fstat, (os_fd_t fd, struct stat* stat));
   MOCK_METHOD(SysCallIntResult, chmod, (const std::string& name, mode_t mode));
   MOCK_METHOD(int, setsockopt_,
               (os_fd_t sockfd, int level, int optname, const void* optval, socklen_t optlen));
@@ -122,10 +124,9 @@ public:
   MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, EnvoyTcpInfo* tcp_info));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
-  MOCK_METHOD(bool, supportsIpTransparent, (), (const));
+  MOCK_METHOD(bool, supportsIpTransparent, (Network::Address::IpVersion version), (const));
   MOCK_METHOD(bool, supportsMptcp, (), (const));
   MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
-  MOCK_METHOD(void, setAlternateGetifaddrs, (AlternateGetifaddrs alternate_getifaddrs));
   MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
   MOCK_METHOD(SysCallIntResult, getaddrinfo,
               (const char* node, const char* service, const addrinfo* hints, addrinfo** res));

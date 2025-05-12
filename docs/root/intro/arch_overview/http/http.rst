@@ -7,6 +7,6 @@ HTTP
   http_connection_management
   http_filters
   http_routing
-  http3
   upgrades
   http_proxy
+  http3

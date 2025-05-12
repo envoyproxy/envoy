@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.extensions.http.header_validators.envoy_default;
+
+import "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto";
+
+message PathNormalizerFuzzTestCase {
+  // The character set of the :path and :method headers is validated before normalization.
+  // As such it is ok to use strings to represent these values in the fuzz test.
+  string method = 1;
+  string path = 2;
+
+  envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+      .UriPathNormalizationOptions options = 3;
+}

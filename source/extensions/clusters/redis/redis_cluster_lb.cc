@@ -1,4 +1,6 @@
-#include "redis_cluster_lb.h"
+#include "source/extensions/clusters/redis/redis_cluster_lb.h"
+
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -56,8 +58,8 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&
         primary_and_replicas->push_back(replica_host->second);
       }
 
-      shard_vector->emplace_back(
-          std::make_shared<RedisShard>(primary_host->second, replicas, primary_and_replicas));
+      shard_vector->emplace_back(std::make_shared<RedisShard>(primary_host->second, replicas,
+                                                              primary_and_replicas, random_));
     }
 
     for (auto i = slot.start(); i <= slot.end(); ++i) {
@@ -90,7 +92,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
 
   for (auto const& shard : *current_shard_vector) {
     shard_vector->emplace_back(std::make_shared<RedisShard>(
-        shard->primary(), shard->replicas().hostsPtr(), shard->allHosts().hostsPtr()));
+        shard->primary(), shard->replicas().hostsPtr(), shard->allHosts().hostsPtr(), random_));
   }
 
   {
@@ -99,7 +101,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   }
 }
 
-Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
+Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams) {
   absl::ReaderMutexLock lock(&mutex_);
   return std::make_unique<RedisClusterLoadBalancer>(slot_array_, shard_vector_, random_);
 }
@@ -124,10 +126,11 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
 }
 } // namespace
 
-Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
+Upstream::HostSelectionResponse
+RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
     Envoy::Upstream::LoadBalancerContext* context) {
   if (!slot_array_) {
-    return nullptr;
+    return {nullptr};
   }
   absl::optional<uint64_t> hash;
   if (context) {
@@ -135,11 +138,20 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   }
 
   if (!hash) {
-    return nullptr;
+    return {nullptr};
   }
 
-  auto shard = shard_vector_->at(
-      slot_array_->at(hash.value() % Envoy::Extensions::Clusters::Redis::MaxSlot));
+  RedisShardSharedPtr shard;
+  if (dynamic_cast<const RedisSpecifyShardContextImpl*>(context)) {
+    if (hash.value() < shard_vector_->size()) {
+      shard = shard_vector_->at(hash.value());
+    } else {
+      return {nullptr};
+    }
+  } else {
+    shard = shard_vector_->at(
+        slot_array_->at(hash.value() % Envoy::Extensions::Clusters::Redis::MaxSlot));
+  }
 
   auto redis_context = dynamic_cast<RedisLoadBalancerContext*>(context);
   if (redis_context && redis_context->isReadCommand()) {
@@ -213,6 +225,12 @@ absl::string_view RedisLoadBalancerContextImpl::hashtag(absl::string_view v, boo
 
   return v.substr(start + 1, end - start - 1);
 }
+RedisSpecifyShardContextImpl::RedisSpecifyShardContextImpl(
+    uint64_t shard_index, const NetworkFilters::Common::Redis::RespValue& request,
+    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
+    : RedisLoadBalancerContextImpl(std::to_string(shard_index), true, true, request, read_policy),
+      shard_index_(shard_index) {}
+
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions

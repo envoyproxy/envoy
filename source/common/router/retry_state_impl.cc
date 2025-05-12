@@ -28,13 +28,11 @@ bool clusterSupportsHttp3AndTcpFallback(const Upstream::ClusterInfo& cluster) {
 std::unique_ptr<RetryStateImpl>
 RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                        const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                       RouteStatsContextOptRef route_stats_context, Runtime::Loader& runtime,
-                       Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                       TimeSource& time_source, Upstream::ResourcePriority priority) {
+                       RouteStatsContextOptRef route_stats_context,
+                       Server::Configuration::CommonFactoryContext& context,
+                       Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
   std::unique_ptr<RetryStateImpl> ret;
 
-  const bool conn_pool_new_stream_with_early_data_and_http3 =
-      Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
   // We short circuit here and do not bother with an allocation if there is no chance we will retry.
   // But for HTTP/3 0-RTT safe requests, which can be rejected because they are sent too early(425
   // response code), we want to give them a chance to retry as normal requests even though the retry
@@ -42,14 +40,11 @@ RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& 
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
       route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster,
-                                 route_stats_context, runtime, random, dispatcher, time_source,
-                                 priority, false, conn_pool_new_stream_with_early_data_and_http3));
-  } else if (conn_pool_new_stream_with_early_data_and_http3 &&
-             (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
+                                 route_stats_context, context, dispatcher, priority, false));
+  } else if ((cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
              Http::Utility::isSafeRequest(request_headers)) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, vcluster,
-                                 route_stats_context, runtime, random, dispatcher, time_source,
-                                 priority, true, conn_pool_new_stream_with_early_data_and_http3));
+                                 route_stats_context, context, dispatcher, priority, true));
   }
 
   // Consume all retry related headers to avoid them being propagated to the upstream
@@ -68,24 +63,21 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
                                RouteStatsContextOptRef route_stats_context,
-                               Runtime::Loader& runtime, Random::RandomGenerator& random,
-                               Event::Dispatcher& dispatcher, TimeSource& time_source,
-                               Upstream::ResourcePriority priority, bool auto_configured_for_http3,
-                               bool conn_pool_new_stream_with_early_data_and_http3)
+                               Server::Configuration::CommonFactoryContext& context,
+                               Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
+                               bool auto_configured_for_http3)
     : cluster_(cluster), vcluster_(vcluster), route_stats_context_(route_stats_context),
-      runtime_(runtime), random_(random), dispatcher_(dispatcher), time_source_(time_source),
-      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
-      priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
+      runtime_(context.runtime()), random_(context.api().randomGenerator()),
+      dispatcher_(dispatcher), time_source_(context.timeSource()),
+      retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
       reset_headers_(route_policy.resetHeaders()),
-      reset_max_interval_(route_policy.resetMaxInterval()),
-      auto_configured_for_http3_(auto_configured_for_http3),
-      conn_pool_new_stream_with_early_data_and_http3_(
-          conn_pool_new_stream_with_early_data_and_http3) {
-  if (conn_pool_new_stream_with_early_data_and_http3_ &&
-      (cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
+      reset_max_interval_(route_policy.resetMaxInterval()), retry_on_(route_policy.retryOn()),
+      retries_remaining_(route_policy.numRetries()), priority_(priority),
+      auto_configured_for_http3_(auto_configured_for_http3) {
+  if ((cluster.features() & Upstream::ClusterInfo::Features::HTTP3) &&
       Http::Utility::isSafeRequest(request_headers)) {
     // Because 0-RTT requests could be rejected because they are sent too early, and such requests
     // should always be retried, setup retry policy for 425 response code for all potential 0-RTT
@@ -164,7 +156,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(
-          std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
+          Http::HeaderUtility::createHeaderData(header_matcher, context));
     }
   }
 }
@@ -185,13 +177,13 @@ void RetryStateImpl::enableBackoffTimer() {
     // be reused.
     ratelimited_backoff_strategy_.reset();
 
-    cluster_.stats().upstream_rq_retry_backoff_ratelimited_.inc();
+    cluster_.trafficStats()->upstream_rq_retry_backoff_ratelimited_.inc();
 
   } else {
     // Otherwise we use a fully jittered exponential backoff algorithm.
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 
-    cluster_.stats().upstream_rq_retry_backoff_exponential_.inc();
+    cluster_.trafficStats()->upstream_rq_retry_backoff_exponential_.inc();
   }
 }
 
@@ -217,6 +209,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
       ret |= RetryPolicy::RETRY_ON_RESET;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.ResetBeforeRequest) {
+      ret |= RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure) {
       ret |= RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE;
     } else {
@@ -277,7 +271,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   // retry this particular request, we can infer that we did a retry earlier
   // and it was successful.
   if ((backoff_callback_ || next_loop_callback_) && would_retry == RetryDecision::NoRetry) {
-    cluster_.stats().upstream_rq_retry_success_.inc();
+    cluster_.trafficStats()->upstream_rq_retry_success_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_success_.inc();
     }
@@ -295,7 +289,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   // The request has exhausted the number of retries allotted to it by the retry policy configured
   // (or the x-envoy-max-retries header).
   if (retries_remaining_ == 0) {
-    cluster_.stats().upstream_rq_retry_limit_exceeded_.inc();
+    cluster_.trafficStats()->upstream_rq_retry_limit_exceeded_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
     }
@@ -308,7 +302,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   retries_remaining_--;
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
-    cluster_.stats().upstream_rq_retry_overflow_.inc();
+    cluster_.trafficStats()->upstream_rq_retry_overflow_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_overflow_.inc();
     }
@@ -324,7 +318,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
 
   ASSERT(!backoff_callback_ && !next_loop_callback_);
   cluster_.resourceManager(priority_).retries().inc();
-  cluster_.stats().upstream_rq_retry_.inc();
+  cluster_.trafficStats()->upstream_rq_retry_.inc();
   if (vcluster_) {
     vcluster_->stats().upstream_rq_retry_.inc();
   }
@@ -345,7 +339,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
                                                const Http::RequestHeaderMap& original_request,
                                                DoRetryHeaderCallback callback) {
   // This may be overridden in wouldRetryFromHeaders().
-  bool disable_early_data = !conn_pool_new_stream_with_early_data_and_http3_;
+  bool disable_early_data = false;
   const RetryDecision retry_decision =
       wouldRetryFromHeaders(response_headers, original_request, disable_early_data);
 
@@ -364,11 +358,13 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
-                                             Http3Used http3_used, DoRetryResetCallback callback) {
+                                             Http3Used http3_used, DoRetryResetCallback callback,
+                                             bool upstream_request_started) {
 
   // Following wouldRetryFromReset() may override the value.
   bool disable_http3 = false;
-  const RetryDecision retry_decision = wouldRetryFromReset(reset_reason, http3_used, disable_http3);
+  const RetryDecision retry_decision =
+      wouldRetryFromReset(reset_reason, http3_used, disable_http3, upstream_request_started);
   return shouldRetry(retry_decision, [disable_http3, callback]() { callback(disable_http3); });
 }
 
@@ -418,8 +414,7 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
     for (auto code : retriable_status_codes_) {
       if (response_status == code) {
-        if (!conn_pool_new_stream_with_early_data_and_http3_ ||
-            static_cast<Http::Code>(code) != Http::Code::TooEarly) {
+        if (static_cast<Http::Code>(code) != Http::Code::TooEarly) {
           return RetryDecision::RetryWithBackoff;
         }
         if (original_request.get(Http::Headers::get().EarlyData).empty()) {
@@ -467,7 +462,8 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    Http3Used http3_used, bool& disable_http3) {
+                                    Http3Used http3_used, bool& disable_http3,
+                                    bool upstream_request_started) {
   ASSERT(!disable_http3);
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
@@ -475,27 +471,35 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     return RetryDecision::NoRetry;
   }
 
-  if (conn_pool_new_stream_with_early_data_and_http3_) {
-    if (reset_reason == Http::StreamResetReason::ConnectionFailure) {
-      if (http3_used != Http3Used::Unknown && clusterSupportsHttp3AndTcpFallback(cluster_)) {
-        // Already got request encoder, so this must be a 0-RTT handshake failure. Retry
-        // immediately.
-        // TODO(danzh) consider making the retry configurable.
-        ASSERT(http3_used == Http3Used::Yes,
-               "0-RTT was attempted on non-Quic connection and failed.");
-        return RetryDecision::RetryImmediately;
-      }
-      if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE)) {
-        // This is a pool failure.
-        return RetryDecision::RetryWithBackoff;
-      }
-    } else if (http3_used == Http3Used::Yes && clusterSupportsHttp3AndTcpFallback(cluster_) &&
-               (retry_on_ & RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE)) {
-      // Retry any post-handshake failure immediately with http3 disabled if the
-      // failed request was sent over Http/3.
-      disable_http3 = true;
+  if (reset_reason == Http::StreamResetReason::LocalConnectionFailure ||
+      reset_reason == Http::StreamResetReason::RemoteConnectionFailure ||
+      reset_reason == Http::StreamResetReason::ConnectionTimeout) {
+    if (http3_used != Http3Used::Unknown && clusterSupportsHttp3AndTcpFallback(cluster_)) {
+      // Already got request encoder, so this must be a 0-RTT handshake failure. Retry
+      // immediately.
+      // TODO(danzh) consider making the retry configurable.
+      ASSERT(http3_used == Http3Used::Yes,
+             "0-RTT was attempted on non-Quic connection and failed.");
       return RetryDecision::RetryImmediately;
     }
+    if (retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) {
+      // This is a pool failure.
+      return RetryDecision::RetryWithBackoff;
+    }
+  } else if (http3_used == Http3Used::Yes && clusterSupportsHttp3AndTcpFallback(cluster_) &&
+             (retry_on_ & RetryPolicy::RETRY_ON_HTTP3_POST_CONNECT_FAILURE)) {
+    // Retry any post-handshake failure immediately with http3 disabled if the
+    // failed request was sent over Http/3.
+    disable_http3 = true;
+    return RetryDecision::RetryImmediately;
+  }
+
+  // Technically, this doesn't *have* to go before the RETRY_ON_RESET check,
+  // but it's safer for the user if they have them both set
+  // for some reason.
+  if (retry_on_ & RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST && !upstream_request_started) {
+    // Only return a positive retry decision if we haven't sent any bytes upstream.
+    return RetryDecision::RetryWithBackoff;
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
@@ -510,12 +514,6 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) &&
       reset_reason == Http::StreamResetReason::RemoteRefusedStreamReset) {
-    return RetryDecision::RetryWithBackoff;
-  }
-
-  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) &&
-      reset_reason == Http::StreamResetReason::ConnectionFailure) {
-    ASSERT(!conn_pool_new_stream_with_early_data_and_http3_);
     return RetryDecision::RetryWithBackoff;
   }
 

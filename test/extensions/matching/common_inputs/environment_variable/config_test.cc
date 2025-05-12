@@ -31,7 +31,7 @@ TEST(ConfigTest, TestConfig) {
     auto input_factory = factory.createCommonProtocolInputFactoryCb(
         *message, ProtobufMessage::getStrictValidationVisitor());
     EXPECT_NE(nullptr, input_factory);
-    EXPECT_EQ(input_factory()->get(), absl::nullopt);
+    EXPECT_TRUE(absl::holds_alternative<absl::monostate>(input_factory()->get()));
   }
 
   TestEnvironment::setEnvVar("foo", "bar", 1);
@@ -39,7 +39,7 @@ TEST(ConfigTest, TestConfig) {
     auto input_factory = factory.createCommonProtocolInputFactoryCb(
         *message, ProtobufMessage::getStrictValidationVisitor());
     EXPECT_NE(nullptr, input_factory);
-    EXPECT_EQ(input_factory()->get(), absl::make_optional("bar"));
+    EXPECT_EQ(absl::get<std::string>(input_factory()->get()), "bar");
   }
 
   TestEnvironment::unsetEnvVar("foo");

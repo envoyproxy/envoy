@@ -1,7 +1,7 @@
 #include <memory>
 
 #include "source/extensions/common/dubbo/codec.h"
-#include "source/extensions/common/dubbo/message_impl.h"
+#include "source/extensions/common/dubbo/message.h"
 
 #include "test/extensions/common/dubbo/mocks.h"
 #include "test/test_common/printers.h"
@@ -227,7 +227,6 @@ TEST(DubboCodecTest, DecodeDataTest) {
     context->setMessageType(MessageType::Request);
     context->setRequestId(1);
     context->setBodySize(buffer.length() + 1);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -245,12 +244,12 @@ TEST(DubboCodecTest, DecodeDataTest) {
     context->setMessageType(MessageType::Request);
     context->setRequestId(1);
     context->setBodySize(buffer.length());
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
-        .WillOnce(testing::Return(testing::ByMove(std::make_unique<RpcRequestImpl>())));
+        .WillOnce(
+            testing::Return(testing::ByMove(std::make_unique<RpcRequest>("a", "b", "c", "d"))));
 
     EXPECT_EQ(DecodeStatus::Success, codec.decodeData(buffer, metadata));
     EXPECT_EQ(true, metadata.hasRequest());
@@ -267,7 +266,6 @@ TEST(DubboCodecTest, DecodeDataTest) {
     context->setMessageType(MessageType::HeartbeatRequest);
     context->setRequestId(1);
     context->setBodySize(buffer.length());
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -290,12 +288,11 @@ TEST(DubboCodecTest, DecodeDataTest) {
     context->setRequestId(1);
     context->setBodySize(buffer.length());
     context->setResponseStatus(ResponseStatus::Ok);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
-        .WillOnce(testing::Return(testing::ByMove(std::make_unique<RpcResponseImpl>())));
+        .WillOnce(testing::Return(testing::ByMove(std::make_unique<RpcResponse>())));
 
     EXPECT_EQ(DecodeStatus::Success, codec.decodeData(buffer, metadata));
     EXPECT_EQ(true, metadata.hasResponse());
@@ -313,7 +310,6 @@ TEST(DubboCodecTest, DecodeDataTest) {
     context->setRequestId(1);
     context->setBodySize(buffer.length());
     context->setResponseStatus(ResponseStatus::Ok);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -336,7 +332,6 @@ TEST(DubboCodecTest, DecodeDataTest) {
     context->setRequestId(1);
     context->setBodySize(buffer.length());
     context->setResponseStatus(ResponseStatus::Ok);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -360,7 +355,6 @@ TEST(DubboCodecTest, EncodeTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Request);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -397,7 +391,6 @@ TEST(DubboCodecTest, EncodeTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Oneway);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -433,7 +426,6 @@ TEST(DubboCodecTest, EncodeTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::HeartbeatRequest);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -470,7 +462,6 @@ TEST(DubboCodecTest, EncodeTest) {
     context->setMessageType(MessageType::Response);
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -507,7 +498,6 @@ TEST(DubboCodecTest, EncodeTest) {
     context->setMessageType(MessageType::Exception);
     context->setResponseStatus(ResponseStatus::BadRequest);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -535,6 +525,42 @@ TEST(DubboCodecTest, EncodeTest) {
     EXPECT_EQ(8, buffer.peekBEInt<int32_t>(BodySizeOffset));
   }
 
+  // Encode exception response with ServerError
+  {
+    Buffer::OwnedImpl buffer;
+    MessageMetadata metadata;
+
+    auto context = std::make_unique<Context>();
+    context->setMessageType(MessageType::Exception);
+    context->setResponseStatus(ResponseStatus::ServerError);
+    context->setRequestId(12345);
+
+    metadata.setContext(std::move(context));
+
+    EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _))
+        .WillOnce(testing::Invoke(
+            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+
+    codec.encode(buffer, metadata);
+
+    EXPECT_EQ(DubboCodec::HeadersSize + 8, buffer.length());
+
+    // Check magic number.
+    EXPECT_EQ(MagicNumber, buffer.peekBEInt<uint16_t>());
+
+    // Check flag.
+    EXPECT_EQ(0x02, buffer.peekBEInt<uint8_t>(FlagOffset));
+
+    // Check status. Only response has valid status byte.
+    EXPECT_EQ(80, buffer.peekBEInt<uint8_t>(StatusOffset));
+
+    // Check request id.
+    EXPECT_EQ(12345, buffer.peekBEInt<int64_t>(RequestIDOffset));
+
+    // Check body size.
+    EXPECT_EQ(8, buffer.peekBEInt<int32_t>(BodySizeOffset));
+  }
+
   // Encode heartbeat response
   {
     Buffer::OwnedImpl buffer;
@@ -544,7 +570,6 @@ TEST(DubboCodecTest, EncodeTest) {
     context->setMessageType(MessageType::HeartbeatResponse);
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -581,7 +606,6 @@ TEST(DubboCodecTest, EncodeTest) {
     context->setMessageType(static_cast<MessageType>(6));
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -600,7 +624,6 @@ TEST(DubboCodecTest, EncodeHeaderForTestTest) {
     context->setMessageType(static_cast<MessageType>(6));
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     EXPECT_DEATH(codec.encodeHeaderForTest(buffer, *context), ".*panic: corrupted enum.*");
   }
@@ -613,7 +636,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::HeartbeatRequest);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -621,7 +643,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::HeartbeatResponse, response->messageType());
     EXPECT_EQ(12345, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::Ok, response->responseStatus());
     EXPECT_EQ(true, response->context().heartbeat());
   }
@@ -632,7 +653,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Request);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -641,14 +661,12 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::Response, response->messageType());
     EXPECT_EQ(12345, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::Ok, response->responseStatus());
     EXPECT_EQ(false, response->context().heartbeat());
     EXPECT_EQ(RpcResponseType::ResponseWithValue, response->response().responseType().value());
 
-    auto typed_response = dynamic_cast<RpcResponseImpl*>(&response->mutableResponse());
-    EXPECT_NE(nullptr, typed_response);
-    EXPECT_EQ("anything", typed_response->localRawMessage().value());
+    auto& typed_response = response->mutableResponse();
+    EXPECT_EQ("anything", typed_response.content().result()->toString().value().get());
   }
 
   // Local normal response without response type.
@@ -657,7 +675,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Request);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -666,14 +683,13 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::Response, response->messageType());
     EXPECT_EQ(12345, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::Ok, response->responseStatus());
     EXPECT_EQ(false, response->context().heartbeat());
-    EXPECT_EQ(false, response->response().responseType().has_value());
+    EXPECT_EQ(true, response->response().responseType().has_value());
+    EXPECT_EQ(RpcResponseType::ResponseWithValue, response->response().responseType().value());
 
-    auto typed_response = dynamic_cast<RpcResponseImpl*>(&response->mutableResponse());
-    EXPECT_NE(nullptr, typed_response);
-    EXPECT_EQ("anything", typed_response->localRawMessage().value());
+    auto& typed_response = response->mutableResponse();
+    EXPECT_EQ("anything", typed_response.content().result()->toString().value().get());
   }
 
   // Local normal response with exception type.
@@ -682,7 +698,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Request);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -691,14 +706,12 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::Exception, response->messageType());
     EXPECT_EQ(12345, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::Ok, response->responseStatus());
     EXPECT_EQ(false, response->context().heartbeat());
     EXPECT_EQ(RpcResponseType::ResponseWithException, response->response().responseType().value());
 
-    auto typed_response = dynamic_cast<RpcResponseImpl*>(&response->mutableResponse());
-    EXPECT_NE(nullptr, typed_response);
-    EXPECT_EQ("anything", typed_response->localRawMessage().value());
+    auto& typed_response = response->mutableResponse();
+    EXPECT_EQ("anything", typed_response.content().result()->toString().value().get());
   }
 
   // Local normal response with exception type.
@@ -707,7 +720,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Request);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -717,15 +729,13 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::Exception, response->messageType());
     EXPECT_EQ(12345, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::Ok, response->responseStatus());
     EXPECT_EQ(false, response->context().heartbeat());
     EXPECT_EQ(RpcResponseType::ResponseWithExceptionWithAttachments,
               response->response().responseType().value());
 
-    auto typed_response = dynamic_cast<RpcResponseImpl*>(&response->mutableResponse());
-    EXPECT_NE(nullptr, typed_response);
-    EXPECT_EQ("anything", typed_response->localRawMessage().value());
+    auto& typed_response = response->mutableResponse();
+    EXPECT_EQ("anything", typed_response.content().result()->toString().value().get());
   }
 
   // Local exception response.
@@ -734,7 +744,6 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
     auto context = std::make_unique<Context>();
     context->setMessageType(MessageType::Request);
     context->setRequestId(12345);
-    context->setSerializeType(SerializeType::Hessian2);
 
     metadata.setContext(std::move(context));
 
@@ -743,15 +752,13 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::Exception, response->messageType());
     EXPECT_EQ(12345, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::BadRequest, response->responseStatus());
     EXPECT_EQ(false, response->context().heartbeat());
     // Response type will be ignored for non-Ok response.
     EXPECT_EQ(false, response->response().responseType().has_value());
 
-    auto typed_response = dynamic_cast<RpcResponseImpl*>(&response->mutableResponse());
-    EXPECT_NE(nullptr, typed_response);
-    EXPECT_EQ("anything", typed_response->localRawMessage().value());
+    auto& typed_response = response->mutableResponse();
+    EXPECT_EQ("anything", typed_response.content().result()->toString().value().get());
   }
 
   // Local response without request context.
@@ -763,15 +770,13 @@ TEST(DirectResponseUtilTest, DirectResponseUtilTest) {
 
     EXPECT_EQ(MessageType::Exception, response->messageType());
     EXPECT_EQ(0, response->requestId());
-    EXPECT_EQ(SerializeType::Hessian2, response->context().serializeType());
     EXPECT_EQ(ResponseStatus::BadRequest, response->responseStatus());
     EXPECT_EQ(false, response->context().heartbeat());
     // Response type will be ignored for non-Ok response.
     EXPECT_EQ(false, response->response().responseType().has_value());
 
-    auto typed_response = dynamic_cast<RpcResponseImpl*>(&response->mutableResponse());
-    EXPECT_NE(nullptr, typed_response);
-    EXPECT_EQ("anything", typed_response->localRawMessage().value());
+    auto& typed_response = response->mutableResponse();
+    EXPECT_EQ("anything", typed_response.content().result()->toString().value().get());
   }
 }
 

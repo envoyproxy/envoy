@@ -58,7 +58,7 @@ public:
   /**
    * Default constructor. Sets up for inline storage.
    */
-  UnionStringBase() : buffer_(InlinedStringVector()) {
+  UnionStringBase() : buffer_(std::in_place_type<InlinedStringVector>) {
     ASSERT((getInVec(buffer_).capacity()) >= MaxIntegerLength);
     ASSERT(valid());
   }

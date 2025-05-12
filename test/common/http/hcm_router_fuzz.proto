@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "test/fuzz/common.proto";
+
+enum Clusters {
+  DEFAULT0 = 0;
+  DEFAULT1 = 1;
+  DEFAULT2 = 2;
+}
+
+message AdvanceTimeAction {
+  uint32 milliseconds = 1;
+}
+
+message ReconfigureClusterAction {
+  Clusters cluster = 1;
+  bool maintenance_mode = 2;
+  bool enable_internal_redirect = 3;
+  bool allow_cross_scheme_redirect = 4;
+  bool allow_early_data = 5;
+}
+
+message RequestHeaderAction {
+  Clusters cluster = 1;
+  test.fuzz.Headers headers = 2;
+  bool end_stream = 3;
+}
+
+message RequestDataAction {
+  Clusters cluster = 1;
+  uint32 stream = 2;
+  bytes data = 3;
+  bool end_stream = 4;
+}
+
+message RequestTrailerAction {
+  Clusters cluster = 1;
+  uint32 stream = 2;
+  test.fuzz.Headers trailers = 3;
+}
+
+message RespondHeaderAction {
+  Clusters cluster = 1;
+  uint32 stream = 2;
+  test.fuzz.Headers headers = 3;
+  bool end_stream = 4;
+}
+
+message RespondDataAction {
+  Clusters cluster = 1;
+  uint32 stream = 2;
+  bytes data = 3;
+  bool end_stream = 4;
+}
+
+message RespondTrailerAction {
+  Clusters cluster = 1;
+  uint32 stream = 2;
+  test.fuzz.Headers trailers = 3;
+}
+
+message FuzzAction {
+  oneof action {
+    AdvanceTimeAction advance_time = 1;
+    ReconfigureClusterAction reconfigure_cluster = 2;
+    RequestHeaderAction request_header = 3;
+    RequestDataAction request_data = 4;
+    RequestTrailerAction request_trailer = 5;
+    RespondHeaderAction respond_header = 6;
+    RespondDataAction respond_data = 7;
+    RespondTrailerAction respond_trailer = 8;
+  }
+}
+
+message RedirectFuzzCase {
+  repeated FuzzAction actions = 1;
+}

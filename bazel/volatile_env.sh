@@ -1,4 +1,6 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+set -e
 
 if [[ ! -f bazel-out/volatile-status.txt ]]; then
     # shellcheck disable=SC2016

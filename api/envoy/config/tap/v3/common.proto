@@ -4,6 +4,7 @@ package envoy.config.tap.v3;
 
 import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/route/v3/route_components.proto";
 
@@ -183,7 +184,7 @@ message OutputConfig {
 }
 
 // Tap output sink configuration.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message OutputSink {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.OutputSink";
@@ -259,6 +260,9 @@ message OutputSink {
     //   been configured to receive tap configuration from some other source (e.g., static
     //   file, XDS, etc.) configuring the buffered admin output type will fail.
     BufferedAdminSink buffered_admin = 5;
+
+    // Tap output filter will be defined by an extension type
+    core.v3.TypedExtensionConfig custom_sink = 6;
   }
 }
 

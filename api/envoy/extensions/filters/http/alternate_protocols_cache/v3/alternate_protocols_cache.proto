@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.alternate_protocols_cache.v3;
 
 import "envoy/config/core/v3/protocol.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.alternate_protocols_cache.v3";
@@ -17,9 +18,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the alternate protocols cache HTTP filter.
 // [#extension: envoy.filters.http.alternate_protocols_cache]
 message FilterConfig {
-  // If set, causes the use of the alternate protocols cache, which is responsible for
-  // parsing and caching HTTP Alt-Svc headers. This enables the use of HTTP/3 for upstream
-  // servers that advertise supporting it.
-  // TODO(RyanTheOptimist): Make this field required when HTTP/3 is enabled via auto_http.
-  config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 1;
+  // This field is ignored: the alternate protocols cache filter will use the
+  // cache for the cluster the request is routed to.
+  config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }

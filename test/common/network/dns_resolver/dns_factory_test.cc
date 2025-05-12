@@ -211,7 +211,7 @@ TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBoostrapWron
   bootstrap_config.set_use_tcp_for_dns_lookups(false);
 
   EXPECT_TRUE(checkTypedDnsResolverConfigExist(bootstrap_config, typed_dns_resolver_config));
-  EXPECT_FALSE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
+  EXPECT_FALSE(tryUseAppleApiForDnsLookups(typed_dns_resolver_config));
   typed_dns_resolver_config = makeDnsResolverConfig(bootstrap_config);
 
   // verify the typed_dns_resolver_config data matching DNS resolution config

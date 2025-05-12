@@ -32,7 +32,7 @@ public:
    * @return CallbackHandle the handle which can remove that validation callback.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
-  addValidationCallback(std::function<void(const SecretType&)> callback) PURE;
+  addValidationCallback(std::function<absl::Status(const SecretType&)> callback) PURE;
 
   /**
    * Add secret update callback into secret provider.
@@ -42,7 +42,7 @@ public:
    * @return CallbackHandle the handle which can remove that update callback.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) PURE;
+  addUpdateCallback(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return const Init::Target* A shared init target that can be used by multiple init managers.

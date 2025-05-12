@@ -14,8 +14,8 @@ static void BM_ProtoEncoderNoEscape(benchmark::State& state) {
   const std::string str = std::string(pass_through_encoding);
 
   for (auto _ : state) { // NOLINT
-    Envoy::MessageUtil::getJsonStringFromMessageOrDie(Envoy::ValueUtil::stringValue(str), false,
-                                                      true);
+    Envoy::MessageUtil::getJsonStringFromMessageOrError(Envoy::ValueUtil::stringValue(str), false,
+                                                        true);
   }
 }
 BENCHMARK(BM_ProtoEncoderNoEscape);
@@ -35,8 +35,8 @@ static void BM_ProtoEncoderWithEscape(benchmark::State& state) {
   const std::string str = std::string(escaped_encoding);
 
   for (auto _ : state) { // NOLINT
-    Envoy::MessageUtil::getJsonStringFromMessageOrDie(Envoy::ValueUtil::stringValue(str), false,
-                                                      true);
+    Envoy::MessageUtil::getJsonStringFromMessageOrError(Envoy::ValueUtil::stringValue(str), false,
+                                                        true);
   }
 }
 BENCHMARK(BM_ProtoEncoderWithEscape);

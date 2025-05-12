@@ -15,8 +15,8 @@ class SimpleFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDual
 public:
   SimpleFilterConfig() : EmptyHttpDualFilterConfig(T::name) {}
 
-  Http::FilterFactoryCb createDualFilter(const std::string&,
-                                         Server::Configuration::ServerFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<T>());
     };

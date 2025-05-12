@@ -22,7 +22,7 @@ class UpstreamRawBufferSocketFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory,
       public RawBufferSocketFactory {
 public:
-  Network::UpstreamTransportSocketFactoryPtr createTransportSocketFactory(
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };
@@ -31,7 +31,7 @@ class DownstreamRawBufferSocketFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
       public RawBufferSocketFactory {
 public:
-  Network::DownstreamTransportSocketFactoryPtr
+  absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) override;

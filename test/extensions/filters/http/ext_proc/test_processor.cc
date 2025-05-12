@@ -20,12 +20,6 @@ grpc::Status ProcessorWrapper::Process(
     (*context_callback_)(ctx);
   }
   callback_(stream);
-  if (testing::Test::HasFatalFailure()) {
-    // This is not strictly necessary, but it may help in troubleshooting to
-    // ensure that we return a bad gRPC status if an "ASSERT" failed in the
-    // processor.
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "Fatal test error");
-  }
   return grpc::Status::OK;
 }
 

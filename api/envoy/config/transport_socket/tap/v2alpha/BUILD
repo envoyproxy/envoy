@@ -8,6 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/api/v2/core:pkg",
         "//envoy/config/common/tap/v2alpha:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_xds//udpa/annotations:pkg",
     ],
 )

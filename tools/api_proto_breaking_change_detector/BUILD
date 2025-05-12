@@ -1,5 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -9,8 +9,8 @@ py_binary(
         "detector.py",
     ],
     data = [
-        "@com_github_bufbuild_buf//:buf",
         "@envoy_api//:proto_breaking_change_detector_buf_config",
+        "@rules_buf_toolchains//:buf",
     ],
     main = "detector.py",
     tags = ["manual"],
@@ -25,9 +25,9 @@ py_binary(
     srcs = [
         "detector_ci.py",
     ],
-    args = ["$(location @com_github_bufbuild_buf//:buf)"],
+    args = ["$(location @rules_buf_toolchains//:buf)"],
     data = [
-        "@com_github_bufbuild_buf//:buf",
+        "@rules_buf_toolchains//:buf",
     ],
     deps = [
         ":detector",
@@ -60,8 +60,6 @@ py_test(
         "//tools/testdata/api_proto_breaking_change_detector:proto_breaking_change_detector_testdata",
     ],
     main = "detector_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["manual"],
     deps = [
         ":detector",

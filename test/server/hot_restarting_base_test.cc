@@ -15,10 +15,10 @@ using HotRestartMessage = envoy::HotRestartMessage;
 class MockHotRestartingBase : public HotRestartingBase {
 public:
   MockHotRestartingBase(const std::string& socket_path) : HotRestartingBase(0) {
-    bindDomainSocket(1, "parent", socket_path, 0644);
+    main_rpc_stream_.bindDomainSocket(1, "parent", socket_path, 0644);
   }
   void sendMessage(sockaddr_un& address, const envoy::HotRestartMessage& message) {
-    sendHotRestartMessage(address, message);
+    main_rpc_stream_.sendHotRestartMessage(address, message);
   }
 };
 
@@ -35,9 +35,8 @@ TEST_F(HotRestartingBaseTest, SendMsgRetryFailsAfterRetries) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, const msghdr*, int) {
-        return Api::SysCallSizeResult{0, ECONNREFUSED};
-      }));
+      .WillRepeatedly(Invoke(
+          [&](os_fd_t, const msghdr*, int) { return Api::SysCallSizeResult{0, ECONNREFUSED}; }));
 
   std::string dst_path = "/tmp/dst";
   sockaddr_un sun;

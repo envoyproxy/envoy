@@ -20,6 +20,8 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/str_format.h"
+
 namespace {
 
 const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPatternCase pattern) {
@@ -34,6 +36,8 @@ const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPattern
     return "safe_regex";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
     return "contains";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kCustom:
+    return "custom";
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
     return "match_pattern_not_set";
   }
@@ -111,8 +115,8 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
     }
   }
 
-  return ToolConfig(std::move(request_headers), std::move(response_headers),
-                    check_config.input().random_value());
+  return {std::move(request_headers), std::move(response_headers),
+          static_cast<int>(check_config.input().random_value())};
 }
 
 ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
@@ -133,17 +137,16 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
-  auto config = std::make_unique<Router::ConfigImpl>(
-      route_config, Router::OptionalHttpFilters(), *factory_context,
-      ProtobufMessage::getNullValidationVisitor(), false);
+  auto config = *Router::ConfigImpl::create(route_config, *factory_context,
+                                            ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     ProtobufMessage::StrictValidationVisitorImpl visitor;
     visitor.setRuntime(factory_context->runtime_loader_);
     MessageUtil::checkForUnexpectedFields(route_config, visitor);
   }
 
-  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
-                         std::move(api), Coverage(route_config));
+  return {std::move(factory_context), std::move(config), std::move(stats), std::move(api),
+          Coverage(route_config)};
 }
 
 void RouterCheckTool::assignUniqueRouteNames(
@@ -151,7 +154,8 @@ void RouterCheckTool::assignUniqueRouteNames(
   Random::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
-      route.set_name(random.uuid());
+      std::string name = absl::StrFormat("%s-%s", route.name(), random.uuid());
+      route.set_name(name);
     }
   }
 }
@@ -212,7 +216,7 @@ void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    std::shared_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
     Api::ApiPtr api, Coverage coverage)
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
@@ -223,11 +227,11 @@ RouterCheckTool::RouterCheckTool(
 }
 
 Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
-  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  std::string contents = api.fileSystem().fileReadToEnd(file_path).value();
   if (absl::EndsWith(file_path, ".yaml")) {
-    contents = MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::loadFromYaml(contents));
+    contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
   }
-  return Json::Factory::loadFromString(contents);
+  return Json::Factory::loadFromString(contents).value();
 }
 
 std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
@@ -235,7 +239,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes);
+  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes).value();
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
   TestUtility::validate(validation_config);
 
@@ -248,7 +252,7 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         nullptr, Network::Utility::getCanonicalIpv4LoopbackAddress());
     Envoy::StreamInfo::StreamInfoImpl stream_info(
         Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
-        connection_info_provider);
+        connection_info_provider, StreamInfo::FilterState::LifeSpan::FilterChain);
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
@@ -313,7 +317,7 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config,
     failure.mutable_actual_cluster_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markClusterCovered(*tool_config.route_);
+    coverage_.markClusterCovered(tool_config.route_);
   }
   return matches;
 }
@@ -328,11 +332,11 @@ bool RouterCheckTool::compareVirtualCluster(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   const bool has_virtual_cluster =
       has_route_entry &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr;
+      tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
     Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_)->statName();
+        tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -343,7 +347,7 @@ bool RouterCheckTool::compareVirtualCluster(
     failure.mutable_actual_virtual_cluster_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markVirtualClusterCovered(*tool_config.route_);
+    coverage_.markVirtualClusterCovered(tool_config.route_);
   }
   return matches;
 }
@@ -358,7 +362,7 @@ bool RouterCheckTool::compareVirtualHost(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   std::string actual = "";
   if (has_route_entry) {
-    Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
+    Stats::StatName stat_name = tool_config.route_->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -368,7 +372,7 @@ bool RouterCheckTool::compareVirtualHost(
     failure.mutable_actual_virtual_host_name()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markVirtualHostCovered(*tool_config.route_);
+    coverage_.markVirtualHostCovered(tool_config.route_);
   }
   return matches;
 }
@@ -391,7 +395,7 @@ bool RouterCheckTool::compareRewritePath(
     failure.mutable_actual_path_rewrite()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markPathRewriteCovered(*tool_config.route_);
+    coverage_.markPathRewriteCovered(tool_config.route_);
   }
   return matches;
 }
@@ -414,7 +418,7 @@ bool RouterCheckTool::compareRewriteHost(
     failure.mutable_actual_host_rewrite()->set_value(actual);
   }
   if (matches && has_route_entry) {
-    coverage_.markHostRewriteCovered(*tool_config.route_);
+    coverage_.markHostRewriteCovered(tool_config.route_);
   }
   return matches;
 }
@@ -429,7 +433,7 @@ bool RouterCheckTool::compareRedirectPath(
       tool_config.route_ != nullptr && tool_config.route_->directResponseEntry() != nullptr;
   std::string actual = "";
   if (has_direct_response_entry) {
-    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.request_headers_);
+    actual = tool_config.route_->directResponseEntry()->newUri(*tool_config.request_headers_);
   }
   const bool matches = compareResults(actual, expected.path_redirect().value(), "path_redirect");
   if (!matches) {
@@ -437,7 +441,7 @@ bool RouterCheckTool::compareRedirectPath(
     failure.mutable_actual_path_redirect()->set_value(actual);
   }
   if (matches && has_direct_response_entry) {
-    coverage_.markRedirectPathCovered(*tool_config.route_);
+    coverage_.markRedirectPathCovered(tool_config.route_);
   }
   return matches;
 }
@@ -460,7 +464,7 @@ bool RouterCheckTool::compareRedirectCode(
     failure.mutable_actual_code_redirect()->set_value(actual);
   }
   if (matches && has_direct_response_entry) {
-    coverage_.markRedirectCodeCovered(*tool_config.route_);
+    coverage_.markRedirectCodeCovered(tool_config.route_);
   }
   return matches;
 }
@@ -526,8 +530,9 @@ bool RouterCheckTool::matchHeaderField(
     const HeaderMap& header_map, const envoy::config::route::v3::HeaderMatcher& header,
     const std::string test_type,
     envoy::RouterCheckToolSchema::HeaderMatchFailure& header_match_failure) {
-  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header};
-  if (Envoy::Http::HeaderUtility::matchHeaders(header_map, expected_header_data)) {
+  Envoy::Http::HeaderUtility::HeaderDataPtr expected_header_data{
+      Http::HeaderUtility::createHeaderData(header, *factory_context_)};
+  if (expected_header_data->matchesHeaders(header_map)) {
     return true;
   }
 
@@ -615,6 +620,7 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
 }
 
 Options::Options(int argc, char** argv) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
@@ -634,6 +640,8 @@ Options::Options(int argc, char** argv) {
       "o", "output-path", "Path to output file to write test results", false, "", "string", cmd);
   TCLAP::UnlabeledMultiArg<std::string> unlabelled_configs(
       "unlabelled-configs", "unlabelled configs", false, "unlabelledConfigStrings", cmd);
+  TCLAP::SwitchArg detailed_coverage(
+      "", "detailed-coverage", "Show detailed coverage with routes without tests", cmd, false);
   try {
     cmd.parse(argc, argv);
   } catch (TCLAP::ArgException& e) {
@@ -646,6 +654,7 @@ Options::Options(int argc, char** argv) {
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();
+  detailed_coverage_report_ = detailed_coverage.getValue();
 
   config_path_ = config_path.getValue();
   test_path_ = test_path.getValue();

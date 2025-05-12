@@ -20,6 +20,7 @@ RedisHealthChecker::RedisHealthChecker(
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
+      redis_stats_(generateRedisStats(cluster.info()->statsScope())),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),
       auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
@@ -42,6 +43,11 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   ASSERT(current_request_ == nullptr);
   ASSERT(client_ == nullptr);
+}
+
+RedisHealthCheckerStats RedisHealthChecker::generateRedisStats(Stats::Scope& scope) {
+  std::string prefix("health_check.redis.");
+  return {ALL_REDIS_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
@@ -67,8 +73,8 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ =
-        parent_.client_factory_.create(host_, parent_.dispatcher_, *this, redis_command_stats_,
-                                       parent_.cluster_.info()->statsScope(),
+        parent_.client_factory_.create(host_, parent_.dispatcher_, redis_config_,
+                                       redis_command_stats_, parent_.cluster_.info()->statsScope(),
                                        parent_.auth_username_, parent_.auth_password_, false);
     client_->addConnectionCallbacks(*this);
   }
@@ -95,6 +101,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
+      parent_.redis_stats_.exists_failure_.inc();
       handleFailure(envoy::data::core::v3::ACTIVE);
     }
     break;
@@ -118,12 +125,11 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
-bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
+void RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
     NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&, bool) {
   // Treat any redirection error response from a Redis server as success.
   current_request_ = nullptr;
   handleSuccess();
-  return true;
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {

@@ -12,9 +12,10 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -94,12 +95,12 @@ common_tls_context:
   }
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
   TestUtility::loadFromYaml(TestEnvironment::substitute(target), config);
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-      config, factory_context_);
+  auto cfg =
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
-      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
-          std::move(cfg), *context_manager_, *client_stats_store)};
+      *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+          std::move(cfg), *context_manager_, *client_stats_store->rootScope())};
 }
 
 Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
@@ -111,26 +112,27 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
   tls_cert->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-      tls_context, factory_context_);
-  static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context_, false);
+  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+  return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()),
+      std::vector<std::string>{});
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(
+      "tcp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+      std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                              Network::Test::createRawBufferSocket(), nullptr,
                                              nullptr);
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
-                                   ":" + std::to_string(lookupPort("http")));
+  Network::Address::InstanceConstSharedPtr address = *Network::Utility::resolveUrl(
+      "tcp://" + Network::Test::getLoopbackAddressUrlString(version_) + ":" +
+      std::to_string(lookupPort("http")));
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       client_mtls_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
@@ -168,8 +170,8 @@ void XfccIntegrationTest::initialize() {
     config_helper_.addSslConfig();
   }
 
-  context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   client_tls_ssl_ctx_ = createClientSslContext(false);
   client_mtls_ssl_ctx_ = createClientSslContext(true);
   HttpIntegrationTest::initialize();
@@ -435,6 +437,11 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   });
   initialize();
 
+  // Make sure worker threads are established (#32237).
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
+  EXPECT_TRUE(response->complete());
+
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
 
   // std::cout << "tag_extracted_counter_map = {";
@@ -621,8 +628,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_rq_4xx", "http.downstream_rq_xx"},
       {"http.config_test.downstream_rq_ws_on_non_ws_route",
        "http.downstream_rq_ws_on_non_ws_route"},
-      {"vhost.integration.vcluster.other.upstream_rq_timeout",
-       "vhost.vcluster.upstream_rq_timeout"},
       {"cluster.cluster_0.update_attempt", "cluster.update_attempt"},
       {"cluster.cluster_0.upstream_rq_retry_limit_exceeded",
        "cluster.upstream_rq_retry_limit_exceeded"},
@@ -681,8 +686,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_rq_rx_reset", "http.downstream_rq_rx_reset"},
       {"cluster.cluster_0.upstream_cx_destroy_local_with_active_rq",
        "cluster.upstream_cx_destroy_local_with_active_rq"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry_success",
-       "vhost.vcluster.upstream_rq_retry_success"},
       {"runtime.load_success", "runtime.load_success"},
       {"filesystem.write_failed", "filesystem.write_failed"},
       {"cluster_manager.cluster_modified", "cluster_manager.cluster_modified"},
@@ -710,7 +713,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.admin.downstream_cx_total", "http.downstream_cx_total"},
       {"http.config_test.tracing.client_enabled", "http.tracing.client_enabled"},
       {"http.config_test.downstream_cx_drain_close", "http.downstream_cx_drain_close"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry", "vhost.vcluster.upstream_rq_retry"},
       {"runtime.override_dir_exists", "runtime.override_dir_exists"},
       {"listener_manager.lds.init_fetch_timeout", "listener_manager.lds.init_fetch_timeout"},
       {"cluster.cluster_0.upstream_rq_total", "cluster.upstream_rq_total"},
@@ -733,7 +735,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"cluster.cluster_0.lb_subsets_fallback", "cluster.lb_subsets_fallback"},
       {"listener_manager.listener_in_place_updated", "listener_manager.listener_in_place_updated"},
       {"cluster.cluster_0.upstream_cx_total", "cluster.upstream_cx_total"},
-      {"vhost.integration.vcluster.other.upstream_rq_total", "vhost.vcluster.upstream_rq_total"},
       {"http.admin.downstream_rq_2xx", "http.downstream_rq_xx"},
       {"cluster.cluster_0.lb_subsets_created", "cluster.lb_subsets_created"},
       {"cluster.cluster_0.upstream_rq_retry_backoff_exponential",
@@ -743,8 +744,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"listener.admin.no_filter_chain_match", "listener.admin.no_filter_chain_match"},
       {"http.config_test.passthrough_internal_redirect_too_many_redirects",
        "http.passthrough_internal_redirect_too_many_redirects"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry_overflow",
-       "vhost.vcluster.upstream_rq_retry_overflow"},
       {"http.config_test.downstream_rq_rejected_via_ip_detection",
        "http.downstream_rq_rejected_via_ip_detection"},
       {"cluster.cluster_0.upstream_cx_destroy", "cluster.upstream_cx_destroy"},
@@ -769,8 +768,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.admin.downstream_cx_overload_disable_keepalive",
        "http.downstream_cx_overload_disable_keepalive"},
       {"cluster.cluster_0.lb_zone_routing_all_directly", "cluster.lb_zone_routing_all_directly"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry_limit_exceeded",
-       "vhost.vcluster.upstream_rq_retry_limit_exceeded"},
       {"cluster.cluster_0.upstream_cx_max_duration_reached",
        "cluster.upstream_cx_max_duration_reached"},
       {"http.admin.downstream_rq_4xx", "http.downstream_rq_xx"},

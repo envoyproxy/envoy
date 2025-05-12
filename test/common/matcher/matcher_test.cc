@@ -36,6 +36,63 @@ public:
   MatchTreeFactory<TestData, absl::string_view> factory_;
 };
 
+MATCHER_P(IsStringAction, m, "") {
+  // Accepts an ActionFactoryCb argument.
+  if (arg == nullptr) {
+    *result_listener << "action callback is nullptr";
+    return false;
+  }
+  ActionPtr action = arg();
+  StringAction string_action = action->getTyped<StringAction>();
+  return ::testing::ExplainMatchResult(m, string_action.string_, result_listener);
+}
+
+MATCHER_P(HasStringAction, m, "") {
+  // Accepts a MatchResult argument.
+  if (arg.match_state_ != MatchState::MatchComplete) {
+    *result_listener << "match_state_ is not MatchComplete";
+    return false;
+  }
+  if (arg.on_match_ == absl::nullopt) {
+    *result_listener << "on_match_ is nullopt";
+    return false;
+  }
+  return ExplainMatchResult(IsStringAction(m), arg.on_match_->action_cb_, result_listener);
+}
+
+MATCHER(HasNoMatch, "") {
+  // Accepts a MatchResult argument.
+  if (arg.match_state_ != MatchState::MatchComplete) {
+    *result_listener << "match_state_ is not MatchComplete";
+    return false;
+  }
+  if (arg.on_match_ != absl::nullopt) {
+    *result_listener << "on_match_ was not nullopt";
+    return false;
+  }
+  return true;
+}
+
+MATCHER(HasSubMatcher, "") {
+  // Accepts a MatchResult argument.
+  if (arg.match_state_ != MatchState::MatchComplete) {
+    *result_listener << "match_state_ is not MatchComplete";
+    return false;
+  }
+  if (arg.on_match_ == absl::nullopt) {
+    *result_listener << "on_match_ is nullopt";
+    return false;
+  }
+  if (arg.on_match_->matcher_ == nullptr) {
+    *result_listener << "on_match_->matcher_ is nullptr, expected it to not be.";
+    if (arg.on_match_->action_cb_ != nullptr) {
+      *result_listener << "\non_match_->action_cb_ is not nullptr.";
+    }
+    return false;
+  }
+  return true;
+}
+
 TEST_F(MatcherTest, TestMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
@@ -54,7 +111,7 @@ matcher_tree:
                   name: test_action
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: match!!
+                    value: expected!
               predicate:
                 single_predicate:
                   input:
@@ -80,9 +137,7 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestPrefixMatcher) {
@@ -103,7 +158,7 @@ matcher_tree:
                   name: test_action
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: match!!
+                    value: expected!
               predicate:
                 single_predicate:
                   input:
@@ -129,9 +184,181 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
+}
+
+TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  prefix_match_map:
+    map:
+      3.14:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: not expected
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+  auto inner_input_factory = TestDataInputBoolFactory("foo");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
+
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat(
+      "Unsupported data input type: float, currently only string type is supported in map matcher");
+
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
+TEST_F(MatcherTest, TestInvalidFloatExactMapMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.FloatValue
+  exact_match_map:
+    map:
+      3.14:
+        matcher:
+          matcher_list:
+            matchers:
+            - on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: not expected
+              predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+  auto inner_input_factory = TestDataInputBoolFactory("foo");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat(
+      "Unsupported data input type: float, currently only string type is supported in map matcher");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
+TEST_F(MatcherTest, InvalidDataInput) {
+  const std::string yaml = R"EOF(
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: not expected
+    predicate:
+      single_predicate:
+        input:
+          name: generic
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.FloatValue
+        value_match:
+          exact: 3.14
+
+  )EOF";
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"));
+  auto match_tree = factory_.create(matcher);
+  std::string error_message = absl::StrCat("Unsupported data input type: float.",
+                                           " The matcher supports input type: string");
+  EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
+}
+
+TEST_F(MatcherTest, InvalidDataInputInAndMatcher) {
+  const std::string yaml = R"EOF(
+  matcher_list:
+    matchers:
+    - on_match:
+        action:
+          name: test_action
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: not expected
+      predicate:
+        and_matcher:
+          predicate:
+          - single_predicate:
+              input:
+                name: inner_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.FloatValue
+              value_match:
+                exact: 3.14
+          - single_predicate:
+              input:
+                name: inner_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.FloatValue
+              value_match:
+                exact: 3.14
+
+  )EOF";
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_input_factory = TestDataInputFloatFactory(3.14);
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.FloatValue"))
+      .Times(2);
+
+  std::string error_message = absl::StrCat("Unsupported data input type: float.",
+                                           " The matcher supports input type: string");
+  EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher)(), EnvoyException, error_message);
 }
 
 TEST_F(MatcherTest, TestAnyMatcher) {
@@ -141,7 +368,7 @@ on_no_match:
     name: test_action
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
-      value: match!!
+      value: expected!
   )EOF";
 
   xds::type::matcher::v3::Matcher matcher;
@@ -152,9 +379,7 @@ on_no_match:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, CustomGenericInput) {
@@ -166,7 +391,7 @@ matcher_list:
         name: test_action
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
-          value: match!!
+          value: expected!
     predicate:
       single_predicate:
         input:
@@ -186,9 +411,7 @@ matcher_list:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, CustomMatcher) {
@@ -200,7 +423,7 @@ matcher_list:
         name: test_action
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
-          value: match!!
+          value: expected!
     predicate:
       single_predicate:
         input:
@@ -231,8 +454,7 @@ matcher_list:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestAndMatcher) {
@@ -253,7 +475,7 @@ matcher_tree:
                   name: test_action
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: match!!
+                    value: expected!
               predicate:
                 and_matcher:
                   predicate:
@@ -289,9 +511,7 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestOrMatcher) {
@@ -312,7 +532,7 @@ matcher_tree:
                   name: test_action
                   typed_config:
                     "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: match!!
+                    value: expected!
               predicate:
                 or_matcher:
                   predicate:
@@ -322,7 +542,7 @@ matcher_tree:
                         typed_config:
                           "@type": type.googleapis.com/google.protobuf.BoolValue
                       value_match:
-                        exact: foo
+                        exact: bar
                   - single_predicate:
                       input:
                         name: inner_input
@@ -348,9 +568,7 @@ matcher_tree:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestNotMatcher) {
@@ -362,7 +580,7 @@ matcher_list:
         name: test_action
         typed_config:
           "@type": type.googleapis.com/google.protobuf.StringValue
-          value: match!!
+          value: not expected
     predicate:
       not_matcher:
         single_predicate:
@@ -387,8 +605,7 @@ matcher_list:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_FALSE(result.on_match_.has_value());
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST_F(MatcherTest, TestRecursiveMatcher) {
@@ -404,7 +621,7 @@ matcher_list:
                 name: test_action
                 typed_config:
                   "@type": type.googleapis.com/google.protobuf.StringValue
-                  value: match!!
+                  value: expected!
             predicate:
               single_predicate:
                 input:
@@ -437,13 +654,11 @@ matcher_list:
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_EQ(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(result, HasSubMatcher());
 
   const auto recursive_result = evaluateMatch(*(match_tree()), TestData());
   EXPECT_EQ(recursive_result.match_state_, MatchState::MatchComplete);
-  EXPECT_NE(recursive_result.result_, nullptr);
+  EXPECT_THAT(recursive_result.result_, IsStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, RecursiveMatcherNoMatch) {

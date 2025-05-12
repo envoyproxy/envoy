@@ -7,6 +7,7 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -19,24 +20,23 @@ class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
 public:
   explicit HttpHeadersDataInputBase(const std::string& name) : name_(name) {}
 
-  virtual absl::optional<std::reference_wrapper<const HeaderType>>
-  headerMap(const HttpMatchingData& data) const PURE;
+  virtual OptRef<const HeaderType> headerMap(const HttpMatchingData& data) const PURE;
 
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
-    const auto maybe_headers = headerMap(data);
+    const OptRef<const HeaderType> maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
-      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
     }
 
-    auto header_string = HeaderUtility::getAllOfHeaderAsString(maybe_headers->get(), name_, ",");
+    auto header_string = HeaderUtility::getAllOfHeaderAsString(*maybe_headers, name_, ",");
 
     if (header_string.result()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
               std::string(header_string.result().value())};
     }
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
   }
 
 private:
@@ -75,8 +75,7 @@ class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase<RequestHeade
 public:
   explicit HttpRequestHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const RequestHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const RequestHeaderMap> headerMap(const HttpMatchingData& data) const override {
     return data.requestHeaders();
   }
 };
@@ -88,12 +87,13 @@ public:
   HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_headers") {}
 };
 
+DECLARE_FACTORY(HttpRequestHeadersDataInputFactory);
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const ResponseHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const ResponseHeaderMap> headerMap(const HttpMatchingData& data) const override {
     return data.responseHeaders();
   }
 };
@@ -105,12 +105,13 @@ public:
   HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_headers") {}
 };
 
+DECLARE_FACTORY(HttpResponseHeadersDataInputFactory);
+
 class HttpRequestTrailersDataInput : public HttpHeadersDataInputBase<RequestTrailerMap> {
 public:
   explicit HttpRequestTrailersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const RequestTrailerMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const RequestTrailerMap> headerMap(const HttpMatchingData& data) const override {
     return data.requestTrailers();
   }
 };
@@ -122,13 +123,14 @@ public:
   HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_trailers") {}
 };
 
+DECLARE_FACTORY(HttpRequestTrailersDataInputFactory);
+
 class HttpResponseTrailersDataInput : public HttpHeadersDataInputBase<ResponseTrailerMap> {
 public:
   explicit HttpResponseTrailersDataInput(const std::string& name)
       : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const ResponseTrailerMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const ResponseTrailerMap> headerMap(const HttpMatchingData& data) const override {
     return data.responseTrailers();
   }
 };
@@ -139,6 +141,63 @@ class HttpResponseTrailersDataInputFactory
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };
+
+DECLARE_FACTORY(HttpResponseTrailersDataInputFactory);
+
+class HttpRequestQueryParamsDataInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit HttpRequestQueryParamsDataInput(const std::string& query_param)
+      : query_param_(query_param) {}
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+    const auto maybe_headers = data.requestHeaders();
+
+    if (!maybe_headers) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+    }
+
+    const auto ret = maybe_headers->Path();
+    if (!ret) {
+      return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()};
+    }
+
+    auto params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(ret->value().getStringView());
+
+    auto ItParam = params.getFirstValue(query_param_);
+    if (!ItParam.has_value()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            std::move(ItParam.value())};
+  }
+
+private:
+  const std::string query_param_;
+};
+
+class HttpRequestQueryParamsDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "query_params"; }
+
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::type::matcher::v3::HttpRequestQueryParamMatchInput&>(config,
+                                                                          validation_visitor);
+
+    return [query_param = typed_config.query_param()] {
+      return std::make_unique<HttpRequestQueryParamsDataInput>(query_param);
+    };
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::type::matcher::v3::HttpRequestQueryParamMatchInput>();
+  }
+};
+
+DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

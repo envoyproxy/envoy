@@ -1,6 +1,8 @@
 Which Envoy features are not supported on Windows?
 ==================================================
 
+.. include:: ../../_include/windows_support_ended.rst
+
 The vast majority of Envoy features are supported on Windows. There are few exceptions that are documented explicitly.
 The most notable features that are not supported on Windows are:
 

@@ -18,16 +18,17 @@ Http::FilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProtoTyped(
     Server::Configuration::FactoryContext& context) {
   auto stats = std::make_shared<DynamoStats>(context.scope(), stats_prefix);
   return [&context, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Dynamo::DynamoFilter>(
-        context.runtime(), stats, context.mainThreadDispatcher().timeSource()));
+    callbacks.addStreamFilter(
+        std::make_shared<Dynamo::DynamoFilter>(context.serverFactoryContext().runtime(), stats,
+                                               context.serverFactoryContext().timeSource()));
   };
 }
 
 /**
  * Static registration for the http dynamodb filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(DynamoFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.http_dynamo_filter"};
+LEGACY_REGISTER_FACTORY(DynamoFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.http_dynamo_filter");
 
 } // namespace Dynamo
 } // namespace HttpFilters

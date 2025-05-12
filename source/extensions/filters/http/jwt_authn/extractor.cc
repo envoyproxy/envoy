@@ -8,6 +8,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/btree_map.h"
@@ -59,7 +60,7 @@ struct JwtConstValueStruct {
   // The header value prefix for Authorization.
   const std::string BearerPrefix{"Bearer "};
 
-  // The default query parameter name to extract JWT token
+  // The default query parameter name to extract JWT
   const std::string AccessTokenParam{"access_token"};
 };
 using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
@@ -92,7 +93,7 @@ public:
                     const LowerCaseString& header)
       : JwtLocationBase(token, issuer_checker), header_(header) {}
 
-  void removeJwt(Http::HeaderMap& headers) const override { headers.remove(header_); }
+  void removeJwt(Http::RequestHeaderMap& headers) const override { headers.remove(header_); }
 
 private:
   // the header name the JWT is extracted from.
@@ -103,12 +104,26 @@ private:
 class JwtParamLocation : public JwtLocationBase {
 public:
   JwtParamLocation(const std::string& token, const JwtIssuerChecker& issuer_checker,
-                   const std::string&)
-      : JwtLocationBase(token, issuer_checker) {}
+                   const std::string& param)
+      : JwtLocationBase(token, issuer_checker), param_(param) {}
 
-  void removeJwt(Http::HeaderMap&) const override {
-    // TODO(qiwzhang): remove JWT from parameter.
+  void removeJwt(Http::RequestHeaderMap& headers) const override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params")) {
+      absl::string_view path = headers.getPathValue();
+      Http::Utility::QueryParamsMulti query_params =
+          Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+
+      query_params.remove(param_);
+
+      const auto updated_path = query_params.replaceQueryString(headers.Path()->value());
+      headers.setPath(updated_path);
+    }
   }
+
+private:
+  // the param name the JWT is extracted from.
+  const std::string& param_;
 };
 
 // The JwtLocation for cookie extraction.
@@ -117,7 +132,7 @@ public:
   JwtCookieLocation(const std::string& token, const JwtIssuerChecker& issuer_checker)
       : JwtLocationBase(token, issuer_checker) {}
 
-  void removeJwt(Http::HeaderMap&) const override {
+  void removeJwt(Http::RequestHeaderMap&) const override {
     // TODO(theshubhamp): remove JWT from cookies.
   }
 };
@@ -136,7 +151,7 @@ public:
 
   std::vector<JwtLocationConstPtr> extract(const Http::RequestHeaderMap& headers) const override;
 
-  void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
+  void sanitizeHeaders(Http::RequestHeaderMap& headers) const override;
 
 private:
   // add a header config
@@ -185,7 +200,7 @@ private:
   // The map of a cookie key to set of issuers specified the cookie.
   absl::btree_map<std::string, CookieLocationSpec> cookie_locations_;
 
-  std::vector<LowerCaseString> forward_payload_headers_;
+  std::vector<LowerCaseString> headers_to_sanitize_;
 };
 
 ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
@@ -215,7 +230,11 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
   }
   if (!provider.forward_payload_header().empty()) {
-    forward_payload_headers_.emplace_back(provider.forward_payload_header());
+    headers_to_sanitize_.emplace_back(provider.forward_payload_header());
+  }
+
+  for (const auto& header_and_claim : provider.claim_to_headers()) {
+    headers_to_sanitize_.emplace_back(header_and_claim.header_name());
   }
 }
 
@@ -248,34 +267,36 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
     ENVOY_LOG(debug, "extract {}", location_it.first);
-    const auto result =
-        Http::HeaderUtility::getAllOfHeaderAsString(headers, location_spec->header_);
-    if (result.result().has_value()) {
-      auto value_str = result.result().value();
-      if (!location_spec->value_prefix_.empty()) {
-        const auto pos = value_str.find(location_spec->value_prefix_);
-        if (pos == absl::string_view::npos) {
-          // value_prefix not found anywhere in value_str, so skip
-          continue;
+    auto header_value = headers.get(location_spec->header_);
+    if (!header_value.empty()) {
+      for (size_t i = 0; i < header_value.size(); i++) {
+        auto value_str = header_value[i]->value().getStringView();
+        if (!location_spec->value_prefix_.empty()) {
+          const auto pos = value_str.find(location_spec->value_prefix_);
+          if (pos == absl::string_view::npos) {
+            // value_prefix not found anywhere in value_str, so skip
+            continue;
+          }
+          value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
         }
-        value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
+        tokens.push_back(std::make_unique<const JwtHeaderLocation>(
+            std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
       }
-      tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-          std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
     }
   }
 
   // Check query parameter locations only if query parameter locations specified and Path() is not
   // null
   if (!param_locations_.empty() && headers.Path() != nullptr) {
-    const auto& params = Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+    const auto& params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
     for (const auto& location_it : param_locations_) {
       const auto& param_key = location_it.first;
       const auto& location_spec = location_it.second;
-      const auto& it = params.find(param_key);
-      if (it != params.end()) {
+      const auto& it = params.getFirstValue(param_key);
+      if (it.has_value()) {
         tokens.push_back(std::make_unique<const JwtParamLocation>(
-            it->second, location_spec.issuer_checker_, param_key));
+            it.value(), location_spec.issuer_checker_, param_key));
       }
     }
   }
@@ -321,16 +342,13 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   if (starting == value_str.npos) {
     return value_str;
   }
+
   // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
-  auto ending = value_str.find_first_not_of(ConstantBase64UrlEncodingCharsPlusDot, starting);
-  if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
-    return value_str.substr(starting);
-  }
-  return value_str.substr(starting, ending - starting);
+  return value_str.substr(starting);
 }
 
-void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
-  for (const auto& header : forward_payload_headers_) {
+void ExtractorImpl::sanitizeHeaders(Http::RequestHeaderMap& headers) const {
+  for (const auto& header : headers_to_sanitize_) {
     headers.remove(header);
   }
 }

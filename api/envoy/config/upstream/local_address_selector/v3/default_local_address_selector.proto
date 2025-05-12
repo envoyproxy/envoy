@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.config.upstream.local_address_selector.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.upstream.local_address_selector.v3";
+option java_outer_classname = "DefaultLocalAddressSelectorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/upstream/local_address_selector/v3;local_address_selectorv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Default Local Address Selector]
+// [#extension: envoy.upstream.local_address_selector.default_local_address_selector]
+
+// Default implementation of a local address selector. This implementation is
+// used if :ref:`local_address_selector
+// <envoy_v3_api_field_config.core.v3.BindConfig.local_address_selector>` is not
+// specified.
+// This implementation supports the specification of only one address in
+// :ref:`extra_source_addresses
+// <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>` which
+// is appended to the address specified in the
+// :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`
+// field. The extra address should have a different IP version than the address in the
+// ``source_address`` field. The address which has the same IP
+// version with the target host's address IP version will be used as bind address.
+// If there is no same IP version address found, the address in the ``source_address`` field will
+// be returned.
+message DefaultLocalAddressSelector {
+}

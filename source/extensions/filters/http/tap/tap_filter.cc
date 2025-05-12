@@ -10,11 +10,11 @@ namespace TapFilter {
 FilterConfigImpl::FilterConfigImpl(
     const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
     const std::string& stats_prefix, Common::Tap::TapConfigFactoryPtr&& config_factory,
-    Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
+    Stats::Scope& scope, OptRef<Server::Admin> admin, Singleton::Manager& singleton_manager,
     ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
-      stats_(Filter::generateStats(stats_prefix, scope)) {}
+      stats_(Filter::generateStats(stats_prefix, scope)), tap_config_(proto_config) {}
 
 HttpTapConfigSharedPtr FilterConfigImpl::currentConfig() {
   return currentConfigHelper<HttpTapConfig>();
@@ -69,8 +69,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
-                 const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&) {
+void Filter::log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) {
   if (tapper_ != nullptr && tapper_->onDestroyLog()) {
     config_->stats().rq_tapped_.inc();
   }

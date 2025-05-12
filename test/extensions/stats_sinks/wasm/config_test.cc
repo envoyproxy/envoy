@@ -49,7 +49,7 @@ protected:
     EXPECT_CALL(context_, initManager()).WillRepeatedly(testing::ReturnRef(init_manager_));
     EXPECT_CALL(context_, lifecycleNotifier())
         .WillRepeatedly(testing::ReturnRef(lifecycle_notifier_));
-    sink_ = factory->createStatsSink(config, context_);
+    sink_ = factory->createStatsSink(config, context_).value();
     EXPECT_CALL(init_watcher_, ready());
     init_manager_.initialize(init_watcher_);
   }
@@ -71,14 +71,7 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmStatSinkConfigTest,
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromEmpty) {
   envoy::extensions::stat_sinks::wasm::v3::Wasm config;
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm Stat Sink ");
-}
-
-TEST_P(WasmStatSinkConfigTest, CreateWasmFailOpen) {
-  envoy::extensions::stat_sinks::wasm::v3::Wasm config;
-  config.mutable_config()->set_fail_open(true);
-  EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm Stat Sink ");
+                            "Unable to create Wasm plugin ");
 }
 
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {

@@ -9,6 +9,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -20,7 +21,6 @@ namespace Config {
 namespace {
 using ::testing::AtLeast;
 using ::testing::NiceMock;
-using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
 protected:
@@ -36,9 +36,6 @@ protected:
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
   NiceMock<Http::MockAsyncClientRequest> request_{&cm_.thread_local_cluster_.async_client_};
-
-  Config::DataSource::LocalAsyncDataProviderPtr local_data_provider_;
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 
   using AsyncClientSendFunc = std::function<Http::AsyncClient::Request*(
       Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
@@ -76,499 +73,6 @@ protected:
   }
 };
 
-TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    local:
-      inline_string:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_local());
-
-  std::string async_data;
-
-  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-    init_target_handle_ = target.createHandle("test");
-  }));
-
-  local_data_provider_ = std::make_unique<Config::DataSource::LocalAsyncDataProvider>(
-      init_manager_, config.local(), true, *api_, [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, "xxxxxx");
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-
-  init_target_handle_->initialize(init_watcher_);
-  EXPECT_EQ(async_data, "xxxxxx");
-}
-
-TEST_F(AsyncDataSourceTest, LoadLocalEmptyDataSource) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    local:
-      inline_string: ""
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_local());
-
-  std::string async_data;
-
-  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
-    init_target_handle_ = target.createHandle("test");
-  }));
-
-  local_data_provider_ = std::make_unique<Config::DataSource::LocalAsyncDataProvider>(
-      init_manager_, config.local(), true, *api_, [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, "");
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-
-  init_target_handle_->initialize(init_watcher_);
-  EXPECT_EQ(async_data, "");
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  initialize(nullptr);
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, EMPTY_STRING);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, EMPTY_STRING);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onFailure(request_, Envoy::Http::AsyncClient::FailureReason::Reset);
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, EMPTY_STRING);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, EMPTY_STRING);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(
-        request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, EMPTY_STRING);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, EMPTY_STRING);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(
-        request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "200"}}})});
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, EMPTY_STRING);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, EMPTY_STRING);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  const std::string body = "hello world";
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body().add(body);
-
-    callbacks.onSuccess(request_, std::move(response));
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, EMPTY_STRING);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, EMPTY_STRING);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  const std::string body = "hello world";
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-    response->body().add(body);
-
-    callbacks.onSuccess(request_, std::move(response));
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, body);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, body);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        xxxxxx
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(
-        request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return nullptr;
-  });
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, false,
-      [&](const std::string& data) { async_data = data; });
-
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, "non-empty");
-}
-
-TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
-  const std::string body = "hello world";
-  std::string async_data = "non-empty";
-
-  {
-    AsyncDataSourcePb config;
-
-    std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-  )EOF";
-    TestUtility::loadFromYamlAndValidate(yaml, config);
-    EXPECT_TRUE(config.has_remote());
-
-    cm_.initializeThreadLocalClusters({"cluster_1"});
-    initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                   const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-      Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
-          Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-      response->body().add(body);
-
-      callbacks.onSuccess(request_, std::move(response));
-      return nullptr;
-    });
-
-    remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-        cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-        [&](const std::string& data) {
-          EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-          EXPECT_EQ(data, body);
-          async_data = data;
-        });
-  }
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  init_target_handle_->initialize(init_watcher_);
-  EXPECT_EQ(async_data, body);
-}
-
-TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-      retry_policy:
-        retry_back_off:
-          base_interval: 1s
-        num_retries: 3
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  cm_.initializeThreadLocalClusters({"cluster_1"});
-  const std::string body = "hello world";
-  int num_retries = 3;
-
-  initialize(
-      [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        callbacks.onSuccess(
-            request_,
-            Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-        return nullptr;
-      },
-      num_retries);
-
-  std::string async_data = "non-empty";
-  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-      [&](const std::string& data) {
-        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-        EXPECT_EQ(data, body);
-        async_data = data;
-      });
-
-  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
-        if (--num_retries == 0) {
-          EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-              .WillOnce(Invoke(
-                  [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-                    Http::ResponseMessagePtr response(
-                        new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                            new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-                    response->body().add(body);
-
-                    callbacks.onSuccess(request_, std::move(response));
-                    return nullptr;
-                  }));
-        }
-
-        retry_timer_cb_();
-      }));
-  init_target_handle_->initialize(init_watcher_);
-
-  EXPECT_EQ(async_data, body);
-}
-
-TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
-  AsyncDataSourcePb config;
-
-  std::string yaml = R"EOF(
-    remote:
-      http_uri:
-        uri: https://example.com/data
-        cluster: cluster_1
-        timeout: 1s
-      sha256:
-        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
-      retry_policy:
-        retry_back_off:
-          base_interval: 10s
-          max_interval: 1s
-        num_retries: 3
-  )EOF";
-  TestUtility::loadFromYamlAndValidate(yaml, config);
-  EXPECT_TRUE(config.has_remote());
-
-  EXPECT_THROW_WITH_MESSAGE(std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-                                cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-                                [&](const std::string&) {}),
-                            EnvoyException,
-                            "max_interval must be greater than or equal to the base_interval");
-}
-
 TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
   AsyncDataSourcePb config;
 
@@ -601,7 +105,7 @@ TEST(DataSourceTest, WellKnownEnvironmentVariableTest) {
             config.specifier_case());
   EXPECT_EQ(config.environment_variable(), "PATH");
   Api::ApiPtr api = Api::createApiForTest();
-  const auto path_data = DataSource::read(config, false, *api);
+  const auto path_data = DataSource::read(config, false, *api).value();
   EXPECT_FALSE(path_data.empty());
 }
 
@@ -618,10 +122,10 @@ TEST(DataSourceTest, MissingEnvironmentVariableTest) {
             config.specifier_case());
   EXPECT_EQ(config.environment_variable(), "ThisVariableDoesntExist");
   Api::ApiPtr api = Api::createApiForTest();
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableDoesntExist");
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableDoesntExist");
+  EXPECT_EQ(DataSource::read(config, false, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableDoesntExist");
+  EXPECT_EQ(DataSource::read(config, true, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableDoesntExist");
 }
 
 TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
@@ -641,16 +145,260 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
   Api::ApiPtr api = Api::createApiForTest();
 #ifdef WIN32
   // Windows doesn't support empty environment variables.
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableIsEmpty");
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
-                            "Environment variable doesn't exist: ThisVariableIsEmpty");
+  EXPECT_EQ(DataSource::read(config, false, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableIsEmpty");
+  EXPECT_EQ(DataSource::read(config, true, *api).status().message(),
+            "Environment variable doesn't exist: ThisVariableIsEmpty");
 #else
-  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
-                            "DataSource cannot be empty");
-  const auto environment_variable = DataSource::read(config, true, *api);
+  EXPECT_EQ(DataSource::read(config, false, *api).status().message(), "DataSource cannot be empty");
+  const auto environment_variable = DataSource::read(config, true, *api).value();
   EXPECT_TRUE(environment_variable.empty());
 #endif
+}
+
+TEST(DataSourceTest, NotExistFileTest) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  const std::string filename = TestEnvironment::temporaryPath("envoy_test/not_exist_file");
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       filename);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+  EXPECT_EQ(config.filename(), filename);
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_EQ(DataSource::read(config, false, *api, 555).status().message(),
+            fmt::format("file {} does not exist", filename));
+}
+
+TEST(DataSourceTest, EmptyFileTest) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  const std::string filename = TestEnvironment::temporaryPath("envoy_test/empty_file");
+  {
+    std::ofstream file(filename);
+    file.close();
+  }
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       filename);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+  EXPECT_EQ(config.filename(), filename);
+
+  Api::ApiPtr api = Api::createApiForTest();
+
+  EXPECT_EQ(DataSource::read(config, false, *api, 555).status().message(),
+            fmt::format("file {} is empty", filename));
+
+  const auto file_data = DataSource::read(config, true, *api, 555).value();
+  EXPECT_TRUE(file_data.empty());
+}
+
+TEST(DataSourceProviderTest, NonFileDataSourceTest) {
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    inline_string: "Hello, world!"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kInlineString,
+            config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+}
+
+TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should still return the old content.
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Create a provider with watch.
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 0);
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should return the updated content.
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world! Updated!");
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+}
+
+TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath("envoy_test/watcher_link"),
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+    file << "Hello, world!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  {
+    std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"));
+    file << "Hello, world! Updated!";
+    file.close();
+  }
+  TestEnvironment::createSymlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target"),
+                                 TestEnvironment::temporaryPath("envoy_test/watcher_new_link"));
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  // Create a provider with watch. The max size is set to 15, so the updated content will be
+  // ignored.
+  auto provider_or_error =
+      DataSource::DataSourceProvider::create(config, *dispatcher, tls, *api, false, 15);
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
+                              TestEnvironment::temporaryPath("envoy_test/watcher_link"));
+  // Handle the events if any.
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // The provider should return the old content because the updated content is ignored.
+  EXPECT_EQ(provider_or_error.value()->data(), "Hello, world!");
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_link").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_target").c_str());
+  unlink(TestEnvironment::temporaryPath("envoy_test/watcher_new_link").c_str());
 }
 
 } // namespace

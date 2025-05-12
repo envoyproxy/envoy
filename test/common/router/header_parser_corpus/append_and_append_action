@@ -1,0 +1,20 @@
+headers_to_add {
+  header {
+    key: " "
+    value: "%UPSTREAM_METADATA([\"\313\253\313\256\313\256*\313\210])%"
+  }
+  append {
+    value: true
+  }
+  keep_empty_value: true
+}
+headers_to_add {
+  header {
+    key: " "
+    value: "%UPSTREAM_METADATA([\"\313\253\313\256\313\256*\313\210])%"
+  }
+  append {
+    value: true
+  }
+  append_action: OVERWRITE_IF_EXISTS_OR_ADD
+}

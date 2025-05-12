@@ -1,7 +1,8 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//tools/protoxform:protoxform.bzl", "protoxform_rule")
 
 licenses(["notice"])  # Apache 2
@@ -15,9 +16,8 @@ py_binary(
         ":utils",
         "//tools/api_proto_plugin",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
-        "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
-        "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
+        "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
+        "@com_github_cncf_xds//xds/annotations/v3:pkg_py_proto",
         "@com_google_googleapis//google/api:annotations_py_proto",
         "@envoy_api//envoy/annotations:pkg_py_proto",
     ],
@@ -33,6 +33,14 @@ py_library(
     name = "utils",
     srcs = ["utils.py"],
     visibility = ["//visibility:public"],
+    deps = [
+        ":validate_py_pb2",
+    ],
+)
+
+py_proto_library(
+    name = "validate_py_pb2",
+    deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
 )
 
 protoxform_rule(

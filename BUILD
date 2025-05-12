@@ -1,4 +1,8 @@
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
+
 licenses(["notice"])  # Apache 2
+
+envoy_py_namespace()
 
 exports_files([
     "VERSION.txt",
@@ -6,16 +10,28 @@ exports_files([
     ".clang-format",
     "pytest.ini",
     ".coveragerc",
+    "CODEOWNERS",
+    "OWNERS.md",
+    ".github/config.yml",
+    "reviewers.yaml",
 ])
 
 alias(
     name = "envoy",
     actual = "//source/exe:envoy",
+    visibility = ["//visibility:public"],
 )
 
 alias(
     name = "envoy.stripped",
     actual = "//source/exe:envoy-static.stripped",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "clang_tidy_config",
+    srcs = [".clang-tidy"],
+    visibility = ["//visibility:public"],
 )
 
 # These two definitions exist to help reduce Envoy upstream core code depending on extensions.
@@ -53,8 +69,12 @@ package_group(
 )
 
 package_group(
-    name = "examples_library",
+    name = "mobile_library",
     packages = [
-        "//examples/...",
+        "//mobile/...",
     ],
 )
+
+exports_files([
+    "rustfmt.toml",
+])

@@ -16,6 +16,7 @@ envoy_cc_mock(
     name = "thrift_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/health_checkers/thrift:client_interface",
         "//test/mocks/network:connection_mocks",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     name = "client_impl_test",
     srcs = ["client_impl_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
+    rbe_pool = "6gig",
     deps = [
         ":thrift_mocks",
         "//source/common/network:utility_lib",
@@ -47,6 +49,7 @@ envoy_extension_cc_test(
     name = "thrift_test",
     srcs = ["thrift_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
+    rbe_pool = "6gig",
     deps = [
         ":thrift_mocks",
         "//source/common/api:api_lib",
@@ -60,7 +63,6 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -69,16 +71,14 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/thrift:config",
         "//test/common/upstream:utility_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:test_runtime_lib",
     ],
 )

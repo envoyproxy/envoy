@@ -11,7 +11,7 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -35,7 +35,7 @@ public:
       proto_config.mutable_update_period()->MergeFrom(
           ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
     }
-    config_ = std::make_shared<Config>(proto_config, store_);
+    config_ = std::make_shared<Config>(proto_config, *store_.rootScope());
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     ON_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
         .WillByDefault(Invoke([this](int, int, void* optval, socklen_t* optlen) {
@@ -278,7 +278,7 @@ TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -300,9 +300,9 @@ TEST(TcpStatsTest, ConfigErrorOnUnsupportedPlatform) {
   transport_socket_config.mutable_typed_config()->PackFrom(proto_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket_config);
-  EXPECT_THROW_WITH_MESSAGE(config_factory.createTransportSocketFactory(proto_config, context, {}),
-                            EnvoyException,
-                            "envoy.transport_sockets.tcp_stats is not supported on this platform.");
+  EXPECT_THROW_WITH_MESSAGE(
+      config_factory.createTransportSocketFactory(proto_config, context, {}).value(),
+      EnvoyException, "envoy.transport_sockets.tcp_stats is not supported on this platform.");
 }
 
 } // namespace TcpStats

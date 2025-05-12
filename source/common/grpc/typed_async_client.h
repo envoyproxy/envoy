@@ -40,9 +40,17 @@ public:
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
+  void waitForRemoteCloseAndDelete() { stream_->waitForRemoteCloseAndDelete(); }
   bool isAboveWriteBufferHighWatermark() const {
     return stream_->isAboveWriteBufferHighWatermark();
   }
+
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) {
+    stream_->setWatermarkCallbacks(callbacks);
+  }
+
+  void removeWatermarkCallbacks() { stream_->removeWatermarkCallbacks(); }
+
   AsyncStream* operator->() { return this; }
   AsyncStream<Request> operator=(RawAsyncStream* stream) {
     stream_ = stream;
@@ -50,6 +58,8 @@ public:
   }
   bool operator==(RawAsyncStream* stream) const { return stream_ == stream; }
   bool operator!=(RawAsyncStream* stream) const { return stream_ != stream; }
+  const StreamInfo::StreamInfo& streamInfo() const { return stream_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return stream_->streamInfo(); }
 
 private:
   RawAsyncStream* stream_{};

@@ -85,10 +85,10 @@ private:
   void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
-  template <typename ValueType>
-  const std::string buildMessage(const Stats::Metric& metric, ValueType value,
+  template <class StatType, typename ValueType>
+  const std::string buildMessage(const StatType& metric, ValueType value,
                                  const std::string& type) const;
-  const std::string getName(const Stats::Metric& metric) const;
+  template <class StatType> const std::string getName(const StatType& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
   const ThreadLocal::SlotPtr tls_;
@@ -105,15 +105,25 @@ private:
  */
 class TcpStatsdSink : public Stats::Sink {
 public:
-  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
-                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
+  /**
+   * This is a wrapper around the constructor to return StatusOr.
+   */
+  static absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
+  create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+         ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   const std::string& getPrefix() { return prefix_; }
+
+protected:
+  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                Stats::Scope& scope, absl::Status& creation_status,
+                const std::string& prefix = getDefaultPrefix());
 
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {

@@ -1,0 +1,33 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: "ext_proc_server"
+    }
+  }
+  processing_mode {
+    request_header_mode: SEND
+  }
+}
+request_data {
+  headers {
+    headers {
+      key: ":host"
+      value: "example.com"
+    }
+    headers {
+      key: ":method"
+      value: "GET"
+    }
+    headers {
+      key: ":path"
+      value: "/users"
+    }
+    headers {
+      key: ":scheme"
+      value: "https"
+    }
+  }
+  http_body {
+    data: "foobarbaz"
+  }
+}

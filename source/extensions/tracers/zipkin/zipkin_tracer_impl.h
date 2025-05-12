@@ -73,7 +73,7 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
 
   void injectContext(Tracing::TraceContext& trace_context,
-                     const Upstream::HostDescriptionConstSharedPtr&) override;
+                     const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -83,8 +83,10 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override;
   std::string getBaggage(absl::string_view) override;
 
-  // TODO: This method is unimplemented for Zipkin.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return span_.traceIdAsHexString(); };
+
+  // TODO(#34412): This method is unimplemented for Zipkin.
+  std::string getSpanId() const override { return EMPTY_STRING; };
 
   /**
    * @return a reference to the Zipkin::Span object.
@@ -123,9 +125,10 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
-                             const std::string&, SystemTime start_time,
-                             const Tracing::Decision tracing_decision) override;
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
+                             Tracing::Decision tracing_decision) override;
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
@@ -224,7 +227,7 @@ public:
    *
    * @return Pointer to the newly-created ZipkinReporter.
    */
-  static ReporterPtr NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+  static ReporterPtr newInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                  const CollectorInfo& collector);
 
 private:

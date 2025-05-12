@@ -20,7 +20,25 @@ RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&.
 
   return rval;
 }
+
+// Own version of lambda overloading since std::overloaded is not available to use yet.
+template <class... Ts> struct Overloaded : Ts... {
+  using Ts::operator()...;
+};
+
+template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
+
 } // namespace
+
+std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfo::buildProtoStruct() const {
+  auto message = std::make_unique<ProtobufWkt::Struct>();
+  auto& fields = *message->mutable_fields();
+  for (const auto& p : actions_) {
+    fields[p.first] = ValueUtil::stringValue(p.second);
+  }
+  return message;
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   decoded_headers_ = true;
 
@@ -49,9 +67,9 @@ void Filter::decodeComplete() {
   }
 }
 
-Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+Http::Filter1xxHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
   return delegateFilterActionOr(delegated_filter_, &StreamEncoderFilter::encode1xxHeaders,
-                                Http::FilterHeadersStatus::Continue, headers);
+                                Http::Filter1xxHeadersStatus::Continue, headers);
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -75,6 +93,7 @@ void Filter::encodeComplete() {
     delegated_filter_->encodeComplete();
   }
 }
+
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
@@ -88,19 +107,28 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
     return;
   }
+  const std::string& action_name = composite_action.actionName();
 
-  if (wrapper.filter_to_inject_) {
+  if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();
-    if (absl::holds_alternative<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_)) {
-      delegated_filter_ = std::make_shared<StreamFilterWrapper>(
-          absl::get<Http::StreamDecoderFilterSharedPtr>(*wrapper.filter_to_inject_));
-    } else if (absl::holds_alternative<Http::StreamEncoderFilterSharedPtr>(
-                   *wrapper.filter_to_inject_)) {
-      delegated_filter_ = std::make_shared<StreamFilterWrapper>(
-          absl::get<Http::StreamEncoderFilterSharedPtr>(*wrapper.filter_to_inject_));
-    } else {
-      delegated_filter_ = absl::get<Http::StreamFilterSharedPtr>(*wrapper.filter_to_inject_);
-    }
+
+    auto createDelegatedFilterFn = Overloaded{
+        [this, action_name](Http::StreamDecoderFilterSharedPtr filter) {
+          delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
+          updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
+                            action_name);
+        },
+        [this, action_name](Http::StreamEncoderFilterSharedPtr filter) {
+          delegated_filter_ = std::make_shared<StreamFilterWrapper>(std::move(filter));
+          updateFilterState(encoder_callbacks_, std::string(encoder_callbacks_->filterConfigName()),
+                            action_name);
+        },
+        [this, action_name](Http::StreamFilterSharedPtr filter) {
+          delegated_filter_ = std::move(filter);
+          updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
+                            action_name);
+        }};
+    absl::visit(createDelegatedFilterFn, std::move(wrapper.filter_to_inject_.value()));
 
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
     delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
@@ -112,6 +140,23 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
   // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
   // either directly or via some return status.
+}
+
+void Filter::updateFilterState(Http::StreamFilterCallbacks* callback,
+                               const std::string& filter_name, const std::string& action_name) {
+  if (isUpstream()) {
+    return;
+  }
+  auto* info = callback->streamInfo().filterState()->getDataMutable<MatchedActionInfo>(
+      MatchedActionsFilterStateKey);
+  if (info != nullptr) {
+    info->setFilterAction(filter_name, action_name);
+  } else {
+    callback->streamInfo().filterState()->setData(
+        MatchedActionsFilterStateKey, std::make_shared<MatchedActionInfo>(filter_name, action_name),
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
 }
 
 Http::FilterHeadersStatus
@@ -146,10 +191,10 @@ void Filter::StreamFilterWrapper::decodeComplete() {
   }
 }
 
-Http::FilterHeadersStatus
+Http::Filter1xxHeadersStatus
 Filter::StreamFilterWrapper::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
   return delegateFilterActionOr(encoder_filter_, &StreamEncoderFilter::encode1xxHeaders,
-                                Http::FilterHeadersStatus::Continue, headers);
+                                Http::Filter1xxHeadersStatus::Continue, headers);
 }
 Http::FilterHeadersStatus
 Filter::StreamFilterWrapper::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -190,6 +235,16 @@ void Filter::StreamFilterWrapper::onDestroy() {
   }
   if (encoder_filter_) {
     encoder_filter_->onDestroy();
+  }
+}
+
+void Filter::StreamFilterWrapper::onStreamComplete() {
+  if (decoder_filter_) {
+    decoder_filter_->onStreamComplete();
+  }
+
+  if (encoder_filter_) {
+    encoder_filter_->onStreamComplete();
   }
 }
 

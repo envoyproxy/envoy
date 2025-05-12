@@ -9,7 +9,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/memory/stats.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
@@ -276,7 +276,7 @@ private:
    * @return size_t the total memory allocated
    */
   size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
@@ -378,6 +378,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   //                                          searching
   // 2021/08/18  13176    40577       40700   Support slow start mode
   // 2022/03/14                       42000   Fix test flakes
+  // 2022/10/27                       44000   Update tcmalloc
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -398,7 +399,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 42000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 44000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
@@ -430,6 +431,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2020/04/02  10624    1380         1655   Use 100 clusters rather than 1000 to avoid timeouts
   // 2020/09/10                        2000   Reduce flakes
   // 2020/03/23                        3000   Reduce flakes
+  // 2023/07/21                        3005   Additional 4 bytes for new health status
+  // 2023/07/21                        3500   Workaround CI flake pending resolution of #28793
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -446,7 +449,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
-  EXPECT_MEMORY_LE(m_per_host, 3000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_host, 3500); // Round up to allow platform variations.
 }
 
 } // namespace

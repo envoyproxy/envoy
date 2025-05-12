@@ -1,4 +1,4 @@
-#include "source/extensions/common/dubbo/message_impl.h"
+#include "source/extensions/common/dubbo/message.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -12,136 +12,552 @@ namespace Common {
 namespace Dubbo {
 namespace {
 
-TEST(RpcRequestImplTest, RpcRequestAttachmentTest) {
-  auto map = std::make_unique<RpcRequestImpl::Attachment::Map>();
+TEST(RpcRequestTest, SimpleSetAndGetTest) {
+  RpcRequest request("a", "b", "c", "d");
 
-  map->emplace(std::make_unique<Hessian2::StringObject>("group"),
-               std::make_unique<Hessian2::StringObject>("fake_group"));
-  map->emplace(std::make_unique<Hessian2::StringObject>("fake_key"),
-               std::make_unique<Hessian2::StringObject>("fake_value"));
+  EXPECT_EQ("a", request.version());
 
-  map->emplace(std::make_unique<Hessian2::NullObject>(), std::make_unique<Hessian2::LongObject>(0));
+  EXPECT_EQ("b", request.service());
 
-  map->emplace(std::make_unique<Hessian2::StringObject>("map_key"),
-               std::make_unique<Hessian2::UntypedMapObject>());
+  EXPECT_EQ("c", request.serviceVersion());
 
-  RpcRequestImpl::Attachment attachment(std::move(map), 23333);
-
-  EXPECT_EQ(4, attachment.attachment().toUntypedMap().value().get().size());
-
-  // Test lookup.
-  EXPECT_EQ(absl::nullopt, attachment.lookup("map_key"));
-  EXPECT_EQ("fake_group", *attachment.lookup("group"));
-
-  EXPECT_FALSE(attachment.attachmentUpdated());
-
-  // Test remove. Remove a normal string type key/value pair.
-  EXPECT_EQ("fake_value", *attachment.lookup("fake_key"));
-  attachment.remove("fake_key");
-  EXPECT_EQ(absl::nullopt, attachment.lookup("fake_key"));
-
-  EXPECT_EQ(3, attachment.attachment().toUntypedMap().value().get().size());
-
-  // Test remove. Delete a key/value pair whose value type is map.
-  attachment.remove("map_key");
-  EXPECT_EQ(2, attachment.attachment().toUntypedMap().value().get().size());
-
-  // Test insert.
-  attachment.insert("test", "test_value");
-  EXPECT_EQ(3, attachment.attachment().toUntypedMap().value().get().size());
-
-  EXPECT_EQ("test_value", *attachment.lookup("test"));
-
-  EXPECT_TRUE(attachment.attachmentUpdated());
-  EXPECT_EQ(23333, attachment.attachmentOffset());
+  EXPECT_EQ("d", request.method());
 }
 
-TEST(RpcRequestImplTest, RpcRequestImplTest) {
-  RpcRequestImpl request;
+TEST(RpcRequestTest, InitializeWithBufferTest) {
+  // Empty buffer.
+  {
+    RpcRequest request("a", "b", "c", "d");
 
-  request.setServiceName("fake_service");
-  EXPECT_EQ("fake_service", request.serviceName());
+    // Initialize the request with an empty buffer.
+    Buffer::OwnedImpl buffer;
+    request.content().initialize(buffer, buffer.length());
 
-  request.setMethodName("fake_method");
-  EXPECT_EQ("fake_method", request.methodName());
+    // Try get the argument vector.
+    EXPECT_EQ(request.content().arguments().size(), 0);
 
-  request.setServiceVersion("fake_version");
-  EXPECT_EQ("fake_version", request.serviceVersion());
+    // Try get the attachment group.
+    EXPECT_FALSE(request.content().attachments().contains("group"));
 
-  bool set_parameters{false};
-  bool set_attachment{false};
+    // attachments() call will make the content to be decoded.
+    // And the content is empty, so the content will be treated as broken.
+    // So the content will be reset to an empty state:
+    // empty types, empty arguments, empty attachments.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({0x0, 'H', 'Z'}));
 
-  request.setParametersLazyCallback([&set_parameters]() -> RpcRequestImpl::ParametersPtr {
-    set_parameters = true;
-    return std::make_unique<RpcRequestImpl::Parameters>();
-  });
+    // Set the group.
+    request.content().setAttachment("group", "group");
+    EXPECT_EQ("group", request.content().attachments().at("group"));
 
-  request.setAttachmentLazyCallback([&set_attachment]() -> RpcRequestImpl::AttachmentPtr {
-    auto map = std::make_unique<RpcRequestImpl::Attachment::Map>();
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(request.content().buffer().toString(),
+              std::string({
+                  0x0,                          // Empty string types
+                  'H',                          // Attachments start
+                  0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                  0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                  'Z'                           // Attachments end
+              }));
+  }
 
-    map->emplace(std::make_unique<Hessian2::StringObject>("group"),
-                 std::make_unique<Hessian2::StringObject>("fake_group"));
+  // Buffer no argument but has attachment.
+  {
+    RpcRequest request("a", "b", "c", "d");
 
-    auto attach = std::make_unique<RpcRequestImpl::Attachment>(std::move(map), 0);
+    Buffer::OwnedImpl buffer(std::string({
+        0x0,                          // Empty string types
+        'H',                          // Attachments start
+        0x5, 'g', 'r', 'o', 'u', 'p', // Key
+        0x5, 'g', 'r', 'o', 'u', 'p', // Value
+        'Z',                          // Attachments end
+        'x'                           // Anything that make no sense
+    }));
 
-    set_attachment = true;
+    // Initialize the request with an empty buffer.
+    request.content().initialize(buffer, buffer.length() - 1);
 
-    return attach;
-  });
+    EXPECT_EQ(1, buffer.length()); // Other data should be consumed.
+    EXPECT_EQ(buffer.toString(), "x");
 
-  EXPECT_EQ(false, request.hasParameters());
-  EXPECT_EQ(false, request.hasAttachment());
+    // Try get the argument vector.
+    EXPECT_EQ(request.content().arguments().size(), 0);
 
-  // When parsing attachment, parameters will also be parsed.
-  EXPECT_NE(nullptr, request.mutableAttachment());
-  request.attachment();
-  EXPECT_EQ(true, set_parameters);
-  EXPECT_EQ(true, set_attachment);
-  EXPECT_EQ(true, request.hasParameters());
-  EXPECT_EQ(true, request.hasAttachment());
-  EXPECT_EQ("fake_group", request.serviceGroup().value());
+    // Try get the attachment group.
+    EXPECT_EQ("group", request.content().attachments().at("group"));
 
-  request.setServiceGroup("new_fake_group");
-  EXPECT_EQ("new_fake_group", request.serviceGroup().value());
+    EXPECT_EQ(request.content().buffer().toString(),
+              std::string({
+                  0x0,                          // Empty string types
+                  'H',                          // Attachments start
+                  0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                  0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                  'Z'                           // Attachments end
+              }));
 
-  // If parameters and attachment have values, the callback function will not be executed.
-  set_parameters = false;
-  set_attachment = false;
-  EXPECT_NE(nullptr, request.mutableParameters());
-  EXPECT_NE(nullptr, request.mutableAttachment());
-  EXPECT_EQ(false, set_parameters);
-  EXPECT_EQ(false, set_attachment);
+    // Overwrite the group.
+    request.content().setAttachment("group", "groupx");
 
-  // Reset attachment and parameters.
-  request.mutableParameters() = nullptr;
-  request.mutableAttachment() = nullptr;
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(request.content().buffer().toString(),
+              std::string({
+                  0x0,                               // Empty string types
+                  'H',                               // Attachments start
+                  0x5, 'g', 'r', 'o', 'u', 'p',      // Key
+                  0x6, 'g', 'r', 'o', 'u', 'p', 'x', // Value
+                  'Z'                                // Attachments end
+              }));
 
-  // When parsing parameters, attachment will not be parsed.
-  request.mutableParameters();
-  EXPECT_EQ(true, set_parameters);
-  EXPECT_EQ(false, set_attachment);
-  EXPECT_EQ(true, request.hasParameters());
-  EXPECT_EQ(false, request.hasAttachment());
+    request.content().delAttachment("group");
 
-  request.messageBuffer().add("abcdefg");
-  EXPECT_EQ("abcdefg", request.messageBuffer().toString());
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(request.content().buffer().toString(),
+              std::string({
+                  0x0, // Empty string types
+                  'H', // Attachments start
+                  'Z'  // Attachments end
+              }));
+  }
+
+  // Broken buffer where -1 is used to tell the arguments number but
+  // no following types string.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        '\x8f', // -1 means the following bytes is types string
+        'H',
+        'Z',
+    }));
+
+    // Initialize the request with the broken buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    EXPECT_EQ(0, request.content().arguments().size());
+
+    // The content is broken, so the content will be reset to an empty state:
+    // empty types, empty arguments, empty attachments.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({0x0, 'H', 'Z'}));
+  }
+
+  // Broken buffer where -2 is used to tell the arguments number. This is
+  // unexpected number.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        '\x8e', // -2 is unexpected
+        'H',
+        'Z',
+    }));
+
+    // Initialize the request with the broken buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    EXPECT_EQ(0, request.content().arguments().size());
+
+    // The content is broken, so the content will be reset to an empty state:
+    // empty types, empty arguments, empty attachments.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({0x0, 'H', 'Z'}));
+  }
+
+  // Correct buffer where -1 is used to tell the arguments number.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        '\x8f',                          // -1 means the following bytes is types string
+        0x2,    'Z', 'Z',                // The types string
+        'T',    'F',                     // true and false
+        'H',                             // Attachments start
+        0x5,    'g', 'r', 'o', 'u', 'p', // Key
+        0x5,    'g', 'r', 'o', 'u', 'p', // Value
+        'Z'                              // Attachments end
+    }));
+
+    // Initialize the request with the correct buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    // Get the argument vector.
+    const auto& args = request.content().arguments();
+
+    // There are 2 arguments.
+    EXPECT_EQ(2, args.size());
+
+    // The first argument is true.
+    EXPECT_EQ(true, args[0]->toBoolean().value().get());
+    // The second argument is false.
+    EXPECT_EQ(false, args[1]->toBoolean().value().get());
+
+    // Get the attachment group.
+    EXPECT_EQ("group", request.content().attachments().at("group"));
+
+    EXPECT_EQ(request.content().buffer().toString(),
+              std::string({
+                  '\x8f',                          // -1 means the following bytes is types string
+                  0x2,    'Z', 'Z',                // The types string
+                  'T',    'F',                     // true and false
+                  'H',                             // Attachments start
+                  0x5,    'g', 'r', 'o', 'u', 'p', // Key
+                  0x5,    'g', 'r', 'o', 'u', 'p', // Value
+                  'Z'                              // Attachments end
+              }));
+
+    // Move the buffer.
+    Buffer::OwnedImpl buffer2;
+    request.content().bufferMoveTo(buffer2);
+
+    // The buffer is moved, and if we call buffer() again, everything will be
+    // re-encoded.
+    // Note: -1 is removed because the single types string is enough.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({
+                                                         0x2, 'Z', 'Z', // The types string
+                                                         'T', 'F',      // true and false
+                                                         'H',           // Attachments start
+                                                         0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                         0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                         'Z' // Attachments end
+                                                     }));
+  }
+
+  // Correct buffer with non-negative integer for the arguments number.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        '\x92',                       // 2 means the following are two arguments
+        'T', 'F',                     // true and false
+        'H',                          // Attachments start
+        0x5, 'g', 'r', 'o', 'u', 'p', // Key
+        0x5, 'g', 'r', 'o', 'u', 'p', // Value
+        'Z'                           // Attachments end
+    }));
+
+    // Initialize the request with the correct buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    // Get the argument vector.
+    const auto& args = request.content().arguments();
+
+    // There are 2 arguments.
+    EXPECT_EQ(2, args.size());
+
+    // The first argument is true.
+    EXPECT_EQ(true, args[0]->toBoolean().value().get());
+    // The second argument is false.
+    EXPECT_EQ(false, args[1]->toBoolean().value().get());
+
+    // Get the attachment group.
+    EXPECT_EQ("group", request.content().attachments().at("group"));
+
+    // Move the buffer.
+    Buffer::OwnedImpl buffer2;
+    request.content().bufferMoveTo(buffer2);
+
+    // No types string is provided and the arguments are not empty.
+    // So the number of arguments will be used directly.
+    EXPECT_EQ(request.content().buffer().toString(),
+              std::string({
+                  '\x92',                       // 2 means the following are two arguments
+                  'T', 'F',                     // true and false
+                  'H',                          // Attachments start
+                  0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                  0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                  'Z'                           // Attachments end
+              }));
+  }
+
+  // Normal correct buffer with normal types string.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        0x2, 'Z', 'Z',                // The types string
+        'T', 'F',                     // true and false
+        'H',                          // Attachments start
+        0x5, 'g', 'r', 'o', 'u', 'p', // Key
+        0x5, 'g', 'r', 'o', 'u', 'p', // Value
+        'T',                          // Key
+        'F',                          // Value
+        'Z'                           // Attachments end
+    }));
+
+    // Initialize the request with the correct buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    // Get the argument vector.
+    const auto& args = request.content().arguments();
+
+    // There are 2 arguments.
+    EXPECT_EQ(2, args.size());
+
+    // The first argument is true.
+    EXPECT_EQ(true, args[0]->toBoolean().value().get());
+    // The second argument is false.
+    EXPECT_EQ(false, args[1]->toBoolean().value().get());
+
+    // Only string key and value are used.
+    EXPECT_EQ(1, request.content().attachments().size());
+
+    // Get the attachment group.
+    EXPECT_EQ("group", request.content().attachments().at("group"));
+
+    // Move the buffer.
+    Buffer::OwnedImpl buffer2;
+    request.content().bufferMoveTo(buffer2);
+
+    EXPECT_EQ(request.content().buffer().toString(), std::string({
+                                                         0x2, 'Z', 'Z', // The types string
+                                                         'T', 'F',      // true and false
+                                                         'H',           // Attachments start
+                                                         0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                         0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                         'Z', // Attachments end
+                                                     }));
+  }
+
+  // Buffer without attachments.
+  {
+    RpcRequest request("a", "b", "c", "d");
+    Buffer::OwnedImpl buffer(std::string({
+        0x2, 'Z', 'Z', // The types string
+        'T', 'F',      // true and false
+    }));
+
+    // Initialize the request with the correct buffer.
+    request.content().initialize(buffer, buffer.length());
+
+    // Get the argument vector.
+    const auto& args = request.content().arguments();
+
+    // There are 2 arguments.
+    EXPECT_EQ(2, args.size());
+
+    // The first argument is true.
+    EXPECT_EQ(true, args[0]->toBoolean().value().get());
+    // The second argument is false.
+    EXPECT_EQ(false, args[1]->toBoolean().value().get());
+
+    EXPECT_TRUE(request.content().attachments().empty());
+
+    // Move the buffer.
+    Buffer::OwnedImpl buffer2;
+    request.content().bufferMoveTo(buffer2);
+
+    // Empty attachments will be encoded to the buffer when buffer() is called
+    // and the underlying buffer is empty.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({
+                                                         0x2, 'Z', 'Z', // The types string
+                                                         'T', 'F',      // true and false
+                                                         'H',           // Attachments start
+                                                         'Z',           // Attachments end
+                                                     }));
+
+    // Set the attachment.
+    request.content().setAttachment("group", "group");
+
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(request.content().buffer().toString(), std::string({
+                                                         0x2, 'Z', 'Z', // The types string
+                                                         'T', 'F',      // true and false
+                                                         'H',           // Attachments start
+                                                         0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                         0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                         'Z' // Attachments end
+                                                     }));
+  }
 }
 
-TEST(RpcResponseImplTest, RpcResponseImplTest) {
-  RpcResponseImpl result;
+TEST(RpcRequestTest, InitializeWithDecodedValuesTest) {
+  RpcRequest request("a", "b", "c", "d");
 
-  EXPECT_EQ(false, result.responseType().has_value());
-  result.setResponseType(RpcResponseType::ResponseWithValue);
-  EXPECT_EQ(true, result.responseType().has_value());
-  EXPECT_EQ(RpcResponseType::ResponseWithValue, result.responseType().value());
+  ArgumentVec args;
+  args.push_back(std::make_unique<Hessian2::BooleanObject>(true));
+  args.push_back(std::make_unique<Hessian2::BooleanObject>(false));
 
-  EXPECT_EQ(false, result.localRawMessage().has_value());
-  result.setLocalRawMessage("abcdefg");
-  EXPECT_EQ(true, result.localRawMessage().has_value());
-  EXPECT_EQ("abcdefg", result.localRawMessage().value());
+  Attachments attachs;
+  attachs.emplace("group", "group");
 
-  result.messageBuffer().add("abcdefg");
-  EXPECT_EQ("abcdefg", result.messageBuffer().toString());
+  // Initialize the request with the given types and arguments and attachments.
+  request.content().initialize(std::string("ZZ"), std::move(args), std::move(attachs));
+
+  // Get the argument vector.
+  const auto& args2 = request.content().arguments();
+
+  // There are 2 arguments.
+  EXPECT_EQ(2, args2.size());
+
+  // The first argument is true.
+  EXPECT_EQ(true, args2[0]->toBoolean().value().get());
+  // The second argument is false.
+  EXPECT_EQ(false, args2[1]->toBoolean().value().get());
+
+  // Get the attachment group.
+  EXPECT_EQ("group", request.content().attachments().at("group"));
+
+  // Get the buffer.
+  EXPECT_EQ(request.content().buffer().toString(), std::string({
+                                                       0x2, 'Z', 'Z', // The types string
+                                                       'T', 'F',      // true and false
+                                                       'H',           // Attachments start
+                                                       0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                       0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                       'Z' // Attachments end
+                                                   }));
+}
+
+TEST(RpcResponseTest, SimpleSetAndGetTest) {
+  RpcResponse response;
+
+  EXPECT_EQ(absl::nullopt, response.responseType());
+
+  // Set the response type and validate we can get it.
+  response.setResponseType(RpcResponseType::ResponseNullValueWithAttachments);
+  EXPECT_EQ(RpcResponseType::ResponseNullValueWithAttachments, response.responseType().value());
+}
+
+TEST(RpcResponseTest, InitializeWithBufferTest) {
+  // Empty buffer.
+  {
+    RpcResponse response;
+
+    // Initialize the response with an empty buffer.
+    Buffer::OwnedImpl buffer;
+    response.content().initialize(buffer, buffer.length());
+
+    // Try get the result.
+    EXPECT_EQ(response.content().result(), nullptr);
+
+    // Try get the attachments.
+    EXPECT_FALSE(response.content().attachments().contains("group"));
+
+    // attachments() call will make the content to be decoded.
+    // And the content is empty, so the content will be treated as broken.
+    // So the content will be reset to an empty state:
+    // empty result, empty attachments.
+    EXPECT_EQ(response.content().buffer().toString(), std::string({'N', 'H', 'Z'}));
+
+    // Set the group.
+    response.content().setAttachment("group", "group");
+    EXPECT_EQ("group", response.content().attachments().at("group"));
+
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(response.content().buffer().toString(), std::string({
+                                                          'N',
+                                                          'H', // Attachments start
+                                                          0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                          0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                          'Z' // Attachments end
+                                                      }));
+  }
+
+  // Buffer with result but no attachments.
+  {
+    RpcResponse response;
+
+    Buffer::OwnedImpl buffer(std::string({
+        'T', // true
+    }));
+
+    // Initialize the response with the buffer.
+    response.content().initialize(buffer, buffer.length());
+
+    // Get the result.
+    const auto* result = response.content().result();
+
+    // The result is a boolean.
+    EXPECT_EQ(true, result->toBoolean().value().get());
+
+    // Try get the attachments.
+    EXPECT_FALSE(response.content().attachments().contains("group"));
+
+    // Move the buffer.
+    Buffer::OwnedImpl buffer2;
+    response.content().bufferMoveTo(buffer2);
+
+    // Empty attachments will be encoded to the buffer when buffer() is called
+    // and the underlying buffer is empty.
+    EXPECT_EQ(response.content().buffer().toString(), std::string({
+                                                          'T', // true
+                                                          'H', // Attachments start
+                                                          'Z', // Attachments end
+                                                      }));
+
+    // Set the attachment.
+    response.content().setAttachment("group", "group");
+
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(response.content().buffer().toString(), std::string({
+                                                          'T', // true
+                                                          'H', // Attachments start
+                                                          0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                          0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                          'Z' // Attachments end
+                                                      }));
+
+    // Remove the attachment.
+    response.content().delAttachment("group");
+
+    // buffer() call will re-encode the attachments into the content buffer.
+    EXPECT_EQ(response.content().buffer().toString(), std::string({
+                                                          'T', // true
+                                                          'H', // Attachments start
+                                                          'Z'  // Attachments end
+                                                      }));
+  }
+
+  // Buffer with result and attachments.
+  {
+    RpcResponse response;
+
+    Buffer::OwnedImpl buffer(std::string({
+        'T',                          // true
+        'H',                          // Attachments start
+        0x5, 'g', 'r', 'o', 'u', 'p', // Key
+        0x5, 'g', 'r', 'o', 'u', 'p', // Value
+        'T',                          // Key
+        'F',                          // Value
+        'Z'                           // Attachments end
+    }));
+
+    // Initialize the response with the buffer.
+    response.content().initialize(buffer, buffer.length());
+
+    // Get the result.
+    const auto* result = response.content().result();
+
+    // The result is a boolean.
+    EXPECT_EQ(true, result->toBoolean().value().get());
+
+    // Only string key and value are used.
+    EXPECT_EQ(1, response.content().attachments().size());
+
+    // Get the attachment group.
+    EXPECT_EQ("group", response.content().attachments().at("group"));
+  }
+}
+
+TEST(RpcResponseTest, InitializeWithDecodedValuesTest) {
+  RpcResponse response;
+
+  Hessian2::ObjectPtr result = std::make_unique<Hessian2::BooleanObject>(true);
+  Attachments attachs;
+  attachs.emplace("group", "group");
+
+  // Initialize the response with the given result and attachments.
+  response.content().initialize(std::move(result), std::move(attachs));
+
+  // Get the result.
+  const auto* result2 = response.content().result();
+
+  // The result is a boolean.
+  EXPECT_EQ(true, result2->toBoolean().value().get());
+
+  // Get the attachment group.
+  EXPECT_EQ("group", response.content().attachments().at("group"));
+
+  // Get the buffer.
+  EXPECT_EQ(response.content().buffer().toString(), std::string({
+                                                        'T', // true
+                                                        'H', // Attachments start
+                                                        0x5, 'g', 'r', 'o', 'u', 'p', // Key
+                                                        0x5, 'g', 'r', 'o', 'u', 'p', // Value
+                                                        'Z' // Attachments end
+                                                    }));
 }
 
 } // namespace

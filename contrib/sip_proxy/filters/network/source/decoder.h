@@ -1,16 +1,9 @@
 #pragma once
 
-#include <memory>
-
-#include "envoy/buffer/buffer.h"
-
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
-#include "metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,9 +46,9 @@ public:
 private:
   friend class SipDecoderTest;
   struct DecoderStatus {
-    DecoderStatus(State next_state) : next_state_(next_state){};
+    DecoderStatus(State next_state) : next_state_(next_state) {};
     DecoderStatus(State next_state, FilterStatus filter_status)
-        : next_state_(next_state), filter_status_(filter_status){};
+        : next_state_(next_state), filter_status_(filter_status) {};
 
     State next_state_;
     absl::optional<FilterStatus> filter_status_;
@@ -175,10 +168,6 @@ private:
     HeaderHandler(MessageHandler& parent);
     virtual ~HeaderHandler() = default;
 
-    using HeaderProcessor =
-        absl::flat_hash_map<HeaderType,
-                            std::function<int(HeaderHandler*, absl::string_view& header)>>;
-
     virtual int processVia(absl::string_view& header);
     virtual int processContact(absl::string_view& header);
     virtual int processPath(absl::string_view& header);
@@ -203,7 +192,6 @@ private:
     void setFirstServiceRoute(bool flag) { parent_.setFirstServiceRoute(flag); }
 
     MessageHandler& parent_;
-    HeaderProcessor header_processors_;
   };
 
   class MessageHandler {

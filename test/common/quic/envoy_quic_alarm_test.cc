@@ -22,7 +22,7 @@ public:
   void OnAlarm() override { fired_ = true; }
 
   bool fired() const { return fired_; }
-  void set_fired(bool fired) { fired_ = fired; }
+  void setFired(bool fired) { fired_ = fired; }
 
 private:
   bool fired_{false};
@@ -174,7 +174,7 @@ TEST_F(EnvoyQuicAlarmTest, UpdateAlarmWithPastDeadline) {
   alarm->Update(clock_.Now() - QuicTime::Delta::FromMilliseconds(1), quic::QuicTime::Delta::Zero());
   advanceMsAndLoop(1);
   EXPECT_TRUE(unowned_delegate->fired());
-  unowned_delegate->set_fired(false);
+  unowned_delegate->setFired(false);
   advanceMsAndLoop(1);
   // alarm shouldn't fire at the original deadline.
   EXPECT_FALSE(unowned_delegate->fired());

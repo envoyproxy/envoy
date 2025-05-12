@@ -3,18 +3,21 @@
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
 
 struct TestParams {
   Network::Address::IpVersion ip_version;
+  Http1ParserImpl parser_impl;
   bool forward_reason_phrase;
 };
 
 std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}_{}",
-                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     TestUtility::http1ParserImplToString(p.param.parser_impl),
                      p.param.forward_reason_phrase ? "enabled" : "disabled");
 }
 
@@ -22,8 +25,10 @@ std::vector<TestParams> getTestsParams() {
   std::vector<TestParams> ret;
 
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TestParams{ip_version, true});
-    ret.push_back(TestParams{ip_version, false});
+    for (auto parser_impl : {Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser}) {
+      ret.push_back(TestParams{ip_version, parser_impl, true});
+      ret.push_back(TestParams{ip_version, parser_impl, false});
+    }
   }
 
   return ret;
@@ -38,6 +43,11 @@ public:
   void SetUp() override {
     setDownstreamProtocol(Http::CodecType::HTTP1);
     setUpstreamProtocol(Http::CodecType::HTTP1);
+    if (GetParam().parser_impl == Http1ParserImpl::BalsaParser) {
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
+    } else {
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
+    }
   }
 
   void initialize() override {
@@ -63,6 +73,9 @@ public:
 
     HttpIntegrationTest::initialize();
   }
+
+private:
+  TestScopedRuntime scoped_runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(CaseFormatter, PreserveCaseFormatterReasonPhraseIntegrationTest,

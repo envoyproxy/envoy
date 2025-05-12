@@ -31,7 +31,7 @@ static RegisterContextFactory register_GrpcStreamContextProto(CONTEXT_FACTORY(Gr
 class MyGrpcStreamHandler
     : public GrpcStreamHandler<google::protobuf::Value, google::protobuf::Value> {
 public:
-  MyGrpcStreamHandler() : GrpcStreamHandler<google::protobuf::Value, google::protobuf::Value>() {}
+  MyGrpcStreamHandler() = default;
   void onReceiveInitialMetadata(uint32_t) override {
     auto h = getHeaderMapValue(WasmHeaderMapType::GrpcReceiveInitialMetadata, "test");
     if (h->view() == "reset") {

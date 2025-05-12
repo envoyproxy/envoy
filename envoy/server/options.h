@@ -85,6 +85,18 @@ public:
   virtual bool useDynamicBaseId() const PURE;
 
   /**
+   * @return bool don't get hot restart information from the parent if the communication channel
+   *         to the parent instance fails to connect.
+   */
+  virtual bool skipHotRestartOnNoParent() const PURE;
+
+  /**
+   * @return bool don't get stats from the parent. If there are a lot of stats, getting them
+   *         from the parent instance can be slow and require a lot of memory.
+   */
+  virtual bool skipHotRestartParentStats() const PURE;
+
+  /**
    * @return const std::string& the dynamic base id output file.
    */
   virtual const std::string& baseIdPath() const PURE;
@@ -143,6 +155,11 @@ public:
   virtual bool ignoreUnknownDynamicFields() const PURE;
 
   /**
+   * @return bool skip deprecated warning log messages?
+   **/
+  virtual bool skipDeprecatedLogs() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;
@@ -168,6 +185,11 @@ public:
    * @return const std::string& the log format string.
    */
   virtual const std::string& logFormat() const PURE;
+
+  /**
+   * @return whether or not a log format was set by CLI option.
+   */
+  virtual bool logFormatSet() const PURE;
 
   /**
    * @return const bool indicating whether to escape c-style escape sequences in logs.

@@ -6,6 +6,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/config/datasource.h"
+#include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/server/configuration_impl.h"
 
 namespace Envoy {
@@ -23,15 +24,16 @@ class WasmSinkFactory : Logger::Loggable<Logger::Id::config>,
                         public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Configuration::ServerFactoryContext& context) override;
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() const override;
 
 private:
-  Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

@@ -68,9 +68,46 @@ public:
  */
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
-  NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
-  FlushWriteAndDelay // Flush pending write data and delay raising a ConnectionEvent::LocalClose
-                     // until the delayed_close_timeout expires
+  NoFlush, // Do not flush any pending data. Write the pending data to buffer and then immediately
+           // raise ConnectionEvent::LocalClose
+  FlushWriteAndDelay, // Flush pending write data and delay raising a ConnectionEvent::LocalClose
+                      // until the delayed_close_timeout expires
+  Abort, // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
+  AbortReset // Do not write/flush any pending data and immediately raise
+             // ConnectionEvent::LocalClose. Envoy will try to close the connection with RST flag.
+};
+
+/**
+ * Type of connection close which is detected from the socket.
+ */
+enum class DetectedCloseType {
+  Normal,      // The normal socket close from Envoy's connection perspective.
+  LocalReset,  // The local reset initiated from Envoy.
+  RemoteReset, // The peer reset detected by the connection.
+};
+
+/**
+ * Combines connection event and close type for connection close operations
+ */
+struct ConnectionCloseAction {
+  ConnectionEvent event_;
+  bool close_socket_;
+  ConnectionCloseType type_;
+
+  ConnectionCloseAction(ConnectionEvent event_type = ConnectionEvent::Connected,
+                        bool close_socket = false,
+                        ConnectionCloseType close_type = ConnectionCloseType::NoFlush)
+      : event_(event_type), close_socket_(close_socket), type_(close_type) {}
+
+  bool operator==(const ConnectionCloseAction& other) const {
+    return event_ == other.event_ && type_ == other.type_ && close_socket_ == other.close_socket_;
+  }
+
+  bool operator!=(const ConnectionCloseAction& other) const { return !(*this == other); }
+
+  bool closeSocket() const { return close_socket_; }
+  bool isLocalClose() const { return event_ == ConnectionEvent::LocalClose; }
+  bool isRemoteClose() const { return event_ == ConnectionEvent::RemoteClose; }
 };
 
 /**
@@ -81,6 +118,13 @@ class Connection : public Event::DeferredDeletable,
                    public ScopeTrackedObject {
 public:
   enum class State { Open, Closing, Closed };
+
+  enum class ReadDisableStatus {
+    NoTransition,
+    StillReadDisabled,
+    TransitionedToReadEnabled,
+    TransitionedToReadDisabled
+  };
 
   /**
    * Callback function for when bytes have been sent by a connection.
@@ -129,17 +173,30 @@ public:
   /**
    * @return true if half-close semantics are enabled, false otherwise.
    */
-  virtual bool isHalfCloseEnabled() PURE;
+  virtual bool isHalfCloseEnabled() const PURE;
 
   /**
    * Close the connection.
+   * @param type the connection close type.
    */
   virtual void close(ConnectionCloseType type) PURE;
 
   /**
+   * Close the connection.
+   * @param type the connection close type.
+   * @param details the reason the connection is being closed.
+   */
+  virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
+
+  /**
+   * @return the detected close type from socket.
+   */
+  virtual DetectedCloseType detectedCloseType() const PURE;
+
+  /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
    */
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual Event::Dispatcher& dispatcher() const PURE;
 
   /**
    * @return uint64_t the unique local ID of this connection.
@@ -169,6 +226,7 @@ public:
    * enabled again if there is data still in the input buffer it will be re-dispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
+   * @return status enum indicating the outcome of calling readDisable on the underlying socket.
    *
    * Note that this function reference counts calls. For example
    * readDisable(true);  // Disables data
@@ -176,7 +234,7 @@ public:
    * readDisable(false);  // Notes the connection is blocked by one source
    * readDisable(false);  // Marks the connection as unblocked, so resumes reading.
    */
-  virtual void readDisable(bool disable) PURE;
+  virtual ReadDisableStatus readDisable(bool disable) PURE;
 
   /**
    * Set if Envoy should detect TCP connection close when readDisable(true) is called.
@@ -253,7 +311,7 @@ public:
   virtual bool connecting() const PURE;
 
   /**
-   * Write data to the connection. Will iterate through downstream filters with the buffer if any
+   * Write data to the connection. Will iterate through network filters with the buffer if any
    * are installed.
    * @param data Supplies the data to write to the connection.
    * @param end_stream If true, this indicates that this is the last write to the connection. If
@@ -309,10 +367,16 @@ public:
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
-   * @return std::string the failure reason of the underlying transport socket, if no failure
-   *         occurred an empty string is returned.
+   * @return absl::string_view the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string view is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * @return absl::string_view the local close reason of the underlying socket, if local close
+   *         did not occur an empty string view is returned.
+   */
+  virtual absl::string_view localCloseReason() const PURE;
 
   /**
    * Instructs the connection to start using secure transport.

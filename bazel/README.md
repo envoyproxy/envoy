@@ -38,11 +38,22 @@ To build Envoy from a release tarball, you can download a release tarball from A
 Given all required [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are installed, the following steps should be followed:
 
 1. Download and extract source code of a release tarball from the Releases page. For example: https://github.com/envoyproxy/envoy/releases/tag/v1.24.0.
-1. `python3 tools/github/tools/github/write_current_source_version.py` from the repository root.
+1. `python3 tools/github/write_current_source_version.py` from the repository root.
 1. `bazel build -c opt envoy` from the repository root.
 
-> Note: If the the `write_current_source_version.py` script is missing from the extracted source code directory, you can download it from [here](https://raw.githubusercontent.com/envoyproxy/envoy/tree/main/tools/github/write_current_source_version.py).
+> **Note**: If the the `write_current_source_version.py` script is missing from the extracted source code directory, you can download it from [here](https://raw.githubusercontent.com/envoyproxy/envoy/main/tools/github/write_current_source_version.py).
 > This script is used to generate SOURCE_VERSION that is required by [`bazel/get_workspace_status`](./get_workspace_status) to "stamp" the binary in a non-git directory.
+
+> **Note**: To avoid rate-limiting by GitHub API, you can provide [a valid GitHub token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats) to `GITHUB_TOKEN` environment variable.
+> The environment variable name that holds the token can also be customized by setting `--github_api_token_env_name`.
+> In a GitHub Actions workflow file, you can set this token from [`secrets.GITHUB_TOKEN`](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret).
+
+Examples:
+
+```console
+GITHUB_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py
+MY_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py --github_api_token_env_name=MY_TOKEN
+```
 
 ## Quick start Bazel build for developers
 
@@ -64,12 +75,8 @@ for how to update or override dependencies.
     ```console
     sudo apt-get install \
        autoconf \
-       automake \
-       cmake \
        curl \
        libtool \
-       make \
-       ninja-build \
        patch \
        python3-pip \
        unzip \
@@ -81,19 +88,18 @@ for how to update or override dependencies.
     ```console
     dnf install \
         aspell-en \
-        cmake \
         libatomic \
         libstdc++ \
         libstdc++-static \
         libtool \
         lld \
-        ninja-build \
         patch \
         python3-pip
     ```
 
     ### Linux
-    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
+    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 14.
+
     Extract the tar.xz and run the following:
     ```console
     bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
@@ -107,7 +113,7 @@ for how to update or override dependencies.
     Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
 
     #### Config Flag Choices
-    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:
+    Different [config](https://bazel.build/run/bazelrc/#config) flags specify the compiler libraries:
 
     - `--config=libc++` means using `clang` + `libc++`
     - `--config=clang` means using `clang` + `libstdc++`
@@ -117,7 +123,7 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10
+    brew install coreutils wget libtool go bazelisk clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
@@ -180,7 +186,7 @@ for how to update or override dependencies.
     is set.
 
     Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
-    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
+    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#symlink).
     For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
@@ -215,15 +221,6 @@ for how to update or override dependencies.
     ```
 
     The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
-
-    Ensure `CMake` and `ninja` binaries are on the PATH. The versions packaged with VC++ Build
-    Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
-    the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
-    projects are used instead.
-    ```cmd
-    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%PATH%
-    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
-    ```
 
     [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
 
@@ -281,6 +278,7 @@ for how to update or override dependencies.
    in your shell for buildozer to work. If GOPATH is not set, it is $HOME/go by default.
 1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
+1. For debug builds on macOS, pass additionally: `--spawn_strategy=local --features=oso_prefix_is_pwd`
 
 ## Building Envoy with the CI Docker image
 
@@ -289,7 +287,7 @@ Envoy can also be built with the Docker image used for CI, by installing Docker 
 On Linux, run:
 
 ```
-./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+./ci/run_envoy_docker.sh './ci/do_ci.sh dev'
 ```
 
 From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
@@ -401,7 +399,7 @@ bazel test //test/...
 ```
 
 An individual test target can be run with a more specific Bazel
-[label](https://bazel.build/versions/master/docs/build-ref.html#Labels), e.g. to build and run only
+[label](https://bazel.build/concepts/labels), e.g. to build and run only
 the units tests in
 [test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/main/test/common/http/async_client_impl_test.cc):
 
@@ -454,7 +452,7 @@ bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 
 Bazel will by default run all tests inside a sandbox, which disallows access to the
 local filesystem. If you need to break out of the sandbox (for example to run under a
-local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#flag--run_under)),
+local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#test-run-under)),
 you can run the test with `--strategy=TestRunner=local`, e.g.:
 
 ```
@@ -565,7 +563,7 @@ RUN_REMOTE=yes MOUNT_LOCAL=yes tools/bazel-test-docker.sh  //test/integration:in
 # Additional Envoy build and test options
 
 In general, there are 3 [compilation
-modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilation_mode)
+modes](https://docs.bazel.build/versions/master/user-manual.html#compilation-mode)
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
@@ -686,8 +684,12 @@ The following optional features can be disabled on the Bazel build command-line:
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
-* http3/quic with --//bazel:http3=False
+* http3/quic with `--//bazel:http3=False`
+* autolinking libraries with `--define=library_autolink=disabled`
 * admin HTML home page with `--define=admin_html=disabled`
+* admin functionality with `--define=admin_functionality=disabled`
+* static extension registration with `--define=static_extension_registration=disabled`
+* spdlogging functionality with `--define=enable_logging=disabled`
 
 ## Enabling optional features
 
@@ -738,7 +740,6 @@ To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wa
 * `v8` (the default included engine)
 * `wamr`
 * `wasmtime`
-* `wavm`
 
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
@@ -923,73 +924,26 @@ This requires Python 3.8.0+, download from [here](https://www.python.org/downloa
 
 Use the following command to prepare a compilation database:
 
-```
+```console
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
+On macOS:
+
+```console
+tools/gen_compilation_database.py --exclude_contrib
+```
 
 # Running format linting without docker
 
-The easiest way to run the clang-format check/fix commands is to run them via
-docker, which helps ensure the right toolchain is set up. However you may prefer
-to run clang-format scripts on your workstation directly:
- * It's possible there is a speed advantage
- * Docker itself can sometimes go awry and you then have to deal with that
- * Type-ahead doesn't always work when waiting running a command through docker
-
-To run the tools directly, you must install the correct version of clang. This
-may change over time, check the version of clang in the docker image. You must
-also have 'buildifier' installed from the bazel distribution.
-
 Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
 
-Edit the paths shown here to reflect the installation locations on your system:
+You can run clang-format directly, without docker:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
-export BUILDIFIER_BIN="/usr/bin/buildifier"
-```
-
-A relatively easy way to use the correct `clang-format` in your host system is to copy the `clang-format` from the ci docker image.
-
-* Run the ci docker image
-
-```shell
-ci/run_envoy_docker.sh bash
-```
-
-* Get the docker container ID
-
-```shell
-dockerContainerID=$(docker ps | grep envoy-build-ubuntu | awk '{print $1}')
-```
-
-* Copy the `clang-format` to host machine
-
-```shell
-docker cp $dockerContainerID:/opt/llvm/bin/clang-format clang-format-ci
-```
-
-* Ensure that the copied `clang-format` is the default one, by ensuring it is in `$PATH`:
-
-```shell
-cp clang-format-ci /usr/local/bin/clang-format
-```
-
-Alternatively, if you are a non-root user, you can use a bin dir and add that to `$PATH`
-
-```shell
-mkdir bin
-mv clang-format-ci bin/clang-format
-export PATH=$PATH:$PWD/bin/
-```
-
-Once this is set up, you can run clang-format without docker:
-
-```shell
-./tools/code_format/check_format.py check
+bazel run //tools/code_format:check_format -- check
 ./tools/spelling/check_spelling_pedantic.py check
-./tools/code_format/check_format.py fix
+bazel run //tools/code_format:check_format -- fix
 ./tools/spelling/check_spelling_pedantic.py fix
 ```
 

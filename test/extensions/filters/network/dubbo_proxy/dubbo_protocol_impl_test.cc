@@ -117,6 +117,39 @@ TEST(DubboProtocolImplTest, Normal) {
     auto result = dubbo_protocol.decodeHeader(buffer, metadata);
     auto context = result.first;
     EXPECT_TRUE(result.second);
+    EXPECT_EQ(ResponseStatus::BadRequest, metadata->responseStatus());
+    EXPECT_EQ(1, metadata->requestId());
+    EXPECT_EQ(body_size, context->bodySize());
+    EXPECT_EQ(MessageType::Response, metadata->messageType());
+
+    context->originMessage().move(buffer, context->headerSize());
+
+    auto body_result = dubbo_protocol.decodeData(buffer, context, metadata);
+
+    EXPECT_TRUE(body_result);
+    EXPECT_EQ(MessageType::Exception, metadata->messageType());
+  }
+
+  // Normal dubbo response with error of ServerError.
+  {
+    Buffer::OwnedImpl buffer;
+    Buffer::OwnedImpl body_buffer;
+    buffer.add(std::string({'\xda', '\xbb', 0x42, 80}));
+    addInt64(buffer, 1);
+
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(body_buffer));
+    // No response type in the body for non `20` response.
+    encoder.encode<std::string>("error_string");
+
+    auto body_size = body_buffer.length();
+    addInt32(buffer, body_size);
+    buffer.move(body_buffer);
+
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+    auto result = dubbo_protocol.decodeHeader(buffer, metadata);
+    auto context = result.first;
+    EXPECT_TRUE(result.second);
+    EXPECT_EQ(ResponseStatus::ServerError, metadata->responseStatus());
     EXPECT_EQ(1, metadata->requestId());
     EXPECT_EQ(body_size, context->bodySize());
     EXPECT_EQ(MessageType::Response, metadata->messageType());

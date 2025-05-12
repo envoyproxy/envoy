@@ -27,11 +27,11 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
-        "//source/common/http:rest_api_fetcher_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/config_subscription/rest:rest_api_fetcher_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/client_ssl_auth/v3:pkg_cc_proto",
     ],
 )

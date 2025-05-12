@@ -4,6 +4,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/utility.h"
 
 #include "spdlog/spdlog.h"
@@ -33,19 +34,12 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
   ASSERT(!udp_listener_->dispatcher().isThreadSafe(),
          "Shouldn't be posting if thread safe; use onWorkerData() instead.");
 
-  // It is not possible to capture a unique_ptr because the post() API copies the lambda, so we must
-  // bundle the socket inside a shared_ptr that can be captured.
-  // TODO(mattklein123): It may be possible to change the post() API such that the lambda is only
-  // moved, but this is non-trivial and needs investigation.
-  auto data_to_post = std::make_shared<Network::UdpRecvData>();
-  *data_to_post = std::move(data);
-
   auto address = listen_socket_.connectionInfoProvider().localAddress();
-  udp_listener_->dispatcher().post([data_to_post, tag = config_->listenerTag(), &parent = parent_,
-                                    address]() {
+  udp_listener_->dispatcher().post([data = std::move(data), tag = config_->listenerTag(),
+                                    &parent = parent_, address]() mutable {
     Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag, *address);
     if (listener.has_value()) {
-      listener->get().onDataWorker(std::move(*data_to_post));
+      listener->get().onDataWorker(std::move(data));
     }
   });
 }
@@ -81,8 +75,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
     : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
-                           dispatcher.createUdpListener(
-                               listen_socket_ptr, *this,
+                           std::make_unique<Network::UdpListenerImpl>(
+                               dispatcher, listen_socket_ptr, *this, dispatcher.timeSource(),
                                config.udpListenerConfig()->config().downstream_socket_config()),
                            config) {}
 

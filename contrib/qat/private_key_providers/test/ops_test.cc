@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/common/tls/private_key/private_key_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -36,15 +36,16 @@ namespace {
 
 class TestCallbacks : public Envoy::Ssl::PrivateKeyConnectionCallbacks {
 public:
-  void onPrivateKeyMethodComplete() override{
+  void onPrivateKeyMethodComplete() override { is_completed_ = true; };
 
-  };
+  bool is_completed_{false};
 };
 
 class FakeSingletonManager : public Singleton::Manager {
 public:
   FakeSingletonManager(LibQatCryptoSharedPtr libqat) : libqat_(libqat) {}
-  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+  Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb,
+                                   bool) override {
     return std::make_shared<QatManager>(libqat_);
   }
 
@@ -59,8 +60,9 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         libqat_(std::make_shared<FakeLibQatCryptoImpl>()), fsm_(libqat_) {
     handle_.setLibqat(libqat_);
-    ON_CALL(factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(factory_context_, singletonManager()).WillByDefault(testing::ReturnRef(fsm_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, singletonManager())
+        .WillByDefault(testing::ReturnRef(fsm_));
   }
 
   Stats::TestUtil::TestStore store_;
@@ -108,7 +110,7 @@ protected:
     rsa_ = EVP_PKEY_get0_RSA(pkey_.get());
     libqat_->setRsaKey(rsa_);
   }
-  bssl::UniquePtr<EVP_PKEY> pkey_{};
+  bssl::UniquePtr<EVP_PKEY> pkey_;
   RSA* rsa_{};
 };
 
@@ -125,6 +127,7 @@ TEST_F(QatProviderRsaTest, TestRsaPkcs1Signing) {
   // to complete() function.
   QatContext* ctx = static_cast<QatContext*>(libqat_->getQatContextPointer());
   EXPECT_NE(ctx, nullptr);
+  op.registerCallback(ctx);
 
   ctx->setOpStatus(CPA_STATUS_RETRY);
   res_ = privateKeyCompleteForTest(&op, ctx, nullptr, nullptr, max_out_len_);
@@ -132,6 +135,8 @@ TEST_F(QatProviderRsaTest, TestRsaPkcs1Signing) {
 
   libqat_->triggerDecrypt();
   ctx->setOpStatus(CPA_STATUS_SUCCESS);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(cb.is_completed_);
 
   res_ = privateKeyCompleteForTest(&op, ctx, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
@@ -158,6 +163,7 @@ TEST_F(QatProviderRsaTest, TestRsaPSSSigning) {
   // to complete() function.
   QatContext* ctx = static_cast<QatContext*>(libqat_->getQatContextPointer());
   EXPECT_NE(ctx, nullptr);
+  op.registerCallback(ctx);
 
   ctx->setOpStatus(CPA_STATUS_RETRY);
   res_ = privateKeyCompleteForTest(&op, ctx, nullptr, nullptr, max_out_len_);
@@ -165,6 +171,8 @@ TEST_F(QatProviderRsaTest, TestRsaPSSSigning) {
 
   libqat_->triggerDecrypt();
   ctx->setOpStatus(CPA_STATUS_SUCCESS);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(cb.is_completed_);
 
   res_ = privateKeyCompleteForTest(&op, ctx, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
@@ -201,6 +209,7 @@ TEST_F(QatProviderRsaTest, TestRsaDecryption) {
 
   QatContext* ctx = static_cast<QatContext*>(libqat_->getQatContextPointer());
   EXPECT_NE(ctx, nullptr);
+  op.registerCallback(ctx);
 
   ctx->setOpStatus(CPA_STATUS_RETRY);
   res_ = privateKeyCompleteForTest(&op, ctx, nullptr, nullptr, max_out_len_);
@@ -208,6 +217,8 @@ TEST_F(QatProviderRsaTest, TestRsaDecryption) {
 
   libqat_->triggerDecrypt();
   ctx->setOpStatus(CPA_STATUS_SUCCESS);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(cb.is_completed_);
 
   res_ = privateKeyCompleteForTest(&op, ctx, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
@@ -240,9 +251,9 @@ TEST_F(QatProviderRsaTest, TestQatDeviceInit) {
 
   // no device found
   libqat_->icpSalUserStart_return_value_ = CPA_STATUS_FAIL;
-  EXPECT_THROW_WITH_REGEX(
-      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_),
-      EnvoyException, "Failed to start QAT device.");
+  Ssl::PrivateKeyMethodProviderSharedPtr provider =
+      std::make_shared<QatPrivateKeyMethodProvider>(conf, factory_context_, libqat_);
+  EXPECT_EQ(provider->isAvailable(), false);
   delete private_key;
 }
 

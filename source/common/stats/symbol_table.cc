@@ -141,7 +141,17 @@ public:
   // The type of token reached.
   enum class TokenType { StringView, Symbol, End };
 
-  TokenIter(StatName stat_name) : array_(stat_name.data()), size_(stat_name.dataSize()) {}
+  TokenIter(StatName stat_name) {
+    const uint8_t* raw_data = stat_name.dataIncludingSize();
+    if (raw_data == nullptr) {
+      size_ = 0;
+      array_ = nullptr;
+    } else {
+      std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
+      size_ = size_consumed.first;
+      array_ = raw_data + size_consumed.second;
+    }
+  }
 
   /**
    * Parses the next token. The token can then be retrieved by calling
@@ -429,8 +439,7 @@ DynamicSpans SymbolTable::getDynamicSpans(StatName stat_name) const {
   // Note that with fake symbol tables, the Symbol lambda is called
   // once for each character in the string, and no dynamics will
   // be recorded.
-  Encoding::decodeTokens(
-      stat_name, [&index](Symbol) { ++index; }, record_dynamic);
+  Encoding::decodeTokens(stat_name, [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 
@@ -610,20 +619,29 @@ StatNameStorage::~StatNameStorage() {
 }
 
 void StatNameStorage::free(SymbolTable& table) {
+  // nolint: https://github.com/llvm/llvm-project/issues/81597
+  // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
   table.free(statName());
   clear();
 }
 
 void StatNamePool::clear() {
   for (StatNameStorage& storage : storage_vector_) {
+    // nolint: https://github.com/llvm/llvm-project/issues/81597
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     storage.free(symbol_table_);
   }
   storage_vector_.clear();
 }
 
 const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
-  storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
+  storage_vector_.emplace_back(str, symbol_table_);
   return storage_vector_.back().bytes();
+}
+
+StatName StatNamePool::add(StatName name) {
+  storage_vector_.emplace_back(name, symbol_table_);
+  return storage_vector_.back().statName();
 }
 
 StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
@@ -723,6 +741,8 @@ void StatNameList::iterate(const std::function<bool(StatName)>& f) const {
 
 void StatNameList::clear(SymbolTable& symbol_table) {
   iterate([&symbol_table](StatName stat_name) -> bool {
+    // nolint: https://github.com/llvm/llvm-project/issues/81597
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     symbol_table.free(stat_name);
     return true;
   });

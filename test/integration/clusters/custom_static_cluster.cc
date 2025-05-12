@@ -16,17 +16,17 @@ void CustomStaticCluster::startPreInit() {
   priority_set_.updateHosts(
       priority_,
       Upstream::HostSetImpl::partitionHosts(hosts_ptr, Upstream::HostsPerLocalityImpl::empty()), {},
-      hosts, {}, absl::nullopt);
+      hosts, {}, 123, absl::nullopt);
 
   onPreInitComplete();
 }
 
 Upstream::HostSharedPtr CustomStaticCluster::makeHost() {
   Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::parseInternetAddress(address_, port_, true);
-  return Upstream::HostSharedPtr{new Upstream::HostImpl(
+      Network::Utility::parseInternetAddressNoThrow(address_, port_, true);
+  return Upstream::HostSharedPtr{*Upstream::HostImpl::create(
       info(), "", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(info()->metadata()), 1,
+      std::make_shared<const envoy::config::core::v3::Metadata>(info()->metadata()), nullptr, 1,
       envoy::config::core::v3::Locality::default_instance(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), priority_,
       envoy::config::core::v3::UNKNOWN, time_source_)};

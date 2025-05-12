@@ -23,7 +23,7 @@ public:
   /**
    * Walks through all global singletons and ensures that none of them are
    * active. No singletons should be allocated at the end of unit tests, so
-   * this is called at the end of Envoy::TestRunner::RunTests().
+   * this is called at the end of Envoy::TestRunner::runTests().
    *
    * @return std::string empty string if quiescent, otherwise newline-separated
    *    error messages.

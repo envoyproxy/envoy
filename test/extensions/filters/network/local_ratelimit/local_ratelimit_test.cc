@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
@@ -24,18 +23,13 @@ namespace LocalRateLimitFilter {
 
 class LocalRateLimitTestBase : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  LocalRateLimitTestBase() : singleton_manager_(Thread::threadFactoryForTest()) {}
+  LocalRateLimitTestBase() = default;
 
-  uint64_t initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
+  uint64_t initialize(const std::string& filter_yaml) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
-    fill_timer_ = new Event::MockTimer(&dispatcher_);
-    if (expect_timer_create) {
-      EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
-      EXPECT_CALL(*fill_timer_, disableTimer());
-    }
-    config_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_,
-                                       singleton_manager_);
+    config_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                       runtime_, singleton_manager_);
     return proto_config.token_bucket().max_tokens();
   }
 
@@ -43,7 +37,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   Singleton::ManagerImpl singleton_manager_;
-  Event::MockTimer* fill_timer_{};
   ConfigSharedPtr config_;
 };
 
@@ -93,16 +86,16 @@ token_bucket:
   // Second connection should be rate limited.
   ActiveFilter active_filter2(config_);
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded));
-  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded));
+  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "local_ratelimit_close_over_limit"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 
   // Refill the bucket.
-  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
-  fill_timer_->invokeCallback();
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
 
   // Third connection is OK.
   ActiveFilter active_filter3(config_);
@@ -144,13 +137,8 @@ public:
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml2, proto_config);
     const uint64_t config2_tokens = proto_config.token_bucket().max_tokens();
-    if (!expect_sharing) {
-      auto timer = new Event::MockTimer(&dispatcher_);
-      EXPECT_CALL(*timer, enableTimer(_, nullptr));
-      EXPECT_CALL(*timer, disableTimer());
-    }
-    config2_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_,
-                                        singleton_manager_);
+    config2_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                        runtime_, singleton_manager_);
 
     // This test just uses the initial tokens without ever refilling.
     if (expect_sharing) {
@@ -226,7 +214,7 @@ TEST_F(LocalRateLimitSharedTokenBucketTest, Shared) {
 // Test that the Key from SharedRateLimitSingleton::get() is valid/stable even if
 // many entries are added and the hash table is rehashed.
 TEST_F(LocalRateLimitSharedTokenBucketTest, RehashPointerStability) {
-  const char* yaml_template = R"EOF(
+  constexpr absl::string_view yaml_template = R"EOF(
 stat_prefix: local_rate_limit_stats
 share_key: key_{}
 token_bucket:
@@ -241,8 +229,8 @@ token_bucket:
     std::string yaml = fmt::format(yaml_template, i);
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-    configs.push_back(std::make_unique<Config>(proto_config, dispatcher_, stats_store_, runtime_,
-                                               singleton_manager_));
+    configs.push_back(std::make_unique<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+                                               runtime_, singleton_manager_));
   }
 
   configs.clear();

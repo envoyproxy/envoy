@@ -66,7 +66,6 @@
             domain: envoy_front
             request_type: external
             rate_limit_service:
-              transport_api_version: V3
               grpc_service:
                 envoy_grpc:
                   cluster_name: ratelimit

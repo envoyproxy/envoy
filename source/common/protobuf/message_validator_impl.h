@@ -17,15 +17,19 @@ public:
   void clearRuntime() { runtime_ = {}; } // for tests
   OptRef<Runtime::Loader> runtime() override { return runtime_; }
 
+  void setSkipDeprecatedLogs(bool skip) { skip_deprecated_logs_ = skip; }
+  bool isSkipDeprecatedLogs() const { return skip_deprecated_logs_; }
+
 protected:
   OptRef<Runtime::Loader> runtime_;
+  bool skip_deprecated_logs_{false};
 };
 
 class NullValidationVisitorImpl : public ValidationVisitorBase {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view) override {}
-  void onDeprecatedField(absl::string_view, bool) override {}
+  absl::Status onUnknownField(absl::string_view) override { return absl::OkStatus(); }
+  absl::Status onDeprecatedField(absl::string_view, bool) override { return absl::OkStatus(); }
   bool skipValidation() override { return true; }
   void onWorkInProgress(absl::string_view) override {}
 };
@@ -50,8 +54,8 @@ public:
   void setCounters(Stats::Counter& unknown_counter, Stats::Counter& wip_counter);
 
   // Envoy::ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view description) override;
-  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+  absl::Status onUnknownField(absl::string_view description) override;
+  absl::Status onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
   bool skipValidation() override { return false; }
   void onWorkInProgress(absl::string_view description) override;
 
@@ -70,9 +74,9 @@ public:
   void setCounters(Stats::Counter& wip_counter) { setWipCounter(wip_counter); }
 
   // Envoy::ProtobufMessage::ValidationVisitor
-  void onUnknownField(absl::string_view description) override;
+  absl::Status onUnknownField(absl::string_view description) override;
   bool skipValidation() override { return false; }
-  void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
+  absl::Status onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
   void onWorkInProgress(absl::string_view description) override;
 };
 
@@ -101,7 +105,7 @@ private:
 class ProdValidationContextImpl : public ValidationContextImpl {
 public:
   ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
-                            bool ignore_unknown_dynamic_fields)
+                            bool ignore_unknown_dynamic_fields, bool skip_deprecated_logs)
       : ValidationContextImpl(
             allow_unknown_static_fields
                 ? static_cast<ValidationVisitor&>(static_warning_validation_visitor_)
@@ -109,7 +113,11 @@ public:
             allow_unknown_dynamic_fields
                 ? (ignore_unknown_dynamic_fields ? ProtobufMessage::getNullValidationVisitor()
                                                  : dynamic_warning_validation_visitor_)
-                : strict_validation_visitor_) {}
+                : strict_validation_visitor_) {
+    strict_validation_visitor_.setSkipDeprecatedLogs(skip_deprecated_logs);
+    static_warning_validation_visitor_.setSkipDeprecatedLogs(skip_deprecated_logs);
+    dynamic_warning_validation_visitor_.setSkipDeprecatedLogs(skip_deprecated_logs);
+  }
 
   void setCounters(Stats::Counter& static_unknown_counter, Stats::Counter& dynamic_unknown_counter,
                    Stats::Counter& wip_counter) {

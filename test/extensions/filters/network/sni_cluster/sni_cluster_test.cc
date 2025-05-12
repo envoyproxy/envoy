@@ -25,7 +25,7 @@ TEST(SniCluster, ConfigTest) {
   SniClusterNetworkFilterConfigFactory factory;
 
   Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), context);
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

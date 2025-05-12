@@ -28,6 +28,10 @@ void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callback
   }
 }
 
+OptRef<const StreamInfo::StreamInfo> ConnectionImplBase::trackedStream() const {
+  return streamInfo();
+}
+
 void ConnectionImplBase::hashKey(std::vector<uint8_t>& hash) const { addIdToHashKey(hash, id()); }
 
 void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
@@ -70,7 +74,8 @@ void ConnectionImplBase::onDelayedCloseTimeout() {
   if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();
   }
-  closeConnectionImmediately();
+  closeConnectionImmediatelyWithDetails(
+      StreamInfo::LocalCloseReasons::get().TriggeredDelayedCloseTimeout);
 }
 
 } // namespace Network

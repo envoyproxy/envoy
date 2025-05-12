@@ -12,6 +12,7 @@ Supported service discovery types
 ---------------------------------
 
 .. _arch_overview_service_discovery_types_static:
+.. _extension_envoy.clusters.static:
 
 Static
 ^^^^^^
@@ -20,6 +21,7 @@ Static is the simplest service discovery type. The configuration explicitly spec
 network name (IP address/port, unix domain socket, etc.) of each upstream host.
 
 .. _arch_overview_service_discovery_types_strict_dns:
+.. _extension_envoy.clusters.strict_dns:
 
 Strict DNS
 ^^^^^^^^^^
@@ -51,6 +53,7 @@ controls the refresh frequency during failures, and, if not configured, the DNS 
 DNS resolving emits :ref:`cluster statistics <config_cluster_manager_cluster_stats>` fields *update_attempt*, *update_success* and *update_failure*.
 
 .. _arch_overview_service_discovery_types_logical_dns:
+.. _extension_envoy.clusters.logical_dns:
 
 Logical DNS
 ^^^^^^^^^^^
@@ -100,6 +103,7 @@ When using the original destination cluster for HTTP upstreams, please set :ref:
 <faq_configuration_connection_timeouts>` to 5min to limit the duration of the upstream HTTP connections.
 
 .. _arch_overview_service_discovery_types_eds:
+.. _extension_envoy.clusters.eds:
 
 Endpoint discovery service (EDS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

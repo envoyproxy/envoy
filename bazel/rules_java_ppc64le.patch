@@ -1,0 +1,75 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+index 801721a..b0c10dd 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -5,7 +5,7 @@ module(
+     compatibility_level = 1,
+ )
+ 
+-bazel_dep(name = "platforms", version = "0.0.4")
++bazel_dep(name = "platforms", version = "0.0.11")
+ bazel_dep(name = "rules_cc", version = "0.0.10")
+ bazel_dep(name = "bazel_features", version = "1.11.0")
+ bazel_dep(name = "bazel_skylib", version = "1.6.1")
+diff --git a/java/bazel/repositories_util.bzl b/java/bazel/repositories_util.bzl
+index 7e9efbd..aaf0f1b 100644
+--- a/java/bazel/repositories_util.bzl
++++ b/java/bazel/repositories_util.bzl
+@@ -44,7 +44,7 @@ _RELEASE_CONFIGS = {
+         "adoptium": {
+             "release": "11.0.15+10",
+             "platforms": {
+-                "linux": ["ppc", "s390x"],
++                "linux": ["ppc", "ppc64le", "s390x"],
+             },
+         },
+         "microsoft": {
+@@ -66,7 +66,7 @@ _RELEASE_CONFIGS = {
+         "adoptium": {
+             "release": "17.0.8.1+1",
+             "platforms": {
+-                "linux": ["ppc", "s390x"],
++                "linux": ["ppc", "ppc64le", "s390x"],
+             },
+         },
+     },
+@@ -82,7 +82,7 @@ _RELEASE_CONFIGS = {
+         "adoptium": {
+             "release": "21.0.4+7",
+             "platforms": {
+-                "linux": ["ppc", "s390x"],
++                "linux": ["ppc", "ppc64le", "s390x"],
+             },
+         },
+     },
+diff --git a/java/repositories.bzl b/java/repositories.bzl
+index 27f4f85..f3ca8ac 100644
+--- a/java/repositories.bzl
++++ b/java/repositories.bzl
+@@ -166,7 +166,7 @@ _REMOTE_JDK_CONFIGS_LIST = [
+     ),
+     struct(
+         name = "remotejdk11_linux_ppc64le",
+-        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc"],
++        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc64le"],
+         sha256 = "a8fba686f6eb8ae1d1a9566821dbd5a85a1108b96ad857fdbac5c1e4649fc56f",
+         strip_prefix = "jdk-11.0.15+10",
+         urls = ["https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_ppc64le_linux_hotspot_11.0.15_10.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_ppc64le_linux_hotspot_11.0.15_10.tar.gz"],
+@@ -238,7 +238,7 @@ _REMOTE_JDK_CONFIGS_LIST = [
+     ),
+     struct(
+         name = "remotejdk17_linux_ppc64le",
+-        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc"],
++        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc64le"],
+         sha256 = "00a4c07603d0218cd678461b5b3b7e25b3253102da4022d31fc35907f21a2efd",
+         strip_prefix = "jdk-17.0.8.1+1",
+         urls = ["https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.8.1+1/OpenJDK17U-jdk_ppc64le_linux_hotspot_17.0.8.1_1.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.8.1+1/OpenJDK17U-jdk_ppc64le_linux_hotspot_17.0.8.1_1.tar.gz"],
+@@ -302,7 +302,7 @@ _REMOTE_JDK_CONFIGS_LIST = [
+     ),
+     struct(
+         name = "remotejdk21_linux_ppc64le",
+-        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc"],
++        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc64le"],
+         sha256 = "c208cd0fb90560644a90f928667d2f53bfe408c957a5e36206585ad874427761",
+         strip_prefix = "jdk-21.0.4+7",
+         urls = ["https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+7/OpenJDK21U-jdk_ppc64le_linux_hotspot_21.0.4_7.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+7/OpenJDK21U-jdk_ppc64le_linux_hotspot_21.0.4_7.tar.gz"],

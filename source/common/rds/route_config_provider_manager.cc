@@ -5,13 +5,16 @@
 namespace Envoy {
 namespace Rds {
 
-RouteConfigProviderManager::RouteConfigProviderManager(Server::Admin& admin,
+RouteConfigProviderManager::RouteConfigProviderManager(OptRef<Server::Admin> admin,
                                                        const std::string& config_tracker_key,
                                                        ProtoTraits& proto_traits)
-    : config_tracker_entry_(admin.getConfigTracker().add(
-          config_tracker_key,
-          [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); })),
-      proto_traits_(proto_traits) {
+    : proto_traits_(proto_traits) {
+  if (!admin.has_value()) {
+    return;
+  }
+  config_tracker_entry_ = admin->getConfigTracker().add(
+      config_tracker_key,
+      [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");
@@ -43,7 +46,8 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
       }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(provider->configInfo().value().version_);
-      dynamic_config->mutable_route_config()->PackFrom(provider->configInfo().value().config_);
+      MessageUtil::packFrom(*dynamic_config->mutable_route_config(),
+                            provider->configInfo().value().config_);
       TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
@@ -55,7 +59,8 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
-    static_config->mutable_route_config()->PackFrom(provider->configInfo().value().config_);
+    MessageUtil::packFrom(*static_config->mutable_route_config(),
+                          provider->configInfo().value().config_);
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *static_config->mutable_last_updated());
   }
@@ -68,25 +73,6 @@ RouteConfigProviderPtr RouteConfigProviderManager::addStaticProvider(
   auto provider = create_static_provider();
   static_route_config_providers_.insert(provider.get());
   return provider;
-}
-
-RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
-    const Protobuf::Message& rds, const std::string& route_config_name, Init::Manager& init_manager,
-    std::function<
-        std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(uint64_t manager_identifier)>
-        create_dynamic_provider) {
-  // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
-  const uint64_t manager_identifier = MessageUtil::hash(rds);
-  auto existing_provider =
-      reuseDynamicProvider(manager_identifier, init_manager, route_config_name);
-
-  if (existing_provider) {
-    return existing_provider;
-  }
-  auto new_provider = create_dynamic_provider(manager_identifier);
-  init_manager.add(*new_provider.second);
-  dynamic_route_config_providers_.insert({manager_identifier, new_provider});
-  return new_provider.first;
 }
 
 RouteConfigProviderSharedPtr

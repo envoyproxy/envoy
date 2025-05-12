@@ -15,7 +15,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 namespace {
-
+static const std::string TEST_STATE_CSRF_TOKEN =
+    "8c18b8fcf575b593.qE67JkhE3H/0rpNYWCkQXX65Yzk5gEe7uETE3m8tylY=";
+// {"url":"http://traffic.example.com/not/_oauth","csrf_token":"${extracted}"}
+static const std::string TEST_ENCODED_STATE =
+    "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
+    "U3NWI1OTMucUU2N0praEUzSC8wcnBOWVdDa1FYWDY1WXprNWdFZTd1RVRFM204dHlsWT0ifQ";
+static const std::string TEST_STATE_CSRF_TOKEN_1 =
+    "8c18b8fcf575b593.ZpkXMDNFiinkL87AoSDONKulBruOpaIiSAd7CNkgOEo=";
+// {"url":"http://traffic.example.com/not/_oauth","csrf_token": "${extracted}}"}
+static const std::string TEST_ENCODED_STATE_1 =
+    "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
+    "U3NWI1OTMuWnBrWE1ETkZpaW5rTDg3QW9TRE9OS3VsQnJ1T3BhSWlTQWQ3Q05rZ09Fbz0ifQ";
+static const std::string TEST_ENCRYPTED_CODE_VERIFIER =
+    "Fc1bBwAAAAAVzVsHAAAAACcWO_WnprqLTdaCdFE7rj83_Jej1OihEIfOcQJFRCQZirutZ-XL7LK2G2KgRnVCCA";
+static const std::string TEST_ENCRYPTED_CODE_VERIFIER_1 =
+    "Fc1bBwAAAAAVzVsHAAAAANRgXgBre6UErcWdPGZOl-o0px-SribGBqMNhaB6Smp-pjDSB20RXanapU6gVN4E1A";
 class OauthIntegrationTest : public HttpIntegrationTest,
                              public Grpc::GrpcClientIntegrationParamTest {
 public:
@@ -175,6 +190,28 @@ resources:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
+  void cleanup() {
+    codec_client_->close();
+    if (fake_oauth2_connection_ != nullptr) {
+      AssertionResult result = fake_oauth2_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_oauth2_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    if (fake_upstream_connection_ != nullptr) {
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
   virtual void setOauthConfig() {
     // This config is same as when the 'auth_type: "URL_ENCODED_BODY"' is set as it's the default
     // value
@@ -187,6 +224,11 @@ typed_config:
       cluster: oauth
       uri: oauth.com/token
       timeout: 3s
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
     authorization_endpoint: https://oauth.com/oauth/authorize/
     redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:
@@ -202,13 +244,11 @@ typed_config:
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/token_secret.yaml"
-          resource_api_version: V3
       hmac_secret:
         name: hmac
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/hmac_secret.yaml"
-          resource_api_version: V3
     auth_scopes:
     - user
     - openid
@@ -228,6 +268,8 @@ typed_config:
         Http::Utility::parseSetCookieValue(headers, default_cookie_names_.bearer_token_);
     std::string hmac =
         Http::Utility::parseSetCookieValue(headers, default_cookie_names_.oauth_hmac_);
+    std::string refreshToken =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.refresh_token_);
 
     Http::TestRequestHeaderMapImpl validate_headers{{":authority", std::string(host)}};
 
@@ -239,51 +281,81 @@ typed_config:
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
                                      absl::StrCat(default_cookie_names_.bearer_token_, "=", token));
 
-    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
+    validate_headers.addReferenceKey(
+        Http::Headers::get().Cookie,
+        absl::StrCat(default_cookie_names_.refresh_token_, "=", refreshToken));
+
+    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_, ""};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }
 
   virtual void checkClientSecretInRequest(absl::string_view token_secret) {
-    std::string request_body = upstream_request_->body().toString();
-    const auto query_parameters = Http::Utility::parseFromBody(request_body);
-    auto it = query_parameters.find("client_secret");
+    std::string request_body = oauth2_request_->body().toString();
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+    auto secret = query_parameters.getFirstValue("client_secret");
 
-    ASSERT_TRUE(it != query_parameters.end());
-    EXPECT_EQ(it->second, token_secret);
+    ASSERT_TRUE(secret.has_value());
+    EXPECT_EQ(secret.value(), token_secret);
   }
 
-  void doAuthenticationFlow(absl::string_view token_secret, absl::string_view hmac_secret) {
+  void waitForOAuth2Response(absl::string_view token_secret, bool expect_failure = false) {
+    std::chrono::milliseconds timeout =
+        expect_failure ? std::chrono::milliseconds(1) : std::chrono::milliseconds(500);
+
+    AssertionResult result = fake_upstreams_.back()->waitForHttpConnection(
+        *dispatcher_, fake_oauth2_connection_, timeout);
+
+    if (expect_failure) {
+      // Assert that the connection failed, as expected
+      ASSERT_FALSE(result) << "Expected failure in connection, but it succeeded.";
+      return;
+    }
+
+    RELEASE_ASSERT(result, result.message());
+    result = fake_oauth2_connection_->waitForNewStream(*dispatcher_, oauth2_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = oauth2_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+
+    ASSERT_TRUE(oauth2_request_->waitForHeadersComplete());
+
+    checkClientSecretInRequest(token_secret);
+
+    oauth2_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+        false);
+
+    envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
+    oauth_response.mutable_access_token()->set_value("bar");
+    oauth_response.mutable_refresh_token()->set_value("foo");
+    oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
+
+    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
+    oauth2_request_->encodeData(buffer, true);
+  }
+
+  void doAuthenticationFlow(absl::string_view token_secret, absl::string_view hmac_secret,
+                            absl::string_view csrf_token, absl::string_view state,
+                            absl::string_view code_verifier) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Http::TestRequestHeaderMapImpl headers{
         {":method", "GET"},
-        {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+        {":path", absl::StrCat("/callback?code=foo&state=", state)},
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
-        {"authority", "Bearer token"}};
+        {"authority", "Bearer token"},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, "=", code_verifier)}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
 
-    waitForNextUpstreamRequest(std::vector<uint64_t>({0, 1, 2, 3}));
-
-    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-    checkClientSecretInRequest(token_secret);
-
-    upstream_request_->encodeHeaders(
-        Http::TestRequestHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-        false);
-
-    envoy::extensions::http_filters::oauth2::OAuthResponse oauth_response;
-    oauth_response.mutable_access_token()->set_value("bar");
-    oauth_response.mutable_expires_in()->set_value(DateUtil::nowToSeconds(api_->timeSource()) + 10);
-
-    Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrDie(oauth_response));
-    upstream_request_->encodeData(buffer, true);
+    waitForOAuth2Response(token_secret);
 
     // We should get an immediate redirect back.
     response->waitForHeaders();
@@ -292,16 +364,94 @@ typed_config:
         validateHmac(response->headers(), headers.Host()->value().getStringView(), hmac_secret));
 
     EXPECT_EQ("302", response->headers().getStatusValue());
+    std::string hmac =
+        Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
+    std::string oauth_expires = Http::Utility::parseSetCookieValue(
+        response->headers(), default_cookie_names_.oauth_expires_);
+    std::string bearer_token = Http::Utility::parseSetCookieValue(
+        response->headers(), default_cookie_names_.bearer_token_);
+    std::string refresh_token = Http::Utility::parseSetCookieValue(
+        response->headers(), default_cookie_names_.refresh_token_);
 
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
-    codec_client_->close();
+    cleanup();
+
+    // Now try sending the cookies back
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl headersWithCookie{
+        {":method", "GET"},
+        {":path", absl::StrCat("/callback?code=foo&state=", state)},
+        {":scheme", "http"},
+        {"x-forwarded-proto", "http"},
+        {":authority", "authority"},
+        {"authority", "Bearer token"},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
+    };
+
+    auto encoder_decoder2 = codec_client_->startRequest(headersWithCookie, true);
+    response = std::move(encoder_decoder2.second);
+    response->waitForHeaders();
+    EXPECT_EQ("302", response->headers().getStatusValue());
+    EXPECT_EQ("http://traffic.example.com/not/_oauth",
+              response->headers().Location()->value().getStringView());
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+    cleanup();
   }
 
-  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires"};
+  void doRefreshTokenFlow(absl::string_view token_secret, absl::string_view hmac_secret,
+                          bool expect_failure = false) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "GET"},          {":path", "/request1"},
+        {":scheme", "http"},         {"x-forwarded-proto", "http"},
+        {":authority", "authority"}, {"Cookie", "RefreshToken=efddf321;BearerToken=ff1234fc"},
+        {":authority", "authority"}, {"authority", "Bearer token"}};
+
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+
+    waitForOAuth2Response(token_secret, expect_failure);
+    if (expect_failure) {
+      return;
+    }
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(response_size_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    EXPECT_TRUE(
+        validateHmac(response->headers(), headers.Host()->value().getStringView(), hmac_secret));
+
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(response_size_, response->body().size());
+
+    cleanup();
+  }
+
+  const CookieNames default_cookie_names_{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
+                                          "RefreshToken", "OauthNonce", "CodeVerifier"};
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;
-  FakeStreamPtr lds_stream_{};
+  FakeStreamPtr lds_stream_;
+  const uint64_t response_size_ = 512;
+
+  FakeHttpConnectionPtr fake_oauth2_connection_;
+  FakeStreamPtr oauth2_request_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthIntegrationTest,
@@ -328,6 +478,8 @@ TEST_P(OauthIntegrationTest, UnauthenticatedFlow) {
   // We should get an immediate redirect back.
   response->waitForHeaders();
   EXPECT_EQ("302", response->headers().getStatusValue());
+
+  cleanup();
 }
 
 TEST_P(OauthIntegrationTest, AuthenticationFlow) {
@@ -339,7 +491,8 @@ TEST_P(OauthIntegrationTest, AuthenticationFlow) {
   initialize();
 
   // 1. Do one authentication flow.
-  doAuthenticationFlow("token_secret", "hmac_secret");
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
 
   // 2. Reload secrets.
   EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
@@ -351,11 +504,61 @@ TEST_P(OauthIntegrationTest, AuthenticationFlow) {
                               TestEnvironment::temporaryPath("hmac_secret.yaml"));
   test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
   // 3. Do another one authentication flow.
-  doAuthenticationFlow("token_secret_1", "hmac_secret_1");
+  doAuthenticationFlow("token_secret_1", "hmac_secret_1", TEST_STATE_CSRF_TOKEN_1,
+                       TEST_ENCODED_STATE_1, TEST_ENCRYPTED_CODE_VERIFIER_1);
 }
 
-// Regression test(issue #22678) where (incorrectly)using server's init manager(initialized state)
-// to add init target by the secret manager led to the assertion failure.
+TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+
+  initialize();
+
+  // 1. Do one authentication flow.
+  doRefreshTokenFlow("token_secret", "hmac_secret");
+
+  // 2. Reload secrets.
+  EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
+  EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("token_secret.yaml"));
+  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("hmac_secret.yaml"));
+  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  // 3. Do another one refresh token flow.
+  doRefreshTokenFlow("token_secret_1", "hmac_secret_1");
+}
+
+// Verify the behavior when the callback param is missing the state query param.
+TEST_P(OauthIntegrationTest, MissingStateParam) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/callback"}, {":scheme", "http"}, {":authority", "authority"}};
+  auto encoder_decoder = codec_client_->startRequest(headers);
+
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // We should get a 401 back since the request looked like a redirect request but did not
+  // contain the state param.
+  response->waitForHeaders();
+  EXPECT_EQ("401", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Regression test for issue #22678 where (incorrectly) using the server's init manager (which was
+// already in an initialized state) in the secret manager to add an init target led to an assertion
+// failure ("trying to add target to already initialized manager").
 TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
   on_server_init_function_ = [&]() {
     createLdsStream();
@@ -388,8 +591,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
                 - name: envoy.filters.http.router
         )EOF");
 
-    // dummy listener is being sent so that lds api gets marked as ready, which would
-    // led to server's init manager reach initialized state
+    // dummy listener is being sent so that lds api gets marked as ready, which
+    // leads to the server's init manager reaching initialized state
     sendLdsResponse({listener}, "initial");
   };
 
@@ -400,8 +603,17 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
   test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
 
-  doAuthenticationFlow("token_secret", "hmac_secret");
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
+  if (lds_connection_ != nullptr) {
+    AssertionResult result = lds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = lds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    lds_connection_.reset();
+  }
 }
+
 class OauthIntegrationTestWithBasicAuth : public OauthIntegrationTest {
   void setOauthConfig() override {
     config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
@@ -428,13 +640,11 @@ typed_config:
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/token_secret.yaml"
-          resource_api_version: V3
       hmac_secret:
         name: hmac
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/hmac_secret.yaml"
-          resource_api_version: V3
     auth_scopes:
     - user
     - openid
@@ -448,13 +658,12 @@ typed_config:
   }
 
   void checkClientSecretInRequest(absl::string_view token_secret) override {
-    EXPECT_FALSE(
-        upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+    EXPECT_FALSE(oauth2_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
     const std::string basic_auth_token = absl::StrCat("foo:", token_secret);
     const std::string encoded_token =
         Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto token_secret_expected = absl::StrCat("Basic ", encoded_token);
-    EXPECT_EQ(token_secret_expected, upstream_request_->headers()
+    EXPECT_EQ(token_secret_expected, oauth2_request_->headers()
                                          .get(Http::CustomHeaders::get().Authorization)[0]
                                          ->value()
                                          .getStringView());
@@ -471,7 +680,171 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
   };
   initialize();
-  doAuthenticationFlow("token_secret", "hmac_secret");
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
+}
+
+class OauthUseRefreshTokenDisabled : public OauthIntegrationTest {
+  void setOauthConfig() override {
+    config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
+name: oauth
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+  config:
+    token_endpoint:
+      cluster: oauth
+      uri: oauth.com/token
+      timeout: 3s
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
+    authorization_endpoint: https://oauth.com/oauth/authorize/
+    redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_path_matcher:
+      path:
+        exact: /callback
+    signout_path:
+      path:
+        exact: /signout
+    credentials:
+      client_id: foo
+      token_secret:
+        name: token
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/token_secret.yaml"
+      hmac_secret:
+        name: hmac
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/hmac_secret.yaml"
+    use_refresh_token: false
+    auth_scopes:
+    - user
+    - openid
+    - email
+    resources:
+    - oauth2-resource
+    - http://example.com
+    - https://example.com
+)EOF"));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthUseRefreshTokenDisabled,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+
+  initialize();
+
+  // 1. Do one authentication flow.
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
+
+  // 2. Reload secrets.
+  EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
+  EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("token_secret.yaml"));
+  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("hmac_secret.yaml"));
+  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  // 3. Do one refresh token flow. This should fail.
+  doRefreshTokenFlow("token_secret_1", "hmac_secret_1", /* expect_failure */ true);
+}
+
+// After an hmac secret change, a request should cause a re-authorization, but not an auth failure
+TEST_P(OauthIntegrationTest, HmacChangeCausesReauth) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+
+  initialize();
+
+  // 1. First perform a complete OAuth flow to get valid cookies
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", absl::StrCat("/callback?code=foo&state=", TEST_ENCODED_STATE)},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"authority", "Bearer token"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)},
+      {"cookie",
+       absl::StrCat(default_cookie_names_.code_verifier_, "=", TEST_ENCRYPTED_CODE_VERIFIER)}};
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  waitForOAuth2Response("token_secret");
+
+  // Get the redirect response with the cookies
+  response->waitForHeaders();
+
+  // Save all the cookies for later use
+  std::string hmac =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_hmac_);
+  std::string oauth_expires =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.oauth_expires_);
+  std::string bearer_token =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.bearer_token_);
+  std::string refresh_token =
+      Http::Utility::parseSetCookieValue(response->headers(), default_cookie_names_.refresh_token_);
+
+  EXPECT_FALSE(hmac.empty());
+  EXPECT_FALSE(oauth_expires.empty());
+  EXPECT_FALSE(bearer_token.empty());
+  EXPECT_FALSE(refresh_token.empty());
+
+  // Verify cookies work with current HMAC secret
+  EXPECT_TRUE(validateHmac(response->headers(), "authority", "hmac_secret"));
+
+  RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
+  cleanup();
+
+  // 2. Reload only the HMAC secret
+  EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("hmac_secret.yaml"));
+  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+
+  // 3. Make another request with the saved cookies after HMAC secret was changed
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers_with_cookies{
+      {":method", "GET"},
+      {":path", "/request1"},
+      {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
+      {":authority", "authority"},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+      {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
+      {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
+      {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", TEST_STATE_CSRF_TOKEN)}};
+
+  auto encoder_decoder2 = codec_client_->startRequest(headers_with_cookies);
+  request_encoder_ = &encoder_decoder2.first;
+  auto response2 = std::move(encoder_decoder2.second);
+
+  // Should get a 302 back since the HMAC secret was changed
+  response2->waitForHeaders();
+  EXPECT_EQ("302", response2->headers().getStatusValue());
+
+  RELEASE_ASSERT(response2->waitForEndStream(), "unexpected timeout");
+  cleanup();
 }
 
 } // namespace

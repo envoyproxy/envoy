@@ -68,8 +68,9 @@ best protect our users.
 
 If the vulnerability affects the last point release version, e.g. 1.10, then the full security
 release process described in this document will be activated. A security point release will be
-created for 1.10, e.g. 1.10.1, together with a fix to main if necessary. Older point releases,
-e.g. 1.9, are not supported by the Envoy project and will not have any security release created.
+created for each currently supported Envoy version, as described in [stable releases](RELEASES.md#stable-releases),
+together with a fix to main if necessary. Older point releases,
+e.g. 1.5, are not supported by the Envoy project and will not have any security release created.
 
 If a security vulnerability affects only these older versions but not main or the last supported
 point release, the Envoy security team will share this information with the private distributor
@@ -464,23 +465,20 @@ and security team to ensure they still qualify for inclusion on the list.
 
 | Organization  | End User | Last Review |
 |:-------------:|:--------:|:-----------:|
-| Aspen Mesh    | No       | 06/21       |
-| AWS           | No       | 06/21       |
-| Cilium        | No       | 06/21       |
-| Cloud Foundry | No       | 06/21       |
-| Datawire      | No       | 06/21       |
-| Google        | No       | 06/21       |
-| IBM           | No       | 06/21       |
-| Istio         | No       | 06/21       |
-| Microsoft     | No       | 2/21        |
-| Red Hat       | No       | 06/21       |
-| solo.io       | No       | 06/21       |
-| Tetrate       | No       | 06/21       |
-| VMware        | No       | 06/21       |
-| Pinterest     | Yes      | 06/21       |
-| Dropbox       | Yes      | 01/20       |
-| Stripe        | Yes      | 01/20       |
-| Square        | Yes      | 05/21       |
-| Apple         | Yes      | 05/21       |
-| Spotify       | Yes      | 06/21       |
-| Netflix       | Yes      | 06/22       |
+| AWS           | No       | 07/24       |
+| Cilium        | No       | 07/24       |
+| Cloud Foundry | No       | 07/24       |
+| F5            | No       | 07/24       |
+| Google        | No       | 07/24       |
+| Istio         | No       | 07/24       |
+| Microsoft     | No       | 07/24       |
+| Red Hat       | No       | 07/24       |
+| VMware        | No       | 07/24       |
+| Tetrate       | No       | 07/24       |
+| solo.io       | No       | 07/24       |
+| Pinterest     | Yes      | 07/24       |
+| Dropbox       | Yes      | 07/24       |
+| Apple         | Yes      | 07/24       |
+| Spotify       | Yes      | 02/21       |
+| Netflix       | Yes      | 07/24       |
+| Slack         | Yes      | 07/24       |

@@ -4,6 +4,7 @@
 #include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/router/router_filter_interface.h"
 #include "test/test_common/test_runtime.h"
 
@@ -28,22 +29,15 @@ public:
     HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
     ON_CALL(router_filter_interface_, downstreamHeaders())
         .WillByDefault(Return(&downstream_request_header_map_));
-
-    ON_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
   }
 
   void initialize() {
     auto conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
     conn_pool_ = conn_pool.get();
-    upstream_request_ = std::make_unique<UpstreamRequest>(router_filter_interface_,
-                                                          std::move(conn_pool), false, true);
+    ON_CALL(*conn_pool_, host()).WillByDefault(Return(host_));
+    upstream_request_ =
+        std::make_unique<UpstreamRequest>(router_filter_interface_, std::move(conn_pool), false,
+                                          true, false /*enable_tcp_tunneling*/);
   }
   Http::FilterFactoryCb createDecoderFilterFactoryCb(Http::StreamDecoderFilterSharedPtr filter) {
     return [filter](Http::FilterChainFactoryCallbacks& callbacks) {
@@ -55,11 +49,12 @@ public:
   Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
-  NiceMock<MockTimeSystem> time_system;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   std::unique_ptr<Router::FilterConfig> router_config_; // must outlive `UpstreamRequest`
   std::unique_ptr<UpstreamRequest> upstream_request_;
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
 };
 
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.
@@ -91,10 +86,38 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
 
 // UpstreamRequest is responsible for adding proper gRPC annotations to spans.
 TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
+  envoy::extensions::filters::http::router::v3::Router router_proto;
+  router_config_ = *Router::FilterConfig::create(
+      pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
+  EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
+
+  // Enable tracing in config.
+  router_filter_interface_.callbacks_.tracing_config_.spawn_upstream_span_ = true;
+
+  // Set expectations on span.
+  auto* child_span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(router_filter_interface_.callbacks_.active_span_, spawnChild_)
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span, setTag).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(Eq("grpc.status_code"), Eq("1")));
+  EXPECT_CALL(*child_span, setTag(Eq("grpc.message"), Eq("failure")));
+
+  // System under test.
+  initialize();
+  auto upgrade_headers =
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+          {{":status", "200"}, {"grpc-status", "1"}, {"grpc-message", "failure"}}));
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, _));
+  upstream_request_->decodeHeaders(std::move(upgrade_headers), false);
+}
+
+// UpstreamRequest is responsible for adding proper gRPC annotations to spans.
+TEST_F(UpstreamRequestTest,
+       DEPRECATED_FEATURE_TEST(DecodeHeadersGrpcSpanAnnotationsWithStartChildSpan)) {
   // Enable tracing in config.
   envoy::extensions::filters::http::router::v3::Router router_proto;
   router_proto.set_start_child_span(true);
-  router_config_ = std::make_unique<Router::FilterConfig>(
+  router_config_ = *Router::FilterConfig::create(
       pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
   EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
 
@@ -118,20 +141,21 @@ TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
 // Test sending headers from the router to upstream.
 TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_upstream_filters", "true"}});
   std::shared_ptr<Http::MockStreamDecoderFilter> filter(
       new NiceMock<Http::MockStreamDecoderFilter>());
 
-  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
-      .WillOnce(Invoke([&](Http::FilterChainManager& manager) -> void {
-        auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-      }));
+  EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_, _))
+      .WillOnce(
+          Invoke([&](Http::FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
+            auto factory = createDecoderFilterFactoryCb(filter);
+            manager.applyFilterFactoryCb({}, factory);
+            Http::FilterFactoryCb factory_cb =
+                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+              callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+            };
+            manager.applyFilterFactoryCb({}, factory_cb);
+            return true;
+          }));
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);
@@ -140,8 +164,8 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_FALSE(filter->callbacks_->informationalHeaders().has_value());
   EXPECT_FALSE(filter->callbacks_->responseHeaders().has_value());
   EXPECT_FALSE(filter->callbacks_->http1StreamEncoderOptions().has_value());
-  EXPECT_EQ(&filter->callbacks_->tracingConfig(),
-            &router_filter_interface_.callbacks_.tracingConfig());
+  EXPECT_EQ(&filter->callbacks_->tracingConfig().value().get(),
+            &router_filter_interface_.callbacks_.tracingConfig().value().get());
   EXPECT_EQ(filter->callbacks_->clusterInfo(), router_filter_interface_.callbacks_.clusterInfo());
   EXPECT_EQ(&filter->callbacks_->activeSpan(), &router_filter_interface_.callbacks_.activeSpan());
   EXPECT_EQ(&filter->callbacks_->streamInfo(), &router_filter_interface_.callbacks_.streamInfo());
@@ -164,6 +188,28 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   filter->callbacks_->resetStream();
 }
 
+TEST_F(UpstreamRequestTest, ConnectionPoolLatencyTime) {
+  initialize();
+
+  const auto latency_to_add = std::chrono::microseconds(10);
+
+  EXPECT_CALL(*conn_pool_, newStream(_))
+      .WillOnce(Invoke([&](GenericConnectionPoolCallbacks* callbacks) {
+        router_filter_interface_.callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+            latency_to_add);
+
+        callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                 "Some Failure", nullptr);
+        return nullptr;
+      }));
+
+  upstream_request_->acceptHeadersFromRouter(false);
+  const StreamInfo::UpstreamTiming& timing =
+      upstream_request_->streamInfo().upstreamInfo()->upstreamTiming();
+  ASSERT_TRUE(timing.connectionPoolCallbackLatency().has_value());
+  EXPECT_EQ(timing.connectionPoolCallbackLatency().value(), latency_to_add);
+}
+
 // UpstreamRequest dumpState without allocating memory.
 TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   initialize();
@@ -171,16 +217,16 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   auto connection_info_provider =
       router_filter_interface_.client_connection_.stream_info_.downstream_connection_info_provider_;
   connection_info_provider->setRemoteAddress(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
+      Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:5678"));
   connection_info_provider->setLocalAddress(
-      Network::Utility::parseInternetAddressAndPort("5.6.7.8:5678"));
+      Network::Utility::parseInternetAddressAndPortNoThrow("5.6.7.8:5678"));
   connection_info_provider->setDirectRemoteAddressForTest(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
+      Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:5678"));
 
   // Dump State
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
   upstream_request_->dumpState(ostream, 0);
   EXPECT_EQ(memory_test.consumedBytes(), 0);
 
@@ -188,6 +234,16 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   EXPECT_THAT(ostream.contents(), HasSubstr("UpstreamRequest "));
   EXPECT_THAT(ostream.contents(), HasSubstr("addressProvider: \n  ConnectionInfoSetterImpl "));
   EXPECT_THAT(ostream.contents(), HasSubstr("request_headers: \n"));
+}
+
+TEST_F(UpstreamRequestTest, TestSetStreamInfoFields) {
+  initialize();
+  EXPECT_EQ(upstream_request_->streamInfo().route(), router_filter_interface_.callbacks_.route());
+}
+
+TEST_F(UpstreamRequestTest, TestSetStreamInfoHost) {
+  initialize();
+  EXPECT_EQ(upstream_request_->streamInfo().upstreamInfo()->upstreamHost(), host_);
 }
 
 } // namespace

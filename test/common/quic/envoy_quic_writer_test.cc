@@ -59,22 +59,23 @@ protected:
 
 TEST_F(EnvoyQuicWriterTest, AssertOnNonNullPacketOption) {
   std::string str("Hello World!");
-  EXPECT_DEBUG_DEATH(envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
-                                                    peer_address_,
-                                                    reinterpret_cast<quic::PerPacketOptions*>(0x1)),
-                     "");
+  quic::QuicPacketWriterParams params;
+  EXPECT_DEBUG_DEATH(
+      envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_, peer_address_,
+                                     reinterpret_cast<quic::PerPacketOptions*>(0x1), params),
+      "");
 }
 
 TEST_F(EnvoyQuicWriterTest, SendSuccessfully) {
   std::string str("Hello World!");
-
+  quic::QuicPacketWriterParams params;
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
         return Api::SysCallSizeResult{static_cast<ssize_t>(str.length()), 0};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
-                                                            peer_address_, nullptr);
+                                                            peer_address_, nullptr, params);
   EXPECT_EQ(quic::WRITE_STATUS_OK, result.status);
   EXPECT_EQ(str.length(), result.bytes_written);
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
@@ -82,13 +83,14 @@ TEST_F(EnvoyQuicWriterTest, SendSuccessfully) {
 
 TEST_F(EnvoyQuicWriterTest, SendBlocked) {
   std::string str("Hello World!");
+  quic::QuicPacketWriterParams params;
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
         return Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
-                                                            peer_address_, nullptr);
+                                                            peer_address_, nullptr, params);
   EXPECT_EQ(quic::WRITE_STATUS_BLOCKED, result.status);
   EXPECT_EQ(SOCKET_ERROR_AGAIN, result.error_code);
   EXPECT_TRUE(envoy_quic_writer_.IsWriteBlocked());
@@ -101,7 +103,7 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
       }));
 #endif
   EXPECT_DEBUG_DEATH(envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
-                                                    peer_address_, nullptr),
+                                                    peer_address_, nullptr, params),
                      "");
   envoy_quic_writer_.SetWritable();
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
@@ -109,13 +111,14 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
 
 TEST_F(EnvoyQuicWriterTest, SendFailure) {
   std::string str("Hello World!");
+  quic::QuicPacketWriterParams params;
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
         return Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
-                                                            peer_address_, nullptr);
+                                                            peer_address_, nullptr, params);
   EXPECT_EQ(quic::WRITE_STATUS_ERROR, result.status);
   EXPECT_EQ(SOCKET_ERROR_NOT_SUP, result.error_code);
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
@@ -123,13 +126,14 @@ TEST_F(EnvoyQuicWriterTest, SendFailure) {
 
 TEST_F(EnvoyQuicWriterTest, SendFailureMessageTooBig) {
   std::string str("Hello World!");
+  quic::QuicPacketWriterParams params;
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _))
       .WillOnce(testing::Invoke([this, str](int, const msghdr* message, int) {
         verifySendData(str, message);
         return Api::SysCallSizeResult{-1, SOCKET_ERROR_MSG_SIZE};
       }));
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
-                                                            peer_address_, nullptr);
+                                                            peer_address_, nullptr, params);
   // Currently MessageSize should be propagated through error_code. This test
   // would fail if QUICHE changes to propagate through status in the future.
   EXPECT_EQ(quic::WRITE_STATUS_ERROR, result.status);

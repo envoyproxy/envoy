@@ -19,7 +19,6 @@ envoy_cc_extension(
         ":hystrix_lib",
         "//envoy/registry",
         "//source/common/network:address_lib",
-        "//source/common/network:resolver_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],

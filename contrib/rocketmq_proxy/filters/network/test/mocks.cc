@@ -29,7 +29,8 @@ MockActiveMessage::MockActiveMessage(ConnectionManager& conn_manager, RemotingCo
 }
 MockActiveMessage::~MockActiveMessage() = default;
 
-MockConfig::MockConfig() : stats_(RocketmqFilterStats::generateStats("test.", store_)) {
+MockConfig::MockConfig()
+    : stats_(RocketmqFilterStats::generateStats("test.", *store_.rootScope())) {
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, createRouter())

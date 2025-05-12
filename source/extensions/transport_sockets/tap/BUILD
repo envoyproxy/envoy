@@ -3,6 +3,7 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_select_admin_functionality",
 )
 
 licenses(["notice"])  # Apache 2
@@ -17,6 +18,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:connection_interface",
         "//source/extensions/common/tap:tap_interface",
+        "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -35,8 +37,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "tap_lib",
-    srcs = ["tap.cc"],
-    hdrs = ["tap.h"],
+    srcs = envoy_select_admin_functionality(["tap.cc"]),
+    hdrs = envoy_select_admin_functionality(["tap.h"]),
     deps = [
         ":tap_config_interface",
         "//envoy/network:transport_socket_interface",
@@ -49,8 +51,12 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "config",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
+    srcs = envoy_select_admin_functionality(["config.cc"]),
+    hdrs = envoy_select_admin_functionality(["config.h"]),
+    extra_visibility = [
+        # test needs refactor
+        "//test/common/tls:__subpackages__",
+    ],
     deps = [
         ":tap_config_impl",
         ":tap_lib",

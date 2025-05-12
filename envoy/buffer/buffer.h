@@ -277,6 +277,18 @@ public:
   virtual void move(Instance& rhs, uint64_t length) PURE;
 
   /**
+   * Move a portion of a buffer into this buffer. If reset_drain_trackers_and_accounting is true,
+   * then any drain trackers on the source buffer are also called and cleared so that the
+   * connection originating the source buffer (e.g. an internal listener connection) may be deleted
+   * without causing a use-after-free.
+   * @param rhs supplies the buffer to move.
+   * @param length supplies the amount of data to move.
+   * @param reset_drain_trackers_and_accounting whether the drain trackers on the source buffers
+   * should be cleared, so that the source buffer is deletable.
+   */
+  virtual void move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) PURE;
+
+  /**
    * Reserve space in the buffer for reading into. The amount of space reserved is determined
    * based on buffer settings and performance considerations.
    * @return a `Reservation`, on which `commit()` can be called, or which can
@@ -635,7 +647,7 @@ public:
   // The following are for use only by implementations of Buffer. Because c++
   // doesn't allow inheritance of friendship, these are just trying to make
   // misuse easy to spot in a code review.
-  static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return Reservation(buffer); }
+  static Reservation bufferImplUseOnlyConstruct(Instance& buffer) { return {buffer}; }
   decltype(slices_)& bufferImplUseOnlySlices() { return slices_; }
   ReservationSlicesOwnerPtr& bufferImplUseOnlySlicesOwner() { return slices_owner_; }
   void bufferImplUseOnlySetLength(uint64_t length) { length_ = length; }
@@ -696,9 +708,7 @@ public:
   // The following are for use only by implementations of Buffer. Because c++
   // doesn't allow inheritance of friendship, these are just trying to make
   // misuse easy to spot in a code review.
-  static ReservationSingleSlice bufferImplUseOnlyConstruct(Instance& buffer) {
-    return ReservationSingleSlice(buffer);
-  }
+  static ReservationSingleSlice bufferImplUseOnlyConstruct(Instance& buffer) { return {buffer}; }
   RawSlice& bufferImplUseOnlySlice() { return slice_; }
   ReservationSlicesOwnerPtr& bufferImplUseOnlySliceOwner() { return slice_owner_; }
 };

@@ -1,11 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/tra/tra_impl.h"
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -189,7 +183,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   ENVOY_LOG(error, "GrpcClientImpl Failure {} {}", message, status);
-  // callbacks_->complete(ResponseType::FailureResp, status);
+  // callbacks_->complete(ResponseType::FailureResp, "", absl::any());
   // callbacks_ = nullptr;
 }
 
@@ -206,10 +200,13 @@ ClientPtr traClient(Event::Dispatcher& dispatcher, Server::Configuration::Factor
                     const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
+  auto client_or_error = context.serverFactoryContext()
+                             .clusterManager()
+                             .grpcAsyncClientManager()
+                             .getOrCreateRawAsyncClient(grpc_service, context.scope(), true);
+  THROW_IF_NOT_OK_REF(client_or_error.status());
   return std::make_unique<SipProxy::TrafficRoutingAssistant::GrpcClientImpl>(
-      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-          grpc_service, context.scope(), true),
-      dispatcher, timeout);
+      client_or_error.value(), dispatcher, timeout);
 }
 
 } // namespace TrafficRoutingAssistant

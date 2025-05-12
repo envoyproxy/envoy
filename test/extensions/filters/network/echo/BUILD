@@ -13,10 +13,12 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
+    rbe_pool = "6gig",
     tags = [
         # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
         # or RBE, see comments in AddRemoveListener.
         # "exclusive",
+        "cpu:2",
     ],
     deps = [
         "//source/extensions/filters/network/echo:config",

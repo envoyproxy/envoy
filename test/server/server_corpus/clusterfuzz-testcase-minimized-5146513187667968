@@ -40,6 +40,5 @@ static_resources {
 }
 hds_config {
   api_type: REST
-  transport_api_version: V3
 }
 enable_dispatcher_stats: true

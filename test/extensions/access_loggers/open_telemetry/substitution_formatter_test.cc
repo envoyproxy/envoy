@@ -5,11 +5,14 @@
 #include "envoy/common/exception.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/utility.h"
@@ -113,10 +116,6 @@ void verifyOpenTelemetryOutput(KeyValueList output, OpenTelemetryFormatMap expec
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -131,19 +130,13 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
           string_value: "plain_string_value"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -172,7 +165,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
               - string_value: "%PROTOCOL%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   KeyValueList expected;
   TestUtility::loadFromYaml(R"EOF(
@@ -198,18 +191,13 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterTypesTest) {
               - string_value: "HTTP/1.1"
   )EOF",
                             expected);
-  const KeyValueList output =
-      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  const KeyValueList output = formatter.format({}, stream_info);
   EXPECT_TRUE(TestUtility::protoEqual(output, expected));
 }
 
 // Test that nested values are formatted properly, including inter-type nesting.
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -313,7 +301,7 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
                           - string_value: "%PROTOCOL%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
   KeyValueList expected;
   TestUtility::loadFromYaml(R"EOF(
     values:
@@ -411,17 +399,12 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNestedObjectsTest) {
                           - string_value: "HTTP/1.1"
   )EOF",
                             expected);
-  const KeyValueList output =
-      formatter.format(request_header, response_header, response_trailer, stream_info, body);
+  const KeyValueList output = formatter.format({}, stream_info);
   EXPECT_TRUE(TestUtility::protoEqual(output, expected));
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -436,19 +419,13 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterSingleOperatorTest) {
           string_value: "%PROTOCOL%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -463,19 +440,15 @@ TEST(SubstitutionFormatterTest, EmptyOpenTelemetryFormatterTest) {
           string_value: ""
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{{"some_response_header", "SOME_RESPONSE_HEADER"}};
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   OpenTelemetryFormatMap expected = {{"protocol", "HTTP/1.1"},
                                      {"some_request_header", "SOME_REQUEST_HEADER"},
@@ -499,14 +472,13 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterNonExistentHeaderTest) {
         string_value: "%RESP(some_response_header)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
@@ -515,8 +487,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
       {"request_present_header", "REQUEST_PRESENT_HEADER"}};
   Http::TestResponseHeaderMapImpl response_header{
       {"response_present_header", "RESPONSE_PRESENT_HEADER"}};
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   OpenTelemetryFormatMap expected = {
       {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
@@ -541,14 +511,13 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterAlternateHeaderTest) {
           string_value: "%RESP(response_present_header?response_absent_header)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
+                            expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
@@ -556,7 +525,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -581,10 +549,10 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterDynamicMetadataTest) {
           string_value: "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
+      formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
       expected);
 }
 
@@ -593,7 +561,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
   envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
@@ -627,10 +594,10 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataTest) {
             string_value: "%CLUSTER_METADATA(com.test:test_obj:non_existing_key)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
+      formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
       expected);
 }
 
@@ -639,7 +606,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
   Http::TestRequestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
   Http::TestResponseHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestResponseTrailerMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
-  std::string body;
 
   OpenTelemetryFormatMap expected = {{"test_key", "-"}};
 
@@ -651,30 +617,26 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterClusterMetadataNoClusterIn
           string_value: "%CLUSTER_METADATA(com.test:test_key)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
   // Empty optional (absl::nullopt)
   {
     EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(absl::nullopt));
     verifyOpenTelemetryOutput(
-        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
         expected);
   }
   // Empty cluster info (nullptr)
   {
     EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillOnce(Return(nullptr));
     verifyOpenTelemetryOutput(
-        formatter.format(request_header, response_header, response_trailer, stream_info, body),
+        formatter.format({&request_header, &response_header, &response_trailer}, stream_info),
         expected);
   }
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
   stream_info.filter_state_->setData("test_key",
                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
                                      StreamInfo::FilterState::StateType::ReadOnly);
@@ -697,19 +659,14 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateTest) {
         string_value: "%FILTER_STATE(test_obj)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
+
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
 
   const StreamInfo::FilterStateSharedPtr upstream_filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
@@ -742,21 +699,15 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateTest) {
         string_value: "%UPSTREAM_FILTER_STATE(test_obj)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
 // the FilterState can call the serializeAsProto or serializeAsString methods correctly.
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
   stream_info.filter_state_->setData(
       "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
       StreamInfo::FilterState::StateType::ReadOnly);
@@ -778,21 +729,15 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateSpeciferTest) {
           string_value: "%FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 // Test new specifier (PLAIN/TYPED) of FilterState. Ensure that after adding additional specifier,
 // the FilterState can call the serializeAsProto or serializeAsString methods correctly.
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpeciferTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
-  std::string body;
 
   stream_info.upstream_info_ = std::make_shared<StreamInfo::UpstreamInfoImpl>();
   stream_info.upstream_info_->setUpstreamFilterState(
@@ -820,18 +765,13 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateSpecife
           string_value: "%UPSTREAM_FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_headers, response_headers, response_trailers, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 // Error specifier will cause an exception to be thrown.
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTest) {
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
   StreamInfo::MockStreamInfo stream_info;
   std::string body;
   stream_info.filter_state_->setData(
@@ -850,8 +790,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterFilterStateErrorSpeciferTe
           string_value: "%FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
-                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
+  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping, {}), EnvoyException,
+                            "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSpeciferTest) {
@@ -881,16 +821,12 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterUpstreamFilterStateErrorSp
           string_value: "%UPSTREAM_FILTER_STATE(test_key:TYPED)%"
   )EOF",
                             key_mapping);
-  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping), EnvoyException,
-                            "Invalid filter state serialize type, only support PLAIN/TYPED.");
+  EXPECT_THROW_WITH_MESSAGE(OpenTelemetryFormatter formatter(key_mapping, {}), EnvoyException,
+                            "Invalid filter state serialize type, only support PLAIN/TYPED/FIELD.");
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterStartTimeTest) {
   StreamInfo::MockStreamInfo stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
 
   time_t expected_time_in_epoch = 1522280158;
   SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
@@ -922,11 +858,9 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterStartTimeTest) {
           string_value: "%START_TIME(%f.%1f.%2f.%3f)%"
   )EOF",
                             key_mapping);
-  OpenTelemetryFormatter formatter(key_mapping);
+  OpenTelemetryFormatter formatter(key_mapping, {});
 
-  verifyOpenTelemetryOutput(
-      formatter.format(request_header, response_header, response_trailer, stream_info, body),
-      expected);
+  verifyOpenTelemetryOutput(formatter.format({}, stream_info), expected);
 }
 
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
@@ -935,8 +869,6 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestResponseHeaderMapImpl response_header{
         {"some_response_header", "SOME_RESPONSE_HEADER"}};
-    Http::TestResponseTrailerMapImpl response_trailer;
-    std::string body;
 
     OpenTelemetryFormatMap expected = {
         {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
@@ -949,16 +881,48 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
             string_value: "%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%"
     )EOF",
                               key_mapping);
-    OpenTelemetryFormatter formatter(key_mapping);
+    OpenTelemetryFormatter formatter(key_mapping, {});
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-    verifyOpenTelemetryOutput(
-        formatter.format(request_header, response_header, response_trailer, stream_info, body),
-        expected);
+    verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
+                              expected);
   }
 }
+
+#ifdef USE_CEL_PARSER
+TEST(SubstitutionFormatterTest, CELFormatterTest) {
+  {
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    ScopedThreadLocalServerContextSetter server_context_setter(context.server_factory_context_);
+
+    StreamInfo::MockStreamInfo stream_info;
+    Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
+    Http::TestResponseHeaderMapImpl response_header{
+        {"some_response_header", "SOME_RESPONSE_HEADER"}};
+
+    OpenTelemetryFormatMap expected = {{"cel_field", "SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
+
+    envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig otel_config;
+    TestUtility::loadFromYaml(R"EOF(
+      resource_attributes:
+        values:
+          - key: "cel_field"
+            value:
+              string_value: "%CEL(request.headers['some_request_header'])% %CEL(response.headers['some_response_header'])%"
+    )EOF",
+                              otel_config);
+    auto commands = *Formatter::SubstitutionFormatStringUtils::parseFormatters(
+        otel_config.formatters(), context);
+
+    OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);
+
+    verifyOpenTelemetryOutput(formatter.format({&request_header, &response_header}, stream_info),
+                              expected);
+  }
+}
+#endif
 
 } // namespace
 } // namespace OpenTelemetry

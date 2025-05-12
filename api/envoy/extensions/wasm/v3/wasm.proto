@@ -2,10 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.wasm.v3;
 
+import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/any.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.wasm.v3";
@@ -16,6 +18,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
+
+// If there is a fatal error on the VM (e.g. exception, abort()), then the policy will be applied.
+enum FailurePolicy {
+  // No policy is specified. The default policy will be used. The default policy is ``FAIL_CLOSED``.
+  UNSPECIFIED = 0;
+
+  // New plugin instance will be created for the new request if the VM is failed. Note this only
+  // be applied to the following failures:
+  //
+  // * ``proxy_wasm::FailState::RuntimeError``
+  //
+  // This will fallback to the ``FAIL_CLOSED`` for all other failures.
+  FAIL_RELOAD = 1;
+
+  // All plugins associated with the VM will return an HTTP 503 error.
+  FAIL_CLOSED = 2;
+
+  // All plugins associated with the VM will be ignored and the filter chain will continue. This
+  // makes sense when the plugin is optional.
+  FAIL_OPEN = 3;
+}
+
+message ReloadConfig {
+  // Backoff strategy for the VM failure reload. If not specified, the default 1s base interval
+  // will be applied.
+  config.core.v3.BackoffStrategy backoff = 1;
+}
 
 // Configuration for restricting Proxy-Wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
@@ -50,7 +79,7 @@ message VmConfig {
   string vm_id = 1;
 
   // The Wasm runtime type, defaults to the first available Wasm engine used at Envoy build-time.
-  // The priority to search for the available engine is: v8 -> wasmtime -> wamr -> wavm.
+  // The priority to search for the available engine is: v8 -> wasmtime -> wamr.
   // Available Wasm runtime types are registered as extensions. The following runtimes are included
   // in Envoy code base:
   //
@@ -66,11 +95,6 @@ message VmConfig {
   // .. _extension_envoy.wasm.runtime.wamr:
   //
   // **envoy.wasm.runtime.wamr**: `WAMR <https://github.com/bytecodealliance/wasm-micro-runtime/>`_-based WebAssembly runtime.
-  // This runtime is not enabled in the official build.
-  //
-  // .. _extension_envoy.wasm.runtime.wavm:
-  //
-  // **envoy.wasm.runtime.wavm**: `WAVM <https://wavm.github.io/>`_-based WebAssembly runtime.
   // This runtime is not enabled in the official build.
   //
   // .. _extension_envoy.wasm.runtime.wasmtime:
@@ -101,9 +125,10 @@ message VmConfig {
   bool nack_on_code_cache_miss = 6;
 
   // Specifies environment variables to be injected to this VM which will be available through
-  // WASI's ``environ_get`` and ``environ_get_sizes`` system calls. Note that these functions are mostly implicitly
-  // called in your language's standard library, so you do not need to call them directly and you can access to env
-  // vars just like when you do on native platforms.
+  // WASI's ``environ_get`` and ``environ_get_sizes`` system calls. Note that these functions
+  // are generally called implicitly by your language's standard library. Therefore, you do not
+  // need to call them directly. You can access environment variables in the same way you would
+  // on native platforms.
   // Warning: Envoy rejects the configuration if there's conflict of key space.
   EnvironmentVariables environment_variables = 7;
 }
@@ -118,7 +143,7 @@ message EnvironmentVariables {
 }
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same ``vm_id`` and ``root_id`` and for
@@ -148,7 +173,14 @@ message PluginConfig {
   // or fail open (if 'fail_open' is set to true) by bypassing the filter. Note: when on_start or on_configure return false
   // during xDS updates the xDS configuration will be rejected and when on_start or on_configuration return false on initial
   // startup the proxy will not start.
-  bool fail_open = 5;
+  // This field is deprecated in favor of the ``failure_policy`` field.
+  bool fail_open = 5 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The failure policy for the plugin.
+  FailurePolicy failure_policy = 7;
+
+  // Reload configuration. This is only applied when ``failure_policy`` is set to ``FAIL_RELOAD``.
+  ReloadConfig reload_config = 8;
 
   // Configuration for restricting Proxy-Wasm capabilities available to modules.
   CapabilityRestrictionConfig capability_restriction_config = 6;

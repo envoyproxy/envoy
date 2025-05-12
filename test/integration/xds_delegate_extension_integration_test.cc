@@ -102,9 +102,8 @@ public:
     use_lds_ = false;
     create_xds_upstream_ = true;
 
-    if (isUnified()) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
 
     // Make the default cluster HTTP2.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -177,9 +176,9 @@ public:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = loader->getObject("entries").value();
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return entries->getObject(key).value()->getString("final_value").value();
     }
     return "";
   }

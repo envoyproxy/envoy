@@ -18,13 +18,9 @@ class ExprDescriptorFactory : public RateLimit::DescriptorProducerFactory {
 public:
   std::string name() const override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  RateLimit::DescriptorProducerPtr
+  absl::StatusOr<RateLimit::DescriptorProducerPtr>
   createDescriptorProducerFromProto(const Protobuf::Message& message,
-                                    ProtobufMessage::ValidationVisitor& validator) override;
-
-private:
-  Filters::Common::Expr::Builder& getOrCreateBuilder();
-  Filters::Common::Expr::BuilderPtr expr_builder_;
+                                    Server::Configuration::CommonFactoryContext& context) override;
 };
 
 } // namespace Expr

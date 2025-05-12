@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -13,7 +13,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/union_string.h"
 #include "envoy/http/header_formatter.h"
-#include "envoy/tracing/trace_context.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
@@ -101,7 +101,14 @@ using LowerCaseStrPairVector =
 
 class HeaderStringValidator {
 public:
-  bool operator()(absl::string_view view) { return validHeaderString(view); }
+  bool operator()(absl::string_view view) {
+    return disable_validation_for_tests_ ? true : validHeaderString(view);
+  }
+
+  // This flag allows disabling the check for the NUL, CR and LF characters in the
+  // header names or values in the DEBUG builds to prevent the `ASSERT(valid())` in the
+  // HeaderString constructor from failing tests.
+  static bool disable_validation_for_tests_;
 };
 
 class HeaderString : public UnionStringBase<HeaderStringValidator> {
@@ -182,6 +189,7 @@ private:
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
   HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
+  HEADER_FUNC(EnvoyIsTimeoutRetry)                                                                 \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
@@ -205,7 +213,8 @@ private:
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
-  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)
+  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)                                                       \
+  HEADER_FUNC(ForwardedPort)
 
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
   INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                           \
@@ -351,7 +360,7 @@ public:
   virtual void addReferenceKey(const LowerCaseString& key, uint64_t value) PURE;
 
   /**
-   * Add a header with a reference key to the map. The key MUST point to point to data that will
+   * Add a header with a reference key to the map. The key MUST point to data that will
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
    *
@@ -446,6 +455,16 @@ public:
    * values and does not account for data structure overhead.
    */
   virtual uint64_t byteSize() const PURE;
+
+  /**
+   * @return uint32_t the max size of the header map in kilobyte.
+   */
+  virtual uint32_t maxHeadersKb() const PURE;
+
+  /**
+   * @return uint32_t the max count of headers in a header map.
+   */
+  virtual uint32_t maxHeadersCount() const PURE;
 
   /**
    * This is a wrapper for the return result from get(). It avoids a copy when translating from
@@ -709,13 +728,14 @@ public:
 // Request headers.
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
-      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders>,
-      public Tracing::TraceContext {
+      public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestHeaders> {
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+using RequestHeaderMapSharedPtr = std::shared_ptr<RequestHeaderMap>;
+using RequestHeaderMapConstSharedPtr = std::shared_ptr<const RequestHeaderMap>;
 using RequestHeaderMapOptRef = OptRef<RequestHeaderMap>;
 using RequestHeaderMapOptConstRef = OptRef<const RequestHeaderMap>;
 
@@ -724,6 +744,8 @@ class RequestTrailerMap
     : public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::RequestTrailers> {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+using RequestTrailerMapSharedPtr = std::shared_ptr<RequestTrailerMap>;
+using RequestTrailerMapConstSharedPtr = std::shared_ptr<const RequestTrailerMap>;
 using RequestTrailerMapOptRef = OptRef<RequestTrailerMap>;
 using RequestTrailerMapOptConstRef = OptRef<const RequestTrailerMap>;
 
@@ -746,6 +768,8 @@ public:
   INLINE_RESP_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
 };
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+using ResponseHeaderMapSharedPtr = std::shared_ptr<ResponseHeaderMap>;
+using ResponseHeaderMapConstSharedPtr = std::shared_ptr<const ResponseHeaderMap>;
 using ResponseHeaderMapOptRef = OptRef<ResponseHeaderMap>;
 using ResponseHeaderMapOptConstRef = OptRef<const ResponseHeaderMap>;
 
@@ -755,8 +779,18 @@ class ResponseTrailerMap
       public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
+using ResponseTrailerMapSharedPtr = std::shared_ptr<ResponseTrailerMap>;
+using ResponseTrailerMapConstSharedPtr = std::shared_ptr<const ResponseTrailerMap>;
 using ResponseTrailerMapOptRef = OptRef<ResponseTrailerMap>;
 using ResponseTrailerMapOptConstRef = OptRef<const ResponseTrailerMap>;
+
+/**
+ * Base class for both tunnel response headers and trailers.
+ */
+class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
+public:
+  virtual const HeaderMap& value() const PURE;
+};
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.

@@ -8,7 +8,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"
@@ -40,7 +40,7 @@ public:
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   void initialize() override;

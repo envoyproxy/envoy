@@ -23,7 +23,11 @@ int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
 
   int32_t val;
   val = data.peekLEInt<uint32_t>();
+#ifdef ABSL_IS_BIG_ENDIAN
+  return val;
+#else
   return le32toh(val);
+#endif
 }
 
 uint8_t BufferHelper::removeByte(Buffer::Instance& data) {
@@ -88,7 +92,11 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
 
   int64_t val;
   val = data.drainLEInt<uint64_t>();
+#ifdef ABSL_IS_BIG_ENDIAN
+  return val;
+#else
   return le64toh(val);
+#endif
 }
 
 std::string BufferHelper::removeString(Buffer::Instance& data) {
@@ -98,7 +106,10 @@ std::string BufferHelper::removeString(Buffer::Instance& data) {
   }
 
   char* start = reinterpret_cast<char*>(data.linearize(length));
-  std::string ret(start);
+  // The BSON spec encodes both strings and C style strings with an additional
+  // null byte, however strings may contain embedded null bytes, therefore the
+  // constructor needs to be given the length of the string explicitly.
+  std::string ret(start, length > 0 ? length - 1 : 0);
   data.drain(length);
   return ret;
 }
@@ -200,6 +211,11 @@ int32_t FieldImpl::byteSize() const {
   return 0; // for gcc
 }
 
+void FieldImpl::checkType(Type type) const {
+  if (type_ != type) {
+    throw EnvoyException("invalid BSON field type cast");
+  }
+}
 void FieldImpl::encode(Buffer::Instance& output) const {
   output.add(&type_, sizeof(type_));
   BufferHelper::writeCString(output, key_);

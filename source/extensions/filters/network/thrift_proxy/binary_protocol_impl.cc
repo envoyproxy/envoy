@@ -7,6 +7,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 namespace Envoy {
@@ -79,9 +80,6 @@ bool BinaryProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& r
   }
 
   int16_t id = buffer.peekBEInt<int16_t>(1);
-  if (id < 0) {
-    throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
-  }
   // successful response struct in field id 0, error (IDL exception) in field id greater than 0
   reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
@@ -115,9 +113,6 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
       return false;
     }
     int16_t id = buffer.peekBEInt<int16_t>(1);
-    if (id < 0) {
-      throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
-    }
     field_id = id;
     buffer.drain(3);
   }

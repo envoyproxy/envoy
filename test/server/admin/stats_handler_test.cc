@@ -9,20 +9,19 @@
 
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
-#include "test/test_common/test_runtime.h"
+#include "test/test_common/stats_utility.h"
 #include "test/test_common/utility.h"
 
 using testing::Combine;
-using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StartsWith;
 using testing::Values;
 using testing::ValuesIn;
 
@@ -53,7 +52,7 @@ public:
     setting.mutable_buckets()->Add(buckets.begin(), buckets.end());
 
     bucket_settings.Add(std::move(setting));
-    store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config));
+    store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config, context_));
   }
 
   using CodeResponse = std::pair<Http::Code, std::string>;
@@ -81,11 +80,12 @@ public:
    * @return the Http Code and the response body as a string.
    */
   CodeResponse handlerStats(absl::string_view url) {
-    MockInstance instance;
+    NiceMock<MockInstance> instance;
     EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
-    EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
+    ON_CALL(instance, stats()).WillByDefault(ReturnRef(*store_));
+    ON_CALL(instance, clusterManager()).WillByDefault(ReturnRef(endpoints_helper_.cm_));
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
@@ -117,18 +117,15 @@ public:
     }
   }
 
-  void setRegexType(Regex::Type type) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.admin_stats_filter_use_re2",
-                                  type == Regex::Type::Re2 ? "true" : "false"}});
-  }
-
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
+  Upstream::PerEndpointMetricsTestHelper endpoints_helper_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
@@ -136,7 +133,6 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 class AdminStatsTest : public StatsHandlerTest, public testing::Test {};
@@ -145,7 +141,8 @@ TEST_F(AdminStatsTest, HandlerStatsInvalidFormat) {
   const std::string url = "/stats?format=blergh";
   const CodeResponse code_response(handlerStats(url));
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?format=(html|json|prometheus|text)\n\n", code_response.second);
+  EXPECT_EQ("usage: /stats?format=(html|active-html|json|prometheus|text)\n\n",
+            code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsPlainText) {
@@ -160,6 +157,8 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
 
   Stats::TextReadout& t = store_->textReadoutFromString("t");
   t.set("hello world");
+
+  endpoints_helper_.makeCluster("mycluster", 1);
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
@@ -177,6 +176,11 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
   constexpr char expected[] = "t: \"hello world\"\n"
                               "c1: 10\n"
                               "c2: 20\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.c1: 11\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.c2: 12\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.g1: 13\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.g2: 14\n"
+                              "cluster.mycluster.endpoint.127.0.0.1_80.healthy: 1\n"
                               "h1: P0(200,200) P25(202.5,202.5) P50(205,205) P75(207.5,207.5) "
                               "P90(209,209) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
                               "P99.9(209.99,209.99) P100(210,210)\n"
@@ -191,9 +195,9 @@ TEST_F(AdminStatsTest, HandlerStatsHtml) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  store_->counterFromStatName(makeStat("foo.c0")).add(0);
+  store_->rootScope()->counterFromStatName(makeStat("foo.c0")).add(0);
   Stats::ScopeSharedPtr scope0 = store_->createScope("");
-  store_->counterFromStatName(makeStat("foo.c1")).add(1);
+  store_->rootScope()->counterFromStatName(makeStat("foo.c1")).add(1);
   Stats::ScopeSharedPtr scope = store_->createScope("scope");
   scope->gaugeFromStatName(makeStat("g2"), Stats::Gauge::ImportMode::Accumulate).set(2);
   Stats::ScopeSharedPtr scope2 = store_->createScope("scope1.scope2");
@@ -241,15 +245,11 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
             code_response.second);
 }
 
-class AdminStatsFilterTest : public StatsHandlerTest, public testing::TestWithParam<Regex::Type> {
+class AdminStatsFilterTest : public StatsHandlerTest, public testing::Test {
 protected:
-  AdminStatsFilterTest() { setRegexType(GetParam()); }
 };
 
-INSTANTIATE_TEST_SUITE_P(RegexTypes, AdminStatsFilterTest,
-                         Values(Regex::Type::Re2, Regex::Type::StdRegex));
-
-TEST_P(AdminStatsFilterTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
+TEST_F(AdminStatsFilterTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint";
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
@@ -299,7 +299,8 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsInvalid) {
   const std::string url = "/stats?histogram_buckets=invalid_input";
   CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  EXPECT_EQ("usage: /stats?histogram_buckets=(cumulative|disjoint|none)\n", code_response.second);
+  EXPECT_EQ("usage: /stats?histogram_buckets=(cumulative|disjoint|detailed|summary)\n",
+            code_response.second);
 }
 
 TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {
@@ -328,7 +329,7 @@ TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {
   EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
 }
 
-TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
+TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative&format=json";
   // Set h as prefix to match both histograms.
   setHistogramBucketSettings("h", {1, 2, 3, 4});
@@ -428,7 +429,63 @@ TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
   EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
 }
 
-TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
+TEST_F(AdminStatsFilterTest, HandlerStatsJsonHiddenGauges) {
+  // Test that hidden=include shows all hidden and non hidden values.
+  const std::string url_hidden_include = "/stats?gauges&format=json&hidden=include";
+
+  Stats::Gauge& g1 =
+      store_->gaugeFromString("hiddenG1", Stats::Gauge::ImportMode::HiddenAccumulate);
+  g1.inc();
+
+  Stats::Gauge& g2 = store_->gaugeFromString("nonHiddenG2", Stats::Gauge::ImportMode::Accumulate);
+  g2.add(2);
+
+  CodeResponse code_response = handlerStats(url_hidden_include);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_hidden_include = R"EOF({
+    "stats": [
+        {"name":"hiddenG1", "value":1},
+        {"name":"nonHiddenG2", "value":2},
+    ]
+})EOF";
+  EXPECT_THAT(expected_json_hidden_include, JsonStringEq(code_response.second));
+
+  // Test that hidden-only will not show non-hidden gauges.
+  const std::string url_hidden_show_only = "/stats?gauges&format=json&hidden=only";
+
+  code_response = handlerStats(url_hidden_show_only);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_hidden_show_only = R"EOF({
+    "stats": [
+        {"name":"hiddenG1", "value":1},
+    ]
+})EOF";
+  EXPECT_THAT(expected_json_hidden_show_only, JsonStringEq(code_response.second));
+
+  // Test that hidden=exclude will not show hidden gauges.
+  const std::string url_hidden_exclude = "/stats?gauges&format=json&hidden=exclude";
+
+  code_response = handlerStats(url_hidden_exclude);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  const std::string expected_json_hidden_exclude = R"EOF({
+    "stats": [
+        {"name":"nonHiddenG2", "value":2},
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_hidden_exclude, JsonStringEq(code_response.second));
+}
+
+TEST_F(AdminStatsFilterTest, HandlerStatsHiddenInvalid) {
+  // Test that hidden=(bad inputs) returns error.
+  const std::string url_hidden_bad_input = "/stats?gauges&format=json&hidden=foo";
+
+  CodeResponse code_response = handlerStats(url_hidden_bad_input);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ("usage: /stats?hidden=(include|only|exclude)\n\n", code_response.second);
+}
+
+TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint&format=json";
   // Set h as prefix to match both histograms.
   setHistogramBucketSettings("h", {1, 2, 3, 4});
@@ -537,6 +594,8 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
   c1.add(10);
   c2.add(20);
 
+  endpoints_helper_.makeCluster("mycluster", 1);
+
   Stats::TextReadout& t = store_->textReadoutFromString("t");
   t.set("hello world");
 
@@ -558,11 +617,31 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
         },
         {
             "name":"c1",
-            "value":10,
+            "value":10
         },
         {
             "name":"c2",
             "value":20
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.c1",
+           "value":11
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.c2",
+           "value":12
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.g1",
+           "value":13
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.g2",
+           "value":14
+        },
+        {
+           "name":"cluster.mycluster.endpoint.127.0.0.1_80.healthy",
+           "value":1
         },
         {
             "histograms": {
@@ -865,7 +944,7 @@ TEST_F(AdminStatsTest, UsedOnlyStatsAsJson) {
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
 }
 
-TEST_P(AdminStatsFilterTest, StatsAsJsonFilterString) {
+TEST_F(AdminStatsFilterTest, StatsAsJsonFilterString) {
   InSequence s;
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
@@ -960,7 +1039,7 @@ TEST_P(AdminStatsFilterTest, StatsAsJsonFilterString) {
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
 }
 
-TEST_P(AdminStatsFilterTest, UsedOnlyStatsAsJsonFilterString) {
+TEST_F(AdminStatsFilterTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
 
   Stats::Histogram& h1 = store_->histogramFromString(
@@ -1171,7 +1250,7 @@ protected:
   void addStats() {
     ASSERT_EQ(NumScopes, scopes_.size());
     for (uint32_t s = 0; s < NumScopes; ++s) {
-      Stats::ScopeSharedPtr scope = store_->scopeFromStatName(scope_names_[s]);
+      Stats::ScopeSharedPtr scope = store_->rootScope()->scopeFromStatName(scope_names_[s]);
       {
         absl::MutexLock lock(&scope_mutexes_[s]);
         scopes_[s] = scope;
@@ -1183,7 +1262,7 @@ protected:
   }
 
   void statsEndpoint() {
-    StatsRequest request(*store_, StatsParams());
+    StatsRequest request(*store_, StatsParams(), cm_);
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;
@@ -1202,6 +1281,7 @@ protected:
   Stats::StatNamePool pool_;
   Stats::AllocatorImpl alloc_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   std::vector<Stats::ScopeSharedPtr> scopes_{NumScopes};
   absl::Mutex scope_mutexes_[NumScopes];
   std::atomic<uint64_t> total_lines_{0};
@@ -1228,23 +1308,12 @@ TEST_F(ThreadedTest, Threaded) {
   EXPECT_LE(expected / 2, total_lines_);
 }
 
-TEST_P(AdminStatsFilterTest, StatsInvalidRegex) {
+TEST_F(AdminStatsFilterTest, StatsInvalidRegex) {
   for (absl::string_view path :
        {"/stats?filter=*.test", "/stats?format=prometheus&filter=*.test"}) {
     CodeResponse code_response;
-    if (GetParam() == Regex::Type::Re2) {
-      code_response = handlerStats(path);
-      EXPECT_EQ("Invalid re2 regex", code_response.second) << path;
-    } else {
-      EXPECT_LOG_CONTAINS("error", "Invalid regex: ", code_response = handlerStats(path));
-
-      // Note: depending on the library, the detailed error message might be one of:
-      //   "One of *?+{ was not preceded by a valid regular expression."
-      //   "regex_error"
-      // but we always precede by 'Invalid regex: "'.
-      EXPECT_THAT(code_response.second, StartsWith("Invalid regex: \"")) << path;
-      EXPECT_THAT(code_response.second, EndsWith("\"\n")) << path;
-    }
+    code_response = handlerStats(path);
+    EXPECT_EQ("Invalid re2 regex", code_response.second) << path;
     EXPECT_EQ(Http::Code::BadRequest, code_response.first) << path;
   }
 }
@@ -1295,36 +1364,31 @@ public:
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
     Stats::StatNameTagVector c2Tags{{makeStat("cluster"), makeStat("c2")}};
 
-    Stats::Counter& c1 =
-        store_->counterFromStatNameWithTags(makeStat("cluster.upstream.cx.total"), c1Tags);
+    Stats::Counter& c1 = store_->rootScope()->counterFromStatNameWithTags(
+        makeStat("cluster.upstream.cx.total"), c1Tags);
     c1.add(10);
-    Stats::Counter& c2 =
-        store_->counterFromStatNameWithTags(makeStat("cluster.upstream.cx.total"), c2Tags);
+    Stats::Counter& c2 = store_->rootScope()->counterFromStatNameWithTags(
+        makeStat("cluster.upstream.cx.total"), c2Tags);
     c2.add(20);
 
-    Stats::Gauge& g1 = store_->gaugeFromStatNameWithTags(
+    Stats::Gauge& g1 = store_->rootScope()->gaugeFromStatNameWithTags(
         makeStat("cluster.upstream.cx.active"), c1Tags, Stats::Gauge::ImportMode::Accumulate);
     g1.set(11);
-    Stats::Gauge& g2 = store_->gaugeFromStatNameWithTags(
+    Stats::Gauge& g2 = store_->rootScope()->gaugeFromStatNameWithTags(
         makeStat("cluster.upstream.cx.active"), c2Tags, Stats::Gauge::ImportMode::Accumulate);
     g2.set(12);
 
-    Stats::TextReadout& t1 =
-        store_->textReadoutFromStatNameWithTags(makeStat("control_plane.identifier"), c1Tags);
+    Stats::TextReadout& t1 = store_->rootScope()->textReadoutFromStatNameWithTags(
+        makeStat("control_plane.identifier"), c1Tags);
     t1.set("cp-1");
   }
 };
 
-class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest,
-                                          public testing::TestWithParam<Regex::Type> {
+class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest, public testing::Test {
 public:
-  StatsHandlerPrometheusDefaultTest() { setRegexType(GetParam()); }
 };
 
-INSTANTIATE_TEST_SUITE_P(RegexTypes, StatsHandlerPrometheusDefaultTest,
-                         Values(Regex::Type::Re2, Regex::Type::StdRegex));
-
-TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
+TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
   const std::string url = "/stats?format=prometheus";
 
   createTestStats();
@@ -1342,18 +1406,140 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
   EXPECT_EQ(expected_response, code_response.second);
 }
 
-TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
+TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
   const std::string url = "/stats?format=prometheus&filter=(+invalid)";
 
   createTestStats();
 
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  if (GetParam() == Regex::Type::Re2) {
-    EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
-  } else {
-    EXPECT_THAT(code_response.second, HasSubstr("Invalid regex"));
-  }
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusDefaultHistogramEmission) {
+  const std::string url = "/stats?format=prometheus";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_response = R"EOF(# TYPE envoy_h1 histogram
+envoy_h1_bucket{le="0.5"} 0
+envoy_h1_bucket{le="1"} 0
+envoy_h1_bucket{le="5"} 0
+envoy_h1_bucket{le="10"} 0
+envoy_h1_bucket{le="25"} 0
+envoy_h1_bucket{le="50"} 0
+envoy_h1_bucket{le="100"} 0
+envoy_h1_bucket{le="250"} 0
+envoy_h1_bucket{le="500"} 1
+envoy_h1_bucket{le="1000"} 1
+envoy_h1_bucket{le="2500"} 1
+envoy_h1_bucket{le="5000"} 1
+envoy_h1_bucket{le="10000"} 1
+envoy_h1_bucket{le="30000"} 1
+envoy_h1_bucket{le="60000"} 1
+envoy_h1_bucket{le="300000"} 1
+envoy_h1_bucket{le="600000"} 1
+envoy_h1_bucket{le="1800000"} 1
+envoy_h1_bucket{le="3600000"} 1
+envoy_h1_bucket{le="+Inf"} 1
+envoy_h1_sum{} 305
+envoy_h1_count{} 1
+)EOF";
+
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusExplicitHistogramEmission) {
+  const std::string url = "/stats?format=prometheus&histogram_buckets=cumulative";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_response = R"EOF(# TYPE envoy_h1 histogram
+envoy_h1_bucket{le="0.5"} 0
+envoy_h1_bucket{le="1"} 0
+envoy_h1_bucket{le="5"} 0
+envoy_h1_bucket{le="10"} 0
+envoy_h1_bucket{le="25"} 0
+envoy_h1_bucket{le="50"} 0
+envoy_h1_bucket{le="100"} 0
+envoy_h1_bucket{le="250"} 0
+envoy_h1_bucket{le="500"} 1
+envoy_h1_bucket{le="1000"} 1
+envoy_h1_bucket{le="2500"} 1
+envoy_h1_bucket{le="5000"} 1
+envoy_h1_bucket{le="10000"} 1
+envoy_h1_bucket{le="30000"} 1
+envoy_h1_bucket{le="60000"} 1
+envoy_h1_bucket{le="300000"} 1
+envoy_h1_bucket{le="600000"} 1
+envoy_h1_bucket{le="1800000"} 1
+envoy_h1_bucket{le="3600000"} 1
+envoy_h1_bucket{le="+Inf"} 1
+envoy_h1_sum{} 305
+envoy_h1_count{} 1
+)EOF";
+
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusSummaryEmission) {
+  const std::string url = "/stats?format=prometheus&histogram_buckets=summary";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_response = R"EOF(# TYPE envoy_h1 summary
+envoy_h1{quantile="0"} 300
+envoy_h1{quantile="0.25"} 302.5
+envoy_h1{quantile="0.5"} 305
+envoy_h1{quantile="0.75"} 307.5
+envoy_h1{quantile="0.9"} 309
+envoy_h1{quantile="0.95"} 309.5
+envoy_h1{quantile="0.99"} 309.89999999999997726263245567679
+envoy_h1{quantile="0.995"} 309.9499999999999886313162278384
+envoy_h1{quantile="0.999"} 309.99000000000000909494701772928
+envoy_h1{quantile="1"} 310
+envoy_h1_sum{} 305
+envoy_h1_count{} 1
+)EOF";
+
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::OK, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
+}
+
+TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusUnsupportedBucketMode) {
+  const std::string url = "/stats?format=prometheus&histogram_buckets=disjoint";
+
+  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 300));
+  h1.recordValue(300);
+
+  store_->mergeHistograms([]() -> void {});
+
+  const std::string expected_response = "unsupported prometheus histogram bucket mode";
+  const CodeResponse code_response = handlerStats(url);
+  EXPECT_EQ(Http::Code::BadRequest, code_response.first);
+  EXPECT_EQ(expected_response, code_response.second);
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest

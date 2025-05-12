@@ -19,15 +19,16 @@ public:
     m_ = std::make_unique<Matcher>(std::move(ranges), stat_prefix_, scope_);
   }
 
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::string stat_prefix_{"ipmatcher.test"};
   std::unique_ptr<Matcher> m_;
 };
 
 TEST_F(MatcherTest, TestV4) {
   std::vector<Network::Address::CidrRange> ranges;
-  ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
-  ranges.emplace_back(Network::Address::CidrRange::create("10.0.0.0", 24));
+  ranges.emplace_back(*Network::Address::CidrRange::create("192.0.2.0", 24));
+  ranges.emplace_back(*Network::Address::CidrRange::create("10.0.0.0", 24));
   initialize(std::move(ranges));
   EXPECT_FALSE(m_->match("192.0.1.255"));
   EXPECT_TRUE(m_->match("192.0.2.0"));
@@ -41,9 +42,9 @@ TEST_F(MatcherTest, TestV4) {
 
 TEST_F(MatcherTest, TestV6) {
   std::vector<Network::Address::CidrRange> ranges;
-  ranges.emplace_back(Network::Address::CidrRange::create("::1/128"));
-  ranges.emplace_back(Network::Address::CidrRange::create("2001::/16"));
-  ranges.emplace_back(Network::Address::CidrRange::create("2002::/16"));
+  ranges.emplace_back(*Network::Address::CidrRange::create("::1/128"));
+  ranges.emplace_back(*Network::Address::CidrRange::create("2001::/16"));
+  ranges.emplace_back(*Network::Address::CidrRange::create("2002::/16"));
   initialize(std::move(ranges));
 
   EXPECT_FALSE(m_->match("::"));
@@ -65,15 +66,15 @@ TEST_F(MatcherTest, EmptyRanges) {
 
 TEST_F(MatcherTest, EmptyIP) {
   std::vector<Network::Address::CidrRange> ranges;
-  ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
+  ranges.emplace_back(*Network::Address::CidrRange::create("192.0.2.0", 24));
   initialize(std::move(ranges));
   EXPECT_FALSE(m_->match(""));
-  EXPECT_FALSE(m_->match(absl::optional<absl::string_view>{}));
+  EXPECT_FALSE(m_->match(absl::monostate()));
 }
 
 TEST_F(MatcherTest, InvalidIP) {
   std::vector<Network::Address::CidrRange> ranges;
-  ranges.emplace_back(Network::Address::CidrRange::create("192.0.2.0", 24));
+  ranges.emplace_back(*Network::Address::CidrRange::create("192.0.2.0", 24));
   initialize(std::move(ranges));
   EXPECT_EQ(m_->stats()->ip_parsing_failed_.value(), 0);
   EXPECT_FALSE(m_->match("foo"));

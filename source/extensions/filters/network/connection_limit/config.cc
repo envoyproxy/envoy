@@ -13,7 +13,8 @@ namespace ConnectionLimitFilter {
 Network::FilterFactoryCb ConnectionLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::connection_limit::v3::ConnectionLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr filter_config(new Config(proto_config, context.scope(), context.runtime()));
+  ConfigSharedPtr filter_config(
+      new Config(proto_config, context.scope(), context.serverFactoryContext().runtime()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<Filter>(filter_config));
   };

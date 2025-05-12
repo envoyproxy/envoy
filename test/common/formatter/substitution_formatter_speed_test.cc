@@ -1,3 +1,4 @@
+#include "source/common/formatter/substitution_format_utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 
@@ -10,7 +11,7 @@ namespace Envoy {
 
 namespace {
 
-std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool typed) {
+std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
   ProtobufWkt::Struct JsonLogFormat;
   const std::string format_yaml = R"EOF(
     remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
@@ -25,7 +26,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool type
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, false);
 }
 
 std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool typed) {
@@ -67,14 +68,15 @@ static void BM_AccessLogFormatterSetup(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-        std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+        *Envoy::Formatter::FormatterImpl::create(LogFormat, false);
   }
 }
 BENCHMARK(BM_AccessLogFormatterSetup);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   static const char* LogFormat =
       "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
@@ -83,17 +85,11 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
   std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+      *Envoy::Formatter::FormatterImpl::create(LogFormat, false);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        formatter->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .length();
+    output_bytes += formatter->formatWithContext({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -101,20 +97,14 @@ BENCHMARK(BM_AccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StructAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> struct_formatter = makeStructFormatter(false);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        struct_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
+    output_bytes += struct_formatter->formatWithContext({}, *stream_info).ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -122,21 +112,15 @@ BENCHMARK(BM_StructAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> typed_struct_formatter =
       makeStructFormatter(true);
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        typed_struct_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
+    output_bytes += typed_struct_formatter->formatWithContext({}, *stream_info).ByteSize();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
@@ -144,53 +128,25 @@ BENCHMARK(BM_TypedStructAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
+  testing::NiceMock<MockTimeSystem> time_system;
+
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
-  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
+  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter();
 
   size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        json_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .length();
+    output_bytes += json_formatter->formatWithContext({}, *stream_info).length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_JsonAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
-  MockTimeSystem time_system;
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
-  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> typed_json_formatter =
-      makeJsonFormatter(true);
-
-  size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
-  for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        typed_json_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .length();
-  }
-  benchmark::DoNotOptimize(output_bytes);
-}
-BENCHMARK(BM_TypedJsonAccessLogFormatter);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FormatterCommandParsing(benchmark::State& state) {
   const std::string token = "Listener:namespace:key";
-  std::string listener, names, key;
+  absl::string_view listener, names, key;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    Formatter::SubstitutionFormatParser::parseSubcommand(token, ':', listener, names, key);
+    Formatter::SubstitutionFormatUtils::parseSubcommand(token, ':', listener, names, key);
   }
 }
 BENCHMARK(BM_FormatterCommandParsing);

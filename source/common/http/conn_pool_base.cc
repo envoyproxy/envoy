@@ -95,11 +95,11 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
 
 // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
 // side we do 2^29.
-static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
+constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
 
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
-  parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
+  parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
   if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
@@ -159,27 +159,30 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
 void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) {
   switch (reason) {
   case StreamResetReason::ConnectionTermination:
-  case StreamResetReason::ConnectionFailure:
-    parent_.host()->cluster().stats().upstream_rq_pending_failure_eject_.inc();
+  case StreamResetReason::LocalConnectionFailure:
+  case StreamResetReason::RemoteConnectionFailure:
+  case StreamResetReason::ConnectionTimeout:
+    parent_.host()->cluster().trafficStats()->upstream_rq_pending_failure_eject_.inc();
     closed_with_active_rq_ = true;
     break;
   case StreamResetReason::LocalReset:
   case StreamResetReason::ProtocolError:
   case StreamResetReason::OverloadManager:
-    parent_.host()->cluster().stats().upstream_rq_tx_reset_.inc();
+    parent_.host()->cluster().trafficStats()->upstream_rq_tx_reset_.inc();
     break;
   case StreamResetReason::RemoteReset:
-    parent_.host()->cluster().stats().upstream_rq_rx_reset_.inc();
+    parent_.host()->cluster().trafficStats()->upstream_rq_rx_reset_.inc();
     break;
   case StreamResetReason::LocalRefusedStreamReset:
   case StreamResetReason::RemoteRefusedStreamReset:
   case StreamResetReason::Overflow:
   case StreamResetReason::ConnectError:
+  case StreamResetReason::Http1PrematureUpstreamHalfClose:
     break;
   }
 }
 
-uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_streams_config) {
+uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config) {
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 

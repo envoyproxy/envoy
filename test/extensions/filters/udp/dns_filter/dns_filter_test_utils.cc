@@ -26,7 +26,7 @@ std::string buildQueryForDomain(const std::string& name, uint16_t rec_type, uint
                                 const uint16_t query_id) {
   Random::RandomGeneratorImpl random_;
   struct DnsHeader query {};
-  uint16_t id = (query_id ? query_id : random_.random() & 0xFFFF);
+  uint16_t id = query_id ? query_id : (random_.random() % 0xFFFF) + 1;
 
   // Generate a random query ID
   query.id = id;
@@ -182,10 +182,6 @@ bool DnsResponseValidator::validateDnsResponseObject(DnsQueryContextPtr& context
   }
 
   context->id_ = static_cast<uint16_t>(context->header_.id);
-  if (context->id_ == 0) {
-    ENVOY_LOG(debug, "No ID in DNS Response");
-    return false;
-  }
 
   // Almost always, we will have only one query here. Per the RFC, QDCOUNT is usually 1
   context->queries_.reserve(context->header_.questions);
@@ -375,7 +371,7 @@ DnsAnswerRecordPtr DnsResponseValidator::parseDnsAnswerRecord(const Buffer::Inst
   offset += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  // TODO(abaptiste): Support Extension Mechanisms for DNS (RFC2671)
+  // TODO(suniltheta): Support Extension Mechanisms for DNS (RFC2671)
   //
   // We may see optional records indicating DNS extension support. We need to skip
   // these records until we have proper support. Encountering one of these records

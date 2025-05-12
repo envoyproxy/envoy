@@ -38,6 +38,9 @@ MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
 
+MockCodecEventCallbacks::MockCodecEventCallbacks() = default;
+MockCodecEventCallbacks::~MockCodecEventCallbacks() = default;
+
 MockServerConnection::MockServerConnection() {
   ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
 }
@@ -72,6 +75,7 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, decodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
 
   ON_CALL(*this, addDownstreamWatermarkCallbacks(_))
@@ -85,7 +89,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
       }));
 
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
-  ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
+  ON_CALL(*this, tracingConfig())
+      .WillByDefault(Return(makeOptRef<const Tracing::Config>(tracing_config_)));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
       .WillByDefault(Invoke([this](Code code, absl::string_view body,
@@ -96,7 +101,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
       }));
   ON_CALL(*this, routeConfig())
       .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
-  ON_CALL(*this, upstreamOverrideHost()).WillByDefault(Return(absl::optional<absl::string_view>()));
+  ON_CALL(*this, upstreamOverrideHost())
+      .WillByDefault(Return(absl::optional<Upstream::LoadBalancerContext::OverrideHost>()));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
       .WillByDefault(Invoke([this]() -> const Router::RouteSpecificFilterConfig* {
@@ -106,15 +112,14 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
       }));
-  ON_CALL(*this, traversePerFilterConfig(_))
-      .WillByDefault(
-          Invoke([this](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            auto route = this->route();
-            if (route == nullptr) {
-              return;
-            }
-            route->traversePerFilterConfig("envoy.filter", cb);
-          }));
+  ON_CALL(*this, perFilterConfigs())
+      .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
+        auto route = this->route();
+        if (route == nullptr) {
+          return {};
+        }
+        return route->perFilterConfigs("envoy.filter");
+      }));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
@@ -143,7 +148,8 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   initializeMockStreamFilterCallbacks(*this);
   ON_CALL(*this, encodingBuffer()).WillByDefault(Invoke(&buffer_, &Buffer::InstancePtr::get));
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
-  ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
+  ON_CALL(*this, tracingConfig())
+      .WillByDefault(Return(makeOptRef<const Tracing::Config>(tracing_config_)));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
 
   ON_CALL(*this, mostSpecificPerFilterConfig())
@@ -154,15 +160,14 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
         }
         return route->mostSpecificPerFilterConfig("envoy.filter");
       }));
-  ON_CALL(*this, traversePerFilterConfig(_))
-      .WillByDefault(
-          Invoke([this](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            auto route = this->route();
-            if (route == nullptr) {
-              return;
-            }
-            route->traversePerFilterConfig("envoy.filter", cb);
-          }));
+  ON_CALL(*this, perFilterConfigs())
+      .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
+        auto route = this->route();
+        if (route == nullptr) {
+          return {};
+        }
+        return route->perFilterConfigs("envoy.filter");
+      }));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() = default;
@@ -211,7 +216,11 @@ MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 
 MockAsyncClientStream::MockAsyncClientStream() = default;
-MockAsyncClientStream::~MockAsyncClientStream() = default;
+MockAsyncClientStream::~MockAsyncClientStream() {
+  if (destructor_callback_) {
+    (*destructor_callback_)();
+  }
+};
 
 MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() = default;
 MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
@@ -221,11 +230,11 @@ MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 namespace Http {
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
-  return IsSubsetOfHeadersMatcher(expected_headers);
+  return {expected_headers};
 }
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers) {
-  return IsSupersetOfHeadersMatcher(expected_headers);
+  return {expected_headers};
 }
 
 MockReceivedSettings::MockReceivedSettings() {

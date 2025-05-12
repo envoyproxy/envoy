@@ -105,9 +105,9 @@ private:
 // An implementation of Envoy::ConnectionPool::ActiveClient for HTTP/1.1 and HTTP/2
 class ActiveClient : public Envoy::ConnectionPool::ActiveClient {
 public:
-  ActiveClient(HttpConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
-               uint64_t effective_concurrent_stream_limit,
-               uint64_t configured_concurrent_stream_limit,
+  ActiveClient(HttpConnPoolImplBase& parent, uint32_t lifetime_stream_limit,
+               uint32_t effective_concurrent_stream_limit,
+               uint32_t configured_concurrent_stream_limit,
                OptRef<Upstream::Host::CreateConnectionData> opt_data)
       : Envoy::ConnectionPool::ActiveClient(parent, lifetime_stream_limit,
                                             effective_concurrent_stream_limit,
@@ -128,14 +128,14 @@ public:
     real_host_description_ = data.host_description_;
     codec_client_ = parent.createCodecClient(data);
     codec_client_->addConnectionCallbacks(*this);
+    Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
     codec_client_->setConnectionStats(
-        {parent_.host()->cluster().stats().upstream_cx_rx_bytes_total_,
-         parent_.host()->cluster().stats().upstream_cx_rx_bytes_buffered_,
-         parent_.host()->cluster().stats().upstream_cx_tx_bytes_total_,
-         parent_.host()->cluster().stats().upstream_cx_tx_bytes_buffered_,
-         &parent_.host()->cluster().stats().bind_errors_, nullptr});
+        {traffic_stats.upstream_cx_rx_bytes_total_, traffic_stats.upstream_cx_rx_bytes_buffered_,
+         traffic_stats.upstream_cx_tx_bytes_total_, traffic_stats.upstream_cx_tx_bytes_buffered_,
+         &traffic_stats.bind_errors_, nullptr});
   }
 
+  void initializeReadFilters() override { codec_client_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
@@ -207,7 +207,7 @@ public:
                               OptRef<Upstream::Host::CreateConnectionData> data);
   ~MultiplexedActiveClientBase() override = default;
   // Caps max streams per connection below 2^31 to prevent overflow.
-  static uint64_t maxStreamsPerConnection(uint64_t max_streams_config);
+  static uint32_t maxStreamsPerConnection(uint32_t max_streams_config);
 
   // ConnPoolImpl::ActiveClient
   bool closingWithIncompleteStream() const override;

@@ -25,9 +25,8 @@ void makeDefaultAppleDnsResolverConfig(
 void makeDefaultDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
-// If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
-// is enabled, create an AppleDnsResolverConfig typed config.
-bool checkUseAppleApiForDnsLookups(
+// If it is MacOS and it's compiled it, create an AppleDnsResolverConfig typed config.
+bool tryUseAppleApiForDnsLookups(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // If the config has typed_dns_resolver_config, copy it over.
@@ -97,7 +96,7 @@ envoy::config::core::v3::TypedExtensionConfig makeDnsResolverConfig(const Config
   }
 
   // If use apple API for DNS lookups, create an AppleDnsResolverConfig typed config.
-  if (checkUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
+  if (tryUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
     return typed_dns_resolver_config;
   }
 

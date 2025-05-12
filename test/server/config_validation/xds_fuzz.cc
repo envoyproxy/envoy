@@ -12,7 +12,7 @@ namespace Envoy {
 
 // Helper functions to build API responses.
 envoy::config::cluster::v3::Cluster XdsFuzzTest::buildCluster(const std::string& name) {
-  return ConfigHelper::buildCluster(name, "ROUND_ROBIN");
+  return ConfigHelper::buildCluster(name);
 };
 
 envoy::config::endpoint::v3::ClusterLoadAssignment
@@ -62,11 +62,10 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
                                          : "DELTA_GRPC")),
-      verifier_(input.config().sotw_or_delta()), actions_(input.actions()), version_(1),
+      verifier_(input.config().sotw_or_delta()), actions_(input.actions()),
       ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
-  if (use_unified_mux) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                    use_unified_mux ? "true" : "false");
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
@@ -324,7 +323,8 @@ void XdsFuzzTest::verifyListeners() {
   const auto dump = getListenersConfigDump().dynamic_listeners();
 
   for (const auto& rep : abstract_rep) {
-    ENVOY_LOG_MISC(debug, "Verifying {} with state {}", rep.listener.name(), rep.state);
+    ENVOY_LOG_MISC(debug, "Verifying {} with state {}", rep.listener.name(),
+                   static_cast<int>(rep.state));
 
     auto listener_dump = std::find_if(dump.begin(), dump.end(), [&](auto& listener) {
       return listener.name() == rep.listener.name();
@@ -387,13 +387,13 @@ void XdsFuzzTest::verifyState() {
 }
 
 envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "listeners")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
 std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
-  auto map = test_server_->server().admin().getConfigTracker().getCallbacksMap();
+  auto map = test_server_->server().admin()->getConfigTracker().getCallbacksMap();
 
   // There is no route config dump before envoy has a route.
   if (map.find("routes") == map.end()) {

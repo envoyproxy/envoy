@@ -12,19 +12,22 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
     Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-    std::shared_ptr<QuicSslConnectionInfo>&& info)
+    std::shared_ptr<QuicSslConnectionInfo>&& info,
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicStatNames& quic_stat_names,
+    Stats::Scope& stats_scope)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
       network_connection_(&connection), quic_ssl_info_(std::move(info)),
+      quic_stat_names_(quic_stat_names), stats_scope_(stats_scope),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
-      stream_info_(dispatcher.timeSource(),
-                   connection.connectionSocket()->connectionInfoProviderSharedPtr()),
+      stream_info_(std::move(stream_info)),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
-  stream_info_.protocol(Http::Protocol::Http3);
+  stream_info_->protocol(Http::Protocol::Http3);
+  network_connection_->connectionSocket()->connectionInfoProvider().setConnectionID(id());
   network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
 }
@@ -53,7 +56,7 @@ void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
 
-bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() {
+bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() const {
   // Quic doesn't support half close.
   return false;
 }
@@ -123,7 +126,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
+  return {quic_ssl_info_};
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
@@ -145,23 +148,22 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }
 
-void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
+void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_any_data) {
   if (!inDelayedClose()) {
-    if (close_type_during_initialize_.has_value()) {
-      ASSERT(!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
-      close(close_type_during_initialize_.value());
-      close_type_during_initialize_ = absl::nullopt;
-    }
+    ASSERT(!close_type_during_initialize_.has_value());
     return;
   }
-  if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-    if (delayed_close_timer_ != nullptr) {
-      // Re-arm delay close timer on every write event if there are still data
-      // buffered or the connection close is supposed to be delayed.
-      delayed_close_timer_->enableTimer(delayed_close_timeout_);
-    }
-  } else {
+  if (has_sent_any_data && delayed_close_timer_ != nullptr) {
+    // Re-arm delay close timer if at least some buffered data is flushed.
+    delayed_close_timer_->enableTimer(delayed_close_timeout_);
+  }
+}
+
+void QuicFilterManagerConnectionImpl::onWriteEventDone() { maybeApplyDelayedClose(); }
+
+void QuicFilterManagerConnectionImpl::maybeApplyDelayedClose() {
+  if (!hasDataToWrite() && inDelayedClose() &&
+      delayed_close_state_ != DelayedCloseState::CloseAfterFlushAndWait) {
     closeConnectionImmediately();
   }
 }
@@ -180,7 +182,6 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     network_connection_ = nullptr;
   }
 
-  filter_manager_ = nullptr;
   if (!codec_stats_.has_value()) {
     // The connection was closed before it could be used. Stats are not recorded.
     return;
@@ -202,8 +203,12 @@ void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
   if (quicConnection() == nullptr) {
     return;
   }
-  quicConnection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quicConnection()->CloseConnection(
+      quic::QUIC_NO_ERROR,
+      (localCloseReason().empty()
+           ? "Closed by application"
+           : absl::StrCat("Closed by application with reason: ", localCloseReason())),
+      quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
@@ -266,6 +271,11 @@ void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
     close(close_type_during_initialize_.value());
     close_type_during_initialize_ = absl::nullopt;
   }
+}
+
+void QuicFilterManagerConnectionImpl::incrementSentQuicResetStreamErrorStats(
+    quic::QuicResetStreamError error, bool from_self, bool is_upstream) {
+  quic_stat_names_.chargeQuicResetStreamErrorStats(stats_scope_, error, from_self, is_upstream);
 }
 
 } // namespace Quic

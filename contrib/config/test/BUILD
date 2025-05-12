@@ -16,15 +16,17 @@ envoy_cc_test(
     ],
     deps = [
         "//contrib/config/source:kv_store_xds_delegate",
-        "//source/common/config:xds_source_id_lib",
+        "//source/extensions/config_subscription/grpc:xds_source_id_lib",
         "//source/extensions/key_value/file_based:config_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:resources_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
     ],
 )
@@ -37,11 +39,12 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = "2core",
     deps = [
         ":invalid_proto_kv_store_config_proto_cc_proto",
         "//contrib/config/source:kv_store_xds_delegate",
         "//envoy/common:key_value_store_interface",
-        "//source/common/config:xds_source_id_lib",
+        "//source/extensions/config_subscription/grpc:xds_source_id_lib",
         "//source/extensions/key_value/file_based:config_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",

@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/router/path_matcher.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
@@ -21,9 +22,11 @@ public:
         const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig&>(
         config, ProtobufMessage::getStrictValidationVisitor());
 
-    if (!UriTemplate::isValidMatchPattern(path_match_config.path_template()).ok()) {
-      return absl::InvalidArgumentError(fmt::format("path_match_policy.path_template {} is invalid",
-                                                    path_match_config.path_template()));
+    const absl::Status valid = UriTemplate::isValidMatchPattern(path_match_config.path_template());
+    if (!valid.ok()) {
+      return absl::InvalidArgumentError(
+          fmt::format("path_match_policy.path_template {} is invalid: {}",
+                      path_match_config.path_template(), valid.message()));
     }
 
     return std::make_shared<UriTemplateMatcher>(path_match_config);
@@ -37,6 +40,8 @@ public:
 
   std::string name() const override { return "envoy.path.match.uri_template.uri_template_matcher"; }
 };
+
+DECLARE_FACTORY(UriTemplateMatcherFactory);
 
 } // namespace Match
 } // namespace UriTemplate

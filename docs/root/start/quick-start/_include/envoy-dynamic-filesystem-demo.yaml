@@ -8,6 +8,7 @@ dynamic_resources:
   lds_config:
     path: /var/lib/envoy/lds.yaml
 
+
 admin:
   address:
     socket_address:

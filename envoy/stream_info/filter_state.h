@@ -3,8 +3,8 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
@@ -19,6 +19,32 @@ namespace StreamInfo {
 class FilterState;
 
 using FilterStateSharedPtr = std::shared_ptr<FilterState>;
+
+// Objects stored in the filter state can optionally be shared between the
+// upstream and downstream filter state. Note that sharing happens at the
+// connection level and in some cases may significantly reduce performance by
+// preventing pooling of multiple downstream requests to a single
+// upstream connection.
+enum class StreamSharingMayImpactPooling {
+  // None implies the object is exclusive to the stream.
+  None,
+
+  // Mark a filter state object as shared with the upstream connection.
+  // Shared filter state objects are copied by reference from the downstream
+  // requests and connections to the upstream connection filter state. When
+  // upstream connections are re-used between streams, the downstream objects
+  // are captured for the first, initiating stream. To force distinct
+  // upstream connections, the shared filter state object must implement the
+  // hashing interface. Shared objects with distinct hashes will use distinct
+  // upstream connections. Note that this affects connection pooling,
+  // preventing any re-use of the upstream connections in the worst case.
+  SharedWithUpstreamConnection,
+
+  // Same as SharedWithUpstreamConnection, except that the filter state is
+  // not transitively shared. The filter state is imported into the upstream
+  // connection filter state as exclusive to the upstream connection.
+  SharedWithUpstreamConnectionOnce,
+};
 
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
@@ -59,26 +85,10 @@ public:
   // request, which remains open after the downstream request completes.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
-  // Objects stored in the filter state can optionally be shared between the
-  // upstrean and downstream filter state.
-  enum class StreamSharing {
-    // None implies the object is exclusive to the stream.
-    None,
-
-    // Mark a filter state object as shared with the upstream connection.
-    // Shared filter state objects are copied by reference from the downstream
-    // requests and connections to the upstream connection filter state. When
-    // upstream connections are re-used between streams, the downstream objects
-    // are captured for the first, initiating stream. To force distinct
-    // upstream connections, the shared filter state object must implement the
-    // hashing interface. Shared objects with distinct hashes will use distinct
-    // upstream connections. Note that this affects connection pooling,
-    // preventing any re-use of the upstream connections in the worst case.
-    SharedWithUpstreamConnection,
-  };
-
   class Object {
   public:
+    using FieldType = absl::variant<absl::monostate, absl::string_view, int64_t>;
+
     virtual ~Object() = default;
 
     /**
@@ -94,12 +104,40 @@ public:
      * This method can be used to get an unstructured serialization result.
      */
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
+
+    /**
+     * @return bool true if the object supports field access. False if the object does not support
+     * field access. Default implementation returns false.
+     */
+    virtual bool hasFieldSupport() const { return false; }
+
+    /**
+     * @return FieldType a single state property or field value for a name.
+     */
+    virtual FieldType getField(absl::string_view) const { return absl::monostate{}; }
+  };
+
+  /**
+   * Generic factory for filter state objects. The factory registry uses the
+   * object data name as the index for the object factory. This factory should be used by the
+   * dynamic extensions that cannot use the object constructors directly.
+   */
+  class ObjectFactory : public Config::UntypedFactory {
+  public:
+    // Config::UntypedFactory
+    std::string category() const override { return "filter_state.object"; }
+
+    /**
+     * @return std::unique_ptr<Object> from the serialized object data or nullptr if the input
+     * is malformed.
+     */
+    virtual std::unique_ptr<Object> createFromBytes(absl::string_view data) const PURE;
   };
 
   struct FilterObject {
     std::shared_ptr<Object> data_;
     StateType state_type_{StateType::ReadOnly};
-    StreamSharing stream_sharing_{StreamSharing::None};
+    StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
     std::string name_;
   };
 
@@ -122,9 +160,10 @@ public:
    * This is to enforce a single authoritative source for each piece of
    * data stored in FilterState.
    */
-  virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain,
-                       StreamSharing stream_sharing = StreamSharing::None) PURE;
+  virtual void
+  setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType state_type,
+          LifeSpan life_span = LifeSpan::FilterChain,
+          StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
@@ -153,14 +192,12 @@ public:
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a pointer to the stored data or nullptr if the data does not exist.
-   * An exception will be thrown if the data is not mutable.
    */
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
    * @return a shared pointer to the stored data or nullptr if the data does not exist.
-   * An exception will be thrown if the data is not mutable.
    */
   virtual std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) PURE;
 

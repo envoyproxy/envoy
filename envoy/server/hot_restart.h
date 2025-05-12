@@ -9,8 +9,6 @@
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
-#include "source/server/hot_restart.pb.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -50,6 +48,30 @@ public:
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */
   virtual int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) PURE;
+
+  /**
+   * Registers a UdpListenerConfig as a possible receiver of udp packets forwarded from the
+   * parent process to the child process. This is used to forward QUIC packets that are not for
+   * connections belonging to the parent process during draining (in the absence of BPF delivery to
+   * the correct process), via its listenerWorkerRouter.
+   * The HotRestart instance is responsible for recognizing "any" addresses (e.g. "0.0.0.0").
+   * @param address supplies the address and port of the listening socket.
+   * @param listener_config is the UdpListenerConfig to receive packets forwarded for the given
+   * address.
+   */
+  virtual void
+  registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr address,
+                                std::shared_ptr<Network::UdpListenerConfig> listener_config) PURE;
+
+  /**
+   * @return An interface on which registerParentDrainedCallback can be called during
+   *         creation of a listener, or nullopt if there is no parent instance.
+   *
+   *         If this is set, any UDP listener should start paused and only begin listening
+   *         when the parent instance is drained; this allows draining QUIC listeners to
+   *         catch their own packets and forward unrecognized packets to the child instance.
+   */
+  virtual OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a

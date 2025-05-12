@@ -15,8 +15,7 @@ const ConstSupportedBuckets default_buckets{};
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl()
-    : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0),
-      unit_(Histogram::Unit::Unspecified) {}
+    : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0) {}
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr,
                                                  Histogram::Unit unit,
@@ -96,15 +95,19 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
     }
     computed_buckets_.emplace_back(hist_approx_count_below(new_histogram_ptr, bucket));
   }
+
+  out_of_bound_count_ = hist_approx_count_above(new_histogram_ptr, supported_buckets.back());
 }
 
-HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config)
-    : configs_([&config]() {
+HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                                             Server::Configuration::CommonFactoryContext& context)
+    : configs_([&config, &context]() {
         std::vector<Config> configs;
         for (const auto& matcher : config.histogram_bucket_settings()) {
           std::vector<double> buckets{matcher.buckets().begin(), matcher.buckets().end()};
           std::sort(buckets.begin(), buckets.end());
-          configs.emplace_back(matcher.match(), std::move(buckets));
+          configs.emplace_back(Matchers::StringMatcherImpl(matcher.match(), context),
+                               std::move(buckets));
         }
 
         return configs;

@@ -27,18 +27,18 @@ Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 CorsFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::cors::v3::CorsPolicy& policy,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<CorsPolicyImpl>(policy, context.runtime());
+  return std::make_shared<CorsPolicyImpl>(policy, context);
 }
 
 /**
  * Static registration for the cors filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(CorsFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.cors"};
+LEGACY_REGISTER_FACTORY(CorsFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.cors");
 
 } // namespace Cors
 } // namespace HttpFilters

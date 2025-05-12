@@ -9,4 +9,5 @@ message CrashFilterConfig {
   bool crash_in_decode_headers = 3;
   bool crash_in_decode_data = 4;
   bool crash_in_decode_trailers = 5;
+  bool crash_in_decode_metadata = 6;
 }

@@ -1,5 +1,3 @@
-load(":genrule_cmd.bzl", "genrule_cmd")
-
 licenses(["notice"])  # Apache 2
 
 cc_library(
@@ -7,9 +5,8 @@ cc_library(
     srcs = [
         "crypto/libcrypto.a",
     ],
-    hdrs = glob(["boringssl/include/openssl/*.h"]),
-    defines = ["BORINGSSL_FIPS"],
-    includes = ["boringssl/include"],
+    hdrs = glob(["include/openssl/*.h"]),
+    includes = ["include"],
     visibility = ["//visibility:public"],
 )
 
@@ -18,18 +15,19 @@ cc_library(
     srcs = [
         "ssl/libssl.a",
     ],
-    hdrs = glob(["boringssl/include/openssl/*.h"]),
-    includes = ["boringssl/include"],
+    hdrs = glob(["include/openssl/*.h"]),
+    includes = ["include"],
     visibility = ["//visibility:public"],
     deps = [":crypto"],
 )
 
 genrule(
     name = "build",
-    srcs = glob(["boringssl/**"]),
+    srcs = glob(["**"]),
     outs = [
         "crypto/libcrypto.a",
         "ssl/libssl.a",
     ],
-    cmd = genrule_cmd("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
+    cmd = "$(location {}) $(location crypto/libcrypto.a) $(location ssl/libssl.a)".format("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
+    tools = ["@envoy//bazel/external:boringssl_fips.genrule_cmd"],
 )

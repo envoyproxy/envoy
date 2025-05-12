@@ -1,49 +1,16 @@
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_contrib_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
 )
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-# Kafka network filter.
-# Broker filter public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/kafka_broker_filter
-
-envoy_cc_contrib_extension(
-    name = "kafka_broker_config_lib",
-    srcs = ["broker/config.cc"],
-    hdrs = ["broker/config.h"],
-    deps = [
-        ":kafka_broker_filter_lib",
-        "//source/extensions/filters/network:well_known_names",
-        "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "kafka_broker_filter_lib",
-    srcs = ["broker/filter.cc"],
-    hdrs = [
-        "broker/filter.h",
-        "external/request_metrics.h",
-        "external/response_metrics.h",
-    ],
-    deps = [
-        ":kafka_request_codec_lib",
-        ":kafka_response_codec_lib",
-        "//envoy/buffer:buffer_interface",
-        "//envoy/network:connection_interface",
-        "//envoy/network:filter_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-    ],
-)
+# Common code for Kafka filters (Kafka type abstractions, protocol, metrics, etc.).
 
 envoy_cc_library(
     name = "abstract_codec_lib",
@@ -72,6 +39,7 @@ envoy_cc_library(
     name = "kafka_request_parser_lib",
     srcs = [
         "external/kafka_request_resolver.cc",
+        "external/requests.cc",
         "kafka_request_parser.cc",
     ],
     hdrs = [
@@ -107,12 +75,15 @@ genrule(
     ],
     outs = [
         "external/requests.h",
+        "external/requests.cc",
         "external/kafka_request_resolver.cc",
         "external/request_metrics.h",
     ],
     cmd = """
       ./$(location :kafka_protocol_code_generator_bin) request \
-        $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
+        $(location external/requests.h) \
+        $(location external/requests.cc) \
+        $(location external/kafka_request_resolver.cc) \
         $(location external/request_metrics.h) $(SRCS)
     """,
     tools = [
@@ -136,12 +107,14 @@ envoy_cc_library(
     name = "kafka_response_parser_lib",
     srcs = [
         "external/kafka_response_resolver.cc",
+        "external/responses.cc",
         "kafka_response_parser.cc",
     ],
     hdrs = [
         "external/responses.h",
         "kafka_response_parser.h",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":kafka_response_lib",
         ":parser_lib",
@@ -171,12 +144,15 @@ genrule(
     ],
     outs = [
         "external/responses.h",
+        "external/responses.cc",
         "external/kafka_response_resolver.cc",
         "external/response_metrics.h",
     ],
     cmd = """
       ./$(location :kafka_protocol_code_generator_bin) response \
-        $(location external/responses.h) $(location external/kafka_response_resolver.cc) \
+        $(location external/responses.h) \
+        $(location external/responses.cc) \
+        $(location external/kafka_response_resolver.cc) \
         $(location external/response_metrics.h) $(SRCS)
     """,
     tools = [
@@ -199,6 +175,16 @@ py_binary(
 py_library(
     name = "kafka_protocol_generator_lib",
     srcs = ["protocol/generator.py"],
+)
+
+envoy_cc_library(
+    name = "kafka_metrics_lib",
+    hdrs = [
+        "external/request_metrics.h",
+        "external/response_metrics.h",
+    ],
+    deps = [
+    ],
 )
 
 envoy_cc_library(
@@ -269,8 +255,8 @@ envoy_cc_library(
     hdrs = [
         "kafka_types.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/common:macros",
+        "@com_google_absl//absl/types:optional",
     ],
 )

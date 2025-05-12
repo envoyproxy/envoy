@@ -11,13 +11,10 @@ namespace Envoy {
 namespace Http {
 
 Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveClient() {
-  uint32_t initial_streams = 1;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
-        http_server_properties_cache_, origin_, host());
-  }
+  uint32_t initial_streams = Http2::ActiveClient::calculateInitialStreamsLimit(
+      http_server_properties_cache_, origin_, host());
   return std::make_unique<Tcp::ActiveTcpClient>(
-      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams);
+      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams, absl::nullopt);
 }
 
 CodecClientPtr
@@ -89,8 +86,8 @@ void HttpConnPoolImplMixed::onConnected(Envoy::ConnectionPool::ActiveClient& cli
   // it to reflect any difference between the TCP stream limits and HTTP/2
   // stream limits.
   if (new_client->effectiveConcurrentStreamLimit() > old_effective_limit) {
-    state_.incrConnectingAndConnectedStreamCapacity(new_client->effectiveConcurrentStreamLimit() -
-                                                    old_effective_limit);
+    incrConnectingAndConnectedStreamCapacity(
+        new_client->effectiveConcurrentStreamLimit() - old_effective_limit, client);
   }
   new_client->setState(ActiveClient::State::Connecting);
   LinkedList::moveIntoList(std::move(new_client), owningList(new_client->state()));

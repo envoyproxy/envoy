@@ -1,0 +1,85 @@
+base {
+  config {
+    grpc_service {
+      envoy_grpc {
+        cluster_name: "ext_authz_server"
+      }
+    }
+    metadata_context_namespaces: "jazz.sax"
+    metadata_context_namespaces: "rock.guitar"
+    metadata_context_namespaces: "hiphop.drums"
+  }
+  filter_metadata {
+  filter_metadata {
+    key: "jazz.piano"
+    value {
+      fields {
+        key: "hancock"
+        value {
+          string_value: "herbie"
+        }
+      }
+      fields {
+        key: "monk"
+        value {
+          string_value: "thelonious"
+        }
+      }
+    }
+  }
+  filter_metadata {
+    key: "jazz.sax"
+    value {
+      fields {
+        key: "coltrane"
+        value {
+          string_value: "john"
+        }
+      }
+      fields {
+        key: "parker"
+        value {
+          string_value: "charlie"
+        }
+      }
+    }
+  }
+  filter_metadata {
+    key: "rock.guitar"
+    value {
+      fields {
+        key: "hendrix"
+        value {
+          string_value: "jimi"
+        }
+      }
+      fields {
+        key: "richards"
+        value {
+          string_value: "keith"
+        }
+      }
+    }
+  }
+  }
+}
+request_data {
+  headers {
+    headers {
+      key: ":host"
+      value: "example.com"
+    }
+    headers {
+      key: ":method"
+      value: "GET"
+    }
+    headers {
+      key: ":path"
+      value: "/users"
+    }
+    headers {
+      key: ":scheme"
+      value: "https"
+    }
+  }
+}

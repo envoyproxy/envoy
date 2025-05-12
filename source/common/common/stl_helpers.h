@@ -2,9 +2,7 @@
 
 #include <algorithm>
 #include <functional>
-#include <iostream>
 #include <numeric>
-#include <vector>
 
 #include "absl/strings/str_join.h"
 
@@ -39,30 +37,13 @@ std::string accumulateToString(const ContainerT& source,
 // Used for converting sanctioned uses of std string_view (e.g. extensions) to absl::string_view
 // for internal use.
 inline absl::string_view toAbslStringView(std::string_view view) { // NOLINT(std::string_view)
-  return absl::string_view(view.data(), view.size());              // NOLINT(std::string_view)
+  return {view.data(), view.size()};                               // NOLINT(std::string_view)
 }
 
 // Used for converting internal absl::string_view to sanctioned uses of std string_view (e.g.
 // extensions).
 inline std::string_view toStdStringView(absl::string_view view) { // NOLINT(std::string_view)
-  return std::string_view(view.data(), view.size());              // NOLINT(std::string_view)
+  return {view.data(), view.size()};                              // NOLINT(std::string_view)
 }
 
 } // namespace Envoy
-
-// NOLINT(namespace-envoy)
-// Overload functions in std library.
-namespace std {
-// Overload std::operator<< to output a vector.
-template <class T> std::ostream& operator<<(std::ostream& out, const std::vector<T>& v) {
-  out << "vector { " << absl::StrJoin(v, ", ", absl::StreamFormatter()) << " }";
-  return out;
-}
-
-// Overload std::operator<< to output a pair.
-template <class T1, class T2>
-std::ostream& operator<<(std::ostream& out, const std::pair<T1, T2>& v) {
-  out << "pair(" << v.first << ", " << v.second << ")";
-  return out;
-}
-} // namespace std

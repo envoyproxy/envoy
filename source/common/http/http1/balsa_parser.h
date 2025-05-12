@@ -1,6 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "source/common/http/http1/parser.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/base/attributes.h"
 #include "quiche/balsa/balsa_enums.h"
@@ -17,7 +20,7 @@ namespace Http1 {
 class BalsaParser : public Parser, public quiche::BalsaVisitorInterface {
 public:
   BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
-              bool enable_trailers);
+              bool enable_trailers, bool allow_custom_methods);
   ~BalsaParser() override = default;
 
   // Http1::Parser implementation
@@ -25,7 +28,7 @@ public:
   void resume() override;
   CallbackResult pause() override;
   ParserStatus getStatus() const override;
-  uint16_t statusCode() const override;
+  Http::Code statusCode() const override;
   bool isHttp11() const override;
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
@@ -39,10 +42,9 @@ private:
   void OnRawBodyInput(absl::string_view input) override;
   void OnBodyChunkInput(absl::string_view input) override;
   void OnHeaderInput(absl::string_view input) override;
-  void OnHeader(absl::string_view key, absl::string_view value) override;
   void OnTrailerInput(absl::string_view input) override;
+  void OnTrailers(std::unique_ptr<quiche::BalsaHeaders> trailers) override;
   void ProcessHeaders(const quiche::BalsaHeaders& headers) override;
-  void ProcessTrailers(const quiche::BalsaHeaders& trailer) override;
   void OnRequestFirstLineInput(absl::string_view line_input, absl::string_view method_input,
                                absl::string_view request_uri,
                                absl::string_view version_input) override;
@@ -51,11 +53,15 @@ private:
                                 absl::string_view reason_input) override;
   void OnChunkLength(size_t chunk_length) override;
   void OnChunkExtensionInput(absl::string_view input) override;
+  void OnInterimHeaders(std::unique_ptr<quiche::BalsaHeaders> headers) override;
   void HeaderDone() override;
   void ContinueHeaderDone() override;
   void MessageDone() override;
   void HandleError(quiche::BalsaFrameEnums::ErrorCode error_code) override;
   void HandleWarning(quiche::BalsaFrameEnums::ErrorCode error_code) override;
+
+  // Shared implementation for ProcessHeaders() and OnTrailers().
+  void validateAndProcessHeadersOrTrailersImpl(const quiche::BalsaHeaders& headers, bool trailers);
 
   // Return ParserStatus::Error if `result` is CallbackResult::Error.
   // Return current value of `status_` otherwise.
@@ -64,12 +70,27 @@ private:
 
   quiche::BalsaFrame framer_;
   quiche::BalsaHeaders headers_;
-  quiche::BalsaHeaders trailers_;
 
+  const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;
+  const bool enable_trailers_ = false;
+  const bool allow_custom_methods_ = false;
+  bool first_byte_processed_ = false;
   bool headers_done_ = false;
+  // True until the first byte of the second message arrives.
+  bool first_message_ = true;
   ParserStatus status_ = ParserStatus::Ok;
+  // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
+  // Latched value of `envoy.reloadable_features.http1_balsa_delay_reset`.
+  const bool delay_reset_ =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_balsa_delay_reset");
+  // Latched value of `envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`.
+  const bool wait_for_first_byte_before_msg_done_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done");
+  // Latched value of `envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`.
+  const bool allow_newlines_between_requests_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start");
 };
 
 } // namespace Http1

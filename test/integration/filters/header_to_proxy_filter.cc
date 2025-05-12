@@ -22,7 +22,7 @@ public:
     ASSERT(!hostname.empty());
     if (!request_headers.get(connect_proxy).empty()) {
       std::string address_string(request_headers.get(connect_proxy)[0]->value().getStringView());
-      auto address = Network::Utility::parseInternetAddressAndPort(address_string);
+      auto address = Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
       decoder_callbacks_->streamInfo().filterState()->setData(
           Network::Http11ProxyInfoFilterState::key(),
           std::make_unique<Network::Http11ProxyInfoFilterState>(hostname, address),
@@ -38,8 +38,8 @@ class HeaderToProxyFilterConfig : public Extensions::HttpFilters::Common::EmptyH
 public:
   HeaderToProxyFilterConfig() : EmptyHttpFilterConfig("header-to-proxy-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::HeaderToProxyFilter>());
     };

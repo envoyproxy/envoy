@@ -1,18 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
-
-function finish {
-  echo "disk space at end of build:"
-  df -h
-}
-trap finish EXIT
-
-echo "disk space at beginning of build:"
-df -h
-
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
 
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
@@ -24,7 +12,6 @@ BUILD_CONFIG="$(dirname "$(realpath "$0")")"/osx-build-config
 BAZEL_BUILD_OPTIONS=(
     "--curses=no"
     --verbose_failures
-    "--test_output=all"
     "--flaky_test_attempts=integration@2"
     "--override_repository=envoy_build_config=${BUILD_CONFIG}"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
@@ -45,6 +32,7 @@ DEFAULT_TEST_TARGETS=(
   "//test/integration:protocol_integration_test"
   "//test/integration:tcp_proxy_integration_test"
   "//test/integration:extension_discovery_integration_test"
+  "//test/extensions/dynamic_modules/http:filter_test"
   "//test/integration:listener_lds_integration_test")
 
 if [[ $# -gt 0 ]]; then

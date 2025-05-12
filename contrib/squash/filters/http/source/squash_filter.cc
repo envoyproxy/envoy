@@ -50,7 +50,7 @@ SquashFilterConfig::SquashFilterConfig(
 std::string SquashFilterConfig::getAttachment(const ProtobufWkt::Struct& attachment_template) {
   ProtobufWkt::Struct attachment_json(attachment_template);
   updateTemplateInStruct(attachment_json);
-  return MessageUtil::getJsonStringFromMessageOrDie(attachment_json);
+  return MessageUtil::getJsonStringFromMessageOrError(attachment_json);
 }
 
 void SquashFilterConfig::updateTemplateInStruct(ProtobufWkt::Struct& attachment_template) {
@@ -125,13 +125,12 @@ std::string SquashFilterConfig::replaceEnv(const std::string& attachment_templat
 }
 
 SquashFilter::SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm)
-    : config_(config), is_squashing_(false), attachment_poll_period_timer_(nullptr),
-      attachment_timeout_timer_(nullptr), in_flight_request_(nullptr),
+    : config_(config), attachment_poll_period_timer_(nullptr), attachment_timeout_timer_(nullptr),
       create_attachment_callback_(std::bind(&SquashFilter::onCreateAttachmentSuccess, this, _1),
                                   std::bind(&SquashFilter::onCreateAttachmentFailure, this, _1)),
       check_attachment_callback_(std::bind(&SquashFilter::onGetAttachmentSuccess, this, _1),
                                  std::bind(&SquashFilter::onGetAttachmentFailure, this, _1)),
-      cm_(cm), decoder_callbacks_(nullptr) {}
+      cm_(cm) {}
 
 SquashFilter::~SquashFilter() = default;
 
@@ -208,9 +207,11 @@ void SquashFilter::onCreateAttachmentSuccess(Http::ResponseMessagePtr&& m) {
     std::string debug_attachment_id;
     try {
       Json::ObjectSharedPtr json_config = getJsonBody(std::move(m));
-      debug_attachment_id =
-          json_config->getObject("metadata", true)->getString("name", EMPTY_STRING);
-    } catch (Json::Exception&) {
+      debug_attachment_id = THROW_OR_RETURN_VALUE(
+          THROW_OR_RETURN_VALUE(json_config->getObject("metadata", true), Json::ObjectSharedPtr)
+              ->getString("name", EMPTY_STRING),
+          std::string);
+    } catch (...) {
       debug_attachment_id = EMPTY_STRING;
     }
 
@@ -243,8 +244,11 @@ void SquashFilter::onGetAttachmentSuccess(Http::ResponseMessagePtr&& m) {
   std::string attachmentstate;
   try {
     Json::ObjectSharedPtr json_config = getJsonBody(std::move(m));
-    attachmentstate = json_config->getObject("status", true)->getString("state", EMPTY_STRING);
-  } catch (Json::Exception&) {
+    attachmentstate = THROW_OR_RETURN_VALUE(
+        THROW_OR_RETURN_VALUE(json_config->getObject("status", true), Json::ObjectSharedPtr)
+            ->getString("state", EMPTY_STRING),
+        std::string);
+  } catch (...) {
     // No state yet.. leave it empty for the retry logic.
   }
 
@@ -316,7 +320,8 @@ void SquashFilter::cleanup() {
 }
 
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::ResponseMessagePtr&& m) {
-  return Json::Factory::loadFromString(m->bodyAsString());
+  return THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(m->bodyAsString()),
+                               Json::ObjectSharedPtr);
 }
 
 } // namespace Squash

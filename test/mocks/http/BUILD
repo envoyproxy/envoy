@@ -31,6 +31,7 @@ envoy_cc_mock(
     name = "conn_pool_mocks",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/http:conn_pool_interface",
         "//test/mocks:common_lib",
@@ -51,9 +52,7 @@ envoy_cc_mock(
     name = "http_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
+    rbe_pool = "6gig",
     deps = [
         ":conn_pool_mocks",
         ":stream_decoder_mock",
@@ -67,7 +66,7 @@ envoy_cc_mock(
         "//envoy/http:conn_pool_interface",
         "//envoy/http:filter_interface",
         "//envoy/ssl:connection_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//source/common/http:conn_manager_config_interface",
         "//source/common/http:filter_manager_lib",
         "//source/common/http:header_map_lib",
@@ -76,6 +75,7 @@ envoy_cc_mock(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -121,6 +121,7 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "http_mocks_test",
     srcs = ["mocks_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":http_mocks",
         "//envoy/http:header_map_interface",
@@ -133,5 +134,14 @@ envoy_cc_mock(
     hdrs = ["stream_reset_handler.h"],
     deps = [
         "//envoy/http:stream_reset_handler_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "early_header_mutation_mock",
+    srcs = ["early_header_mutation.cc"],
+    hdrs = ["early_header_mutation.h"],
+    deps = [
+        "//envoy/http:early_header_mutation_interface",
     ],
 )

@@ -4,6 +4,7 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/tracing/trace_context_impl.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -51,7 +52,7 @@ public:
   absl::string_view value(const CustomTagContext& ctx) const override;
 
 private:
-  const Http::LowerCaseString name_;
+  const Tracing::TraceContextHandler name_;
   const std::string default_value_;
 };
 

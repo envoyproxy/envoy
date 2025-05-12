@@ -13,7 +13,6 @@ option java_package = "io.envoyproxy.envoy.service.metrics.v2";
 option java_outer_classname = "MetricsServiceProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/metrics/v2;metricsv2";
-option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Metrics service]

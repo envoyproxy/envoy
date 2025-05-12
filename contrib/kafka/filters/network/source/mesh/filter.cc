@@ -15,9 +15,11 @@ namespace Kafka {
 namespace Mesh {
 
 KafkaMeshFilter::KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
-                                 UpstreamKafkaFacade& upstream_kafka_facade)
-    : KafkaMeshFilter{std::make_shared<RequestDecoder>(std::vector<RequestCallbackSharedPtr>(
-          {std::make_shared<RequestProcessor>(*this, configuration, upstream_kafka_facade)}))} {}
+                                 UpstreamKafkaFacade& upstream_kafka_facade,
+                                 RecordCallbackProcessor& record_callback_processor)
+    : KafkaMeshFilter{std::make_shared<RequestDecoder>(
+          std::vector<RequestCallbackSharedPtr>({std::make_shared<RequestProcessor>(
+              *this, configuration, upstream_kafka_facade, record_callback_processor)}))} {}
 
 KafkaMeshFilter::KafkaMeshFilter(RequestDecoderSharedPtr request_decoder)
     : request_decoder_{request_decoder} {}
@@ -88,6 +90,10 @@ void KafkaMeshFilter::onRequestReadyForAnswer() {
       break;
     }
   }
+}
+
+Event::Dispatcher& KafkaMeshFilter::dispatcher() {
+  return read_filter_callbacks_->connection().dispatcher();
 }
 
 void KafkaMeshFilter::abandonAllInFlightRequests() {

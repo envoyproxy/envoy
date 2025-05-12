@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/admin/v3/init_dump.pb.h"

@@ -8,19 +8,23 @@
 namespace Envoy {
 namespace Singleton {
 
-InstanceSharedPtr ManagerImpl::get(const std::string& name, SingletonFactoryCb cb) {
-  ASSERT(run_tid_ == thread_factory_.currentThreadId());
+InstanceSharedPtr ManagerImpl::get(const std::string& name, SingletonFactoryCb cb, bool pin) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
 
-  if (nullptr == Registry::FactoryRegistry<Registration>::getFactory(name)) {
-    PANIC(fmt::format("invalid singleton name '{}'. Make sure it is registered.", name));
-  }
+  ENVOY_BUG(Registry::FactoryRegistry<Registration>::getFactory(name) != nullptr,
+            "invalid singleton name '" + name + "'. Make sure it is registered.");
 
-  if (nullptr == singletons_[name].lock()) {
+  auto existing_singleton = singletons_[name].lock();
+
+  if (existing_singleton == nullptr) {
     InstanceSharedPtr singleton = cb();
     singletons_[name] = singleton;
+    if (pin && singleton != nullptr) {
+      pinned_singletons_.push_back(singleton);
+    }
     return singleton;
   } else {
-    return singletons_[name].lock();
+    return existing_singleton;
   }
 }
 

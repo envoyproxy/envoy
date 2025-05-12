@@ -81,7 +81,6 @@ KeyValueStoreXdsDelegate::getAllResources(const XdsSourceId& source_id) const {
   // expectation is we won't be iterating over too many values. But still, try to find a better way.
   xds_config_store_->iterate(
       [&resources, &source_id](const std::string& key, const std::string& value) {
-        // TODO(abeyad): Don't include TTL'ed resources.
         if (absl::StartsWith(key, source_id.toKey())) {
           // The source id is a prefix of the key, so it should be included in the list of returned
           // resources.
@@ -104,11 +103,16 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
       r.set_name(decoded_resource.name());
       r.set_version(decoded_resource.version());
       r.mutable_resource()->PackFrom(decoded_resource.resource());
-      // TODO(abeyad): Set TTL parameter.
+      absl::optional<std::chrono::seconds> ttl = absl::nullopt;
+      if (decoded_resource.ttl().has_value()) {
+        r.mutable_ttl()->CopyFrom(
+            Protobuf::util::TimeUtil::MillisecondsToDuration(decoded_resource.ttl()->count()));
+        ttl = std::chrono::duration_cast<std::chrono::seconds>(decoded_resource.ttl().value());
+      }
       std::string serialized_resource;
       if (r.SerializeToString(&serialized_resource)) {
         xds_config_store_->addOrUpdate(constructKey(source_id, r.name()),
-                                       std::move(serialized_resource), absl::nullopt);
+                                       std::move(serialized_resource), ttl);
       } else {
         stats_.serialization_failed_.inc();
         ENVOY_LOG_MISC(

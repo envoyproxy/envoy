@@ -12,7 +12,7 @@ namespace NetworkFilters {
 namespace ExtAuthz {
 
 /**
- * Config registration for the  external authorization filter. @see NamedNetworkFilterConfigFactory.
+ * Config registration for the external authorization filter. @see NamedNetworkFilterConfigFactory.
  */
 class ExtAuthzConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::ext_authz::v3::ExtAuthz> {

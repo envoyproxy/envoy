@@ -1,0 +1,72 @@
+# This configuration terminates a CONNECT-UDP request and sends UDP payloads directly over UDP to the target.
+# The configured dynamic forward proxy enables DNS resolution at the proxy to suppot arbitrary target domain names.
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: UDP
+        address: 127.0.0.1
+        port_value: 10001
+    udp_listener_config:
+      quic_options: {}
+      downstream_socket_config:
+        prefer_gro: true
+    filter_chains:
+    - transport_socket:
+        name: envoy.transport_sockets.quic
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+          downstream_tls_context:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: certs/servercert.pem
+                private_key:
+                  filename: certs/serverkey.pem
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: HTTP3
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  connect_matcher:
+                    {}
+                route:
+                  cluster: dynamic_forward_proxy_cluster
+                  upgrade_configs:
+                  - upgrade_type: CONNECT-UDP
+                    connect_config:
+                      {}
+          http_filters:
+          - name: envoy.filters.http.dynamic_forward_proxy
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+              dns_cache_config:
+                name: dynamic_forward_proxy_cache_config
+                dns_lookup_family: V4_ONLY
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          http3_protocol_options:
+            allow_extended_connect: true
+          upgrade_configs:
+          - upgrade_type: CONNECT-UDP
+  clusters:
+  - name: dynamic_forward_proxy_cluster
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: V4_ONLY

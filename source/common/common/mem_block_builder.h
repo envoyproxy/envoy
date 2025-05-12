@@ -26,7 +26,7 @@ template <class T> class MemBlockBuilder {
 public:
   // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
   explicit MemBlockBuilder(uint64_t capacity)
-      : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity){};
+      : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity) {};
   MemBlockBuilder() = default;
 
   /**
@@ -53,7 +53,7 @@ public:
    * @param object the object to append.
    */
   void appendOne(T object) {
-    SECURITY_ASSERT(write_span_.size() >= 1, "insufficient capacity");
+    SECURITY_ASSERT(!write_span_.empty(), "insufficient capacity");
     *write_span_.data() = object;
     write_span_.remove_prefix(1);
   }

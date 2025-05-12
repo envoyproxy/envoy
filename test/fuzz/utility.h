@@ -13,7 +13,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 // Strong assertion that applies across all compilation modes and doesn't rely
 // on gtest, which only provides soft fails that don't trip oss-fuzz failures.
@@ -53,7 +53,7 @@ inline std::string replaceInvalidHostCharacters(absl::string_view string) {
   std::string filtered;
   filtered.reserve(string.length());
   for (const char& c : string) {
-    if (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(&c), 1)) {
+    if (http2::adapter::HeaderValidator::IsValidAuthority(absl::string_view(&c, 1))) {
       filtered.push_back(c);
     } else {
       filtered.push_back('0');
@@ -151,7 +151,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           : stream_info.start_time() / 1000;
   test_stream_info->start_time_ = SystemTime(std::chrono::microseconds(start_time));
   if (stream_info.has_response_code()) {
-    test_stream_info->response_code_ = stream_info.response_code().value();
+    test_stream_info->setResponseCode(stream_info.response_code().value());
   }
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
@@ -170,15 +170,22 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           replaceInvalidHostCharacters(
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
-      address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      auto address_or_error = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+      THROW_IF_NOT_OK_REF(address_or_error.status());
+      address = address_or_error.value();
     }
   } else {
-    address = Network::Utility::resolveUrl("tcp://10.0.0.1:443");
+    address = *Network::Utility::resolveUrl("tcp://10.0.0.1:443");
   }
-  auto upstream_local_address =
-      stream_info.has_upstream_local_address()
-          ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
-          : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  Envoy::Network::Address::InstanceConstSharedPtr upstream_local_address;
+  if (stream_info.has_upstream_local_address()) {
+    auto upstream_local_address_or_error =
+        Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address());
+    THROW_IF_NOT_OK_REF(upstream_local_address_or_error.status());
+    upstream_local_address = upstream_local_address_or_error.value();
+  } else {
+    upstream_local_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  }
   test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
@@ -207,17 +214,6 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
 
   return data_chunks;
 }
-
-// Returns a vector of differences between expected and actual. An empty array indicates
-// expected==actual
-std::vector<std::string> fuzzFindDiffs(absl::string_view expected, absl::string_view actual);
-
-#define FUZZ_ASSERT_EQ(expected, actual, annotation)                                               \
-  {                                                                                                \
-    std::vector<std::string> diffs = fuzzFindDiffs(expected, actual);                              \
-    RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual,    \
-                                                    "\n  ", absl::StrJoin(diffs, "\n  ")));        \
-  }
 
 } // namespace Fuzz
 } // namespace Envoy

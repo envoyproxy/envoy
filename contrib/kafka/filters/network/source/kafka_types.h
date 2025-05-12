@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/types/optional.h"
@@ -44,6 +45,11 @@ struct Uuid {
 
   bool operator==(const Uuid& rhs) const { return msb_ == rhs.msb_ && lsb_ == rhs.lsb_; };
 };
+
+/**
+ * Kafka topic-partition pair.
+ */
+using KafkaPartition = std::pair<std::string, int32_t>;
 
 } // namespace Kafka
 } // namespace NetworkFilters

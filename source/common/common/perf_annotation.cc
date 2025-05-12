@@ -131,7 +131,8 @@ std::string PerfAnnotationContext::toString() {
   for (size_t row = 0; row < columns[0].size(); ++row) {
     for (size_t i = 0; i < num_columns; ++i) {
       const std::string& str = columns[i][row];
-      absl::StrAppend(&out, fmt::format(formats[i], str), (i != (num_columns - 1) ? "  " : "\n"));
+      absl::StrAppend(&out, fmt::format(fmt::runtime(formats[i]), str),
+                      (i != (num_columns - 1) ? "  " : "\n"));
     }
   }
   return out;

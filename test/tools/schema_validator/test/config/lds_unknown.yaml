@@ -17,7 +17,6 @@ resources:
         rds:
           route_config_name: ingress_http
           config_source:
-            resource_api_version: V3
             path_config_source:
               path: /config_map/rds/rds.yaml
               watched_directory:

@@ -19,16 +19,16 @@ Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
   Envoy::TcpProxy::ConfigSharedPtr filter_config(
       std::make_shared<Envoy::TcpProxy::Config>(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<Envoy::TcpProxy::Filter>(filter_config, context.clusterManager()));
+    filter_manager.addReadFilter(std::make_shared<Envoy::TcpProxy::Filter>(
+        filter_config, context.serverFactoryContext().clusterManager()));
   };
 }
 
 /**
  * Static registration for the tcp_proxy filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(ConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.tcp_proxy"};
+LEGACY_REGISTER_FACTORY(ConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
+                        "envoy.tcp_proxy");
 
 } // namespace TcpProxy
 } // namespace NetworkFilters

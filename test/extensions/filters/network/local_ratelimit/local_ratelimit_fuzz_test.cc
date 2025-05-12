@@ -35,11 +35,8 @@ DEFINE_PROTO_FUZZER(
 
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-    return;
-  } catch (const ProtobufMessage::DeprecatedProtoFieldException& e) {
-    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
   try {
@@ -47,7 +44,7 @@ DEFINE_PROTO_FUZZER(
       ENVOY_LOG_MISC(debug, "In fill_interval, msecs must be greater than 50ms!");
       return;
     }
-  } catch (const DurationUtil::OutOfRangeException& e) {
+  } catch (const EnvoyException& e) {
     // TODO:
     // protoc-gen-validate has an issue on type "Duration" which may generate interval with seconds
     // > 0 while "nanos" < 0. And negative "nanos" will cause validation inside the filter to fail.
@@ -64,15 +61,14 @@ DEFINE_PROTO_FUZZER(
   // default time system in GlobalTimeSystem.
   dispatcher.time_system_ = std::make_unique<Event::SimulatedTimeSystem>();
   Stats::IsolatedStoreImpl stats_store;
-  Singleton::ManagerImpl singleton_manager(Thread::threadFactoryForTest());
+  Singleton::ManagerImpl singleton_manager;
   static NiceMock<Runtime::MockLoader> runtime;
-  Event::MockTimer* fill_timer = new Event::MockTimer(&dispatcher);
   envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config =
       input.config();
   ConfigSharedPtr config = nullptr;
   try {
-    config =
-        std::make_shared<Config>(proto_config, dispatcher, stats_store, runtime, singleton_manager);
+    config = std::make_shared<Config>(proto_config, dispatcher, *stats_store.rootScope(), runtime,
+                                      singleton_manager);
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;
@@ -96,8 +92,6 @@ DEFINE_PROTO_FUZZER(
       break;
     }
     case envoy::extensions::filters::network::local_ratelimit::Action::kRefill: {
-      EXPECT_CALL(*fill_timer, enableTimer(fill_interval, nullptr));
-      fill_timer->invokeCallback();
       break;
     }
     default:

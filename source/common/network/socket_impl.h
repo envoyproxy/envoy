@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
 
@@ -13,8 +14,8 @@ class ConnectionInfoSetterImpl : public ConnectionInfoSetter {
 public:
   ConnectionInfoSetterImpl(const Address::InstanceConstSharedPtr& local_address,
                            const Address::InstanceConstSharedPtr& remote_address)
-      : local_address_(local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {}
+      : local_address_(local_address), direct_local_address_(local_address),
+        remote_address_(remote_address), direct_remote_address_(remote_address) {}
 
   void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
     direct_remote_address_ = direct_remote_address;
@@ -31,6 +32,9 @@ public:
 
   // ConnectionInfoSetter
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return direct_local_address_;
+  }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
   }
@@ -67,9 +71,28 @@ public:
   }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
   void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return round_trip_time_;
+  }
+  void setRoundTripTime(std::chrono::milliseconds round_trip_time) override {
+    round_trip_time_ = round_trip_time;
+  }
+  OptRef<const FilterChainInfo> filterChainInfo() const override {
+    return makeOptRefFromPtr<const FilterChainInfo>(filter_chain_info_.get());
+  }
+  void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) override {
+    filter_chain_info_ = std::move(filter_chain_info);
+  }
+  OptRef<const ListenerInfo> listenerInfo() const override {
+    return makeOptRefFromPtr<const ListenerInfo>(listener_info_.get());
+  }
+  void setListenerInfo(ListenerInfoConstSharedPtr listener_info) override {
+    listener_info_ = std::move(listener_info);
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr direct_local_address_;
   bool local_address_restored_{false};
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
@@ -79,6 +102,9 @@ private:
   absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
+  absl::optional<std::chrono::milliseconds> round_trip_time_;
+  FilterChainInfoConstSharedPtr filter_chain_info_;
+  ListenerInfoConstSharedPtr listener_info_;
 };
 
 class SocketImpl : public virtual Socket {
@@ -104,11 +130,11 @@ public:
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (io_handle_->isOpen()) {
+    if (io_handle_ && io_handle_->isOpen()) {
       io_handle_->close();
     }
   }
-  bool isOpen() const override { return io_handle_->isOpen(); }
+  bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();

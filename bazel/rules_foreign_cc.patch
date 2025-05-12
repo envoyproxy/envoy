@@ -1,0 +1,14 @@
+diff --git a/toolchains/private/BUILD.bazel b/toolchains/private/BUILD.bazel
+index 4ccdeef..25658e9 100644
+--- a/toolchains/private/BUILD.bazel
++++ b/toolchains/private/BUILD.bazel
+@@ -23,6 +23,9 @@ native_tool_toolchain(
+ make_tool(
+     name = "make_tool",
+     srcs = "@gnumake_src//:all_srcs",
++    features = [
++        "-default_link_libs",
++    ],
+     tags = ["manual"],
+ )
+ 

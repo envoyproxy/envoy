@@ -8,6 +8,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,32 +18,32 @@ namespace AlternateProtocolsCache {
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
-        proto_config,
-    Http::HttpServerPropertiesCacheManagerFactory& alternate_protocol_cache_manager_factory,
-    TimeSource& time_source)
-    : alternate_protocol_cache_manager_(alternate_protocol_cache_manager_factory.get()),
-      proto_config_(proto_config), time_source_(time_source) {}
-
-Http::HttpServerPropertiesCacheSharedPtr
-FilterConfig::getAlternateProtocolCache(Event::Dispatcher& dispatcher) {
-  return proto_config_.has_alternate_protocols_cache_options()
-             ? alternate_protocol_cache_manager_->getCache(
-                   proto_config_.alternate_protocols_cache_options(), dispatcher)
-             : nullptr;
+    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig& config,
+    Http::HttpServerPropertiesCacheManager& cache_manager, TimeSource& time_source)
+    : alternate_protocol_cache_manager_(cache_manager), time_source_(time_source) {
+  if (config.has_alternate_protocols_cache_options()) {
+    ENVOY_LOG_MISC(warn, "Using deprecated and ignored alternate_protocols_cache_options in "
+                         "alternate_protocols_cache config.");
+  }
 }
 
 void Filter::onDestroy() {}
 
 Filter::Filter(const FilterConfigSharedPtr& config, Event::Dispatcher& dispatcher)
-    : cache_(config->getAlternateProtocolCache(dispatcher)), time_source_(config->timeSource()) {}
+    : config_(config), dispatcher_(dispatcher) {}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  if (!cache_) {
-    return Http::FilterHeadersStatus::Continue;
-  }
   const auto alt_svc = headers.get(Http::CustomHeaders::get().AltSvc);
   if (alt_svc.empty()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::HttpServerPropertiesCacheSharedPtr cache;
+  auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
+  if (info && (*info)->alternateProtocolsCacheOptions()) {
+    cache = config_->alternateProtocolCacheManager().getCache(
+        *((*info)->alternateProtocolsCacheOptions()), dispatcher_);
+  }
+  if (!cache) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -50,7 +51,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   for (size_t i = 0; i < alt_svc.size(); ++i) {
     std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> advertised_protocols =
         Http::HttpServerPropertiesCacheImpl::alternateProtocolsFromString(
-            alt_svc[i]->value().getStringView(), time_source_, false);
+            alt_svc[i]->value().getStringView(), config_->timeSource(), false);
     if (advertised_protocols.empty()) {
       ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
                 alt_svc[i]->value().getStringView());
@@ -73,10 +74,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // available.
     hostname = encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni();
   }
-  const uint32_t port = host->address()->ip()->port();
+  auto host_addr = host->address();
+  const uint32_t port = (host_addr ? host_addr->ip()->port() : 443);
   Http::HttpServerPropertiesCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                  port);
-  cache_->setAlternatives(origin, protocols);
+  cache->setAlternatives(origin, protocols);
   return Http::FilterHeadersStatus::Continue;
 }
 

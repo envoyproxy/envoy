@@ -137,9 +137,23 @@ struct DnsParserCounters {
         queries_with_ans_or_authority_rrs(queries_with_ans_or_authority_rrs) {}
 };
 
-// The flags have been verified with dig and this structure should not be modified. The flag
-// order here does not match the RFC, but takes byte ordering into account so that serialization
-// does not bitwise operations.
+// The flags have been verified with dig and this structure should not be modified. On little
+// endian platforms, the flag order here does not match the RFC, but takes byte ordering into
+// account so that serialization does not bitwise operations.
+#if ABSL_IS_BIG_ENDIAN
+PACKED_STRUCT(struct DnsHeaderFlags {
+  unsigned qr : 1;     // query or response
+  unsigned opcode : 4; // operation code
+  unsigned aa : 1;     // authoritative answer
+  unsigned tc : 1;     // truncated response
+  unsigned rd : 1;     // recursion desired
+  unsigned ra : 1;     // recursion available
+  unsigned z : 1;      // z - bit (must be zero in queries per RFC1035)
+  unsigned ad : 1;     // authenticated data
+  unsigned cd : 1;     // checking disabled
+  unsigned rcode : 4;  // return code
+});
+#else
 PACKED_STRUCT(struct DnsHeaderFlags {
   unsigned rcode : 4;  // return code
   unsigned cd : 1;     // checking disabled
@@ -152,6 +166,7 @@ PACKED_STRUCT(struct DnsHeaderFlags {
   unsigned opcode : 4; // operation code
   unsigned qr : 1;     // query or response
 });
+#endif
 
 /**
  * Structure representing the DNS header as it appears in a packet
@@ -174,18 +189,18 @@ public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,
                   uint64_t retry_count)
-      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters), parse_status_(false),
+      : local_(std::move(local)), peer_(std::move(peer)), counters_(counters),
         response_code_(DNS_RESPONSE_CODE_NO_ERROR), retry_(retry_count) {}
 
   const Network::Address::InstanceConstSharedPtr local_;
   const Network::Address::InstanceConstSharedPtr peer_;
   DnsParserCounters& counters_;
-  bool parse_status_;
+  bool parse_status_{false};
   uint16_t response_code_;
   uint64_t retry_;
   uint16_t id_;
   Network::DnsResolver::ResolutionStatus resolution_status_ =
-      Network::DnsResolver::ResolutionStatus::Success;
+      Network::DnsResolver::ResolutionStatus::Completed;
   DnsHeader header_;
   DnsHeader response_header_;
   DnsQueryPtrVec queries_;

@@ -412,6 +412,15 @@ ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
   return state_;
 }
 
+void DecoderStateMachine::runPassthroughData(Buffer::Instance& buffer) {
+  handler_.messageBegin(metadata_);
+  setCurrentState(ProtocolState::StructBegin);
+  stack_.clear();
+  stack_.emplace_back(Frame(ProtocolState::MessageEnd));
+  ProtocolState done = run(buffer);
+  ASSERT(done == ProtocolState::Done);
+}
+
 Decoder::Decoder(Transport& transport, Protocol& protocol, DecoderCallbacks& callbacks)
     : transport_(transport), protocol_(protocol), callbacks_(callbacks) {}
 

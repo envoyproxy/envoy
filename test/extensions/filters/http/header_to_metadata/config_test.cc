@@ -28,8 +28,8 @@ void testForbiddenConfig(const std::string& yaml) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   HeaderToMetadataConfig factory;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-               EnvoyException);
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
 }
 
 // Tests that empty (metadata) keys are rejected.
@@ -84,7 +84,8 @@ request_rules:
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   HeaderToMetadataConfig factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
@@ -112,7 +113,8 @@ request_rules:
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   HeaderToMetadataConfig factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
@@ -140,8 +142,11 @@ request_rules:
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HeaderToMetadataConfig factory;
 
-  const auto route_config = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto route_config =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   const auto* config = dynamic_cast<const Config*>(route_config.get());
   EXPECT_TRUE(config->doRequest());
   EXPECT_FALSE(config->doResponse());

@@ -58,7 +58,8 @@ public:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_{*stats_store_.rootScope()};
   NiceMock<Runtime::MockLoader> runtime_;
   std::shared_ptr<MockConcurrencyController> controller_{new MockConcurrencyController()};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -368,6 +369,87 @@ TEST_F(AdaptiveConcurrencyFilterTest, DisregardHealthChecks) {
   // We do not expect a call to recordLatencySample() as well.
 
   filter_->encodeComplete();
+}
+
+/**
+ * Tests that if configured a custom status code is returned
+ * from the adaptive concurrency filter
+ */
+TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlockWithCustomStatus) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      nanos: 1000000
+    request_count: 50
+enabled:
+  default_value: true
+  runtime_key: "adaptive_concurrency.enabled"
+concurrency_limit_exceeded_status:
+  code: 429
+)EOF";
+
+  auto config = makeConfig(yaml_config);
+
+  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+      config, runtime_, "testprefix.", stats_, time_system_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+
+  EXPECT_CALL(*controller_, forwardingDecision()).WillOnce(Return(RequestForwardingAction::Block));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+}
+
+/**
+ * Tests that if an invalid (<400) status code is configured then the
+ * Adaptive Concurrency Filter falls back to 503
+ */
+TEST_F(AdaptiveConcurrencyFilterTest,
+       DecodeHeadersTestBlockWithServiceUnavailableForInvalidStatus) {
+  std::string yaml_config =
+      R"EOF(
+gradient_controller_config:
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms
+  min_rtt_calc_params:
+    interval:
+      nanos: 1000000
+    request_count: 50
+enabled:
+  default_value: true
+  runtime_key: "adaptive_concurrency.enabled"
+concurrency_limit_exceeded_status:
+  code: 200
+)EOF";
+
+  auto config = makeConfig(yaml_config);
+
+  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
+      config, runtime_, "testprefix.", stats_, time_system_);
+  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+
+  EXPECT_CALL(*controller_, forwardingDecision()).WillOnce(Return(RequestForwardingAction::Block));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
 }
 
 } // namespace

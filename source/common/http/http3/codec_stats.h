@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/header_validator.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -25,8 +26,13 @@ namespace Http3 {
 /**
  * Wrapper struct for the HTTP/3 codec stats. @see stats_macros.h
  */
-struct CodecStats {
+struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  CodecStats(ALL_HTTP3_CODEC_STATS(GENERATE_CONSTRUCTOR_COUNTER_PARAM,
+                                   GENERATE_CONSTRUCTOR_GAUGE_PARAM)...)
+      : ::Envoy::Http::HeaderValidatorStats()
+            ALL_HTTP3_CODEC_STATS(GENERATE_CONSTRUCTOR_INIT_LIST, GENERATE_CONSTRUCTOR_INIT_LIST) {}
 
   static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
     return *ptr.get([&scope]() -> CodecStats* {
@@ -34,6 +40,13 @@ struct CodecStats {
                                                   POOL_GAUGE_PREFIX(scope, "http3."))};
     });
   }
+
+  void incDroppedHeadersWithUnderscores() override { dropped_headers_with_underscores_.inc(); }
+  void incRequestsRejectedWithUnderscoresInHeaders() override {
+    requests_rejected_with_underscores_in_headers_.inc();
+  }
+  // TODO(yanavlasov): add corresponding counter for H/3 codec.
+  void incMessagingError() override {}
 
   ALL_HTTP3_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };

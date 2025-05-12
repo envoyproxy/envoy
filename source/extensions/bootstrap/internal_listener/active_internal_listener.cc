@@ -3,10 +3,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
-#include "source/server/active_stream_listener_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,7 +40,8 @@ ActiveInternalListener::~ActiveInternalListener() {
     ASSERT(active_connections != nullptr);
     auto& connections = active_connections->connections_;
     while (!connections.empty()) {
-      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush,
+                                              "Active Internal Listener destructor");
     }
   }
   dispatcher().clearDeferredDeleteList();

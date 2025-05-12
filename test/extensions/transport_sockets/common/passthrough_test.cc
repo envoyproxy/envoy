@@ -145,10 +145,12 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     EXPECT_CALL(*inner_factory, clientContextConfig());
     factory->clientContextConfig();
   }
+#ifdef ENVOY_ENABLE_QUIC
   {
     EXPECT_CALL(*inner_factory, getCryptoConfig());
     factory->getCryptoConfig();
   }
+#endif
 }
 
 class DownstreamTestFactory : public DownstreamPassthroughFactory {

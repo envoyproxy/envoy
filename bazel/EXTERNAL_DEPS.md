@@ -16,7 +16,7 @@ build process.
 1. Define a new Bazel repository in [`bazel/repositories.bzl`](repositories.bzl),
    in the `envoy_dependencies()` function.
 2. Reference your new external dependency in some `envoy_cc_library` via the
-   `external_deps` attribute.
+   `deps` attribute.
 3. `bazel test //test/...`
 
 ## External CMake (preferred)
@@ -28,34 +28,8 @@ This is the preferred style of adding dependencies that use CMake for their buil
 2. Add an `envoy_cmake` rule to [`bazel/foreign_cc/BUILD`](foreign_cc/BUILD). This will reference
    the source repository in step 1.
 3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
-   `external_deps` attribute.
+   `deps` attribute.
 4. `bazel test //test/...`
-
-
-## genrule repository
-
-This is the newer style of adding dependencies with no upstream Bazel configs.
-It wraps the dependency's native build tooling in a Bazel-aware shell script,
-installing to a Bazel-managed prefix.
-
-The shell script is executed by Bash, with a few Bazel-specific extensions.
-See the [Bazel docs for "genrule"](https://docs.bazel.build/versions/master/be/general.html#genrule)
-for details on Bazel's shell extensions.
-
-1. Add a BUILD file in [`bazel/external/`](external/), using a `genrule` target
-   to build the dependency. Please do not add BUILD logic that replaces the
-   dependency's upstream build tooling.
-2. Define a new Bazel repository in [`bazel/repositories.bzl`](repositories.bzl),
-   in the `envoy_dependencies()` function. The repository may use `genrule_repository`
-   from [`bazel/genrule_repository.bzl`](genrule_repository.bzl) to place large
-   genrule shell commands into a separate file.
-3. Reference your new external dependency in some `envoy_cc_library` via Y in the
-   `external_deps` attribute.
-4. `bazel test //test/...`
-
-Dependencies between external libraries can use the standard Bazel dependency
-resolution logic, using the `$(location)` shell extension to resolve paths
-to binaries, libraries, headers, etc.
 
 # Adding external dependencies to Envoy (Python)
 

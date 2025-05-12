@@ -1,0 +1,9 @@
+frames {
+  qframe {
+    window_update {
+      control_frame_id: 0,
+      stream_id: 0,
+      max_data: 100,
+    }
+  }
+}

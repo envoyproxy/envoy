@@ -1,0 +1,6 @@
+date: April 27, 2023
+
+bug_fixes:
+- area: tls
+  change: |
+    Fix build FIPS compliance when using both FIPS mode and Wasm extensions (``--define boringssl=fips`` and ``--define wasm=v8``).

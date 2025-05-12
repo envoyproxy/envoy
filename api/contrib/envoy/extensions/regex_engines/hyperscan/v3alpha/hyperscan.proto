@@ -7,10 +7,11 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.regex_engines.hyperscan.v3alpha";
 option java_outer_classname = "HyperscanProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/regex_engines/hyperscan/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/regex_engines/hyperscan/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Hyperscan]
+// Hyperscan :ref:`configuration overview <config_hyperscan>`.
 // [#extension: envoy.regex_engines.hyperscan]
 
 // `Hyperscan <https://github.com/intel/hyperscan>`_ regex engine. The engine uses hybrid automata

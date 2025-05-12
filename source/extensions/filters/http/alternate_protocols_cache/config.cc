@@ -15,11 +15,12 @@ Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryF
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocol_cache_manager_factory(
-      context.singletonManager(), context.threadLocal(), {context});
-  FilterConfigSharedPtr filter_config(
-      std::make_shared<FilterConfig>(proto_config, alternate_protocol_cache_manager_factory,
-                                     context.mainThreadDispatcher().timeSource()));
+
+  auto& server_context = context.serverFactoryContext();
+
+  FilterConfigSharedPtr filter_config(std::make_shared<FilterConfig>(
+      proto_config, context.serverFactoryContext().httpServerPropertiesCacheManager(),
+      server_context.mainThreadDispatcher().timeSource()));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamEncoderFilter(

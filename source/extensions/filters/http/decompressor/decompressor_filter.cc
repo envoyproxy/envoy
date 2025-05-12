@@ -3,7 +3,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -73,15 +72,9 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
   if (config_->responseDirectionConfig().decompressionEnabled() &&
       config_->requestDirectionConfig().advertiseAcceptEncoding()) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.append_to_accept_content_encoding_only_once")) {
-      const std::string new_accept_encoding_header =
-          Http::HeaderUtility::addEncodingToAcceptEncoding(
-              headers.getInlineValue(accept_encoding_handle.handle()), config_->contentEncoding());
-      headers.setInline(accept_encoding_handle.handle(), new_accept_encoding_header);
-    } else {
-      headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
-    }
+    const std::string new_accept_encoding_header = Http::HeaderUtility::addEncodingToAcceptEncoding(
+        headers.getInlineValue(accept_encoding_handle.handle()), config_->contentEncoding());
+    headers.setInline(accept_encoding_handle.handle(), new_accept_encoding_header);
 
     ENVOY_STREAM_LOG(debug,
                      "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",

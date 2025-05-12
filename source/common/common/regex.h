@@ -20,33 +20,53 @@ namespace Regex {
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
-  explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check);
-
-  explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config)
-      : CompiledGoogleReMatcher(config.regex(), false) {}
-
-  explicit CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config);
+  // Create, applying re2.max_program_size.error_level and re2.max_program_size.warn_level.
+  static absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
+  createAndSizeCheck(const std::string& regex);
+  static absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
+  create(const envoy::type::matcher::v3::RegexMatcher& config);
+  static absl::StatusOr<std::unique_ptr<CompiledGoogleReMatcher>>
+  create(const xds::type::matcher::v3::RegexMatcher& config);
 
   // CompiledMatcher
-  bool match(absl::string_view value) const override {
-    return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
-  }
+  bool match(absl::string_view value) const override { return re2::RE2::FullMatch(value, regex_); }
 
   // CompiledMatcher
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
     std::string result = std::string(value);
-    re2::RE2::GlobalReplace(&result, regex_,
-                            re2::StringPiece(substitution.data(), substitution.size()));
+    re2::RE2::GlobalReplace(&result, regex_, substitution);
     return result;
   }
 
-private:
+  // CompiledMatcher
+  const std::string& pattern() const override { return regex_.pattern(); }
+
+protected:
+  explicit CompiledGoogleReMatcher(const std::string& regex) : regex_(regex, re2::RE2::Quiet) {
+    ENVOY_BUG(regex_.ok(), "Invalid regex");
+  }
+  explicit CompiledGoogleReMatcher(const std::string& regex, absl::Status& creation_status,
+                                   bool do_program_size_check);
+  explicit CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config,
+                                   absl::Status& creation_status);
+  explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config,
+                                   absl::Status& creation_status)
+      : CompiledGoogleReMatcher(config.regex(), creation_status, false) {}
+
   const re2::RE2 regex_;
+};
+
+// Allow creating CompiledGoogleReMatcher without checking for status failures
+// for call sites which really really want to.
+class CompiledGoogleReMatcherNoSafetyChecks : public CompiledGoogleReMatcher {
+public:
+  CompiledGoogleReMatcherNoSafetyChecks(const std::string& regex)
+      : CompiledGoogleReMatcher(regex) {}
 };
 
 class GoogleReEngine : public Engine {
 public:
-  CompiledMatcherPtr matcher(const std::string& regex) const override;
+  absl::StatusOr<CompiledMatcherPtr> matcher(const std::string& regex) const override;
 };
 
 class GoogleReEngineFactory : public EngineFactory {
@@ -59,7 +79,7 @@ public:
   std::string name() const override { return "envoy.regex_engines.google_re2"; };
 };
 
-using EngineSingleton = InjectableSingleton<Engine>;
+DECLARE_FACTORY(GoogleReEngineFactory);
 
 enum class Type { Re2, StdRegex };
 
@@ -68,27 +88,15 @@ enum class Type { Re2, StdRegex };
  */
 class Utility {
 public:
-  /**
-   * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
-   * @param regex std::string containing the regular expression to parse.
-   * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
-   * @return std::regex constructed from regex and flags.
-   * @throw EnvoyException if the regex string is invalid.
-   */
-  static std::regex parseStdRegex(const std::string& regex,
-                                  std::regex::flag_type flags = std::regex::optimize);
-
-  /**
-   * Construct a compiled regex matcher from a match config.
-   */
   template <class RegexMatcherType>
-  static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher) {
+  static absl::StatusOr<CompiledMatcherPtr> parseRegex(const RegexMatcherType& matcher,
+                                                       Engine& engine) {
     // Fallback deprecated engine type in regex matcher.
     if (matcher.has_google_re2()) {
-      return std::make_unique<CompiledGoogleReMatcher>(matcher);
+      return CompiledGoogleReMatcher::create(matcher);
     }
 
-    return EngineSingleton::get().matcher(matcher.regex());
+    return engine.matcher(matcher.regex());
   }
 };
 

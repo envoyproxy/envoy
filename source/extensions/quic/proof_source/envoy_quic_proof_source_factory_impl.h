@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -19,7 +21,7 @@ public:
   std::unique_ptr<quic::ProofSource>
   createQuicProofSource(Network::Socket& listen_socket,
                         Network::FilterChainManager& filter_chain_manager,
-                        Server::ListenerStats& listener_stats) override;
+                        Server::ListenerStats& listener_stats, TimeSource& time_source) override;
 };
 
 DECLARE_FACTORY(EnvoyQuicProofSourceFactoryImpl);

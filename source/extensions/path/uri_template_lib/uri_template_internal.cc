@@ -6,6 +6,9 @@
 #include <variant>
 #include <vector>
 
+#include "source/common/common/fmt.h"
+#include "source/common/runtime/runtime_features.h"
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/flags/flag.h"
 #include "absl/functional/function_ref.h"
@@ -41,7 +44,18 @@ constexpr unsigned long kPatternMatchingMinVariableNameLen = 1;
 constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        "%"             // pct-encoded
                                        "!$&'()+,;"     // sub-delims excluding *=
-                                       ":@";
+                                       ":@"
+                                       "="; // user included "=" allowed
+
+// Additional literal that allows "*" in the pattern.
+// This should replace "kLiteral" after removal of
+// "reloadable_features.uri_template_match_on_asterisk" runtime guard.
+// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
+constexpr absl::string_view kLiteralWithAsterisk = "a-zA-Z0-9-._~" // Unreserved
+                                                   "%"             // pct-encoded
+                                                   "!$&'()+,;"     // sub-delims excluding *=
+                                                   ":@"
+                                                   "=*"; // reserved characters
 
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
@@ -119,22 +133,35 @@ std::string ParsedPathPattern::debugString() const {
 }
 
 bool isValidLiteral(absl::string_view literal) {
+  static const std::string* kValidLiteralRegexAsterisk =
+      new std::string(absl::StrCat("^[", kLiteralWithAsterisk, "]+$"));
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "]+$"));
+  static const LazyRE2 literal_regex_asterisk = {kValidLiteralRegexAsterisk->data()};
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(toStringPiece(literal), *literal_regex);
+
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
+             ? RE2::FullMatch(literal, *literal_regex_asterisk)
+             : RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidRewriteLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
+  static const std::string* kValidLiteralRegexAsterisk =
+      new std::string(absl::StrCat("^[", kLiteralWithAsterisk, "/]+$"));
+
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(toStringPiece(literal), *literal_regex);
+  static const LazyRE2 literal_regex_asterisk = {kValidLiteralRegexAsterisk->data()};
+
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
+             ? RE2::FullMatch(literal, *literal_regex_asterisk)
+             : RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidVariableName(absl::string_view variable) {
   static const LazyRE2 variable_regex = {"^[a-zA-Z][a-zA-Z0-9_]*$"};
-  return RE2::FullMatch(toStringPiece(variable), *variable_regex);
+  return RE2::FullMatch(variable, *variable_regex);
 }
 
 absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
@@ -142,7 +169,7 @@ absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
       std::vector<absl::string_view>(absl::StrSplit(pattern, absl::MaxSplits('/', 1)))[0];
   absl::string_view unparsed_pattern = pattern.substr(literal.size());
   if (!isValidLiteral(literal)) {
-    return absl::InvalidArgumentError("Invalid literal");
+    return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", literal));
   }
   return ParsedResult<Literal>(literal, unparsed_pattern);
 }
@@ -154,24 +181,25 @@ absl::StatusOr<ParsedResult<Operator>> parseOperator(absl::string_view pattern) 
   if (absl::StartsWith(pattern, "*")) {
     return ParsedResult<Operator>(Operator::PathGlob, pattern.substr(1));
   }
-  return absl::InvalidArgumentError("Invalid Operator");
+  return absl::InvalidArgumentError(fmt::format("Invalid Operator: \"{}\"", pattern));
 }
 
 absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) {
   // Locate the variable pattern to parse.
   if (pattern.size() < 2 || (pattern)[0] != '{') {
-    return absl::InvalidArgumentError("Invalid variable");
+    return absl::InvalidArgumentError(fmt::format("Invalid variable: \"{}\"", pattern));
   }
   std::vector<absl::string_view> parts = absl::StrSplit(pattern.substr(1), absl::MaxSplits('}', 1));
   if (parts.size() != 2) {
-    return absl::InvalidArgumentError("Unmatched variable bracket");
+    return absl::InvalidArgumentError(fmt::format("Unmatched variable bracket in \"{}\"", pattern));
   }
   absl::string_view unparsed_pattern = parts[1];
 
   // Parse the actual variable pattern, starting with the variable name.
   std::vector<absl::string_view> variable_parts = absl::StrSplit(parts[0], absl::MaxSplits('=', 1));
   if (!isValidVariableName(variable_parts[0])) {
-    return absl::InvalidArgumentError("Invalid variable name");
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid variable name: \"{}\"", variable_parts[0]));
   }
   Variable var = Variable(variable_parts[0], {});
 
@@ -203,7 +231,8 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
     var.match_.push_back(match);
     if (!pattern_item.empty()) {
       if (pattern_item[0] != '/' || pattern_item.size() == 1) {
-        return absl::InvalidArgumentError("Invalid variable match");
+        return absl::InvalidArgumentError(
+            fmt::format("Invalid variable match: \"{}\"", pattern_item));
       }
       pattern_item = pattern_item.substr(1);
     }
@@ -221,16 +250,20 @@ gatherCaptureNames(const struct ParsedPathPattern& pattern) {
       continue;
     }
     if (captured_variables.size() >= kPatternMatchingMaxVariablesPerPath) {
-      return absl::InvalidArgumentError("Exceeded variable count limit");
+      return absl::InvalidArgumentError(
+          fmt::format("Exceeded variable count limit ({})", kPatternMatchingMaxVariablesPerPath));
     }
     absl::string_view name = absl::get<Variable>(segment).name_;
 
     if (name.size() < kPatternMatchingMinVariableNameLen ||
         name.size() > kPatternMatchingMaxVariableNameLen) {
-      return absl::InvalidArgumentError("Invalid variable name length");
+      return absl::InvalidArgumentError(fmt::format(
+          "Invalid variable name length (length of \"{}\" should be at least {} and no more than "
+          "{})",
+          name, kPatternMatchingMinVariableNameLen, kPatternMatchingMaxVariableNameLen));
     }
     if (captured_variables.contains(name)) {
-      return absl::InvalidArgumentError("Repeated variable name");
+      return absl::InvalidArgumentError(fmt::format("Repeated variable name: \"{}\"", name));
     }
     captured_variables.emplace(name);
   }
@@ -273,8 +306,8 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
   struct ParsedPathPattern parsed_pattern;
 
   static const LazyRE2 printable_regex = {"^/[[:graph:]]*$"};
-  if (!RE2::FullMatch(toStringPiece(path), *printable_regex)) {
-    return absl::InvalidArgumentError("Invalid pattern");
+  if (!RE2::FullMatch(path, *printable_regex)) {
+    return absl::InvalidArgumentError(fmt::format("Invalid pattern: \"{}\"", path));
   }
 
   // Parse the leading '/'
@@ -351,11 +384,26 @@ std::string toRegexPattern(absl::string_view pattern) {
 std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
   static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
-  switch (pattern) {
-  case Operator::PathGlob: // "*"
-    return *kPathGlobRegex;
-  case Operator::TextGlob: // "**"
-    return *kTextGlobRegex;
+
+  static const std::string* kPathGlobRegexAsterisk =
+      new std::string(absl::StrCat("[", kLiteralWithAsterisk, "]+"));
+  static const std::string* kTextGlobRegexAsterisk =
+      new std::string(absl::StrCat("[", kLiteralWithAsterisk, "/]*"));
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")) {
+    switch (pattern) {
+    case Operator::PathGlob: // "*"
+      return *kPathGlobRegexAsterisk;
+    case Operator::TextGlob: // "**"
+      return *kTextGlobRegexAsterisk;
+    }
+  } else {
+    switch (pattern) {
+    case Operator::PathGlob: // "*"
+      return *kPathGlobRegex;
+    case Operator::TextGlob: // "**"
+      return *kTextGlobRegex;
+    }
   }
   return "";
 }

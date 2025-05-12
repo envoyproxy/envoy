@@ -14,7 +14,6 @@ namespace {
 constexpr char kDir[] = "test/tools/router_check/test/config/";
 
 TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string config_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
@@ -30,7 +29,6 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
 }
 
 TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string config_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
@@ -43,7 +41,6 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
 }
 
 TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   const std::string config_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
@@ -53,7 +50,7 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
   EXPECT_EQ(test_results.size(), 1);
-  envoy::RouterCheckToolSchema::ValidationItemResult test_result = test_results[0];
+  const envoy::RouterCheckToolSchema::ValidationItemResult& test_result = test_results[0];
   std::string expected_result_str = R"pb(
       test_name: "ResponseHeaderMatches Failures"
       failure {

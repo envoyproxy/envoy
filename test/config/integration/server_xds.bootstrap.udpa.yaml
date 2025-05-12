@@ -1,7 +1,6 @@
 dynamic_resources:
   lds_resources_locator: "file:///{{ lds_json_path }}"
   cds_config:
-    resource_api_version: V3
     path_config_source:
       path: "{{ cds_json_path }}"
 admin:

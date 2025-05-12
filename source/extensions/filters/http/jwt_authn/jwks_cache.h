@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 
+#include "absl/strings/string_view.h"
 #include "jwt_verify_lib/jwks.h"
 
 namespace Envoy {
@@ -55,6 +56,12 @@ public:
     // Check if a list of audiences are allowed.
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
 
+    // Check if a subject is allowed.
+    virtual bool isSubjectAllowed(absl::string_view sub) const PURE;
+
+    // Check if the current credential lifetime is allowed.
+    virtual bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const PURE;
+
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
     getJwtProvider() const PURE;
@@ -71,6 +78,10 @@ public:
     // Get Token Cache.
     virtual JwtCache& getJwtCache() PURE;
   };
+
+  // If there is only one provider in the config, return the data for that provider.
+  // It is only used for checking "failed_status_in_metadata" config for now.
+  virtual JwksData* getSingleProvider() PURE;
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& issuer) PURE;

@@ -57,11 +57,8 @@ message RegexMatcher {
 
   oneof engine_type {
     // Google's RE2 regex engine.
-    GoogleRE2 google_re2 = 1 [
-      deprecated = true,
-      (validate.rules).message = {required: true},
-      (envoy.annotations.deprecated_at_minor_version) = "3.0"
-    ];
+    GoogleRE2 google_re2 = 1
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // The regex match string. The string must be supported by the configured engine. The regex is matched

@@ -27,7 +27,7 @@ TEST(CdnLoopFilterFactoryTest, ValidValuesWork) {
   config.set_cdn_id("cdn");
   CdnLoopFilterFactory factory;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context).value();
   cb(filter_callbacks);
   EXPECT_NE(filter.get(), nullptr);
   EXPECT_NE(dynamic_cast<CdnLoopFilter*>(filter.get()), nullptr);
@@ -39,7 +39,7 @@ TEST(CdnLoopFilterFactoryTest, BlankCdnIdThrows) {
   envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig config;
   CdnLoopFilterFactory factory;
 
-  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context).value(),
                              ProtoValidationException, HasSubstr("value length must be at least"));
 }
 
@@ -50,8 +50,9 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnId) {
   config.set_cdn_id("[not-token-or-ip");
   CdnLoopFilterFactory factory;
 
-  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
-                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
+  auto status_or = factory.createFilterFactoryFromProto(config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or.status().message(), HasSubstr("is not a valid CDN identifier"));
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
@@ -61,8 +62,9 @@ TEST(CdnLoopFilterFactoryTest, InvalidCdnIdNonHeaderWhitespace) {
   config.set_cdn_id("\r\n");
   CdnLoopFilterFactory factory;
 
-  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
-                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
+  auto status_or = factory.createFilterFactoryFromProto(config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or.status().message(), HasSubstr("is not a valid CDN identifier"));
 }
 
 TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
@@ -72,8 +74,9 @@ TEST(CdnLoopFilterFactoryTest, InvalidParsedCdnIdNotInput) {
   config.set_cdn_id("cdn,cdn");
   CdnLoopFilterFactory factory;
 
-  EXPECT_THAT_THROWS_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
-                             EnvoyException, HasSubstr("is not a valid CDN identifier"));
+  auto status_or = factory.createFilterFactoryFromProto(config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_THAT(status_or.status().message(), HasSubstr("is not a valid CDN identifier"));
 }
 
 } // namespace CdnLoop

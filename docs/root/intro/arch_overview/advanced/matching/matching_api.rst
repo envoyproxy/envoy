@@ -3,11 +3,6 @@
 Matching API
 ============
 
-.. attention::
-
-   The matching API is alpha and is currently under active development.
-   Capabilities will be expanded over time and the configuration structures are likely to change.
-
 Envoy makes use of a :ref:`matching API <envoy_v3_api_msg_config.common.matcher.v3.Matcher>`
 to allow the various subsystems to express actions that should be performed based on incoming data.
 
@@ -34,6 +29,8 @@ These input functions are available for matching HTTP requests:
 * :ref:`Request trailer value <extension_envoy.matching.inputs.request_trailers>`.
 * :ref:`Response header value <extension_envoy.matching.inputs.response_headers>`.
 * :ref:`Response trailer value <extension_envoy.matching.inputs.response_trailers>`.
+* :ref:`Query parameters value <extension_envoy.matching.inputs.query_params>`.
+* :ref:`Dynamic metadata <extension_envoy.matching.inputs.dynamic_metadata>`.
 
 .. _extension_category_envoy.matching.network.input:
 
@@ -52,6 +49,7 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
+* :ref:`Filter state <extension_envoy.matching.inputs.filter_state>`.
 
 These input functions are available for matching TCP connections:
 
@@ -85,6 +83,40 @@ are available in some contexts:
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+
+* `Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching:
+
+.. _extension_envoy.matching.inputs.cel_data_input:
+
+  * CEL matching data input: :ref:`CEL data input value <envoy_v3_api_msg_.xds.type.matcher.v3.HttpAttributesCelMatchInput>`.
+
+.. _extension_envoy.matching.matchers.cel_matcher:
+
+  * CEL matching input matcher: :ref:`CEL input matcher <envoy_v3_api_msg_.xds.type.matcher.v3.CelMatcher>`.
+
+* Regex matching using :ref:`Hyperscan matcher <envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan>`.
+
+Matching actions
+################
+
+The action in the matcher framework typically refers to the selected resource by name.
+
+Network filter chain matching supports the following extensions:
+
+.. _extension_envoy.matching.actions.format_string:
+
+* :ref:`Format string action <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>` computes the filter chain name
+  from the connection dynamic metadata and its filter state. Example:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.common.matcher.v3.Matcher.OnMatch
+
+  action:
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.core.v3.SubstitutionFormatString
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(com.test_filter:test_key)%"
 
 Filter Integration
 ##################
@@ -157,8 +189,84 @@ HTTP Routing Integration
 ########################
 
 The matching API can be used with HTTP routing, by specifying a match tree as part of the virtual host
-and specifying a Route as the resulting action. See examples in the above sections for how the match
-tree can be configured.
+and specifying a :ref:`Route <envoy_v3_api_msg_config.route.v3.Route>` or :ref:`RouteList
+<envoy_v3_api_msg_config.route.v3.RouteList>` as the resulting action. See :ref:`the examples
+<arch_overview_http_routing_matcher>` for how the match tree can be configured.
+
+.. _arch_overview_sublinear_routing:
+
+Sublinear Route Matching
+########################
+
+An incoming request to Envoy needs to be matched to a cluster based on defined :ref:`routes <envoy_v3_api_msg_config.route.v3.VirtualHost>`. Typically, a well understood, linear route search matching with O(n) search cost is employed which can become a scalability issue with higher latencies as the number of routes go up to O(1k+).
+
+To overcome these scalability challenges the Generic Matcher API (:ref:`matcher_tree <envoy_v3_api_field_config.common.matcher.v3.Matcher.matcher_tree>` can offer a robust and flexible framework for route matching with two distinct sublinear matching implementations:
+
+* **Trie-based Matching** (:ref:`prefix_match_map <envoy_v3_api_field_config.common.matcher.v3.Matcher.MatcherTree.prefix_match_map>`): Employs a prefix trie structure for efficient longest prefix matching in significantly much lower time complexity of O(min{input key length, longest prefix match}) compared to traditional linear search with O(# of routes x avg length of routes). Trie implementation in Envoy leverages ranged vectors for storing child nodes to optimize on memory. Also, note that longest-prefix-match lookup of chars in trie does not support wildcards and each char is matched literally.
+
+* **HashMap-based Matching** (:ref:`exact_match_map <envoy_v3_api_field_config.common.matcher.v3.Matcher.MatcherTree.exact_match_map>`): Uses a hashmap structure for exact string matching in practically constant time O(1).
+
+These implementations can be used recursively and even combined with each other in nested fashion using the :ref:`Generic Matching API <arch_overview_matching_api>`. It also enables mixing sublinear and linear route matching for breaking up route matching space for diverse use-cases.
+
+**Example 1:** A single trie structure for all url paths in ``:path`` header
+
+Suppose one wants to route requests with following path prefixes to respective clusters using trie or hashmap for sublinear route searching
+
+.. image:: /_static/sublinear_routing_img1.png
+
+A request with ``:path`` header set to url ``/new_endpoint/path/2/abc`` should be routed to ``cluster_2``
+
+To achieve the above results, Envoy config below will create a single trie structure with above path strings and calls ``findLongestPrefix()`` match once, for paths in incoming request ``:path`` header.
+
+.. note::
+   Changing ``prefix_match_map`` to ``exact_match_map`` in below configuration will result in use of hash-based path matching (instead of trie) and will succeed in lookup if ``:path`` header in request matches exactly with one of the routes defined.
+
+.. literalinclude:: /_configs/route/sublinear_routing_example1.yaml
+    :language: yaml
+    :lines: 25-59
+    :emphasize-lines: 7
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`single_trie.yaml </_configs/route/sublinear_routing_example1.yaml>`
+
+**Example 2:** Configuration for hierarchical trie structures in the example below illustrates how three different trie structures can be created by Envoy using nested ``prefix_match_map`` which can do request matching across various headers.:
+
+.. note::
+   Use of ``exact_match_map`` will result in creation of hashmaps instead of tries.
+
+.. image:: /_static/sublinear_routing_img2.png
+
+For an incoming request with ``:path`` header set to say ``/new_endpoint/path/2/video``, ``x-foo-header`` set to ``foo-2`` and ``x-bar-header`` set to ``bar-2``, three longest-prefix-match trie lookups will happen across A, B and C tries in the order of nesting for a successful request match.
+
+.. literalinclude:: /_configs/route/sublinear_routing_example2.yaml
+    :language: yaml
+    :lines: 25-115
+    :emphasize-lines: 7,26,45
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`nested_trie.yaml </_configs/route/sublinear_routing_example2.yaml>`
+
+**Example 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
+
+.. image:: /_static/sublinear_routing_img3.png
+
+.. literalinclude:: /_configs/route/sublinear_routing_example3.yaml
+    :language: yaml
+    :lines: 25-80
+    :emphasize-lines: 7,31
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`mix_sublinear_linear.yaml </_configs/route/sublinear_routing_example3.yaml>`
+
+**Example 4:** This example shows how one can run exact matches first (using hashmap) and if no matches are found then attempt prefix matches (using tries).
+
+.. literalinclude:: /_configs/route/sublinear_routing_example4.yaml
+    :language: yaml
+    :lines: 25-87
+    :emphasize-lines: 7,36,44
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`exact_prefix_mix.yaml </_configs/route/sublinear_routing_example4.yaml>`
 
 Match Tree Validation
 #####################

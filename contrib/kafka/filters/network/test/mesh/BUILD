@@ -4,10 +4,6 @@ load(
     "envoy_cc_test_library",
     "envoy_contrib_package",
 )
-load(
-    "//bazel:envoy_internal.bzl",
-    "envoy_external_dep_path",
-)
 
 licenses(["notice"])  # Apache 2
 
@@ -16,16 +12,19 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:config_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/thread:thread_mocks",
     ],
 )
 
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:filter_lib",
@@ -39,6 +38,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:request_processor_lib",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
@@ -57,6 +57,7 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:upstream_kafka_facade_lib",
+        "//test/mocks/thread:thread_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:thread_factory_for_test_lib",
     ],
@@ -74,13 +75,35 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "shared_consumer_manager_impl_unit_test",
+    srcs = ["shared_consumer_manager_impl_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:shared_consumer_manager_impl_lib",
+        "//test/mocks/thread:thread_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_kafka_consumer_impl_unit_test",
+    srcs = ["upstream_kafka_consumer_impl_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":kafka_mocks_lib",
+        "//contrib/kafka/filters/network/source/mesh:upstream_kafka_consumer_impl_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "kafka_mocks_lib",
     srcs = [],
     hdrs = ["kafka_mocks.h"],
     tags = ["skip_on_windows"],
     deps = [
-        envoy_external_dep_path("librdkafka"),
+        "//bazel/foreign_cc:librdkafka",
+        "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )
 

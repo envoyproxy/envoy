@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.network.ext_authz"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -29,6 +30,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],
@@ -38,10 +40,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.ext_authz"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/ext_authz:config",
         "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],
@@ -59,6 +61,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_fuzz_test",
     srcs = ["ext_authz_fuzz_test.cc"],
     corpus = "ext_authz_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
@@ -66,6 +69,7 @@ envoy_cc_fuzz_test(
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],
 )

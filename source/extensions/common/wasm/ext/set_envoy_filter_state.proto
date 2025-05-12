@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package envoy.source.extensions.common.wasm;
+
+import "source/extensions/common/wasm/ext/declare_property.proto";
+
+message SetEnvoyFilterStateArguments {
+  // path is the filter state key
+  string path = 1;
+  // value is the filter state object factory input
+  string value = 2;
+  // span is the life span of the filter state object
+  LifeSpan span = 3;
+};

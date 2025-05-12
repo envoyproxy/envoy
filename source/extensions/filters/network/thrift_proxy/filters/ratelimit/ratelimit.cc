@@ -46,7 +46,7 @@ void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, config_->domain(), descriptors, Tracing::NullSpan::instance(),
-                   decoder_callbacks_->streamInfo());
+                   decoder_callbacks_->streamInfo(), 0);
     initiating_call_ = false;
   }
 }
@@ -90,7 +90,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
       decoder_callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::RateLimitServiceError);
+          StreamInfo::CoreResponseFlag::RateLimitServiceError);
       return;
     }
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -102,7 +102,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
           false);
-      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
       return;
     }
     break;

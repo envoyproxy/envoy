@@ -1,8 +1,14 @@
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
+#include <cstdint>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,6 +16,8 @@ namespace HttpFilters {
 namespace Compressor {
 
 namespace {
+
+using envoy::extensions::filters::http::compressor::v3::CompressorPerRoute;
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     accept_encoding_handle(Http::CustomHeaders::get().AcceptEncoding);
@@ -77,9 +85,8 @@ CompressorFilterConfig::DirectionConfig::DirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type())), stats_{generateStats(
-                                                                             stats_prefix, scope)} {
-}
+      content_type_values_(contentTypeSet(proto_config.content_type())),
+      stats_{generateStats(stats_prefix, scope)} {}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
@@ -113,6 +120,11 @@ CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
                       stats_prefix + "request.", scope, runtime),
       is_set_{proto_config.has_request_direction_config()} {}
 
+absl::flat_hash_set<uint32_t>
+uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes) {
+  return {codes.begin(), codes.end()};
+}
+
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
@@ -128,6 +140,8 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
+      uncompressible_response_codes_(uncompressibleResponseCodesSet(
+          proto_config.response_direction_config().uncompressible_response_codes())),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
 
 const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig
@@ -164,6 +178,32 @@ Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompre
 CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
 
+CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
+    const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config) {
+  switch (config.override_case()) {
+  case CompressorPerRoute::kDisabled:
+    response_compression_enabled_ = false;
+    break;
+  case CompressorPerRoute::kOverrides:
+    if (config.overrides().has_response_direction_config()) {
+      // The presence of an empty `response_direction_config` must enable response compression, just
+      // as its presence in `Compressor` would. As fields are added, this must remain true.
+      // Consequently, if `response_direction_config.common_direction_config.enabled` ever gets
+      // added, its absence must enable compression.
+      response_compression_enabled_ = true;
+      if (config.overrides().response_direction_config().has_remove_accept_encoding_header()) {
+        remove_accept_encoding_header_ =
+            config.overrides().response_direction_config().remove_accept_encoding_header().value();
+      }
+    }
+    break;
+  case CompressorPerRoute::OVERRIDE_NOT_SET:
+    // This can't happen, because the `override` oneof has a `validate.required` PGV constraint,
+    // which is checked in `CommonFactoryBase::createRouteSpecificFilterConfig`.
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+}
+
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                           bool end_stream) {
   const Http::HeaderEntry* accept_encoding = headers.getInline(accept_encoding_handle.handle());
@@ -174,7 +214,11 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   const auto& response_config = config_->responseDirectionConfig();
-  if (response_config.compressionEnabled() && response_config.removeAcceptEncodingHeader()) {
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
+          decoder_callbacks_);
+  if (compressionEnabled(response_config, per_route_config) &&
+      removeAcceptEncodingHeader(response_config, per_route_config)) {
     headers.removeInline(accept_encoding_handle.handle());
   }
 
@@ -239,18 +283,36 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   }
 }
 
+bool isResponseCodeCompressible(const Http::ResponseHeaderMap& headers,
+                                const CompressorFilterConfig::ResponseDirectionConfig& config) {
+  if (config.areAllResponseCodesCompressible()) {
+    return true;
+  }
+
+  absl::optional<uint64_t> response_code = Http::Utility::getResponseStatusOrNullopt(headers);
+  if (!response_code.has_value()) {
+    return true;
+  }
+
+  return config.isResponseCodeCompressible(response_code.value());
+}
+
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   const auto& config = config_->responseDirectionConfig();
+  const auto* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
+          decoder_callbacks_);
 
   // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
-      config.compressionEnabled() && config.isMinimumContentLength(headers);
+      compressionEnabled(config, per_route_config) && config.isMinimumContentLength(headers);
 
   const bool isCompressible =
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
       config.isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
-      isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle());
+      isEtagAllowed(headers) && !headers.getInline(response_content_encoding_handle.handle()) &&
+      isResponseCodeCompressible(headers, config);
   if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
     sanitizeEtagHeader(headers);
@@ -530,6 +592,15 @@ bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
   return is_etag_allowed;
 }
 
+bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompressible() const {
+  return uncompressible_response_codes_.empty();
+}
+
+bool CompressorFilterConfig::ResponseDirectionConfig::isResponseCodeCompressible(
+    uint32_t response_code) const {
+  return !uncompressible_response_codes_.contains(response_code);
+}
+
 bool CompressorFilterConfig::DirectionConfig::isMinimumContentLength(
     const Http::RequestOrResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
@@ -602,6 +673,23 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
       headers.removeInline(etag_handle.handle());
     }
   }
+}
+
+// True if response compression is enabled.
+bool CompressorFilter::compressionEnabled(
+    const CompressorFilterConfig::ResponseDirectionConfig& config,
+    const CompressorPerRouteFilterConfig* per_route_config) const {
+  return per_route_config && per_route_config->responseCompressionEnabled().has_value()
+             ? *per_route_config->responseCompressionEnabled()
+             : config.compressionEnabled();
+}
+
+bool CompressorFilter::removeAcceptEncodingHeader(
+    const CompressorFilterConfig::ResponseDirectionConfig& config,
+    const CompressorPerRouteFilterConfig* per_route_config) const {
+  return per_route_config && per_route_config->removeAcceptEncodingHeader().has_value()
+             ? *per_route_config->removeAcceptEncodingHeader()
+             : config.removeAcceptEncodingHeader();
 }
 
 } // namespace Compressor

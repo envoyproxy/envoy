@@ -39,10 +39,11 @@ struct VhdsStats {
 class VhdsSubscription : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>,
                          Logger::Loggable<Logger::Id::router> {
 public:
-  VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
-                   Server::Configuration::ServerFactoryContext& factory_context,
-                   const std::string& stat_prefix,
-                   absl::optional<Rds::RouteConfigProvider*>& route_config_providers);
+  static absl::StatusOr<std::unique_ptr<VhdsSubscription>>
+  createVhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         const std::string& stat_prefix,
+                         Rds::RouteConfigProvider* route_config_provider);
 
   ~VhdsSubscription() override { init_target_.ready(); }
 
@@ -58,11 +59,19 @@ public:
   }
 
 private:
+  VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                   Server::Configuration::ServerFactoryContext& factory_context,
+                   const std::string& stat_prefix, Rds::RouteConfigProvider* route_config_provider,
+                   absl::Status& creation_status);
+
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
-                      const std::string&) override {}
-  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
+                              const std::string&) override {
+    return absl::OkStatus();
+  }
+  absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
+                              const Protobuf::RepeatedPtrField<std::string>&,
+                              const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
@@ -71,7 +80,7 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
-  absl::optional<Rds::RouteConfigProvider*>& route_config_provider_opt_;
+  Rds::RouteConfigProvider* route_config_provider_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

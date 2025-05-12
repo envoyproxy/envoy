@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "envoy/config/core/v3/grpc_service.proto";
+
+// Message for downstream only filter factory.
+message ServerFactoryContextFilterConfig {
+  envoy.config.core.v3.GrpcService grpc_service = 1;
+}
+
+// Message for dual filter factory.
+message ServerFactoryContextFilterConfigDual {
+  envoy.config.core.v3.GrpcService grpc_service = 1;
+}

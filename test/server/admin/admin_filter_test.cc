@@ -7,27 +7,28 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ByMove;
 using testing::InSequence;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Server {
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminFilterTest() : filter_(adminHandlerCallback), request_headers_{{":path", "/"}} {
+  AdminFilterTest() : filter_(admin_), request_headers_{{":path", "/"}} {
+    EXPECT_CALL(admin_, makeRequest(_)).WillOnce(Return(ByMove(adminHandlerCallback())));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  NiceMock<MockInstance> server_;
+  NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
 
-  static Admin::RequestPtr adminHandlerCallback(AdminStream& admin_stream) {
-    // silence compiler warnings for unused params
-    UNREFERENCED_PARAMETER(admin_stream);
+  static Admin::RequestPtr adminHandlerCallback() {
     return AdminImpl::makeStaticTextRequest("OK\n", Http::Code::OK);
   }
 };

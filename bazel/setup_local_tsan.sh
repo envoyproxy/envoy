@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 BAZELRC_FILE="${BAZELRC_FILE:-$(bazel info workspace)/local_tsan.bazelrc}"
 

@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.data.core.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.data.core.v3";
+option java_outer_classname = "TlvMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Proxy Protocol Filter Typed Metadata]
+// PROXY protocol filter typed metadata.
+
+message TlvsMetadata {
+  // Typed metadata for :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`, that represents a map of TLVs.
+  // Each entry in the map consists of a key which corresponds to a configured
+  // :ref:`rule key <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.key>` and a value (TLV value in bytes).
+  // When runtime flag ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` is enabled,
+  // :ref:`Proxy protocol filter <envoy_v3_api_msg_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol>`
+  // will populate typed metadata and regular metadata. By default filter will populate typed and untyped metadata.
+  map<string, bytes> typed_metadata = 1;
+}

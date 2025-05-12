@@ -4,13 +4,19 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/early_data/v3/default_early_data_policy_descriptor.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+
 #include "source/common/http/codec_client.h"
 #include "source/common/network/filter_impl.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
@@ -22,7 +28,6 @@ using ::Envoy::Http::Http2::Http2Frame;
 
 enum class Http2Impl {
   Nghttp2,
-  WrappedNghttp2,
   Oghttp2,
 };
 
@@ -55,6 +60,8 @@ public:
   void sendReset(Http::RequestEncoder& encoder);
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
+  IntegrationStreamDecoderPtr initRequest(const Http::RequestHeaderMap& headers,
+                                          bool header_only_request = false);
   std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
@@ -138,17 +145,30 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp2Overrides(Http2Impl implementation);
+  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
+  void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
                     std::vector<envoy::config::core::v3::TypedExtensionConfig> formatters = {});
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
+                               bool allow_excess_entries = false,
+                               Network::ClientConnection* client_connection = nullptr) {
+    if (client_connection == nullptr && codec_client_) {
+      client_connection = codec_client_->connection();
+    }
+    return BaseIntegrationTest::waitForAccessLog(filename, entry, allow_excess_entries,
+                                                 client_connection);
+  };
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options);
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          absl::nullopt,
+      bool wait_till_connected = true);
   // Makes a downstream network connection object based on client codec version.
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override;
@@ -181,7 +201,12 @@ protected:
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
       uint64_t upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+  struct Result {
+    IntegrationStreamDecoderPtr response;
+    absl::optional<uint64_t> upstream_index;
+  };
+
+  Result sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
       const std::vector<uint64_t>& upstream_indices,
@@ -255,21 +280,23 @@ protected:
       ConnectionCreationFunction* creator = nullptr);
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
-  void testRouterUpstreamResponseBeforeRequestComplete();
+  void testRouterUpstreamResponseBeforeRequestComplete(uint32_t status_code = 0);
 
   void testTwoRequests(bool force_network_backup = false);
-  void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,
-                        Http::TestRequestTrailerMapImpl request_trailers, uint32_t size,
-                        uint32_t max_size);
   void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
                                uint32_t max_count = 100,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  void testLargeResponseHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
+                                uint32_t max_count = 100,
+                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
   void testAddEncodedTrailers();
   void testRetry();
+  void testRouterRetryOnResetBeforeRequestBeforeHeaders();
+  void testRouterRetryOnResetBeforeRequestAfterHeaders();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
   void testGrpcRetry();
@@ -294,9 +321,10 @@ protected:
   void testAdminDrain(Http::CodecClient::Type admin_request_type);
 
   // Test sending and receiving large request and response bodies with autonomous upstream.
-  void testGiantRequestAndResponse(
-      uint64_t request_size, uint64_t response_size, bool set_content_length_header,
-      std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+  void testGiantRequestAndResponse(uint64_t request_size, uint64_t response_size,
+                                   bool set_content_length_header,
+                                   std::chrono::milliseconds timeout = 2 *
+                                                                       TestUtility::DefaultTimeout);
 
   struct BytesCountExpectation {
     BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
@@ -348,7 +376,10 @@ protected:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
-  bool enable_quic_early_data_{true};
+  // Set this to true when sending malformed requests to avoid test client codec rejecting it.
+  // This flag is only valid when UHV build flag is enabled.
+  bool disable_client_header_validation_{false};
+
 #ifdef ENVOY_ENABLE_QUIC
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
@@ -369,5 +400,9 @@ protected:
 
   IntegrationTcpClientPtr tcp_client_;
 };
+
+absl::string_view upstreamToString(Http::CodecType type);
+absl::string_view downstreamToString(Http::CodecType type);
+absl::string_view http2ImplementationToString(Http2Impl impl);
 
 } // namespace Envoy

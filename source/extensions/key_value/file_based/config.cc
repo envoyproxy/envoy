@@ -16,7 +16,9 @@ FileBasedKeyValueStore::FileBasedKeyValueStore(Event::Dispatcher& dispatcher,
     ENVOY_LOG(info, "File for key value store does not yet exist: {}", filename);
     return;
   }
-  const std::string contents = file_system_.fileReadToEnd(filename_);
+  auto file_or_error = file_system_.fileReadToEnd(filename_);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
+  const std::string contents = file_or_error.value();
   if (!parseContents(contents)) {
     ENVOY_LOG(warn, "Failed to parse key value store file {}", filename);
   }
@@ -31,11 +33,17 @@ void FileBasedKeyValueStore::flush() {
     ENVOY_LOG(error, "Failed to flush cache to file {}", filename_);
     return;
   }
-  for (const auto& it : store_) {
-    file->write(absl::StrCat(it.first.length(), "\n"));
-    file->write(it.first);
-    file->write(absl::StrCat(it.second.length(), "\n"));
-    file->write(it.second);
+  for (const auto& [key, value_with_ttl] : store()) {
+    file->write(absl::StrCat(key.length(), "\n"));
+    file->write(key);
+    file->write(absl::StrCat(value_with_ttl.value_.length(), "\n"));
+    file->write(value_with_ttl.value_);
+    if (value_with_ttl.ttl_.has_value()) {
+      std::string ttl = std::to_string(value_with_ttl.ttl_.value().count());
+      file->write(KV_STORE_TTL_KEY);
+      file->write(absl::StrCat(ttl.length(), "\n"));
+      file->write(ttl);
+    }
   }
   file->close();
 }

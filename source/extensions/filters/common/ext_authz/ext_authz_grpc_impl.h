@@ -17,7 +17,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/grpc/typed_async_client.h"
@@ -51,6 +51,9 @@ public:
   void cancel() override;
   void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
              Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
+  StreamInfo::StreamInfo const* streamInfo() const override {
+    return request_ ? &request_->streamInfo() : nullptr;
+  }
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -60,9 +63,6 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  void toAuthzResponseHeader(
-      ResponsePtr& response,
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};

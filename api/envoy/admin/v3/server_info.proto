@@ -59,7 +59,7 @@ message ServerInfo {
   config.core.v3.Node node = 7;
 }
 
-// [#next-free-field: 39]
+// [#next-free-field: 42]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -98,6 +98,12 @@ message CommandLineOptions {
   // See :option:`--use-dynamic-base-id` for details.
   bool use_dynamic_base_id = 31;
 
+  // See :option:`--skip-hot-restart-on-no-parent` for details.
+  bool skip_hot_restart_on_no_parent = 39;
+
+  // See :option:`--skip-hot-restart-parent-stats` for details.
+  bool skip_hot_restart_parent_stats = 40;
+
   // See :option:`--base-id-path` for details.
   string base_id_path = 32;
 
@@ -118,6 +124,9 @@ message CommandLineOptions {
 
   // See :option:`--ignore-unknown-dynamic-fields` for details.
   bool ignore_unknown_dynamic_fields = 30;
+
+  // See :option:`--skip-deprecated-logs` for details.
+  bool skip_deprecated_logs = 41;
 
   // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;

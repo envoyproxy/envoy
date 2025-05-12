@@ -1,0 +1,10 @@
+frames {
+  qframe {
+    rst_stream {
+      control_frame_id: 0,
+      stream_id: 0,
+      error_code: 0,
+      bytes_written: 0,
+    }
+  }
+}

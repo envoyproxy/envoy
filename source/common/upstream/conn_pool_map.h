@@ -84,9 +84,10 @@ private:
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<IdleCb> cached_callbacks_;
-  Common::DebugRecursionChecker recursion_checker_;
   const HostConstSharedPtr host_;
+  // Keep smaller fields near the end to reduce padding
   const ResourcePriority priority_;
+  Common::DebugRecursionChecker recursion_checker_;
 };
 
 } // namespace Upstream

@@ -7,8 +7,10 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
@@ -23,6 +25,7 @@ namespace Address {
 
 class Instance;
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
+using InstanceConstOptRef = OptRef<const Instance>;
 
 /**
  * Interface for an Ipv4 address.
@@ -50,6 +53,11 @@ public:
   virtual absl::uint128 address() const PURE;
 
   /**
+   * @return the uint32_t scope/zone identifier of the IPv6 address.
+   */
+  virtual uint32_t scopeId() const PURE;
+
+  /**
    * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
    */
   virtual bool v6only() const PURE;
@@ -59,6 +67,12 @@ public:
    * if the Ipv6 address isn't Ipv4 mapped.
    */
   virtual InstanceConstSharedPtr v4CompatibleAddress() const PURE;
+
+  /**
+   * @return Ipv6 address that has no scope/zone identifier. Return `nullptr`
+   * if the conversion failed.
+   */
+  virtual InstanceConstSharedPtr addressWithoutScopeId() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
@@ -225,6 +239,19 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+};
+
+/*
+ * Used to store Instance in filter state.
+ */
+class InstanceAccessor : public Envoy::StreamInfo::FilterState::Object {
+public:
+  InstanceAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
+
+  InstanceConstOptRef getIp() const { return makeOptRefFromPtr<const Instance>(ip_.get()); }
+
+private:
+  InstanceConstSharedPtr ip_;
 };
 
 } // namespace Address

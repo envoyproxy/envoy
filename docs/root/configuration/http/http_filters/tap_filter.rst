@@ -307,7 +307,7 @@ Etc.
 Statistics
 ----------
 
-The tap filter outputs statistics in the *http.<stat_prefix>.tap.* namespace. The :ref:`stat prefix
+The tap filter outputs statistics in the ``http.<stat_prefix>.tap.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 

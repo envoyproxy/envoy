@@ -1,4 +1,8 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
@@ -25,6 +29,7 @@ envoy_cc_library(
         "//source/common/quic:envoy_quic_proof_source_lib",
         "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_extension(

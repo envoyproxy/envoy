@@ -26,7 +26,7 @@ TEST(CookieBasedSessionStateFactoryConfigTest, Basic) {
   )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
 }
 
@@ -44,7 +44,7 @@ TEST(CookieBasedSessionStateFactoryConfigTest, NegativeTTL) {
   )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   EXPECT_THROW(factory->createSessionStateFactory(proto_config, context), EnvoyException);
 }
 

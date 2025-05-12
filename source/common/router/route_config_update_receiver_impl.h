@@ -20,9 +20,7 @@ namespace Router {
 
 class ConfigTraitsImpl : public Rds::ConfigTraits {
 public:
-  ConfigTraitsImpl(const OptionalHttpFilters& optional_http_filters,
-                   ProtobufMessage::ValidationVisitor& validator)
-      : optional_http_filters_(optional_http_filters), validator_(validator) {}
+  ConfigTraitsImpl(ProtobufMessage::ValidationVisitor& validator) : validator_(validator) {}
 
   Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
@@ -30,26 +28,21 @@ public:
                                          bool validate_clusters_default) const override;
 
 private:
-  const OptionalHttpFilters optional_http_filters_;
   ProtobufMessage::ValidationVisitor& validator_;
 };
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                const OptionalHttpFilters& optional_http_filters)
-      : config_traits_(optional_http_filters,
-                       factory_context.messageValidationContext().dynamicValidationVisitor()),
-        base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
-        vhds_virtual_hosts_(
-            std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
-        vhds_configuration_changed_(true) {}
+                                Server::Configuration::ServerFactoryContext& factory_context)
+      : config_traits_(factory_context.messageValidationContext().dynamicValidationVisitor()),
+        base_(config_traits_, proto_traits, factory_context) {}
 
-  bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
+  using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
+
+  bool removeVhosts(VirtualHostMap& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  bool updateVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
-                    const VirtualHostRefVector& added_vhosts);
+  bool updateVhosts(VirtualHostMap& vhosts, const VirtualHostRefVector& added_vhosts);
   bool onDemandFetchFailed(const envoy::service::discovery::v3::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver
@@ -85,11 +78,13 @@ private:
 
   Rds::RouteConfigUpdateReceiverImpl base_;
 
-  uint64_t last_vhds_config_hash_;
-  std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts_;
-  std::unique_ptr<std::map<std::string, envoy::config::route::v3::VirtualHost>> vhds_virtual_hosts_;
+  uint64_t last_vhds_config_hash_{0ul};
+  // vhosts supplied by RDS, to be merged with VHDS vhosts in onVhdsUpdate.
+  std::unique_ptr<VirtualHostMap> rds_virtual_hosts_;
+  // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
+  std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
-  bool vhds_configuration_changed_;
+  bool vhds_configuration_changed_{true};
 };
 
 } // namespace Router

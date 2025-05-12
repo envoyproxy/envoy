@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -21,7 +22,12 @@ using envoy::service::ext_proc::v3::BodyMutation;
 using Filters::Common::MutationRules::Checker;
 using Http::LowerCaseString;
 
-TEST(MutationUtils, TestBuildHeaders) {
+class MutationUtilsTest : public ::testing::Test {
+public:
+  Regex::GoogleReEngine regex_engine_;
+};
+
+TEST_F(MutationUtilsTest, TestBuildHeaders) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"},
       {":path", "/foo/the/bar?size=123"},
@@ -34,7 +40,10 @@ TEST(MutationUtils, TestBuildHeaders) {
   headers.addCopy(LowerCaseString("x-number"), 9999);
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  MutationUtils::headersToProto(headers, proto_headers);
+  // Neither allow_headers nor disallow_headers is set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -45,7 +54,7 @@ TEST(MutationUtils, TestBuildHeaders) {
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
-TEST(MutationUtils, TestApplyMutations) {
+TEST_F(MutationUtilsTest, TestApplyMutations) {
   Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"},
       {":method", "GET"},
@@ -63,27 +72,27 @@ TEST(MutationUtils, TestApplyMutations) {
   auto* s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key("x-append-this");
-  s->mutable_header()->set_value("2");
+  s->mutable_header()->set_raw_value("2");
   s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key("x-append-this");
-  s->mutable_header()->set_value("3");
+  s->mutable_header()->set_raw_value("3");
   s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key("x-remove-and-append-this");
-  s->mutable_header()->set_value("4");
+  s->mutable_header()->set_raw_value("4");
   s = mutation.add_set_headers();
   s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-replace-this");
-  s->mutable_header()->set_value("no");
+  s->mutable_header()->set_raw_value("no");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
-  s->mutable_header()->set_value("418");
-  // Default of "append" is "false" and mutations
-  // are applied in order.
+  s->mutable_header()->set_raw_value("418");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-replace-this");
-  s->mutable_header()->set_value("nope");
+  s->mutable_header()->set_raw_value("nope");
   // Incomplete structures should be ignored
   mutation.add_set_headers();
 
@@ -98,35 +107,43 @@ TEST(MutationUtils, TestApplyMutations) {
   // Attempts to set method, host, authority, and x-envoy headers
   // should be ignored until we explicitly allow them.
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("host");
-  s->mutable_header()->set_value("invalid:123");
+  s->mutable_header()->set_raw_value("invalid:123");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("Host");
-  s->mutable_header()->set_value("invalid:456");
+  s->mutable_header()->set_raw_value("invalid:456");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":authority");
-  s->mutable_header()->set_value("invalid:789");
+  s->mutable_header()->set_raw_value("invalid:789");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":method");
-  s->mutable_header()->set_value("PATCH");
+  s->mutable_header()->set_raw_value("PATCH");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":scheme");
-  s->mutable_header()->set_value("http");
+  s->mutable_header()->set_raw_value("http");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("X-Envoy-StrangeThing");
-  s->mutable_header()->set_value("Yes");
+  s->mutable_header()->set_raw_value("Yes");
 
   // Attempts to set the status header out of range should
   // also be ignored.
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
-  s->mutable_header()->set_value("This is not even an integer");
+  s->mutable_header()->set_raw_value("This is not even an integer");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
-  s->mutable_header()->set_value("100");
+  s->mutable_header()->set_raw_value("100");
 
   // Use the default mutation rules
-  Checker checker(HeaderMutationRules::default_instance());
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc()).Times(10);
   // There were 10 attempts to change un-changeable headers above.
@@ -152,29 +169,30 @@ TEST(MutationUtils, TestApplyMutations) {
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
 
-TEST(MutationUtils, TestNonAppendableHeaders) {
+TEST_F(MutationUtilsTest, TestNonAppendableHeaders) {
   Http::TestRequestHeaderMapImpl headers;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key(":path");
-  s->mutable_header()->set_value("/foo");
+  s->mutable_header()->set_raw_value("/foo");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
-  s->mutable_header()->set_value("400");
+  s->mutable_header()->set_raw_value("400");
   // These two should be ignored since we ignore attempts
   // to set multiple values for system headers.
   s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key(":path");
-  s->mutable_header()->set_value("/baz");
+  s->mutable_header()->set_raw_value("/baz");
   s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key(":status");
-  s->mutable_header()->set_value("401");
+  s->mutable_header()->set_raw_value("401");
 
   // Use the default mutation rules
-  Checker checker(HeaderMutationRules::default_instance());
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
   // There were two invalid attempts above.
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc()).Times(2);
@@ -188,8 +206,80 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
 }
 
+TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // Test header key contains invalid character.
+  s->mutable_append()->set_value(false);
+  s->mutable_header()->set_key("x-append-this\n");
+  s->mutable_header()->set_raw_value("value");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
+  mutation.Clear();
+  s = mutation.add_set_headers();
+  // Test header value contains invalid character.
+  s->mutable_append()->set_value(false);
+  s->mutable_header()->set_key("x-append-this");
+  s->mutable_header()->set_raw_value("value\r");
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+}
+
+TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"},
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"host", "localhost:1000"},
+  };
+  // Use the default mutation rules
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  // Test header key contains content_length.
+  s->mutable_append()->set_value(false);
+  s->mutable_header()->set_key("content-length");
+  s->mutable_header()->set_raw_value("10");
+
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                  /*remove_content_length=*/true)
+                  .ok());
+  // When `remove_content_length` is true, content_length headers is not added.
+  EXPECT_EQ(headers.ContentLength(), nullptr);
+
+  EXPECT_TRUE(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections,
+                                                  /*remove_content_length=*/false)
+                  .ok());
+  // When `remove_content_length` is false, content_length headers is added.
+  EXPECT_EQ(headers.getContentLengthValue(), "10");
+}
+
+TEST_F(MutationUtilsTest, TestRemoveHeaderWithInvalidCharacter) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {"host", "localhost:1000"},
+  };
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  mutation.add_remove_headers("host\n");
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_FALSE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+}
+
 // Ensure that we actually replace the body
-TEST(MutationUtils, TestBodyMutationReplace) {
+TEST_F(MutationUtilsTest, TestBodyMutationReplace) {
   Buffer::OwnedImpl buf;
   TestUtility::feedBufferWithRandomCharacters(buf, 100);
   BodyMutation mut;
@@ -200,7 +290,7 @@ TEST(MutationUtils, TestBodyMutationReplace) {
 
 // If an empty string is included in the "body" field, we should
 // replace the body with nothing
-TEST(MutationUtils, TestBodyMutationReplaceEmpty) {
+TEST_F(MutationUtilsTest, TestBodyMutationReplaceEmpty) {
   Buffer::OwnedImpl buf;
   TestUtility::feedBufferWithRandomCharacters(buf, 100);
   BodyMutation mut;
@@ -210,7 +300,7 @@ TEST(MutationUtils, TestBodyMutationReplaceEmpty) {
 }
 
 // Clear the buffer if the "clear_buffer" flag is set
-TEST(MutationUtils, TestBodyMutationClearYes) {
+TEST_F(MutationUtilsTest, TestBodyMutationClearYes) {
   Buffer::OwnedImpl buf;
   TestUtility::feedBufferWithRandomCharacters(buf, 100);
   BodyMutation mut;
@@ -221,7 +311,7 @@ TEST(MutationUtils, TestBodyMutationClearYes) {
 
 // Don't clear the buffer if the "clear_buffer" flag is set to false,
 // which is weird, but possible
-TEST(MutationUtils, TestBodyMutationClearNo) {
+TEST_F(MutationUtilsTest, TestBodyMutationClearNo) {
   Buffer::OwnedImpl buf;
   TestUtility::feedBufferWithRandomCharacters(buf, 100);
   Buffer::OwnedImpl bufCopy;
@@ -234,7 +324,7 @@ TEST(MutationUtils, TestBodyMutationClearNo) {
 
 // Nothing should happen if we don't set the proto oneof,
 // which is weird, but possible
-TEST(MutationUtils, TestBodyMutationNothing) {
+TEST_F(MutationUtilsTest, TestBodyMutationNothing) {
   Buffer::OwnedImpl buf;
   TestUtility::feedBufferWithRandomCharacters(buf, 100);
   Buffer::OwnedImpl bufCopy;
@@ -242,6 +332,113 @@ TEST(MutationUtils, TestBodyMutationNothing) {
   BodyMutation mut;
   MutationUtils::applyBodyMutations(mut, buf);
   EXPECT_TRUE(TestUtility::buffersEqual(buf, bufCopy));
+}
+
+TEST_F(MutationUtilsTest, TestAllowHeadersExactCaseSensitive) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers is set. disallow_headers is not.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+  string_matcher.set_exact(":Path");
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST_F(MutationUtilsTest, TestAllowHeadersExactIgnoreCase) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers is set. disallow_headers is not.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+  string_matcher.set_exact(":Path");
+  string_matcher.set_ignore_case(true);
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{":method", "GET"}, {":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST_F(MutationUtilsTest, TestBothAllowAndDisallowHeadersSet) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // Both allow_headers and disallow_headers are set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+
+  // Set allow_headers.
+  string_matcher.set_exact(":method");
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+  string_matcher.set_exact(":path");
+  allow_headers.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+
+  // Set disallow_headers
+  string_matcher.set_exact(":method");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{":path", "/foo/the/bar?size=123"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST_F(MutationUtilsTest, TestDisallowHeaderSetNotAllowHeader) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},
+      {":path", "/foo/the/bar?size=123"},
+      {"content-type", "text/plain; encoding=UTF8"},
+      {"x-something-else", "yes"},
+  };
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::config::core::v3::HeaderMap proto_headers;
+  // allow_headers not set. disallow_headers set.
+  std::vector<Matchers::StringMatcherPtr> allow_headers;
+  std::vector<Matchers::StringMatcherPtr> disallow_headers;
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+
+  // Set disallow_headers.
+  string_matcher.set_exact(":method");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+  string_matcher.set_exact(":path");
+  disallow_headers.push_back(
+      std::make_unique<Matchers::StringMatcherImpl>(string_matcher, context));
+
+  MutationUtils::headersToProto(headers, allow_headers, disallow_headers, proto_headers);
+  Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},
+                                          {"x-something-else", "yes"}};
+  EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
 }
 
 } // namespace

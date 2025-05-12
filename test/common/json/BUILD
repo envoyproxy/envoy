@@ -16,6 +16,7 @@ envoy_cc_fuzz_test(
     name = "json_fuzz_test",
     srcs = ["json_fuzz_test.cc"],
     corpus = "json_corpus",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -33,9 +34,11 @@ JSON_TEST_DEPS = [
 envoy_cc_test(
     name = "json_loader_test",
     srcs = ["json_loader_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -43,8 +46,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "json_sanitizer_test",
     srcs = ["json_sanitizer_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":json_sanitizer_test_util_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/json:json_internal_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
@@ -65,11 +70,33 @@ envoy_cc_fuzz_test(
     name = "json_sanitizer_fuzz_test",
     srcs = ["json_sanitizer_fuzz_test.cc"],
     corpus = "json_sanitizer_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":json_sanitizer_test_util_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
         "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "json_streamer_test",
+    srcs = ["json_streamer_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/json:json_internal_lib",
+        "//source/common/json:json_streamer_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "json_utility_test",
+    srcs = ["json_utility_test.cc"],
+    deps = [
+        "//source/common/json:json_utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
@@ -103,5 +130,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utf8_test",
     srcs = ["utf8_test.cc"],
+    rbe_pool = "6gig",
     deps = [":utf8_lib"],
 )

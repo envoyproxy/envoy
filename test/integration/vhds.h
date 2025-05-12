@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/status.h"
@@ -85,10 +87,8 @@ static_resources:
           rds:
             route_config_name: my_route
             config_source:
-              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
-                transport_api_version: V3
                 grpc_services:
                   envoy_grpc:
                     cluster_name: xds_cluster
@@ -96,7 +96,7 @@ static_resources:
                                                   Platform::null_device_path));
 }
 
-const char VhostTemplate[] = R"EOF(
+constexpr absl::string_view VhostTemplate = R"EOF(
 name: {}
 domains: [{}]
 routes:
@@ -110,10 +110,8 @@ const char RdsConfig[] = R"EOF(
 name: my_route
 vhds:
   config_source:
-    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -129,10 +127,8 @@ virtual_hosts:
     route: { cluster: my_service }
 vhds:
   config_source:
-    resource_api_version: V3
     api_config_source:
       api_type: DELTA_GRPC
-      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: xds_cluster
@@ -143,9 +139,8 @@ class VhdsIntegrationTest : public HttpIntegrationTest,
 public:
   VhdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
-    if (isUnified()) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
   }
 
   void TearDown() override { cleanUpXdsConnection(); }
@@ -215,12 +210,12 @@ public:
     RELEASE_ASSERT(result, result.message());
     vhds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(
-        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_);
-    EXPECT_TRUE(
-        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
+        Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
 
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
@@ -254,7 +249,7 @@ public:
       const std::vector<std::string>& removed, const std::string& version, FakeStreamPtr& stream,
       const std::vector<std::string>& aliases, const std::vector<std::string>& unresolved_aliases) {
     auto response = createDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases);
+        Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases, {});
     for (const auto& unresolved_alias : unresolved_aliases) {
       auto* resource = response.add_resources();
       resource->set_name(unresolved_alias);

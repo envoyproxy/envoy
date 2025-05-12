@@ -14,7 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/tcp:conn_pool_interface",
         "//envoy/upstream:load_balancer_interface",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
     ],
 )
 

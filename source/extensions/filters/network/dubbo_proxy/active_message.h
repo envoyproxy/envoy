@@ -55,7 +55,8 @@ private:
   ResponseDecoderPtr decoder_;
   MessageMetadataSharedPtr metadata_;
   bool complete_ : 1;
-  DubboFilters::UpstreamResponseStatus response_status_;
+  DubboFilters::UpstreamResponseStatus response_status_{
+      DubboFilters::UpstreamResponseStatus::MoreData};
 };
 
 using ActiveResponseDecoderPtr = std::unique_ptr<ActiveResponseDecoder>;

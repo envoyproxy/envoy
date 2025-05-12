@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
 
 namespace Envoy {
@@ -12,6 +13,47 @@ namespace Tracing {
 
 class Span;
 using SpanPtr = std::unique_ptr<Span>;
+
+/**
+ * The upstream service type.
+ */
+enum class ServiceType {
+  // Service type is unknown.
+  Unknown,
+  // Service is treated as HTTP.
+  Http,
+  // Service is treated as GoogleGrpc.
+  GoogleGrpc,
+  // Service is treated as EnvoyGrpc.
+  EnvoyGrpc
+};
+
+/**
+ * Contains upstream context information essential for the injectContext process.
+ *
+ * @param host Optional reference to the upstream host description.
+ * @param cluster Optional reference to the upstream cluster information.
+ * @param service_type The type of service the upstream context relates to.
+ * @param async_client_span Indicates if the injectContext originates from an asynchronous
+ * client.
+ */
+struct UpstreamContext {
+  UpstreamContext(const Upstream::HostDescription* host = nullptr,
+                  const Upstream::ClusterInfo* cluster = nullptr,
+                  const ServiceType service_type = ServiceType::Unknown,
+                  const bool async_client_span = false)
+      : host_(makeOptRefFromPtr(host)), cluster_(makeOptRefFromPtr(cluster)),
+        service_type_(service_type), async_client_span_(async_client_span) {}
+
+  OptRef<const Upstream::HostDescription> host_;
+  OptRef<const Upstream::ClusterInfo> cluster_;
+  const ServiceType service_type_;
+
+  // TODO(botengyao): further distinction for the shared upstream code path can be
+  // added if needed. Setting this flag to true only means it is called from async
+  // client at current stage.
+  const bool async_client_span_;
+};
 
 /**
  * Basic abstraction for span.
@@ -50,10 +92,9 @@ public:
    * Mutate the provided headers with the context necessary to propagate this
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
-   * @param upstream connecting host description
+   * @param upstream upstream context info
    */
-  virtual void injectContext(TraceContext& trace_conext,
-                             const Upstream::HostDescriptionConstSharedPtr& upstream) PURE;
+  virtual void injectContext(TraceContext& trace_conext, const UpstreamContext& upstream) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -92,9 +133,15 @@ public:
    * Retrieve the trace ID associated with this span.
    * The trace id may be generated for this span, propagated by parent spans, or
    * not created yet.
-   * @return trace ID as a hex string
+   * @return trace ID
    */
-  virtual std::string getTraceIdAsHex() const PURE;
+  virtual std::string getTraceId() const PURE;
+
+  /**
+   * Retrieve the span's identifier.
+   * @return span ID as a hex string
+   */
+  virtual std::string getSpanId() const PURE;
 };
 
 /**
@@ -107,9 +154,10 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_conext,
-                            const std::string& operation_name, SystemTime start_time,
-                            const Tracing::Decision tracing_decision) PURE;
+  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_context,
+                            const StreamInfo::StreamInfo& stream_info,
+                            const std::string& operation_name,
+                            Tracing::Decision tracing_decision) PURE;
 };
 
 using DriverPtr = std::unique_ptr<Driver>;

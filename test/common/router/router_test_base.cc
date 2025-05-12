@@ -12,25 +12,28 @@ using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
                                bool suppress_grpc_request_failure_code_stats,
+                               bool flush_upstream_log_on_upstream_stream,
                                Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
-      config_(pool_.add("test"), local_info_, stats_store_, cm_, runtime_, random_,
-              ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-              false, suppress_grpc_request_failure_code_stats, std::move(strict_headers_to_check),
-              test_time_.timeSystem(), http_context_, router_context_),
-      router_(config_, config_.default_stats_) {
-  router_.setDecoderFilterCallbacks(callbacks_);
+      config_(std::make_shared<FilterConfig>(
+          factory_context_, pool_.add("test"), factory_context_.local_info_,
+          *stats_store_.rootScope(), cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true,
+          start_child_span, suppress_envoy_headers, false, suppress_grpc_request_failure_code_stats,
+          flush_upstream_log_on_upstream_stream, std::move(strict_headers_to_check),
+          test_time_.timeSystem(), http_context_, router_context_)),
+      router_(std::make_unique<RouterTestFilter>(config_, config_->default_stats_)) {
+  router_->setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
   cm_.initializeThreadLocalClusters({"fake_cluster"});
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, address())
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      host_address_);
-  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_
-      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
   test_time_.setMonotonicTime(std::chrono::milliseconds(50));
@@ -42,16 +45,9 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
       .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
-  // All router based tests will fail if the codec filter is not created in the
-  // filter chain. By default, create a filter chain with just a codec filter.
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-      .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-      }));
+  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+    return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+  }));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
@@ -119,9 +115,9 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
         .WillByDefault(Return(nullptr));
   }
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
         EXPECT_EQ(match.size(), 2);
         auto it = match.begin();
@@ -150,11 +146,11 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
-  router_.onDestroy();
+  router_->onDestroy();
 }
 
 void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
@@ -171,19 +167,19 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
   if (preset_count) {
     headers.setEnvoyAttemptCount(preset_count.value());
   }
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
 
   EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
   EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
-  router_.onDestroy();
+  router_->onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
@@ -198,7 +194,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -216,7 +212,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 void RouterTestBase::sendRequest(bool end_stream) {
@@ -227,7 +223,7 @@ void RouterTestBase::sendRequest(bool end_stream) {
                                       Http::Protocol::Http10);
 
   HttpTestUtility::addDefaultHeaders(default_request_headers_, false);
-  router_.decodeHeaders(default_request_headers_, end_stream);
+  router_->decodeHeaders(default_request_headers_, end_stream);
 }
 
 void RouterTestBase::enableRedirects(uint32_t max_internal_redirects) {
@@ -299,9 +295,9 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -344,9 +340,9 @@ void RouterTestBase::testAppendUpstreamHost(
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -392,9 +388,9 @@ void RouterTestBase::testDoNotForward(
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
   EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
@@ -412,6 +408,15 @@ void RouterTestBase::expectNewStreamWithImmediateEncoder(Http::RequestEncoder& e
                               upstream_stream_info_, protocol);
         return nullptr;
       }));
+}
+
+void RouterTestBase::recreateFilter() {
+  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+  router_->setDecoderFilterCallbacks(callbacks_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
 }
 
 } // namespace Router

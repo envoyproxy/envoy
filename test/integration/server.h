@@ -17,9 +17,12 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/options_impl.h"
+#include "source/server/options_impl_base.h"
 #include "source/server/server.h"
 
 #include "test/integration/server_stats.h"
@@ -39,15 +42,15 @@ struct FieldValidationConfig {
   bool ignore_unknown_dynamic_fields = false;
 };
 
-// Create OptionsImpl structures suitable for tests. Disables hot restart.
-OptionsImpl
-createTestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
-                      Network::Address::IpVersion ip_version,
-                      FieldValidationConfig validation_config = FieldValidationConfig(),
-                      uint32_t concurrency = 1,
-                      std::chrono::seconds drain_time = std::chrono::seconds(1),
-                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-                      bool use_bootstrap_node_metadata = false);
+// Create OptionsImplBase structures suitable for tests. Disables hot restart.
+OptionsImplBase createTestOptionsImpl(
+    const std::string& config_path, const std::string& config_yaml,
+    Network::Address::IpVersion ip_version,
+    FieldValidationConfig validation_config = FieldValidationConfig(), uint32_t concurrency = 1,
+    std::chrono::seconds drain_time = std::chrono::seconds(1),
+    Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+    bool use_bootstrap_node_metadata = false,
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -71,22 +74,18 @@ namespace Stats {
  */
 class TestScopeWrapper : public Scope {
 public:
-  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope)
-      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
+      : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
   ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
-  }
-
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    Thread::LockGuard lock(lock_);
-    wrapped_scope_->deliverHistogramToSinks(histogram, value);
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
+                                              store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -111,10 +110,6 @@ public:
                                                StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
-  }
-
-  NullGaugeImpl& nullGauge(const std::string& str) override {
-    return wrapped_scope_->nullGauge(str);
   }
 
   Counter& counterFromString(const std::string& name) override {
@@ -165,10 +160,13 @@ public:
     return wrapped_scope_->iterate(fn);
   }
   StatName prefix() const override { return wrapped_scope_->prefix(); }
+  Store& store() override { return store_; }
+  const Store& constStore() const override { return store_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;
+  Store& store_;
 };
 
 // A counter which signals on a condition variable when it is incremented.
@@ -198,6 +196,7 @@ public:
   uint32_t use_count() const override { return counter_->use_count(); }
   StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
   bool used() const override { return counter_->used(); }
+  bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }
 
@@ -278,12 +277,7 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterFromStatNameWithTags(name, tags);
-  }
+  // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
@@ -317,66 +311,29 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedTextReadout(f_size, f_stat);
   }
+  void forEachSinkedHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedHistogram(f_size, f_stat);
+  }
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
-
-  Counter& counterFromString(const std::string& name) override {
+  OptRef<SinkPredicates> sinkPredicates() override { return OptRef<SinkPredicates>{}; }
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterFromString(name);
+    store_.deliverHistogramToSinks(histogram, value);
   }
-  ScopeSharedPtr createScope(const std::string& name) override {
+  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
+  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+    if (lazy_default_scope_ == nullptr) {
+      lazy_default_scope_ = std::make_shared<TestScopeWrapper>(lock_, store_.rootScope(), *this);
+    }
+    return lazy_default_scope_;
   }
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
-  }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromString(name, import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatNameWithTags(name, tags, unit);
-  }
-  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromString(name, unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromStatNameWithTags(name, tags);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromString(name);
-  }
-  CounterOptConstRef findCounter(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findCounter(name);
-  }
-  GaugeOptConstRef findGauge(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findGauge(name);
-  }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findHistogram(name);
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findTextReadout(name);
+  ConstScopeSharedPtr constRootScope() const override {
+    return const_cast<TestIsolatedStoreImpl*>(this)->rootScope();
   }
   const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
@@ -398,12 +355,15 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
-  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
+
+  void extractAndAppendTags(StatName, StatNamePool&, StatNameTagVector&) override {};
+  void extractAndAppendTags(absl::string_view, StatNamePool&, StatNameTagVector&) override {};
+  const Stats::TagVector& fixedTags() override { CONSTRUCT_ON_FIRST_USE(Stats::TagVector); }
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
@@ -420,6 +380,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   PostMergeCb merge_cb_;
+  ScopeSharedPtr lazy_default_scope_;
 };
 
 } // namespace Stats
@@ -449,7 +410,9 @@ public:
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
          Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
          Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
-         bool use_bootstrap_node_metadata = false);
+         bool use_bootstrap_node_metadata = false,
+         std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr,
+         bool use_admin_server = true);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -459,6 +422,7 @@ public:
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
   void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);
+  void setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source);
 
   Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
@@ -478,7 +442,8 @@ public:
              ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
              uint32_t concurrency, std::chrono::seconds drain_time,
              Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata);
+             Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
+             bool use_admin_server);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -506,6 +471,24 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  void waitForCounterNonexistent(const std::string& name,
+                                 std::chrono::milliseconds timeout) override {
+    Event::TestTimeSystem::RealTimeBound bound(timeout);
+    while (TestUtility::findCounter(statStore(), name) != nullptr) {
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+      ASSERT_FALSE(!bound.withinBound())
+          << "timed out waiting for counter " << name << " to not exist.";
+    }
+  }
+
+  void waitForProactiveOverloadResourceUsageEq(
+      const Server::OverloadProactiveResourceName resource_name, int64_t value,
+      Event::Dispatcher& dispatcher,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    ASSERT_TRUE(TestUtility::waitForProactiveOverloadResourceUsageEq(
+        overloadState(), resource_name, value, time_system_, dispatcher, timeout));
+  }
+
   // TODO(#17956): Add Gauge type to NotifyingAllocator and adopt it in this method.
   void waitForGaugeDestroyed(const std::string& name) override {
     ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_));
@@ -514,8 +497,14 @@ public:
   void waitUntilHistogramHasSamples(
       const std::string& name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_,
-                                                          server().dispatcher(), timeout));
+    waitForNumHistogramSamplesGe(name, 1, timeout);
+  }
+
+  void waitForNumHistogramSamplesGe(
+      const std::string& name, uint64_t sample_count,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForNumHistogramSamplesGe(
+        statStore(), name, sample_count, time_system_, server().dispatcher(), timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
@@ -560,6 +549,7 @@ public:
   // Should not be called until createAndRunEnvoyServer() is called.
   virtual Server::Instance& server() PURE;
   virtual Stats::Store& statStore() PURE;
+  virtual Server::ThreadLocalOverloadState& overloadState() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
   virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
@@ -567,20 +557,23 @@ public:
 
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
-                        const std::string& config_path)
-      : time_system_(time_system), api_(api), config_path_(config_path) {}
+                        const std::string& config_path,
+                        std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto)
+      : time_system_(time_system), api_(api), config_path_(config_path),
+        config_proto_(std::move(config_proto)) {}
 
   // Create the running envoy server. This function will call serverReady() when the virtual
   // functions server(), statStore(), and adminAddress() may be called, but before the server
   // has been started.
   // The subclass is also responsible for tearing down this server in its destructor.
-  virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+  virtual void createAndRunEnvoyServer(OptionsImplBase& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
                                        Random::RandomGeneratorPtr&& random_generator,
                                        ProcessObjectOptRef process_object,
-                                       Buffer::WatermarkFactorySharedPtr watermark_factory) PURE;
+                                       Buffer::WatermarkFactorySharedPtr watermark_factory,
+                                       bool use_admin_server) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), statStore(),
@@ -597,7 +590,7 @@ private:
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
                      Buffer::WatermarkFactorySharedPtr watermark_factory,
-                     bool use_bootstrap_node_metadata);
+                     bool use_bootstrap_node_metadata, bool use_admin_server);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -613,13 +606,16 @@ private:
   TcpDumpPtr tcp_dump_;
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
   bool use_admin_interface_to_quit_{};
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_;
 };
 
 // Default implementation of IntegrationTestServer
 class IntegrationTestServerImpl : public IntegrationTestServer {
 public:
-  IntegrationTestServerImpl(Event::TestTimeSystem& time_system, Api::Api& api,
-                            const std::string& config_path, bool real_stats = false);
+  IntegrationTestServerImpl(
+      Event::TestTimeSystem& time_system, Api::Api& api, const std::string& config_path,
+      bool real_stats = false,
+      std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
 
   ~IntegrationTestServerImpl() override;
 
@@ -631,6 +627,11 @@ public:
     RELEASE_ASSERT(stat_store_ != nullptr, "");
     return *stat_store_;
   }
+  Server::ThreadLocalOverloadState& overloadState() override {
+    RELEASE_ASSERT(server_ != nullptr, "");
+    return server_->overloadManager().getThreadLocalOverloadState();
+  }
+
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
   Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
@@ -641,13 +642,14 @@ public:
   }
 
 private:
-  void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
+  void createAndRunEnvoyServer(OptionsImplBase& options, Event::TimeSystem& time_system,
                                Network::Address::InstanceConstSharedPtr local_address,
                                ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,
                                Random::RandomGeneratorPtr&& random_generator,
                                ProcessObjectOptRef process_object,
-                               Buffer::WatermarkFactorySharedPtr watermark_factory) override;
+                               Buffer::WatermarkFactorySharedPtr watermark_factory,
+                               bool use_admin_server) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.

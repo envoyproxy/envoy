@@ -1,6 +1,6 @@
 broker.id=0
 listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_real_port'] }}
-advertised.listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_envoy_port'] }}
+advertised.listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_real_port'] }}
 
 num.network.threads=3
 num.io.threads=8

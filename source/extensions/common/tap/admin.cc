@@ -17,7 +17,7 @@ namespace Tap {
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(tap_admin_handler);
 
-AdminHandlerSharedPtr AdminHandler::getSingleton(Server::Admin& admin,
+AdminHandlerSharedPtr AdminHandler::getSingleton(OptRef<Server::Admin> admin,
                                                  Singleton::Manager& singleton_manager,
                                                  Event::Dispatcher& main_thread_dispatcher) {
   return singleton_manager.getTyped<AdminHandler>(
@@ -26,8 +26,8 @@ AdminHandlerSharedPtr AdminHandler::getSingleton(Server::Admin& admin,
       });
 }
 
-AdminHandler::AdminHandler(Server::Admin& admin, Event::Dispatcher& main_thread_dispatcher)
-    : admin_(admin), main_thread_dispatcher_(main_thread_dispatcher) {
+AdminHandler::AdminHandler(OptRef<Server::Admin> admin, Event::Dispatcher& main_thread_dispatcher)
+    : admin_(admin.value()), main_thread_dispatcher_(main_thread_dispatcher) {
   const bool rc =
       admin_.addHandler("/tap", "tap filter control", MAKE_ADMIN_HANDLER(handler), true, true);
   RELEASE_ASSERT(rc, "/tap admin endpoint is taken");
@@ -55,12 +55,11 @@ Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
   }
 
   envoy::admin::v3::TapRequest tap_request;
-  try {
+  TRY_NEEDS_AUDIT {
     MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request,
                                          ProtobufMessage::getStrictValidationVisitor());
-  } catch (EnvoyException& e) {
-    return badRequest(response, e.what());
   }
+  END_TRY catch (EnvoyException& e) { return badRequest(response, e.what()); }
 
   ENVOY_LOG(debug, "tap admin request for config_id={}", tap_request.config_id());
   if (config_id_map_.count(tap_request.config_id()) == 0) {

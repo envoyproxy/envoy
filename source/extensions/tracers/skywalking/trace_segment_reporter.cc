@@ -19,7 +19,8 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
                                            Random::RandomGenerator& random_generator,
                                            SkyWalkingTracerStatsSharedPtr stats,
                                            uint32_t delayed_buffer_size, const std::string& token)
-    : tracing_stats_(stats), client_(factory->createUncachedRawAsyncClient()),
+    : tracing_stats_(stats), client_(THROW_OR_RETURN_VALUE(factory->createUncachedRawAsyncClient(),
+                                                           Grpc::RawAsyncClientPtr)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "skywalking.v3.TraceSegmentReportService.collect")),
       random_generator_(random_generator), token_(token),
@@ -42,12 +43,17 @@ void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metad
   }
 }
 
-void TraceSegmentReporter::report(TracingContextPtr tracing_context) {
+void TraceSegmentReporter::report(TracingContextSharedPtr tracing_context) {
   ASSERT(tracing_context);
   auto request = tracing_context->createSegmentObject();
   ENVOY_LOG(trace, "Try to report segment to SkyWalking Server:\n{}", request.DebugString());
 
   if (stream_ != nullptr) {
+    if (stream_->isAboveWriteBufferHighWatermark()) {
+      ENVOY_LOG(debug, "Failed to report segment to SkyWalking Server since buffer is over limit");
+      tracing_stats_->segments_dropped_.inc();
+      return;
+    }
     tracing_stats_->segments_sent_.inc();
     stream_->sendMessage(request, false);
     return;

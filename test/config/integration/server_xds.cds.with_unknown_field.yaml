@@ -6,7 +6,6 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
-      resource_api_version: V3
       path_config_source:
         path: "{{ eds_json_path }}"
   lb_policy: ROUND_ROBIN

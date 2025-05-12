@@ -30,6 +30,11 @@ INSTANTIATE_TEST_SUITE_P(Protocols, HttpConnPoolIntegrationTest,
 
 // Tests that conn pools are cleaned up after becoming idle due to a LocalClose
 TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterLocalClose) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 ||
+      downstreamProtocol() == Http::CodecType::HTTP3) {
+    // TODO(#26236) - Fix test flakiness over HTTP/3.
+    return;
+  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Make Envoy close the upstream connection after a single request.
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -162,16 +167,16 @@ TEST_P(HttpConnPoolIntegrationTest, PoolDrainAfterDrainApiAllClusters) {
 
   setUpstreamCount(2);
 
-  auto host = config_helper_.createVirtualHost("cluster_1.com", "/", "cluster_1");
+  auto host = config_helper_.createVirtualHost("cluster_1.lyft.com", "/", "cluster_1");
   config_helper_.addVirtualHost(host);
 
-  config_helper_.setDefaultHostAndRoute("cluster_0.com", "/");
+  config_helper_.setDefaultHostAndRoute("cluster_0.lyft.com", "/");
 
   initialize();
 
   // Request Flow to cluster_0.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("cluster_0.com");
+  default_request_headers_.setHost("cluster_0.lyft.com");
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();
 
@@ -190,7 +195,7 @@ TEST_P(HttpConnPoolIntegrationTest, PoolDrainAfterDrainApiAllClusters) {
 
   // Request Flow to cluster_1.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("cluster_1.com");
+  default_request_headers_.setHost("cluster_1.lyft.com");
   response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest(1);
 

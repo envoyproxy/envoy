@@ -17,8 +17,8 @@
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/non_copyable.h"
+#include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/server/active_stream_listener_base.h"
 
 #include "spdlog/spdlog.h"
 
@@ -51,6 +51,8 @@ public:
     }
 
     void setRejectFraction(UnitFloat) override {}
+    void configureLoadShedPoints(Server::LoadShedPointProvider&) override {}
+    bool shouldBypassOverloadManager() const override { return false; }
   };
 
   // Network::TcpConnectionHandler
@@ -74,7 +76,9 @@ public:
       listener_->enable();
     }
   }
-  void shutdownListener() override { listener_.reset(); }
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
+    listener_.reset();
+  }
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override {

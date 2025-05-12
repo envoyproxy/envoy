@@ -87,6 +87,8 @@ Extensions
 Windows
 -------
 
+.. include:: ../_include/windows_support_ended.rst
+
 .. toctree::
   :maxdepth: 2
 

@@ -82,6 +82,43 @@ public:
   std::string name() const override { return "envoy.filters.udp_listener.test"; }
 };
 
+#ifdef ENVOY_ENABLE_QUIC
+/**
+ * Config registration for the test filter.
+ */
+class TestQuicListenerFilterConfigFactory
+    : public Server::Configuration::NamedQuicListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  Network::QuicListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& proto_config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext& context) override {
+    const auto& message = MessageUtil::downcastAndValidate<
+        const test::integration::filters::TestQuicListenerFilterConfig&>(
+        proto_config, context.messageValidationVisitor());
+    return [listener_filter_matcher, added_value = message.added_value(),
+            allow_server_migration = message.allow_server_migration(),
+            allow_client_migration = message.allow_client_migration()](
+               Network::QuicListenerFilterManager& filter_manager) -> void {
+      filter_manager.addFilter(listener_filter_matcher,
+                               std::make_unique<TestQuicListenerFilter>(
+                                   added_value, allow_server_migration, allow_client_migration));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::TestQuicListenerFilterConfig>();
+  }
+
+  std::string name() const override { return "envoy.filters.quic_listener.test"; }
+};
+
+REGISTER_FACTORY(TestQuicListenerFilterConfigFactory,
+                 Server::Configuration::NamedQuicListenerFilterConfigFactory);
+
+#endif
+
 REGISTER_FACTORY(TestInspectorConfigFactory,
                  Server::Configuration::NamedListenerFilterConfigFactory);
 
@@ -90,4 +127,5 @@ REGISTER_FACTORY(TestTcpInspectorConfigFactory,
 
 REGISTER_FACTORY(TestUdpInspectorConfigFactory,
                  Server::Configuration::NamedUdpListenerFilterConfigFactory);
+
 } // namespace Envoy

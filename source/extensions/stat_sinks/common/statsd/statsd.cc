@@ -5,7 +5,6 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
@@ -67,11 +66,21 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
     }
   }
 
+  for (const auto& counter : snapshot.hostCounters()) {
+    const std::string counter_str = buildMessage(counter, counter.delta(), "|c");
+    writeBuffer(buffer, writer, counter_str);
+  }
+
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       const std::string gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
       writeBuffer(buffer, writer, gauge_str);
     }
+  }
+
+  for (const auto& gauge : snapshot.hostGauges()) {
+    const std::string gauge_str = buildMessage(gauge, gauge.value(), "|g");
+    writeBuffer(buffer, writer, gauge_str);
   }
 
   flushBuffer(buffer, writer);
@@ -126,8 +135,8 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   tls_->getTyped<Writer>().write(message);
 }
 
-template <typename ValueType>
-const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
+template <class StatType, typename ValueType>
+const std::string UdpStatsdSink::buildMessage(const StatType& metric, ValueType value,
                                               const std::string& type) const {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
@@ -155,7 +164,7 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, Value
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
+template <class StatType> const std::string UdpStatsdSink::getName(const StatType& metric) const {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {
@@ -179,17 +188,32 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                             const std::string& prefix)
+                             absl::Status& creation_status, const std::string& prefix)
     : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
       cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
-  const auto cluster = Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name,
-                                                                 cluster_manager, local_info);
+  SET_AND_RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo("tcp statsd", local_info),
+                           creation_status);
+  auto cluster_or_error =
+      Config::Utility::checkCluster("tcp statsd", cluster_name, cluster_manager);
+  SET_AND_RETURN_IF_NOT_OK(cluster_or_error.status(), creation_status);
+  const auto cluster = cluster_or_error.value();
   cluster_info_ = cluster->get().info();
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
+}
+
+absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
+TcpStatsdSink::create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                      ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                      Stats::Scope& scope, const std::string& prefix) {
+  absl::Status creation_status;
+  auto sink = std::unique_ptr<TcpStatsdSink>(new TcpStatsdSink(
+      local_info, cluster_name, tls, cluster_manager, scope, creation_status, prefix));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return sink;
 }
 
 void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
@@ -201,9 +225,17 @@ void TcpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
     }
   }
 
+  for (const auto& counter : snapshot.hostCounters()) {
+    tls_sink.flushCounter(counter.name(), counter.delta());
+  }
+
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
       tls_sink.flushGauge(gauge.get().name(), gauge.get().value());
+    }
+
+    for (const auto& gauge : snapshot.hostGauges()) {
+      tls_sink.flushGauge(gauge.name(), gauge.value());
     }
   }
   // TODO(efimki): Add support of text readouts stats.
@@ -330,8 +362,8 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   //       since if we stay over, the other threads will eventually kill their connections too.
   // TODO(mattklein123): The use of the stat is somewhat of a hack, and should be replaced with
   // real flow control callbacks once they are available.
-  if (parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_.value() >
-      MAX_BUFFERED_STATS_BYTES) {
+  Upstream::ClusterTrafficStats& cluster_traffic_stats = *parent_.cluster_info_->trafficStats();
+  if (cluster_traffic_stats.upstream_cx_tx_bytes_buffered_.value() > MAX_BUFFERED_STATS_BYTES) {
     if (connection_) {
       connection_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -354,11 +386,11 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
     connection_ = std::move(info.connection_);
     connection_->addConnectionCallbacks(*this);
-    connection_->setConnectionStats({parent_.cluster_info_->stats().upstream_cx_rx_bytes_total_,
-                                     parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
-                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
-                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
-                                     &parent_.cluster_info_->stats().bind_errors_, nullptr});
+    connection_->setConnectionStats({cluster_traffic_stats.upstream_cx_rx_bytes_total_,
+                                     cluster_traffic_stats.upstream_cx_rx_bytes_buffered_,
+                                     cluster_traffic_stats.upstream_cx_tx_bytes_total_,
+                                     cluster_traffic_stats.upstream_cx_tx_bytes_buffered_,
+                                     &cluster_traffic_stats.bind_errors_, nullptr});
     connection_->connect();
   }
 

@@ -1,0 +1,8 @@
+header_name: endpoint-load-metrics
+header_value: JSON {"cpu_utilization': 0.7, 
+response_headers {
+  headers {
+    key: "endpoint-load-metrics"
+    value: "JSON {\"cpu_utilization\': 0.7,"
+  }
+}

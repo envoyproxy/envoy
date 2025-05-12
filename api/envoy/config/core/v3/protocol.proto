@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -39,24 +40,21 @@ message QuicKeepAliveSettings {
   //
   // If zero, disable keepalive probing.
   // If absent, use the QUICHE default interval to probe.
-  google.protobuf.Duration max_interval = 1 [(validate.rules).duration = {
-    lte {}
-    gte {seconds: 1}
-  }];
+  google.protobuf.Duration max_interval = 1;
 
   // The interval to send the first few keep-alive probing packets to prevent connection from hitting the idle timeout. Subsequent probes will be sent, each one with an interval exponentially longer than previous one, till it reaches :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`. And the probes afterwards will always use :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`.
   //
   // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout and smaller than max_interval to take effect.
   //
-  // If absent or zero, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
+  // If absent, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>` is zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
   google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
     lte {}
-    gte {seconds: 1}
+    gte {nanos: 1000000}
   }];
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 6]
+// [#next-free-field: 10]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -64,7 +62,7 @@ message QuicProtocolOptions {
 
   // `Initial stream-level flow-control receive window
   // <https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1>`_ size. Valid values range from
-  // 1 to 16777216 (2^24, maximum supported by QUICHE) and defaults to 65536 (2^16).
+  // 1 to 16777216 (2^24, maximum supported by QUICHE) and defaults to 16777216 (16 * 1024 * 1024).
   //
   // NOTE: 16384 (2^14) is the minimum window size supported in Google QUIC. If configured smaller than it, we will use 16384 instead.
   // QUICHE IETF Quic implementation supports 1 bytes window. We only support increasing the default window size now, so it's also the minimum.
@@ -76,8 +74,8 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level
-  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults to 65536 (2^16).
-  // window. Currently, this has the same minimum/default as ``initial_stream_window_size``.
+  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
+  // to 25165824 (24 * 1024 * 1024).
   //
   // NOTE: 16384 (2^14) is the minimum window size supported in Google QUIC. We only support increasing the default
   // window size now, so it's also the minimum.
@@ -85,7 +83,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
-  // This defaults to 1. If set to 0, port migration will not occur on path degrading.
+  // This defaults to 4. If set to 0, port migration will not occur on path degrading.
   // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
@@ -94,6 +92,27 @@ message QuicProtocolOptions {
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
   QuicKeepAliveSettings connection_keepalive = 5;
+
+  // A comma-separated list of strings representing QUIC connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
+  string connection_options = 6;
+
+  // A comma-separated list of strings representing QUIC client connection options defined in
+  // `QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/crypto/crypto_protocol.h>`_ and to be sent by upstream connections.
+  string client_connection_options = 7;
+
+  // The duration that a QUIC connection stays idle before it closes itself. If this field is not present, QUICHE
+  // default 600s will be applied.
+  // For internal corporate network, a long timeout is often fine.
+  // But for client facing network, 30s is usually a good choice.
+  google.protobuf.Duration idle_network_timeout = 8 [(validate.rules).duration = {
+    lte {seconds: 600}
+    gte {seconds: 1}
+  }];
+
+  // Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
+  // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.
+  google.protobuf.UInt64Value max_packet_length = 9;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -104,12 +123,20 @@ message UpstreamHttpProtocolOptions {
   // upstream connections based on the downstream HTTP host/authority header or any other arbitrary
   // header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
   // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
+  //
+  // See :ref:`SNI configuration <start_quick_start_securing_sni_client>` for details on how this
+  // interacts with other validation options.
   bool auto_sni = 1;
 
   // Automatic validate upstream presented certificate for new upstream connections based on the
   // downstream HTTP host/authority header or any other arbitrary header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
   // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
   // This field is intended to be set with ``auto_sni`` field.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
+  //
+  // See :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
+  // other validation options.
   bool auto_san_validation = 2;
 
   // An optional alternative to the host/authority header to be used for setting the SNI value.
@@ -119,6 +146,7 @@ message UpstreamHttpProtocolOptions {
   // is not found or the value is empty, host/authority header will be used instead.
   // This field is intended to be set with ``auto_sni`` and/or ``auto_san_validation`` fields.
   // If none of these fields are set then setting this would be a no-op.
+  // Does nothing if a filter before the http router filter sets the corresponding metadata.
   string override_auto_sni_header = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 }
@@ -177,7 +205,7 @@ message AlternateProtocolsCacheOptions {
   // this list contained the value ``.c.example.com``, then an Alt-Svc entry for ``foo.c.example.com``
   // could be shared with ``bar.c.example.com`` but would not be shared with ``baz.example.com``. On
   // the other hand, if the list contained the value ``.example.com`` then all three hosts could share
-  // Alt-Svc entries. Each entry must start with ``.``.  If a hostname matches multiple suffixes, the
+  // Alt-Svc entries. Each entry must start with ``.``. If a hostname matches multiple suffixes, the
   // first listed suffix will be used.
   //
   // Since lookup in this list is O(n), it is recommended that the number of suffixes be limited.
@@ -185,7 +213,7 @@ message AlternateProtocolsCacheOptions {
   repeated string canonical_suffixes = 5;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -229,17 +257,36 @@ message HttpProtocolOptions {
   google.protobuf.Duration idle_timeout = 1;
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
-  // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // and if there are no active streams, the connection will be closed. If the connection is a
-  // downstream connection and there are any active streams, the drain sequence will kick-in,
-  // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
+  // was established. If not set, there is no max duration. When max_connection_duration is reached,
+  // the drain sequence will kick-in. The connection will be closed after the drain timeout period
+  // if there are no active streams. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration max_connection_duration = 3;
 
-  // The maximum number of headers. If unconfigured, the default
-  // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
-  // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
+  // The maximum number of headers (request headers if configured on HttpConnectionManager,
+  // response headers when configured on a cluster).
+  // If unconfigured, the default maximum number of headers allowed is 100.
+  // The default value for requests can be overridden by setting runtime key ``envoy.reloadable_features.max_request_headers_count``.
+  // The default value for responses can be overridden by setting runtime key ``envoy.reloadable_features.max_response_headers_count``.
+  // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
+  // reset for HTTP/2.
+  // Upstream responses that exceed this limit will result in a 503 response.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // The maximum size of response headers.
+  // If unconfigured, the default is 60 KiB, except for HTTP/1 response headers which have a default
+  // of 80KiB.
+  // The default value can be overridden by setting runtime key ``envoy.reloadable_features.max_response_headers_size_kb``.
+  // Responses that exceed this limit will result in a 503 response.
+  // In Envoy, this setting is only valid when configured on an upstream cluster, not on the
+  // :ref:`HTTP Connection Manager
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`.
+  //
+  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
+  //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   HTTP/3 limits a single header to around 1024kb.
+  google.protobuf.UInt32Value max_response_headers_kb = 7
+      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
   // reset independent of any other timeouts. If not specified, this value is not set.
@@ -259,7 +306,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 12]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -350,6 +397,35 @@ message Http1ProtocolOptions {
   // (inferred if not present), host (from the host/:authority header) and path
   // (from first line or :path header).
   bool send_fully_qualified_url = 8;
+
+  // [#not-implemented-hide:] Hiding so that field can be removed after BalsaParser is rolled out.
+  // If set, force HTTP/1 parser: BalsaParser if true, http-parser if false.
+  // If unset, HTTP/1 parser is selected based on
+  // envoy.reloadable_features.http1_use_balsa_parser.
+  // See issue #21245.
+  google.protobuf.BoolValue use_balsa_parser = 9
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // [#not-implemented-hide:] Hiding so that field can be removed.
+  // If true, and BalsaParser is used (either `use_balsa_parser` above is true,
+  // or `envoy.reloadable_features.http1_use_balsa_parser` is true and
+  // `use_balsa_parser` is unset), then every non-empty method with only valid
+  // characters is accepted. Otherwise, methods not on the hard-coded list are
+  // rejected.
+  // Once UHV is enabled, this field should be removed, and BalsaParser should
+  // allow any method. UHV validates the method, rejecting empty string or
+  // invalid characters, and provides :ref:`restrict_http_methods
+  // <envoy_v3_api_field_extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig.restrict_http_methods>`
+  // to reject custom methods.
+  bool allow_custom_methods = 10 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Ignore HTTP/1.1 upgrade values matching any of the supplied matchers.
+  //
+  // .. note::
+  //
+  //   ``h2c`` upgrades are always removed for backwards compatibility, regardless of the
+  //   value in this setting.
+  repeated type.matcher.v3.StringMatcher ignore_http_11_upgrade = 11;
 }
 
 message KeepaliveSettings {
@@ -382,7 +458,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 18]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -445,10 +521,10 @@ message Http2ProtocolOptions {
   // Allows proxying Websocket and other upgrades over H2 connect.
   bool allow_connect = 5;
 
-  // [#not-implemented-hide:] Hiding until envoy has full metadata support.
+  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
   // Still under implementation. DO NOT USE.
   //
-  // Allows metadata. See [metadata
+  // Allows sending and receiving HTTP/2 METADATA frames. See [metadata
   // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
@@ -560,6 +636,15 @@ message Http2ProtocolOptions {
   // Send HTTP/2 PING frames to verify that the connection is still healthy. If the remote peer
   // does not respond within the configured timeout, the connection will be aborted.
   KeepaliveSettings connection_keepalive = 15;
+
+  // [#not-implemented-hide:] Hiding so that the field can be removed after oghttp2 is rolled out.
+  // If set, force use of a particular HTTP/2 codec: oghttp2 if true, nghttp2 if false.
+  // If unset, HTTP/2 codec is selected based on envoy.reloadable_features.http2_use_oghttp2.
+  google.protobuf.BoolValue use_oghttp2_codec = 16
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
+  google.protobuf.UInt64Value max_metadata_size = 17;
 }
 
 // [#not-implemented-hide:]
@@ -571,7 +656,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -590,12 +675,35 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
   // Note that HTTP/3 CONNECT is not yet an RFC.
   bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Allows sending and receiving HTTP/3 METADATA frames. See [metadata
+  // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
+  // information.
+  bool allow_metadata = 6;
+
+  // [#not-implemented-hide:] Hiding until Envoy has full HTTP/3 upstream support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Disables QPACK compression related features for HTTP/3 including:
+  // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
+  // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
+  bool disable_qpack = 7;
 }
 
 // A message to control transformations to the :scheme header
 message SchemeHeaderTransformation {
   oneof transformation {
     // Overwrite any Scheme header with the contents of this string.
+    // If set, takes precedence over match_upstream.
     string scheme_to_overwrite = 1 [(validate.rules).string = {in: "http" in: "https"}];
   }
+
+  // Set the Scheme header to match the upstream transport protocol. For example, should a
+  // request be sent to the upstream over TLS, the scheme header will be set to "https". Should the
+  // request be sent over plaintext, the scheme header will be set to "http".
+  // If scheme_to_overwrite is set, this field is not used.
+  bool match_upstream = 2;
 }

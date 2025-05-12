@@ -22,7 +22,8 @@ public:
   explicit Http1BridgeFilter(
       Grpc::Context& context,
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config)
-      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
+      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()),
+        ignore_query_parameters_(proto_config.ignore_query_parameters()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -40,8 +41,8 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
@@ -56,6 +57,7 @@ public:
 
 private:
   void setupStatTracking(const Http::RequestHeaderMap& headers);
+  void ignoreQueryParams(Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
@@ -64,6 +66,7 @@ private:
   bool do_framing_{};
   Grpc::Context& context_;
   bool upgrade_protobuf_{};
+  bool ignore_query_parameters_{};
 };
 
 } // namespace GrpcHttp1Bridge

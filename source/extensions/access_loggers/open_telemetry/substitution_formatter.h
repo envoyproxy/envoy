@@ -26,13 +26,11 @@ OpenTelemetryFormatMapVisitorHelper(Ts...) -> OpenTelemetryFormatMapVisitorHelpe
  */
 class OpenTelemetryFormatter {
 public:
-  OpenTelemetryFormatter(const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping);
+  OpenTelemetryFormatter(const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping,
+                         const std::vector<Formatter::CommandParserPtr>& commands);
 
   ::opentelemetry::proto::common::v1::KeyValueList
-  format(const Http::RequestHeaderMap& request_headers,
-         const Http::ResponseHeaderMap& response_headers,
-         const Http::ResponseTrailerMap& response_trailers,
-         const StreamInfo::StreamInfo& stream_info, absl::string_view local_reply_body) const;
+  format(const Formatter::HttpFormatterContext& context, const StreamInfo::StreamInfo& info) const;
 
 private:
   struct OpenTelemetryFormatMapWrapper;
@@ -65,22 +63,24 @@ private:
   // Methods for building the format map.
   class FormatBuilder {
   public:
+    explicit FormatBuilder(const std::vector<Formatter::CommandParserPtr>& commands)
+        : commands_(commands) {}
     std::vector<Formatter::FormatterProviderPtr>
     toFormatStringValue(const std::string& string_format) const;
     OpenTelemetryFormatMapWrapper
     toFormatMapValue(const ::opentelemetry::proto::common::v1::KeyValueList& struct_format) const;
     OpenTelemetryFormatListWrapper toFormatListValue(
         const ::opentelemetry::proto::common::v1::ArrayValue& list_value_format) const;
+
+  private:
+    const std::vector<Formatter::CommandParserPtr>& commands_;
   };
 
   // Methods for doing the actual formatting.
   ::opentelemetry::proto::common::v1::AnyValue
   providersCallback(const std::vector<Formatter::FormatterProviderPtr>& providers,
-                    const Http::RequestHeaderMap& request_headers,
-                    const Http::ResponseHeaderMap& response_headers,
-                    const Http::ResponseTrailerMap& response_trailers,
-                    const StreamInfo::StreamInfo& stream_info,
-                    absl::string_view local_reply_body) const;
+                    const Formatter::HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& info) const;
   ::opentelemetry::proto::common::v1::AnyValue openTelemetryFormatMapCallback(
       const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map,
       const OpenTelemetryFormatMapVisitor& visitor) const;

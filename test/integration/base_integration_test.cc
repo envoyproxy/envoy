@@ -18,8 +18,9 @@
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
+#include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
@@ -28,6 +29,17 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
+#ifdef ENVOY_ENABLE_YAML
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config, bootstrap);
+  return bootstrap;
+#else
+  UNREFERENCED_PARAMETER(config);
+  PANIC("YAML support compiled out: can't parse YAML");
+#endif
+}
+
 using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
@@ -39,14 +51,15 @@ using ::testing::ReturnRef;
 
 BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
     : api_(Api::createApiForTest(stats_store_, time_system_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
       dispatcher_(api_->allocateDispatcher("test_thread",
                                            Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
-      config_helper_(version, *api_, config),
+      config_helper_(version, bootstrap),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
+  Envoy::Server::validateProtoDescriptors();
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -59,21 +72,34 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
-  ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
-  // Allow extension lookup by name in the integration tests.
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
-                                    "false");
+  ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
+  ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(factory_context_.server_context_, sslContextManager())
+      .WillByDefault(ReturnRef(context_manager_));
+  ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+  config_helper_.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
+#endif
+}
+
+BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(upstream_address_fn, version, configToBootstrap(config)) {}
+
+const BaseIntegrationTest::InstanceConstSharedPtrFn
+BaseIntegrationTest::defaultAddressFunction(Network::Address::IpVersion version) {
+  return [version](int) {
+    return Network::Utility::parseInternetAddressNoThrow(
+        Network::Test::getLoopbackAddressString(version), 0);
+  };
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          const std::string& config)
-    : BaseIntegrationTest(
-          [version](int) {
-            return Network::Utility::parseInternetAddress(
-                Network::Test::getLoopbackAddressString(version), 0);
-          },
-          version, config) {}
+    : BaseIntegrationTest(defaultAddressFunction(version), version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   return makeClientConnectionWithOptions(port, nullptr);
@@ -82,7 +108,7 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOptions(
     uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(
+      *Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
       nullptr));
@@ -100,38 +126,39 @@ void BaseIntegrationTest::initialize() {
   createXdsUpstream();
   createEnvoy();
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   if (!skip_tag_extraction_rule_check_) {
     checkForMissingTagExtractionRules();
   }
+#endif
 }
 
 Network::DownstreamTransportSocketFactoryPtr
 BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  const std::string yaml = absl::StrFormat(
-      R"EOF(
-common_tls_context:
-  tls_certificates:
-  - certificate_chain: { filename: "%s" }
-    private_key: { filename: "%s" }
-  validation_context:
-    trusted_ca: { filename: "%s" }
-)EOF",
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  TestUtility::loadFromYaml(yaml, tls_context);
+  const std::string rundir = TestEnvironment::runfilesDirectory();
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_filename(rundir + "/test/config/integration/certs/cacert.pem");
+  auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  certs->mutable_certificate_chain()->set_filename(
+      rundir + "/test/config/integration/certs/upstreamcert.pem");
+  certs->mutable_private_key()->set_filename(rundir +
+                                             "/test/config/integration/certs/upstreamkey.pem");
+
   if (upstream_config.upstream_protocol_ == Http::CodecType::HTTP2) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
   } else if (upstream_config.upstream_protocol_ == Http::CodecType::HTTP1) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+        tls_context, factory_context_, false);
+    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -140,7 +167,8 @@ common_tls_context:
     auto& config_factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(
         "envoy.transport_sockets.quic");
-    return config_factory.createTransportSocketFactory(quic_config, factory_context_, server_names);
+    return *config_factory.createTransportSocketFactory(quic_config, factory_context_,
+                                                        server_names);
   }
 }
 
@@ -156,10 +184,11 @@ void BaseIntegrationTest::createUpstream(Network::Address::InstanceConstSharedPt
       upstream_tls_ ? createUpstreamTlsContext(config)
                     : Network::Test::createRawBufferDownstreamSocketFactory();
   if (autonomous_upstream_) {
-    fake_upstreams_.emplace_back(new AutonomousUpstream(std::move(factory), endpoint, config,
-                                                        autonomous_allow_incomplete_streams_));
+    fake_upstreams_.emplace_back(std::make_unique<AutonomousUpstream>(
+        std::move(factory), endpoint, config, autonomous_allow_incomplete_streams_));
   } else {
-    fake_upstreams_.emplace_back(new FakeUpstream(std::move(factory), endpoint, config));
+    fake_upstreams_.emplace_back(
+        std::make_unique<FakeUpstream>(std::move(factory), endpoint, config));
   }
 }
 
@@ -197,15 +226,22 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
       ProtobufWkt::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
+#ifdef ENVOY_ENABLE_YAML
     TestEnvironment::writeStringToFileForTest(
-        lds_path, MessageUtil::getJsonStringFromMessageOrDie(lds), true);
-
+        lds_path, MessageUtil::getJsonStringFromMessageOrError(lds), true);
+#else
+    PANIC("YAML support compiled out: can't parse YAML");
+#endif
     // Now that the listeners have been written to the lds file, remove them from static resources
     // or they will not be reloadable.
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
   }
+#ifdef ENVOY_ENABLE_YAML
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
                  MessageUtil::getYamlStringFromMessage(bootstrap));
+#else
+  ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}", bootstrap.DebugString());
+#endif
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
@@ -305,9 +341,11 @@ absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                       Network::Address::InstanceConstSharedPtr source_address) {
+                                       Network::Address::InstanceConstSharedPtr source_address,
+                                       absl::string_view destination_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enableHalfClose(), options, source_address);
+                                                enableHalfClose(), options, source_address,
+                                                destination_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -330,6 +368,33 @@ void BaseIntegrationTest::setUpstreamAddress(
   auto* socket_address = endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
   socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
+}
+
+bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
+                                          void* optval, socklen_t* optlen, int address_index) {
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([&]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
+  for (auto& listener : listeners) {
+    if (listener.get().name() == listener_name) {
+      auto& socket_factory = listener.get().listenSocketFactories()[address_index];
+      auto socket = socket_factory->getListenSocket(0);
+      if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+        return false;
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names,
@@ -360,18 +425,25 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       }
     }
   }
-  const auto admin_addr =
-      test_server->server().admin().socket().connectionInfoProvider().localAddress();
-  if (admin_addr->type() == Network::Address::Type::Ip) {
-    registerPort("admin", admin_addr->ip()->port());
+  if (test_server->server().admin().has_value()) {
+    const auto admin_addr =
+        test_server->server().admin()->socket().connectionInfoProvider().localAddress();
+    if (admin_addr->type() == Network::Address::Type::Ip) {
+      ENVOY_LOG(debug, "registered 'admin' as port {}.", admin_addr->ip()->port());
+      registerPort("admin", admin_addr->ip()->port());
+    }
   }
 }
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
-  const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
+  const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
-  auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
+  auto listener_info = dynamic_cast<envoy::admin::v3::ListenersConfigDump&>(*details);
+#ifdef ENVOY_ENABLE_YAML
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
+#else
+  return listener_info.dynamic_listeners(0).error_state().DebugString();
+#endif
 }
 
 void BaseIntegrationTest::createGeneratedApiTestServer(
@@ -393,11 +465,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
-    // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
-    // needs to know about the bound listener ports.
-    // Using 2x default timeout to cover for slow TLS implementations (no inline asm) on slow
-    // computers (e.g., Raspberry Pi) that sometimes time out on TLS listeners here.
-    Event::TestTimeSystem::RealTimeBound bound(2 * TestUtility::DefaultTimeout);
+    Event::TestTimeSystem::RealTimeBound bound(listeners_bound_timeout_ms_);
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server->counter(success),
@@ -469,10 +537,13 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
 }
 
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
-                                                  bool allow_excess_entries) {
+                                                  bool allow_excess_entries,
+                                                  Network::ClientConnection* client_connection) {
+
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
-  for (int i = 0; i < 1000; ++i) {
+  const int num_iterations = TIMEOUT_FACTOR * 1000;
+  for (int i = 0; i < num_iterations; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
     if (entries.size() >= entry + 1) {
@@ -483,6 +554,11 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
           << entries.size() << "\n"
           << contents;
       return entries[entry];
+    }
+    if (i % 25 == 0 && client_connection != nullptr) {
+      // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
+      // then run dispatcher to send any pending acks.
+      client_connection->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
@@ -505,12 +581,13 @@ void BaseIntegrationTest::createXdsUpstream() {
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
-        tls_context, factory_context_);
+    auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+        tls_context, factory_context_, false);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
-    auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
+    auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
+        std::vector<std::string>{});
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
@@ -522,11 +599,13 @@ void BaseIntegrationTest::createXdsConnection() {
 }
 
 void BaseIntegrationTest::cleanUpXdsConnection() {
-  AssertionResult result = xds_connection_->close();
-  RELEASE_ASSERT(result, result.message());
-  result = xds_connection_->waitForDisconnect();
-  RELEASE_ASSERT(result, result.message());
-  xds_connection_.reset();
+  if (xds_connection_ != nullptr) {
+    AssertionResult result = xds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    xds_connection_.reset();
+  }
 }
 
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
@@ -534,15 +613,18 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream,
+    OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_substring);
+                                       expect_node, expected_error_code, expected_error_substring,
+                                       stream);
   } else {
-    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, expected_error_code,
-                                        expected_error_substring, expect_node);
+    return compareDeltaDiscoveryRequest(
+        expected_type_url, expected_resource_names_added, expected_resource_names_removed, stream,
+        expected_error_code, expected_error_substring, expect_node, initial_resource_versions);
   }
 }
 
@@ -613,15 +695,18 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                                           std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    try {
-      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
-                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
-                               nullptr, true);
+    TRY_NEEDS_AUDIT {
+      Network::TcpListenSocket give_me_a_name(
+          Network::Utility::getAddressWithPort(
+              *Network::Test::getCanonicalLoopbackAddress(version_), port),
+          nullptr, true);
       return AssertionSuccess();
-    } catch (const EnvoyException&) {
+    }
+    END_TRY
+    CATCH(const EnvoyException&, {
       // The nature of this function requires using a real sleep here.
       timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
-    }
+    });
   }
 
   return AssertionFailure() << "Timeout waiting for port availability";
@@ -645,10 +730,14 @@ BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
-    bool expect_node) {
+    bool expect_node,
+    OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+  if (xds_stream == nullptr) {
+    xds_stream = xds_stream_.get();
+  }
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.
@@ -679,7 +768,34 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   if (!unsub_result) {
     return unsub_result;
   }
-  // (We don't care about response_nonce or initial_resource_versions.)
+  // Validate initial_resource_versions if given (otherwise, we don't care what
+  // the request contains).
+  if (initial_resource_versions.has_value()) {
+    const auto& req_map = request.initial_resource_versions();
+    // Compare size, and that elements in one map appear in the other.
+    if (req_map.size() != initial_resource_versions->size()) {
+      return AssertionFailure() << fmt::format(
+                 "Wrong size of initial_resource_versions. Expected: {}, observed: {}.\n{}",
+                 initial_resource_versions->size(), req_map.size(),
+                 absl::StrJoin(req_map, ", ", absl::PairFormatter("=")));
+    }
+    EXPECT_EQ(req_map.size(), initial_resource_versions->size());
+    for (const auto& [resource_name, resource_version] : *initial_resource_versions) {
+      auto it = req_map.find(resource_name);
+      if (it == req_map.end()) {
+        return AssertionFailure() << fmt::format(
+                   "Could not find resource {} in received initial_resource_versions map: {}",
+                   resource_name, absl::StrJoin(req_map, ", ", absl::PairFormatter("=")));
+      }
+      if (resource_version != it->second) {
+        return AssertionFailure() << fmt::format(
+                   "Incorrect resource version {} in received initial_resource_versions map. "
+                   "Expected: {}, observed: {}",
+                   resource_name, resource_version, it->second);
+      }
+    }
+  }
+  // (We don't care about response_nonce.)
 
   if (request.error_detail().code() != expected_error_code) {
     return AssertionFailure() << fmt::format(
@@ -699,16 +815,16 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
 // Attempt to heuristically discover missing tag-extraction rules when new stats are added.
 // This is done by looking through the entire config for fields named `stat_prefix`, and then
 // validating that those values do not appear in the tag-extracted name of any stat. The alternate
-// approach of looking for the prefix in the extracted tags was more difficult because in the tests
-// some prefix values are reused (leading to false negatives) and some tests have base configuration
-// that sets a stat_prefix but don't produce any stats at all with that configuration (leading to
-// false positives).
+// approach of looking for the prefix in the extracted tags was more difficult because in the
+// tests some prefix values are reused (leading to false negatives) and some tests have base
+// configuration that sets a stat_prefix but don't produce any stats at all with that
+// configuration (leading to false positives).
 //
 // To add a rule, see `source/common/config/well_known_names.cc`.
 //
-// This is done in all integration tests because it is testing new stats and scopes that are created
-// for which the author isn't aware that tag extraction rules need to be written, and thus the
-// author wouldn't think to write tests for that themselves.
+// This is done in all integration tests because it is testing new stats and scopes that are
+// created for which the author isn't aware that tag extraction rules need to be written, and thus
+// the author wouldn't think to write tests for that themselves.
 void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
@@ -719,23 +835,23 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   }
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
 
   std::vector<std::string> stat_prefixes;
   Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
                                               const Json::Object& root) -> bool {
-    // Looking for `stat_prefix` is based on precedent for how this is usually named in the config.
-    // If there are other names used for a similar purpose, this check could be expanded to add them
-    // also.
+    // Looking for `stat_prefix` is based on precedent for how this is usually named in the
+    // config. If there are other names used for a similar purpose, this check could be expanded
+    // to add them also.
     if (name == "stat_prefix") {
-      auto prefix = root.asString();
+      auto prefix = root.asString().value();
       if (!prefix.empty()) {
         stat_prefixes.push_back(prefix);
       }
     } else if (root.isObject()) {
-      root.iterate(find_stat_prefix);
+      THROW_IF_NOT_OK(root.iterate(find_stat_prefix));
     } else if (root.isArray()) {
-      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray();
+      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray().value();
       for (const auto& element : elements) {
         find_stat_prefix("", *element);
       }

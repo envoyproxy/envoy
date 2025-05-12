@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
@@ -13,6 +14,8 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace {
+
+using ::testing::MatchesRegex;
 
 TEST(Evaluator, Print) {
   EXPECT_EQ(print(CelValue::CreateBool(false)), "false");
@@ -29,8 +32,8 @@ TEST(Evaluator, Print) {
   std::string node_yaml = "id: test";
   TestUtility::loadFromYaml(node_yaml, node);
   EXPECT_EQ(print(CelValue::CreateNull()), "NULL");
-  EXPECT_EQ(print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena)),
-            "id: \"test\"");
+  EXPECT_THAT(print(google::api::expr::runtime::CelProtoWrapper::CreateMessage(&node, &arena)),
+              MatchesRegex(".*id:\\s+\"test\""));
 
   EXPECT_EQ(print(CelValue::CreateDuration(absl::Minutes(1))), "1m");
   absl::Time time = TestUtility::parseTime("Dec 22 01:50:34 2020 GMT", "%b %e %H:%M:%S %Y GMT");
@@ -38,6 +41,17 @@ TEST(Evaluator, Print) {
 
   absl::Status status = absl::UnimplementedError("unimplemented");
   EXPECT_EQ(print(CelValue::CreateError(&status)), "CelError value");
+}
+
+TEST(Evaluator, Activation) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  info.upstreamInfo()->setUpstreamFilterState(filter_state);
+  ProtobufWkt::Arena arena;
+  const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
+  EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
+  EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());
 }
 
 } // namespace

@@ -64,7 +64,7 @@ public:
         position += 2;
         break;
       default:
-        if (character >= 0x00 && character <= 0x1f) {
+        if (character == 0x00 || (character > 0x00 && character <= 0x1f)) {
           // Print character as unicode hex.
           sprintf(&result[position + 1], "u%04x", static_cast<int>(character));
           position += 6;
@@ -107,7 +107,7 @@ public:
       }
 
       default: {
-        if (character >= 0x00 && character <= 0x1f) {
+        if (character == 0x00 || (character > 0x00 && character <= 0x1f)) {
           // From character (1 byte) to unicode hex (6 bytes).
           result += 5;
         }

@@ -175,7 +175,7 @@ struct ActiveTestRequest {
       : parent_(parent), client_index_(client_index) {
     uint64_t active_rq_observed =
         parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default).requests().count();
-    uint64_t current_rq_total = parent_.cluster_->stats_.upstream_rq_total_.value();
+    uint64_t current_rq_total = parent_.cluster_->traffic_stats_->upstream_rq_total_.value();
     if (type == Type::CreateConnection) {
       parent.conn_pool_->expectClientCreate();
     }
@@ -199,7 +199,7 @@ struct ActiveTestRequest {
           Network::ConnectionEvent::Connected);
     }
     if (type != Type::Pending) {
-      EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
+      EXPECT_EQ(current_rq_total + 1, parent_.cluster_->traffic_stats_->upstream_rq_total_.value());
       EXPECT_EQ(active_rq_observed + 1,
                 parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default)
                     .requests()
@@ -440,7 +440,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
 }
 
 /**
@@ -464,8 +464,8 @@ TEST_F(Http1ConnPoolImplTest, ConnectFailure) {
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
-  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_failure_eject_.value());
 }
 
 /**
@@ -553,9 +553,9 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
-  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_connect_timeout_.value());
 }
 
 /**
@@ -655,7 +655,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_->newStream(outer_decoder2, callbacks2, {false, true});
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_overflow_.value());
   EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.cx_open_.value());
 
   EXPECT_NE(nullptr, handle);
@@ -719,7 +719,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   NiceMock<MockResponseDecoder> outer_decoder2;
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_->newStream(outer_decoder2, callbacks2, {false, true});
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_overflow_.value());
 
   EXPECT_NE(nullptr, handle);
 
@@ -803,7 +803,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
 }
 
 /**
@@ -841,7 +841,7 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
 }
 
 /**
@@ -878,7 +878,7 @@ TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
 }
 
 /**
@@ -920,8 +920,8 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   dispatcher_.clearDeferredDeleteList();
 
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
-  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_max_requests_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_max_requests_.value());
 }
 
 TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
@@ -943,7 +943,7 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   r1.completeResponse(false);
   conn_pool_->expectAndRunUpstreamReady();
   r3.startRequest();
-  EXPECT_EQ(3U, cluster_->stats_.upstream_rq_total_.value());
+  EXPECT_EQ(3U, cluster_->traffic_stats_->upstream_rq_total_.value());
 
   conn_pool_->expectEnableUpstreamReady();
   r2.completeResponse(false);
@@ -956,8 +956,8 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_.value());
-  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http1ConnPoolImplTest, DrainCallback) {
@@ -971,7 +971,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_total_.value());
 
   conn_pool_->expectEnableUpstreamReady();
   EXPECT_CALL(drained, ready()).Times(AtLeast(1));
@@ -1048,8 +1048,8 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http1ConnPoolImplTest, NoActiveConnectionsByDefault) {
@@ -1093,13 +1093,13 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
 
   EXPECT_CALL(*conn_pool_, onClientDestroy());
   r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_total_.value());
   conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_local_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_local_.value());
 }
 
 // Schedulable callback that can track it's destruction.

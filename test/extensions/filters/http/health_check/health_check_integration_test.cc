@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
 
 using testing::HasSubstr;
 using testing::Not;
@@ -31,7 +32,7 @@ TEST_P(HealthCheckIntegrationTest, DrainCloseGradual) {
 
   absl::Notification drain_sequence_started;
   test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
+    test_server_->drainManager().startDrainSequence(Network::DrainDirection::All, [] {});
     drain_sequence_started.Notify();
   });
   drain_sequence_started.WaitForNotification();
@@ -64,7 +65,7 @@ TEST_P(HealthCheckIntegrationTest, DrainCloseImmediate) {
 
   absl::Notification drain_sequence_started;
   test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence([] {});
+    test_server_->drainManager().startDrainSequence(Network::DrainDirection::All, [] {});
     drain_sequence_started.Notify();
   });
   drain_sequence_started.WaitForNotification();
@@ -130,6 +131,7 @@ typed_config:
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheck) {
+  DISABLE_IF_ADMIN_DISABLED;
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -143,6 +145,8 @@ TEST_P(HealthCheckIntegrationTest, HealthCheck) {
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheckWithoutServerStats) {
+  DISABLE_IF_ADMIN_DISABLED;
+
   envoy::config::metrics::v3::StatsMatcher stats_matcher;
   stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   config_helper_.addConfigModifier(
@@ -173,6 +177,37 @@ TEST_P(HealthCheckIntegrationTest, HealthCheckWithBufferFilter) {
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
+}
+
+TEST_P(HealthCheckIntegrationTest, HealthCheckStats) {
+  DISABLE_IF_ADMIN_DISABLED;
+  initialize();
+
+  // Initial stats should be zero
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.failed")->value());
+
+  // Make a health check request - should result in OK response and increment request/ok counters
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.failed")->value());
+
+  // Fail the health check and verify failed counter increments
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
+  EXPECT_EQ("503", request("http", "GET", "/healthcheck", response));
+  EXPECT_EQ(2, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.failed")->value());
+
+  // Restore health check and verify ok counter increments
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/ok", response));
+  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
+  EXPECT_EQ(3, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(2, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.failed")->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HealthCheckIntegrationTest,

@@ -35,7 +35,7 @@ SpanContextExtractor::~SpanContextExtractor() = default;
 
 bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decision) {
   bool sampled(false);
-  auto b3_header_entry = trace_context_.getByKey(ZipkinCoreConstants::get().B3);
+  auto b3_header_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
   if (b3_header_entry.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
     absl::string_view b3 = b3_header_entry.value();
@@ -61,7 +61,7 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
     return getSamplingFlags(b3[sampled_pos], tracing_decision);
   }
 
-  auto x_b3_sampled_entry = trace_context_.getByKey(ZipkinCoreConstants::get().X_B3_SAMPLED);
+  auto x_b3_sampled_entry = ZipkinCoreConstants::get().X_B3_SAMPLED.get(trace_context_);
   if (!x_b3_sampled_entry.has_value()) {
     return tracing_decision.traced;
   }
@@ -74,7 +74,7 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
 }
 
 std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sampled) {
-  if (trace_context_.getByKey(ZipkinCoreConstants::get().B3).has_value()) {
+  if (ZipkinCoreConstants::get().B3.get(trace_context_).has_value()) {
     return extractSpanContextFromB3SingleFormat(is_sampled);
   }
   uint64_t trace_id(0);
@@ -82,8 +82,8 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
   uint64_t span_id(0);
   uint64_t parent_id(0);
 
-  auto b3_trace_id_entry = trace_context_.getByKey(ZipkinCoreConstants::get().X_B3_TRACE_ID);
-  auto b3_span_id_entry = trace_context_.getByKey(ZipkinCoreConstants::get().X_B3_SPAN_ID);
+  auto b3_trace_id_entry = ZipkinCoreConstants::get().X_B3_TRACE_ID.get(trace_context_);
+  auto b3_span_id_entry = ZipkinCoreConstants::get().X_B3_SPAN_ID.get(trace_context_);
   if (b3_span_id_entry.has_value() && b3_trace_id_entry.has_value()) {
     // Extract trace id - which can either be 128 or 64 bit. For 128 bit,
     // it needs to be divided into two 64 bit numbers (high and low).
@@ -107,8 +107,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
       throw ExtractorException(absl::StrCat("Invalid span id ", spid.c_str()));
     }
 
-    auto b3_parent_id_entry =
-        trace_context_.getByKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
+    auto b3_parent_id_entry = ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.get(trace_context_);
     if (b3_parent_id_entry.has_value() && !b3_parent_id_entry.value().empty()) {
       // This is an implicitly untrusted header, so only the first value is used.
       const std::string pspid(b3_parent_id_entry.value());
@@ -125,7 +124,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
 
 std::pair<SpanContext, bool>
 SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
-  auto b3_head_entry = trace_context_.getByKey(ZipkinCoreConstants::get().B3);
+  auto b3_head_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
   ASSERT(b3_head_entry.has_value());
   // This is an implicitly untrusted header, so only the first value is used.
   const std::string b3(b3_head_entry.value());
@@ -135,7 +134,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
 
   if (b3.length() == 1) { // possibly sampling flags
     if (validSamplingFlags(b3[0])) {
-      return std::pair<SpanContext, bool>(SpanContext(), false);
+      return {SpanContext(), false};
     }
     throw ExtractorException(fmt::format("Invalid input: invalid sampling flag {}", b3[0]));
   }

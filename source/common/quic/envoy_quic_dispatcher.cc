@@ -8,6 +8,7 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -51,7 +52,8 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
     Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-    quic::ConnectionIdGeneratorInterface& generator)
+    quic::ConnectionIdGeneratorInterface& generator,
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length,
@@ -60,7 +62,10 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
       listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
       crypto_server_stream_factory_(crypto_server_stream_factory),
-      quic_stats_(generateStats(listener_config.listenerScope())) {}
+      quic_stats_(generateStats(listener_config.listenerScope())),
+      connection_stats_({QUIC_CONNECTION_STATS(
+          POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}),
+      debug_visitor_factory_(debug_visitor_factory) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
@@ -82,24 +87,51 @@ quic::QuicTimeWaitListManager* EnvoyQuicDispatcher::CreateQuicTimeWaitListManage
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
     const quic::QuicSocketAddress& peer_address, absl::string_view /*alpn*/,
-    const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) {
+    const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo,
+    quic::ConnectionIdGeneratorInterface& connection_id_generator) {
   quic::QuicConfig quic_config = config();
   // TODO(danzh) use passed-in ALPN instead of hard-coded h3 after proof source interfaces takes in
   // ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
-  const Network::FilterChain* filter_chain =
-      listener_config_->filterChainManager().findFilterChain(*connection_socket);
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr(),
+      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto listener_filter_manager = std::make_unique<QuicListenerFilterManagerImpl>(
+      dispatcher_, *connection_socket, *stream_info);
+  const bool success = listener_config_->filterChainFactory().createQuicListenerFilterChain(
+      *listener_filter_manager);
+  const Network::FilterChain* filter_chain = nullptr;
+  if (success) {
+    listener_filter_manager->startFilterChain();
+    // Quic listener filters are not supposed to pause the filter chain iteration unless it closes
+    // the connection socket. If any listener filter have closed the socket, do not get a network
+    // filter chain. Thus early fail the connection.
+    if (connection_socket->ioHandle().isOpen()) {
+      for (auto address_family : {quiche::IpAddressFamily::IP_V4, quiche::IpAddressFamily::IP_V6}) {
+        absl::optional<quic::QuicSocketAddress> address =
+            quic_config.GetPreferredAddressToSend(address_family);
+        if (address.has_value() && address->IsInitialized() &&
+            !listener_filter_manager->shouldAdvertiseServerPreferredAddress(address.value())) {
+          quic_config.ClearAlternateServerAddressToSend(address_family);
+        }
+      }
+      filter_chain =
+          listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
+    }
+  }
 
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, std::move(connection_socket),
-      connection_id_generator());
+      connection_id_generator, std::move(listener_filter_manager));
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
-      listener_config_->listenerScope(), crypto_server_stream_factory_);
+      listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info),
+      connection_stats_, debug_visitor_factory_);
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =
@@ -111,6 +143,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
         std::reference_wrapper<Network::Connection>(*quic_session));
     quic_session->storeConnectionMapPosition(connections_by_filter_chain_, *filter_chain,
                                              connections_by_filter_chain_[filter_chain].begin());
+  } else {
+    quic_session->close(Network::ConnectionCloseType::FlushWrite, "no filter chain found");
   }
   quic_session->Initialize();
   connection_handler_.incNumConnections();
@@ -119,6 +153,24 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   per_worker_stats_.downstream_cx_active_.inc();
   per_worker_stats_.downstream_cx_total_.inc();
   return quic_session;
+}
+
+bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_address,
+                                        const quic::QuicSocketAddress& peer_address,
+                                        const quic::QuicReceivedPacket& packet) {
+  // Assume a packet was dispatched successfully, if OnFailedToDispatchPacket is not called.
+  current_packet_dispatch_success_ = true;
+  ProcessPacket(self_address, peer_address, packet);
+  return current_packet_dispatch_success_;
+}
+
+bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
+    const quic::ReceivedPacketInfo& received_packet_info) {
+  if (!accept_new_connections()) {
+    current_packet_dispatch_success_ = false;
+    return true;
+  }
+  return quic::QuicDispatcher::OnFailedToDispatchPacket(received_packet_info);
 }
 
 void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
@@ -136,6 +188,12 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
       connection.close(Network::ConnectionCloseType::NoFlush);
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
+    if (num_connections > 0) {
+      // Explicitly destroy closed sessions in the current call stack. Because upon
+      // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
+      // If any filters access those configs during destruction, it'll be use-after-free
+      DeleteSessions();
+    }
   }
 }
 

@@ -1,0 +1,29 @@
+date: April 4, 2024
+
+behavior_changes:
+- area: http2
+  change: |
+    Discard the ``Host`` header if the ``:authority`` header was received to bring Envoy into compliance with
+    https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1 This behavioral change can be reverted by setting runtime flag
+    ``envoy.reloadable_features.http2_discard_host_header`` to false.
+
+minor_behavior_changes:
+- area: http
+  change: |
+    Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+    previously used HTTP/1 parser).
+
+bug_fixes:
+- area: jwt_authn
+  change: |
+    Fixed JWT extractor, which concatenated headers with a comma, resultig in invalid tokens.
+- area: http2
+  change: |
+    Update nghttp2 to resolve CVE-2024-30255 (https://github.com/envoyproxy/envoy/security/advisories/GHSA-j654-3ccm-vfmm).
+
+new_features:
+- area: google_grpc
+  change: |
+    Added an off-by-default runtime flag
+    ``envoy.reloadable_features.google_grpc_disable_tls_13`` to disable TLSv1.3
+    usage by gRPC SDK for ``google_grpc`` services.

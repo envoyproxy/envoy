@@ -6,6 +6,19 @@
 
 namespace Envoy {
 namespace Tracing {
+namespace {
+
+absl::optional<std::string> jsonOrNullopt(const Protobuf::Message& message) {
+#ifdef ENVOY_ENABLE_YAML
+  auto json_or_error = MessageUtil::getJsonStringFromMessage(message);
+  return json_or_error.ok() ? absl::optional<std::string>(json_or_error.value()) : absl::nullopt;
+#else
+  UNREFERENCED_PARAMETER(message);
+  return absl::nullopt;
+#endif
+}
+
+} // namespace
 
 void CustomTagBase::applySpan(Span& span, const CustomTagContext& ctx) const {
   absl::string_view tag_value = value(ctx);
@@ -36,11 +49,8 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (ctx.trace_context == nullptr) {
-    return default_value_;
-  }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.trace_context->getByKey(name_);
+  const auto entry = name_.get(ctx.trace_context);
   return entry.value_or(default_value_);
 }
 
@@ -94,9 +104,9 @@ MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* met
   case ProtobufWkt::Value::kStringValue:
     return value.string_value();
   case ProtobufWkt::Value::kListValue:
-    return MessageUtil::getJsonStringFromMessageOrDie(value.list_value());
+    return jsonOrNullopt(value.list_value());
   case ProtobufWkt::Value::kStructValue:
-    return MessageUtil::getJsonStringFromMessageOrDie(value.struct_value());
+    return jsonOrNullopt(value.struct_value());
   default:
     break;
   }

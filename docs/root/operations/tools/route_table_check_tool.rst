@@ -43,6 +43,9 @@ Usage
     --disable-deprecation-check
       Disables the deprecation check for RouteConfiguration proto.
 
+    --detailed-coverage
+      Enables displaying of not covered routes for non-comprehensive code coverage mode.
+
     -h,  --help
       Displays usage information and exits.
 
@@ -69,6 +72,8 @@ Output
   If the ``--only-show-failures`` flag is provided, only the failed test cases are written to a file.
 
 Building
+  The tool is included in the :ref:`tools image <install_tools>`.
+
   The tool can be built locally using Bazel. ::
 
     bazel build //test/tools/router_check:router_check_tool

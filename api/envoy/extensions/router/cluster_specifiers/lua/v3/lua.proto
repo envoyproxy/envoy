@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifiers.lua.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifiers.lua.v3";
+option java_outer_classname = "LuaProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifiers/lua/v3;luav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Lua]
+//
+// Lua cluster specifier :ref:`configuration reference documentation <config_http_cluster_specifier_lua>`.
+// [#extension: envoy.router.cluster_specifier_plugin.lua]
+
+message LuaConfig {
+  // The lua code that Envoy will execute to select cluster.
+  config.core.v3.DataSource source_code = 1 [(validate.rules).message = {required: true}];
+
+  // Default cluster. It will be used when the lua code execute failure.
+  string default_cluster = 2;
+}

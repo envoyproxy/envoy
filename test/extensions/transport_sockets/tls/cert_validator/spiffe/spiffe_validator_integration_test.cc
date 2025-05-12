@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/integration/integration.h"
 
@@ -21,8 +21,8 @@ void SslSPIFFECertValidatorIntegrationTest::initialize() {
                                   .setAllowExpiredCertificate(allow_expired_cert_));
   HttpIntegrationTest::initialize();
 
-  context_manager_ =
-      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+  context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+      server_factory_context_);
   registerTestServerPorts({"http"});
 }
 
@@ -114,7 +114,7 @@ typed_config:
   trust_domains:
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"),
                             *typed_conf);
   custom_validator_config_ = typed_conf;
@@ -200,7 +200,7 @@ typed_config:
   trust_domains:
     - name: example.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"),
                             *typed_conf);
   custom_validator_config_ = typed_conf;
@@ -257,7 +257,7 @@ typed_config:
   trust_domains:
     - name: lyft.com
       trust_bundle:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"
+        filename: "{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"
     - name: example.com
       trust_bundle:
         filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"

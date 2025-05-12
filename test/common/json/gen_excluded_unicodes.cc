@@ -77,8 +77,8 @@ void allThreeByteUtf8() {
         utf8[2] = byte3 | Utf8::ContinuePattern;
         auto [unicode, consumed] = Utf8::decode(utf8);
         if (consumed == 3) {
-          std::string proto_sanitized =
-              MessageUtil::getJsonStringFromMessageOrDie(ValueUtil::stringValue(utf8), false, true);
+          std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrError(
+              ValueUtil::stringValue(utf8), false, true);
           if (isInvalidProtobufSerialization(proto_sanitized)) {
             invalid.collect(unicode);
           }
@@ -106,7 +106,7 @@ void allFourByteUtf8() {
           utf8[3] = byte4 | Utf8::ContinuePattern;
           auto [unicode, consumed] = Utf8::decode(utf8);
           if (consumed == 4) {
-            std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrDie(
+            std::string proto_sanitized = MessageUtil::getJsonStringFromMessageOrError(
                 ValueUtil::stringValue(utf8), false, true);
             if (isInvalidProtobufSerialization(proto_sanitized)) {
               invalid.collect(unicode);

@@ -19,6 +19,7 @@ envoy_cc_library(
     hdrs = ["adaptive_concurrency_filter.h"],
     deps = [
         "//envoy/http:filter_interface",
+        "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/filters/http/adaptive_concurrency/controller:controller_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg_cc_proto",

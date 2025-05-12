@@ -97,7 +97,7 @@ static void BM_RE2(benchmark::State& state) {
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const char* cluster_input : ClusterInputs) {
-      re2::StringPiece match1, match2;
+      absl::string_view match1, match2;
       if (re2::RE2::PartialMatch(cluster_input, re, &match1, &match2)) {
         ASSERT(match1 == "match.");
         ASSERT(match2 == "match");
@@ -115,7 +115,7 @@ static void BM_RE2_AltPattern(benchmark::State& state) {
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const char* cluster_input : ClusterInputs) {
-      re2::StringPiece match1, match2;
+      absl::string_view match1, match2;
       if (re2::RE2::PartialMatch(cluster_input, re, &match1, &match2)) {
         ASSERT(match1 == "match.");
         ASSERT(match2 == "match");

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.cpu_utilization.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.cpu_utilization.v3";
+option java_outer_classname = "CpuUtilizationProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/cpu_utilization/v3;cpu_utilizationv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: CPU utilization]
+// [#extension: envoy.resource_monitors.cpu_utilization]
+
+// The CPU utilization resource monitor reports the Envoy process the CPU Utilization across different platforms.
+message CpuUtilizationConfig {
+  enum UtilizationComputeStrategy {
+    // Reports CPU Utilization of the entire Linux Host machine
+    HOST = 0;
+
+    // Reports CPU Utilization of Envoy Container using CGROUP stats in Linux K8s environment
+    CONTAINER = 1;
+  }
+
+  UtilizationComputeStrategy mode = 1 [(validate.rules).enum = {defined_only: true}];
+}

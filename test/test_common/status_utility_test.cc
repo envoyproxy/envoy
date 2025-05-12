@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "test/test_common/status_utility.h"
 
 namespace Envoy {
@@ -126,7 +128,14 @@ TEST(StatusUtilityTest, IsOkAndHoldsSuccess) {
 
 TEST(StatusUtilityTest, IsOkAndHoldsFailureByValue) {
   ::testing::StringMatchResultListener listener;
-  ::testing::ExplainMatchResult(IsOkAndHolds(5), absl::StatusOr<int>{6}, &listener);
+  EXPECT_FALSE(::testing::ExplainMatchResult(IsOkAndHolds(5), absl::StatusOr<int>{6}, &listener));
+  EXPECT_EQ("which has wrong value: 6", listener.str());
+}
+
+TEST(StatusUtilityTest, IsOkAndHoldsFailureByValueMatcher) {
+  ::testing::StringMatchResultListener listener;
+  EXPECT_FALSE(::testing::ExplainMatchResult(IsOkAndHolds(::testing::Lt(4)), absl::StatusOr<int>{6},
+                                             &listener));
   EXPECT_EQ("which has wrong value: 6", listener.str());
 }
 

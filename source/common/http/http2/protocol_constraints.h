@@ -9,11 +9,27 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/status.h"
 
+#ifdef ENVOY_NGHTTP2
 #include "nghttp2/nghttp2.h"
+#endif
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+// Frame types as inherited from nghttp2 and preserved for oghttp2
+enum FrameType {
+  OGHTTP2_DATA_FRAME_TYPE,
+  OGHTTP2_HEADERS_FRAME_TYPE,
+  OGHTTP2_PRIORITY_FRAME_TYPE,
+  OGHTTP2_RST_STREAM_FRAME_TYPE,
+  OGHTTP2_SETTINGS_FRAME_TYPE,
+  OGHTTP2_PUSH_PROMISE_FRAME_TYPE,
+  OGHTTP2_PING_FRAME_TYPE,
+  OGHTTP2_GOAWAY_FRAME_TYPE,
+  OGHTTP2_WINDOW_UPDATE_FRAME_TYPE,
+  OGHTTP2_CONTINUATION_FRAME_TYPE,
+};
 
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
 //  This class does not check protocol compliance with the H/2 standard, as this is checked by
@@ -47,7 +63,7 @@ public:
 
   // Track received frames of various types.
   // Return an error status if inbound frame constraints were violated.
-  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length);
+  Status trackInboundFrame(uint8_t type, bool end_stream, bool is_empty);
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
   void incrementOpenedStreamCount() { ++opened_streams_; }

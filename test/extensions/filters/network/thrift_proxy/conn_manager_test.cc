@@ -88,22 +88,24 @@ public:
 
 class ThriftConnectionManagerTest : public testing::Test {
 public:
-  ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {
-    route_config_provider_manager_ =
-        std::make_unique<Router::RouteConfigProviderManagerImpl>(context_.admin_);
-    ON_CALL(*context_.access_log_manager_.file_, write(_))
+  ThriftConnectionManagerTest()
+      : stats_(ThriftFilterStats::generateStats("test.", *store_.rootScope())) {
+    route_config_provider_manager_ = std::make_unique<Router::RouteConfigProviderManagerImpl>(
+        context_.server_factory_context_.admin_);
+    ON_CALL(*context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
   ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  void initializeFilterWithCustomFilters() {
+  void initializeFilterWithCustomFilters(const std::string& yaml = "",
+                                         const std::vector<std::string>& cluster_names = {}) {
     auto* decoder_filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
     custom_decoder_filter_.reset(decoder_filter);
     auto* encoder_filter = new NiceMock<ThriftFilters::MockEncoderFilter>();
     custom_encoder_filter_.reset(encoder_filter);
-    initializeFilter();
+    initializeFilter(yaml, cluster_names);
   }
   void initializeFilter() { initializeFilter(""); }
 
@@ -189,7 +191,7 @@ stat_prefix: test
     encoder_filter_ = std::make_shared<NiceMock<ThriftFilters::MockEncoderFilter>>();
     bidirectional_filter_ = std::make_shared<NiceMock<ThriftFilters::MockBidirectionalFilter>>();
 
-    config_ = std::make_unique<TestConfigImpl>(proto_config_, context_,
+    config_ = std::make_shared<TestConfigImpl>(proto_config_, context_,
                                                *route_config_provider_manager_, decoder_filter_,
                                                encoder_filter_, bidirectional_filter_, stats_);
     if (custom_transport_) {
@@ -207,7 +209,7 @@ stat_prefix: test
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     ON_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
         .WillByDefault(Invoke([this](const std::string& key, const ProtobufWkt::Struct& obj) {
@@ -270,6 +272,10 @@ stat_prefix: test
     TransportPtr transport =
         NamedTransportConfigFactory::getFactory(transport_type).createTransport();
     transport->encodeFrame(buffer, metadata, msg);
+  }
+
+  void writeHeaderBinaryMessage(Buffer::Instance& buffer, MessageType msg_type, int32_t seq_id) {
+    writeMessage(buffer, TransportType::Header, ProtocolType::Binary, msg_type, seq_id);
   }
 
   void writeFramedBinaryMessage(Buffer::Instance& buffer, MessageType msg_type, int32_t seq_id) {
@@ -445,9 +451,7 @@ stat_prefix: test
     TestScopedRuntime scoped_runtime;
 
     if (draining) {
-      scoped_runtime.mergeValues(
-          {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
-      EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
+      EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
     }
 
     initializeFilter(defaultYamlConfig(true));
@@ -682,7 +686,7 @@ stat_prefix: test
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
   std::unique_ptr<Router::RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  std::unique_ptr<TestConfigImpl> config_;
+  std::shared_ptr<TestConfigImpl> config_;
 
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -815,12 +819,13 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
                       0x80, 0x01, 0x00, 0x01,                     // binary, call
                       0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
                       0x00, 0x00, 0x00, 0x01,                     // sequence id
-                      0x08, 0xff, 0xff                            // illegal field id
+                      0x0d, 0x00, 0x01, 0x0b, 0xb,                // map, field id, string key/value
+                      0xff, 0xff, 0xff, 0xff,                     // negative length
                   });
 
-  std::string err = "invalid binary protocol field id -1";
+  std::string err = "negative binary protocol map size -1";
   addSeq(write_buffer_, {
-                            0x00, 0x00, 0x00, 0x42,                     // framed: 66 bytes
+                            0x00, 0x00, 0x00, 0x43,                     // framed: 67 bytes
                             0x80, 0x01, 0x00, 0x03,                     // binary, exception
                             0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
                             0x00, 0x00, 0x00, 0x01,                     // sequence id
@@ -847,9 +852,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
-
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
@@ -1048,6 +1052,67 @@ route_config:
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(access_log_data_, "");
+}
+
+TEST_F(ThriftConnectionManagerTest, ClearRouteCache) {
+  // Use HEADER transport to determine the route by `cluster_header`.
+  const std::string yaml = R"EOF(
+transport: HEADER
+protocol: BINARY
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: name
+      route:
+        cluster_header: mesh-cluster
+)EOF";
+
+  initializeFilterWithCustomFilters(yaml, {"cluster", "cluster_override"});
+  writeHeaderBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  Http::LowerCaseString cluster_header{"mesh-cluster"};
+
+  ThriftFilters::DecoderFilterCallbacks* custom_callbacks{};
+  EXPECT_CALL(*custom_decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke(
+          [&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { custom_callbacks = &cb; }));
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        metadata->requestHeaders().addCopy(cluster_header, "cluster");
+
+        // Route is cached here.
+        Router::RouteConstSharedPtr route = custom_callbacks->route();
+        EXPECT_NE(nullptr, route);
+        EXPECT_NE(nullptr, route->routeEntry());
+        EXPECT_EQ("cluster", route->routeEntry()->clusterName());
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> FilterStatus {
+        // Override the cluster.
+        metadata->requestHeaders().setCopy(cluster_header, "cluster_override");
+        // Need to clear route cache. Otherwise, we would use the cached route.
+        callbacks->clearRouteCache();
+        return FilterStatus::Continue;
+      }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  Router::RouteConstSharedPtr route = callbacks->route();
+  EXPECT_NE(nullptr, route);
+  EXPECT_NE(nullptr, route->routeEntry());
+  // The cluster is overridden.
+  EXPECT_EQ("cluster_override", route->routeEntry()->clusterName());
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponse) { testRequestResponse(false); }
@@ -1262,13 +1327,14 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
-  // illegal field id
+  // illegal negative set length
   addSeq(write_buffer_, {
-                            0x00, 0x00, 0x00, 0x1f,                     // framed: 31 bytes
+                            0x00, 0x00, 0x00, 0x2f,                     // framed: 31 bytes
                             0x80, 0x01, 0x00, 0x02,                     // binary, reply
                             0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
                             0x00, 0x00, 0x00, 0x01,                     // sequence id
-                            0x08, 0xff, 0xff                            // illegal field id
+                            0x0e, 0x00, 0x00, 0x0b,                     // set, field id, strings
+                            0xff, 0xff, 0xff, 0xff,                     // negative length
                         });
 
   FramedTransportImpl transport;
@@ -1292,8 +1358,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
@@ -1337,8 +1403,34 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false header binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false header binary call header "
+                              "binary exception - 0 0 0 -\n");
+}
+
+TEST_F(ThriftConnectionManagerTest, BadFunctionCallExceptionHandling) {
+  initializeFilter();
+
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
+        std::function<int()> func;
+        func(); // throw bad_function_call
+        return FilterStatus::Continue;
+      }));
+
+  // A local exception is sent by error handling.
+  EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("test.request_internal_error").value());
+
+  EXPECT_EQ(access_log_data_, "");
 }
 
 // Tests that a request is routed and a non-thrift response is handled.
@@ -1375,8 +1467,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary exception - 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
@@ -1588,7 +1680,7 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -1863,8 +1955,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary call success 0 0 0 -\n");
 }
 
 // Tests multiple filters where one invokes sendLocalReply with an error reply.
@@ -1917,8 +2009,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary call error 0 0 0 -\n");
 }
 
 // sendLocalReply does nothing, when the remote closed the connection.
@@ -2082,10 +2174,9 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
 
   // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
-  EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
 
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);

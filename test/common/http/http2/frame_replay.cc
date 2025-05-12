@@ -12,8 +12,10 @@ namespace Http {
 namespace Http2 {
 
 FileFrame::FileFrame(absl::string_view path) : api_(Api::createApiForTest()) {
-  const std::string contents = api_->fileSystem().fileReadToEnd(
-      TestEnvironment::runfilesPath("test/common/http/http2/" + std::string(path)));
+  const std::string contents = api_->fileSystem()
+                                   .fileReadToEnd(TestEnvironment::runfilesPath(
+                                       "test/common/http/http2/" + std::string(path)))
+                                   .value();
   frame_.resize(contents.size());
   contents.copy(reinterpret_cast<char*>(frame_.data()), frame_.size());
 }
@@ -60,7 +62,8 @@ void FrameUtils::fixupHeaders(Frame& frame) {
 
 CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
     : options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions())),
+                   envoy::config::core::v3::Http2ProtocolOptions())
+                   .value()),
       injector_name_(injector_name) {}
 
 ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("server") {

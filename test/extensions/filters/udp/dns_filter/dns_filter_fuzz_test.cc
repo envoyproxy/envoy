@@ -17,8 +17,8 @@ namespace DnsFilter {
 namespace {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  static const auto local = Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353");
-  static const auto peer = Network::Utility::parseInternetAddressAndPort("127.0.2.1:55088");
+  static const auto local = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.2.1:5353");
+  static const auto peer = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.2.1:55088");
 
   static NiceMock<Random::MockRandomGenerator> random;
   static NiceMock<Stats::MockHistogram> histogram;

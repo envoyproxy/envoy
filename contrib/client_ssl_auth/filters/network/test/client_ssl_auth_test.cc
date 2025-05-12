@@ -77,8 +77,8 @@ ip_white_list:
     cm_.initializeClusters({"vpn"}, {});
     cm_.initializeThreadLocalClusters({"vpn"});
     setupRequest();
-    config_ =
-        ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
+    config_ = ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_,
+                                          *stats_store_.rootScope(), random_);
 
     createAuthFilter();
   }
@@ -129,9 +129,9 @@ stat_prefix: bad_cluster
   envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
   TestUtility::loadFromYaml(yaml, proto_config);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(Upstream::ClusterManager::ClusterInfoMaps()));
-  EXPECT_THROW(
-      ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
-      EnvoyException);
+  EXPECT_THROW(ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_,
+                                           *stats_store_.rootScope(), random_),
+               EnvoyException);
 }
 
 TEST_F(ClientSslAuthFilterTest, NoSsl) {
@@ -164,10 +164,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   std::string expected_sha_1("digest");
   EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError));
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
               setResponseCodeDetails("auth_digest_no_match"));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "auth_digest_no_match"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -176,8 +177,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   Http::ResponseMessagePtr message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  message->body().add(api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
-      "contrib/client_ssl_auth/filters/network/test/test_data/vpn_response_1.json")));
+  message->body().add(
+      api_->fileSystem()
+          .fileReadToEnd(TestEnvironment::runfilesPath(
+              "contrib/client_ssl_auth/filters/network/test/test_data/vpn_response_1.json"))
+          .value());
   callbacks_->onSuccess(request_, std::move(message));
   EXPECT_EQ(1U,
             stats_store_

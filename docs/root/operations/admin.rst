@@ -215,6 +215,10 @@ modify different aspects of the server:
   - :ref:`envoy.extensions.transport_sockets.tls.v3.Secret <envoy_v3_api_field_extensions.transport_sockets.tls.v3.Secret.name>`
   - :ref:`envoy.config.endpoint.v3.ClusterLoadAssignment <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.cluster_name>`
 
+  For ECDS config dump, the matched name field is the corresponding filter name, which is stored in:
+
+  - :ref:`envoy.config.core.v3.TypedExtensionConfig.name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>`
+
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 
 .. http:get:: /config_dump?resource={}&mask={}
@@ -244,6 +248,11 @@ modify different aspects of the server:
 .. http:get:: /heap_dump
 
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
+.. http:post:: /allocprofiler
+
+  Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
 .. _operations_admin_interface_healthcheck_fail:
@@ -303,16 +312,32 @@ modify different aspects of the server:
 
   Enable/disable logging levels for different loggers.
 
-  - To change the logging level across all loggers, set the query parameter as level=<desired_level>.
-  - To change a particular logger's level, set the query parameter like so, <logger_name>=<desired_level>.
-  - To change multiple logging levels at once, set the query parameter as paths=<logger_name1>=<desired_level1>,<logger_name2>=<desired_level2>.
-  - To list the loggers, send a POST request to the /logging endpoint without a query parameter.
+  If the default component logger is used, the logger name should be exactlly the component name.
 
-  .. note::
+  - To change the logging level across all loggers, set the query parameter as ``level=<desired_level>``.
+  - To change a particular logger's level, set the query parameter like so, ``<logger_name>=<desired_level>``.
+  - To change multiple logging levels at once, set the query parameter as ``paths=<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>``.
+  - To list the loggers, send a POST request to the ``/logging`` endpoint without a query parameter.
 
-    Generally only used during development. With ``--enable-fine-grain-logging`` being set, the logger is represented
-    by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``), so the logger list
-    will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
+  If ``--enable-fine-grain-logging`` is set, the logger is represented by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``),
+  so the logger list will show a list of file paths, and the specific path should be used as ``<logger_name>`` to change the log level.
+
+  We also added the file basename, glob ``*`` and ``?`` support for fine-grain loggers. For example, we have the following active loggers with trace level.
+
+  .. code-block:: text
+
+    source/server/admin/admin_filter.cc: trace
+    source/common/event/dispatcher_impl.cc: trace
+    source/common/network/tcp_listener_impl.cc: trace
+    source/common/network/udp_listener_impl.cc: trace
+
+  - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
+  - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
+  - ``/logging?paths=source/common*:warning`` will make the level of ``source/common/event/dispatcher_impl.cc:``, ``source/common/network/tcp_listener_impl.cc`` be warning.
+    Other unmatched loggers will be the default trace, e.g., `admin_filter.cc`, even it was updated to info from the previous post update.
+  - ``/logging?paths=???_listener_impl:info`` will make the level of ``source/common/network/tcp_listener_impl.cc``, ``source/common/network/udp_listener_impl.cc`` be info.
+  - ``/logging?paths=???_listener_impl:info,tcp_listener_impl:warning``, the level of ``source/common/network/tcp_listener_impl.cc`` will be info, since the first match will take effect.
+  - ``/logging?level=info`` will change the default verbosity level to info. All the unmatched loggers in the following update will be this default level.
 
 .. http:get:: /memory
 
@@ -338,13 +363,18 @@ modify different aspects of the server:
 
    :ref:`Drains <arch_overview_draining>` all inbound listeners. ``traffic_direction`` field in
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
-   is inbound or outbound.
+   is inbound or outbound. May not be effective for network filters like :ref:`Redis <config_network_filters_redis_proxy>`,
+   :ref:`Mongo <config_network_filters_mongo_proxy>`, or :ref:`Thrift <config_network_filters_thrift_proxy>`.
 
    .. http:post:: /drain_listeners?graceful
 
    When draining listeners, enter a graceful drain period prior to closing listeners.
    This behaviour and duration is configurable via server options or CLI
    (:option:`--drain-time-s` and :option:`--drain-strategy`).
+
+   .. http:post:: /drain_listeners?graceful&skip_exit
+
+   When draining listeners, do not exit after the drain period. This must be used with `graceful`.
 
 .. attention::
 
@@ -446,6 +476,18 @@ modify different aspects of the server:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
+  .. http::get:: /stats?hidden=showonly
+
+  Only outputs statistics that are internally marked as hidden.
+
+  .. http::get:: /stats?hidden=include
+
+  Hidden stats will be shown along side non-hidden stats.
+
+  .. http::get:: /stats?hidden=exclude
+
+  Hidden stats will be excluded from the output. This is the default behavior.
+
   .. http:get:: /stats?filter=regex
 
   Filters the returned stats to those with names matching the regular
@@ -455,9 +497,7 @@ modify different aspects of the server:
   with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
 
   By default, the regular expression is evaluated using the
-  `Google RE2 <https://github.com/google/re2>`_ engine. To switch
-  to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
-  ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
+  `Google RE2 <https://github.com/google/re2>`_ engine.
 
   .. http:get:: /stats?histogram_buckets=cumulative
 
@@ -473,7 +513,45 @@ modify different aspects of the server:
   Buckets do not include values from other buckets with smaller upper bounds;
   the previous bucket's upper bound acts as a lower bound. Compatible with ``usedonly`` and ``filter``.
 
-.. http:get:: /stats?format=json
+  .. http:get:: /stats?histogram_buckets=detailed
+
+  Shows histograms as both percentile summary data, and raw bucket data.
+
+  Example output
+  .. code-block:: text
+
+    http.admin.downstream_rq_time:
+      totals=1,0.25:25, 2,0.25:9
+      intervals=1,0.25:2, 2,0.25:3
+      summary=P0(1,1) P25(1.0625,1.034) P50(2.0166,1.068) P75(2.058,2.005) P90(2.083,2.06) P95(2.091,2.08) P99(2.09,2.09) P99.5(2.099,2.098) P99.9(2.099,2.099) P100(2.1,2.1)
+
+  Each bucket is shown as `lower_bound,width:count`. In the above example there are two
+  buckets. `totals` contains the accumulated data-points since the binary was started.
+  `intervals` shows the new data points since the previous stats flush.
+
+  Compatible with ``usedonly`` and ``filter``.
+
+  .. http:get:: /stats?format=html
+
+  Renders stats using HTML for a web browser, providing form fields to incrementally
+  modify the filter, toggle used-only mode, control the types of stats displayed,
+  and also toggle into another format.
+
+  This format is disabled if Envoy is compiled with `--define=admin_html=disabled`
+
+  .. http:get:: /stats?format=active-html
+
+  Renders stats continuously, displaying the top 50 stats ordered by frequency of
+  changes. In this format, used-only mode is implied. You can incrementally adjust
+  the filter, the subset of types, the number of stats displayed, and the interval
+  between updates.
+
+  After using this mode, be sure to close the browser tab to avoid
+  placing periodic load on the server as stats are updated regularly.
+
+  This format is disabled if Envoy is compiled with `--define=admin_html=disabled`
+
+  .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
   will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
@@ -625,7 +703,53 @@ modify different aspects of the server:
       ]
     }
 
-.. http:get:: /stats?format=prometheus
+  .. http:get:: /stats?format=json&histogram_buckets=detailed
+
+  Shows histograms as both percentile summary data..
+
+  Example output:
+
+  .. code-block:: json
+
+    {
+      "stats": [
+        {
+          "histograms": {
+            "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+            "details": [
+              {
+                "name": "http.admin.downstream_rq_time",
+                "percentiles": [
+                  { "interval": null, "cumulative": 1 },
+                  { "interval": null, "cumulative": 1.0351851851851852 },
+                  { "interval": null "cumulative": 1.0703703703703704 },
+                  { "interval": null, "cumulative": 2.0136363636363637 },
+                  { "interval": null "cumulative": 2.0654545454545454 },
+                  { "interval": null "cumulative": 2.0827272727272725 },
+                  { "interval": null "cumulative": 2.0965454545454545 },
+                  { "interval": null, "cumulative": 2.098272727272727 },
+                  { "interval": null, "cumulative": 2.0996545454545457 },
+                  { "interval": null "cumulative": 2.1 }
+                ],
+                "totals": [
+                  { "lower_bound": 1, "width": 0.25, "count": 25 },
+                  { "lower_bound": 2, "width": 0.25, "count": 9 }
+                ],
+                "intervals": [
+                  { "lower_bound": 1, "width": 0.25, "count": 2 },
+                  { "lower_bound": 2, "width": 0.25, "count": 3 }
+                ],
+              },
+            ]
+          }
+        }
+      ]
+    }
+
+  Compatible with ``usedonly`` and ``filter``.
+
+
+  .. http:get:: /stats?format=prometheus
 
   or alternatively,
 
@@ -651,6 +775,59 @@ modify different aspects of the server:
     in Prometheus, which can dramatically increase the amount of data stored.
     Text readout stats create a new label value every time the value
     of the text readout stat changes, which could create an unbounded number of time series.
+
+  .. http:get:: /stats?format=prometheus&histogram_buckets=summary
+
+  Optional ``histogram_buckets`` query parameter is used to control how histogram metrics get reported.
+  If unset, histograms get reported as the "histogram" prometheus metric type, but can also be used to
+  emit prometheus "summary" metrics if set to ``summary``. Each emitted summary is over the interval
+  of the last :ref:`stats_flush_interval <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_flush_interval>`.
+
+  Example histogram output:
+
+  .. code-block:: text
+
+    # TYPE envoy_server_initialization_time_ms histogram
+    envoy_server_initialization_time_ms_bucket{le="0.5"} 0
+    envoy_server_initialization_time_ms_bucket{le="1"} 0
+    envoy_server_initialization_time_ms_bucket{le="5"} 0
+    envoy_server_initialization_time_ms_bucket{le="10"} 0
+    envoy_server_initialization_time_ms_bucket{le="25"} 0
+    envoy_server_initialization_time_ms_bucket{le="50"} 0
+    envoy_server_initialization_time_ms_bucket{le="100"} 0
+    envoy_server_initialization_time_ms_bucket{le="250"} 1
+    envoy_server_initialization_time_ms_bucket{le="500"} 1
+    envoy_server_initialization_time_ms_bucket{le="1000"} 1
+    envoy_server_initialization_time_ms_bucket{le="2500"} 1
+    envoy_server_initialization_time_ms_bucket{le="5000"} 1
+    envoy_server_initialization_time_ms_bucket{le="10000"} 1
+    envoy_server_initialization_time_ms_bucket{le="30000"} 1
+    envoy_server_initialization_time_ms_bucket{le="60000"} 1
+    envoy_server_initialization_time_ms_bucket{le="300000"} 1
+    envoy_server_initialization_time_ms_bucket{le="600000"} 1
+    envoy_server_initialization_time_ms_bucket{le="1800000"} 1
+    envoy_server_initialization_time_ms_bucket{le="3600000"} 1
+    envoy_server_initialization_time_ms_bucket{le="+Inf"} 1
+    envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+    envoy_server_initialization_time_ms_count{} 1
+
+  Example summary output:
+
+  .. code-block:: text
+
+    # TYPE envoy_server_initialization_time_ms summary
+    envoy_server_initialization_time_ms{quantile="0"} 110.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.25"} 112.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.5"} 115.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.75"} 117.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.9"} 119.00000000000001
+    envoy_server_initialization_time_ms{quantile="0.95"} 119.50000000000001
+    envoy_server_initialization_time_ms{quantile="0.99"} 119.90000000000002
+    envoy_server_initialization_time_ms{quantile="0.995"} 119.95000000000002
+    envoy_server_initialization_time_ms{quantile="0.999"} 119.99000000000001
+    envoy_server_initialization_time_ms{quantile="1"} 120.00000000000001
+    envoy_server_initialization_time_ms_sum{} 115.000000000000014210854715202
+    envoy_server_initialization_time_ms_count{} 1
 
 .. http:get:: /stats/recentlookups
 

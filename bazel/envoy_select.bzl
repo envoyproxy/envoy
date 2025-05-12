@@ -25,10 +25,24 @@ def envoy_select_google_grpc(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if logging is enabled in the current build.
+def envoy_select_disable_logging(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_logging": xs,
+        "//conditions:default": [],
+    })
+
 # Selects the given values if admin HTML is enabled in the current build.
 def envoy_select_admin_html(xs, repository = ""):
     return select({
         repository + "//bazel:disable_admin_html": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if admin functionality is enabled in the current build.
+def envoy_select_admin_functionality(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_admin_functionality": [],
         "//conditions:default": xs,
     })
 
@@ -38,6 +52,20 @@ def envoy_select_admin_no_html(xs, repository = ""):
         "//conditions:default": [],
     })
 
+# Selects the given values if static extension registration is enabled in the current build.
+def envoy_select_static_extension_registration(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_static_extension_registration": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if the Envoy Mobile listener is enabled in the current build.
+def envoy_select_envoy_mobile_listener(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_envoy_mobile_listener": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if http3 is enabled in the current build.
 def envoy_select_enable_http3(xs, repository = ""):
     return select({
@@ -45,10 +73,66 @@ def envoy_select_enable_http3(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if yaml is enabled in the current build.
+def envoy_select_enable_yaml(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_yaml": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if exceptions are disabled in the current build.
+def envoy_select_disable_exceptions(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_exceptions": xs,
+        "//conditions:default": [],
+    })
+
+# Selects the given values if exceptions are enabled in the current build.
+def envoy_select_enable_exceptions(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_exceptions": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if HTTP datagram support is enabled in the current build.
+def envoy_select_enable_http_datagrams(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_http_datagrams": [],
+        "//conditions:default": xs,
+    })
+
 # Selects the given values if hot restart is enabled in the current build.
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if hot restart is enabled in the current build.
+def envoy_select_nghttp2(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_nghttp2": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if full protos are enabled in the current build.
+def envoy_select_enable_full_protos(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_full_protos": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values if lite protos are enabled in the current build.
+def envoy_select_enable_lite_protos(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_full_protos": xs,
+        "//conditions:default": [],
+    })
+
+# Selects the given values if signal trace is enabled in the current build.
+def envoy_select_signal_trace(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_signal_trace": [],
         "//conditions:default": xs,
     })
 
@@ -74,7 +158,6 @@ def envoy_select_wasm_v8(xs):
         "@envoy//bazel:wasm_v8": xs,
         "@envoy//bazel:wasm_wamr": [],
         "@envoy//bazel:wasm_wasmtime": [],
-        "@envoy//bazel:wasm_wavm": [],
         "@envoy//bazel:wasm_disabled": [],
         "//conditions:default": xs,  # implicit default (v8)
     })
@@ -85,7 +168,6 @@ def envoy_select_wasm_v8_bool():
         "@envoy//bazel:wasm_v8": True,
         "@envoy//bazel:wasm_wamr": False,
         "@envoy//bazel:wasm_wasmtime": False,
-        "@envoy//bazel:wasm_wavm": False,
         "@envoy//bazel:wasm_disabled": False,
         "//conditions:default": True,  # implicit default (v8)
     })
@@ -94,13 +176,6 @@ def envoy_select_wasm_v8_bool():
 def envoy_select_wasm_wamr(xs):
     return select({
         "@envoy//bazel:wasm_wamr": xs,
-        "//conditions:default": [],
-    })
-
-# Selects the given values depending on the Wasm runtimes enabled in the current build.
-def envoy_select_wasm_wavm(xs):
-    return select({
-        "@envoy//bazel:wasm_wavm": xs,
         "//conditions:default": [],
     })
 

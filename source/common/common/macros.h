@@ -57,4 +57,8 @@ namespace Envoy {
 #if (defined(__GNUC__) && !defined(__clang__))
 #define GCC_COMPILER
 #endif
+
+#define GTEST_FRIEND_CLASS(test_case_name, test_name)                                              \
+  friend class test_case_name##_##test_name##_Test
+
 } // namespace Envoy

@@ -13,6 +13,9 @@ envoy_cc_extension(
     name = "upstream_config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/common/upstream:__subpackages__",
+    ],
     deps = [
         ":connect",
         "//envoy/network:transport_socket_interface",
@@ -33,6 +36,8 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/http:header_utility_lib",
         "//source/common/http/http1:balsa_parser_lib",
         "//source/common/http/http1:legacy_parser_lib",
         "//source/common/network:address_lib",

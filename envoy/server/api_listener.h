@@ -22,21 +22,20 @@ public:
   virtual absl::string_view name() const PURE;
 
   /**
-   * Shutdown the ApiListener. This is an interrupt, not a drain. In other words, calling this
-   * function results in termination of all active streams vs. draining where no new streams are
-   * allowed, but already existing streams are allowed to finish.
-   */
-  virtual void shutdown() PURE;
-
-  /**
    * @return the Type of the ApiListener.
    */
   virtual Type type() const PURE;
 
   /**
-   * @return valid ref IFF type() == Type::HttpApiListener, otherwise nullopt.
+   * Create an Http::ApiListener capable of starting synthetic HTTP streams. The returned listener
+   * must only be deleted in the dispatcher's thread.
+   *
+   * While Envoy Mobile only uses this from the main thread, taking a dispatcher as a parameter
+   * allows other users to use this from worker threads as well.
+   *
+   * @return valid pointer IFF type() == Type::HttpApiListener, otherwise nullptr.
    */
-  virtual Http::ApiListenerOptRef http() PURE;
+  virtual Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) PURE;
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;

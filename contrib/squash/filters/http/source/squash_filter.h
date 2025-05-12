@@ -113,7 +113,7 @@ private:
   // Current state of the squash filter. If is_squashing_ is true, Hold the request while we
   // communicate with the squash server to attach a debugger. If it is false, let the request
   // pass-through.
-  bool is_squashing_;
+  bool is_squashing_{false};
   // The API path of the created debug attachment (used for polling its state).
   std::string debug_attachment_path_;
   // A timer for polling the state of a debug attachment until it reaches a final state.
@@ -122,7 +122,7 @@ private:
   // filter iteration
   Event::TimerPtr attachment_timeout_timer_;
   // The current inflight request to the squash server.
-  Http::AsyncClient::Request* in_flight_request_;
+  Http::AsyncClient::Request* in_flight_request_{nullptr};
   // Shims to get AsyncClient callbacks to specific methods, per API method.
   AsyncClientCallbackShim create_attachment_callback_;
   AsyncClientCallbackShim check_attachment_callback_;
@@ -130,7 +130,7 @@ private:
   // ClusterManager to send requests to squash server
   Upstream::ClusterManager& cm_;
   // Callbacks used to continue filter iteration.
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 
   // Create debug attachment URL path.
   const static std::string POST_ATTACHMENT_PATH;

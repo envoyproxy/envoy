@@ -114,8 +114,14 @@ SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long control_cod
 }
 
 SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
-  const int rc = ::closesocket(fd);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  int rc = ::closesocket(fd);
+  const int socket_err = ::WSAGetLastError();
+  if (rc == -1) {
+    // If `closesocket` failed, maybe the descriptor was a file.
+    rc = ::close(fd);
+  }
+  // Assume the descriptor was a socket, and return the error from that one, if both failed.
+  return {rc, rc != -1 ? 0 : socket_err};
 }
 
 SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) {
@@ -150,6 +156,11 @@ SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t 
 SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
                                         off_t offset) const {
   PANIC("not implemented");
+}
+
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, static_cast<char*>(buffer), length, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
@@ -201,7 +212,7 @@ bool OsSysCallsImpl::supportsUdpGso() const {
   return false;
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion) const {
   // Windows doesn't support it.
   return false;
 }
@@ -226,14 +237,27 @@ SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
+  const int rc = ::fstat(fd, buf);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallIntResult OsSysCallsImpl::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
+  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
+    const int rc = ::WSASetRecvIPEcn(sockfd, *(int*)optval == 1);
+    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  }
   const int rc = ::setsockopt(sockfd, level, optname, static_cast<const char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallIntResult OsSysCallsImpl::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
+  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
+    const int rc = ::WSAGetRecvIPEcn(sockfd, (DWORD*)optval);
+    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  }
   const int rc = ::getsockopt(sockfd, level, optname, static_cast<char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
@@ -444,17 +468,9 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
-bool OsSysCallsImpl::supportsGetifaddrs() const {
-  if (alternate_getifaddrs_.has_value()) {
-    return true;
-  }
-  return false;
-}
+bool OsSysCallsImpl::supportsGetifaddrs() const { return false; }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-  if (alternate_getifaddrs_.has_value()) {
-    return alternate_getifaddrs_.value()(interfaces);
-  }
   PANIC("not implemented");
 }
 

@@ -6,9 +6,8 @@ load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
 _required_extensions = {
     "envoy.http.original_ip_detection.xff": "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.request_id.uuid": "//source/extensions/request_id/uuid:config",
-    "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
-    "envoy.network.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
-    "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
+    # To provide default round robin load balancer.
+    "envoy.load_balancing_policies.round_robin": "//source/extensions/load_balancing_policies/round_robin:config",
 }
 
 # Return the extension cc_library target after select
@@ -35,6 +34,8 @@ _core_extensions = [
     "envoy.transport_sockets.raw_buffer",
     "envoy.network.dns_resolver.cares",
     "envoy.network.dns_resolver.apple",
+    "envoy.load_balancing_policies.round_robin",
+    "envoy.transport_sockets.tls",
 ]
 
 # Return all core extensions to be compiled into Envoy.
@@ -52,14 +53,8 @@ def envoy_all_http_filters():
 
     return {_selected_extension_target(v): True for k, v in all_extensions.items() if (k.startswith(_http_filter_prefix) or k.startswith(_upstream_http_filter_prefix))}.keys()
 
-# All network-layer filters are extensions with names that have the following prefix.
-_network_filter_prefix = "envoy.filters.network"
-
-# All thrift filters are extensions with names that have the following prefix.
-_thrift_filter_prefix = "envoy.filters.thrift"
-
-# Return all network-layer filter extensions to be compiled into network-layer filter generic fuzzer.
-def envoy_all_network_filters():
+# Return 'selected' network-layer filter extensions to be compiled into network-layer filter generic fuzzer.
+def envoy_filters_from_selected(selected):
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
-    return [_selected_extension_target(v) for k, v in all_extensions.items() if (k.startswith(_network_filter_prefix) or k.startswith(_thrift_filter_prefix))]
+    return [_selected_extension_target(v) for k, v in all_extensions.items() if (k in selected)]

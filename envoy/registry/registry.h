@@ -219,13 +219,18 @@ public:
     return *factories_by_type;
   }
 
+  static bool& allowDuplicates() {
+    static bool* allow_duplicates = new bool(false);
+    return *allow_duplicates;
+  }
+
   /**
    * instead_value are used when passed name was deprecated.
    */
   static void registerFactory(Base& factory, absl::string_view name,
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
-    if (!result.second) {
+    if (!result.second && !allowDuplicates()) {
       ExceptionUtil::throwEnvoyException(
           fmt::format("Double registration for name: '{}'", factory.name()));
     }
@@ -497,7 +502,7 @@ private:
  * unit. For an example of a typical use case, @see NamedNetworkFilterConfigFactory.
  *
  * Example registration: REGISTER_FACTORY(SpecificFactory, BaseFactory);
- *                       REGISTER_FACTORY(SpecificFactory, BaseFactory){"deprecated_name"};
+ *                       LEGACY_REGISTER_FACTORY(SpecificFactory, BaseFactory, "deprecated_name");
  */
 template <class T, class Base> class RegisterFactory {
 public:
@@ -610,6 +615,7 @@ private:
   T instance_{};
 };
 
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
 /**
  * Macro used for static registration.
  */
@@ -618,6 +624,34 @@ private:
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
+/**
+ * Macro used for static registration with deprecated name.
+ */
+#define LEGACY_REGISTER_FACTORY(FACTORY, BASE, DEPRECATED_NAME)                                    \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                           \
+  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
+                                          FACTORY, BASE>                                           \
+      FACTORY##_registered {                                                                       \
+    DEPRECATED_NAME                                                                                \
+  }
+#else
+/**
+ * Macro used to define a registration function.
+ */
+#define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {                                            \
+    ABSL_ATTRIBUTE_UNUSED static auto registered =                                                 \
+        new Envoy::Registry::RegisterFactory<FACTORY, BASE>();                                     \
+  }
+/**
+ * Macro used to define a registration function with deprecated name.
+ */
+#define LEGACY_REGISTER_FACTORY(FACTORY, BASE, DEPRECATED_NAME)                                    \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {                                            \
+    ABSL_ATTRIBUTE_UNUSED static auto registered =                                                 \
+        new Envoy::Registry::RegisterFactory<FACTORY, BASE>({DEPRECATED_NAME});                    \
+  }
+#endif
 
 #define FACTORY_VERSION(major, minor, patch, ...) major, minor, patch, __VA_ARGS__
 

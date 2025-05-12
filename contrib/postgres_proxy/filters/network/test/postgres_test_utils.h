@@ -8,6 +8,7 @@ namespace NetworkFilters {
 namespace PostgresProxy {
 
 void createPostgresMsg(Buffer::Instance& data, std::string type, std::string payload = "");
+void createInitialPostgresRequest(Buffer::Instance& data);
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

@@ -5,7 +5,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "contrib/rocketmq_proxy/filters/network/source/router/router.h"
 
@@ -62,9 +62,9 @@ private:
    *
    * If there are connections which can be returned immediately, this handle is assigned as nullptr.
    */
-  Tcp::ConnectionPool::Cancellable* handle_;
+  Tcp::ConnectionPool::Cancellable* handle_{nullptr};
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
-  ActiveMessage* active_message_;
+  ActiveMessage* active_message_{nullptr};
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   UpstreamRequestPtr upstream_request_;
   const RouteEntry* route_entry_{};

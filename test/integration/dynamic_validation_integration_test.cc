@@ -35,10 +35,10 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& /*proto_config*/,
       Server::Configuration::FactoryContext& /*context*/) override {
-    return Network::FilterFactoryCb();
+    return {};
   }
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsTyped(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&,
                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return nullptr;

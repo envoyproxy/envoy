@@ -51,11 +51,12 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
   if (U_FAILURE(errorCode)) {
     throw EnvoyException(fmt::format("Failed to initialize icu::LocaleMatcher::Builder: ICU error "
                                      "code icu::LocaleMatcher::Builder build: {}",
-                                     errorCode));
+                                     static_cast<int>(errorCode)));
   }
 
   auto config = std::make_shared<LanguageFilterConfigImpl>(
-      std::make_shared<icu::Locale>(default_locale), locale_matcher, stats_prefix, context.scope());
+      std::make_shared<icu::Locale>(default_locale), locale_matcher,
+      proto_config.clear_route_cache(), stats_prefix, context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<LanguageFilter>(config);

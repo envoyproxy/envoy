@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.data.tap.v3;
 
+import "envoy/config/core/v3/address.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -35,4 +37,15 @@ message Body {
   // :ref:`max_buffered_tx_bytes
   // <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes>` settings.
   bool truncated = 3;
+}
+
+// Connection properties.
+message Connection {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.data.tap.v2alpha.Connection";
+
+  // Local address.
+  config.core.v3.Address local_address = 1;
+
+  // Remote address.
+  config.core.v3.Address remote_address = 2;
 }

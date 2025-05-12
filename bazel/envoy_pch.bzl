@@ -8,6 +8,12 @@ load(
 )
 load(":pch.bzl", "pch")
 
+def envoy_pch_deps(repository, target):
+    return select({
+        repository + "//bazel:clang_pch_build": [repository + target],
+        "//conditions:default": [],
+    })
+
 def envoy_pch_copts(repository, target):
     return select({
         repository + "//bazel:clang_pch_build": [
@@ -21,8 +27,8 @@ def envoy_pch_library(
         name,
         includes,
         deps,
-        external_deps,
         visibility,
+        external_deps = [],
         testonly = False,
         repository = ""):
     native.cc_library(

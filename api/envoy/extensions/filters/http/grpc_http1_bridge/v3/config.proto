@@ -26,4 +26,7 @@ message Config {
   // For the requests that went through this upgrade the filter will also strip the frame before forwarding the
   // response to the client.
   bool upgrade_protobuf_to_grpc = 1;
+
+  // If true then query parameters in request's URL path will be removed.
+  bool ignore_query_parameters = 2;
 }

@@ -10,9 +10,11 @@ envoy_package()
 
 envoy_cc_test(
     name = "redirect_extension_integration_test",
+    size = "large",
     srcs = [
         "redirect_extension_integration_test.cc",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/internal_redirect/allow_listed_routes:config",

@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package testdata.dynamic_descriptors;
+
+message FooCopy {
+  optional string bar = 1;
+
+  extensions 10 to 20;
+}

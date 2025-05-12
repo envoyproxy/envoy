@@ -86,7 +86,7 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
   }
   RoleBasedAccessControlFilterConfigSharedPtr config(
       std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(),
-                                                           context.getServerFactoryContext(),
+                                                           context.serverFactoryContext(),
                                                            context.messageValidationVisitor()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));

@@ -262,6 +262,7 @@ public:
   MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
   MOCK_METHOD(void, startUpstreamResponse, (Transport&, Protocol&));
   MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
+  MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
@@ -547,10 +548,10 @@ public:
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
-  MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRouterHandle>>, submit,
+  MOCK_METHOD(OptRef<ShadowRouterHandle>, submit,
               (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());
 
-  absl::optional<std::reference_wrapper<ShadowRouterHandle>> router_handle_{absl::nullopt};
+  OptRef<ShadowRouterHandle> router_handle_{absl::nullopt};
 };
 
 } // namespace Router

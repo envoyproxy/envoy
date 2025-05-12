@@ -14,8 +14,8 @@ void HttpHealthCheckerImplTestBase::expectSessionCreate(
   TestSessionPtr new_test_session(new TestSession());
   test_sessions_.emplace_back(std::move(new_test_session));
   TestSession& test_session = *test_sessions_.back();
-  test_session.timeout_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  test_session.interval_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  test_session.timeout_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  test_session.interval_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectClientCreate(test_sessions_.size() - 1, health_check_map);
 }
 
@@ -28,7 +28,7 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(
   connection_index_.push_back(index);
   codec_index_.push_back(index);
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
       .Times(testing::AnyNumber())
       .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
         uint32_t index = connection_index_.front();
@@ -77,13 +77,13 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(size_t index) {
 // This is needed to put expectations in LIFO order. The unit tests use inSequence, which makes
 // expectations FIFO.
 void TcpHealthCheckerImplTestBase::expectSessionCreate() {
-  timeout_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  interval_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  timeout_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  interval_timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 }
 
 void TcpHealthCheckerImplTestBase::expectClientCreate() {
   connection_ = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillOnce(testing::Return(connection_));
   EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(testing::SaveArg<0>(&read_filter_));
 }
@@ -98,8 +98,8 @@ void GrpcHealthCheckerImplTestBaseUtils::expectSessionCreate() {
   TestSessionPtr new_test_session(new TestSession());
   test_sessions_.emplace_back(std::move(new_test_session));
   TestSession& test_session = *test_sessions_.back();
-  test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
-  test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_session.timeout_timer_ = new Event::MockTimer(&context_.dispatcher_);
+  test_session.interval_timer_ = new Event::MockTimer(&context_.dispatcher_);
   expectClientCreate(test_sessions_.size() - 1);
 }
 
@@ -110,7 +110,7 @@ void GrpcHealthCheckerImplTestBaseUtils::expectClientCreate(size_t index) {
   connection_index_.push_back(index);
   codec_index_.push_back(index);
 
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+  EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
       .Times(testing::AnyNumber())
       .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
         uint32_t index = connection_index_.front();

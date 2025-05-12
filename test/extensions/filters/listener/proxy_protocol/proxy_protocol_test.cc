@@ -4,18 +4,23 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/listener_manager/connection_handler_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -25,12 +30,15 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using envoy::config::core::v3::ProxyProtocolConfig;
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
 using testing::_;
@@ -48,8 +56,16 @@ namespace ListenerFilters {
 namespace ProxyProtocol {
 namespace {
 
-// Build again on the basis of the connection_handler_test.cc
+TEST(ConfigTest, AllVersionsCannotBeDisallowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.mutable_disallowed_versions()->Add(ProxyProtocolConfig::V1);
+  proto_config.mutable_disallowed_versions()->Add(ProxyProtocolConfig::V2);
+  Stats::TestUtil::TestStore stats_store;
+  EXPECT_THROW(ProxyProtocol::Config(*stats_store.rootScope(), proto_config),
+               ProtoValidationException);
+}
 
+// Build again on the basis of the connection_handler_test.cc
 class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           public Network::FilterChainManager,
@@ -62,7 +78,8 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr) {
+        init_manager_(nullptr),
+        listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -73,7 +90,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr,
@@ -92,31 +109,34 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
-  Stats::Scope& listenerScope() override { return stats_store_; }
+  Stats::Scope& listenerScope() override {
+    return *stats_store_.createScope("listener.test_listener");
+  }
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
   }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
+  bool shouldBypassOverloadManager() const override { return false; }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return filter_chain_.get();
   }
 
@@ -135,10 +155,10 @@ public:
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               nullptr, std::make_unique<Filter>(std::make_shared<Config>(
-                           listenerScope(), (nullptr != proto_config)
-                                                ? *proto_config
-                                                : envoy::extensions::filters::listener::
-                                                      proxy_protocol::v3::ProxyProtocol())));
+                           *stats_store_.rootScope(),
+                           (nullptr != proto_config) ? *proto_config
+                                                     : envoy::extensions::filters::listener::
+                                                           proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
         }));
@@ -147,7 +167,7 @@ public:
       read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
           .WillOnce(Invoke([&](Network::Connection& connection,
-                               const std::vector<Network::FilterFactoryCb>&) -> bool {
+                               const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
@@ -204,6 +224,7 @@ public:
   }
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -221,14 +242,31 @@ public:
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
-  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  const AccessLog::InstanceSharedPtrVector empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 // Parameterize the listener socket address version.
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ProxyProtocolTest, V1UnsupportedIPv4) {
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V1UnsupportedIPv6) {
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 65535 1234\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
 
 TEST_P(ProxyProtocolTest, V1Basic) {
   connect();
@@ -240,7 +278,16 @@ TEST_P(ProxyProtocolTest, V1Basic) {
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V1);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
@@ -258,6 +305,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
@@ -277,6 +325,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV1First) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
@@ -296,6 +345,7 @@ TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocolPartialMatchesV2First) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
@@ -313,6 +363,7 @@ TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
   write(msg);
   expectData(msg);
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1Minimal) {
@@ -331,6 +382,7 @@ TEST_P(ProxyProtocolTest, V1Minimal) {
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Basic) {
@@ -349,6 +401,7 @@ TEST_P(ProxyProtocolTest, V2Basic) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, BasicV6) {
@@ -362,6 +415,7 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2BasicV6) {
@@ -382,6 +436,37 @@ TEST_P(ProxyProtocolTest, V2BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2UnsupportedIPv4) {
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv4Instance::forceProtocolUnsupportedForTest(true);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2UnsupportedIPv6) {
+  // A well-formed ipv6/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
+                                0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',
+                                'e',  ' ',  'd',  'a',  't',  'a'};
+
+  connect(false);
+  Cleanup cleaner = Network::Address::Ipv6Instance::forceProtocolUnsupportedForTest(true);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
@@ -394,6 +479,7 @@ TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, ErrorRecv_2) {
@@ -416,10 +502,10 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -429,6 +515,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -464,6 +555,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -491,10 +587,10 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -504,6 +600,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -540,6 +641,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -556,6 +662,7 @@ TEST_P(ProxyProtocolTest, V2NotLocalOrOnBehalf) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnection) {
@@ -577,6 +684,7 @@ TEST_P(ProxyProtocolTest, V2LocalConnection) {
   }
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
@@ -598,6 +706,37 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   }
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
+  // A well-formed local proxy protocol v2 header sampled from an AWS NLB healthcheck request,
+  // no address, 1 TLV is present.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x20, 0x00, 0x00, 0x07, 0x00, 0x00, 0x04, 0x0a, 0x0b, 0x0c,
+                                0x0d, 'm',  'o',  'r',  'e',  'd',  'a',  't',  'a'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  expectData("moredata");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  if (server_connection_->connectionInfoProvider().remoteAddress()->ip()->version() ==
+      Envoy::Network::Address::IpVersion::v6) {
+    EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "::1");
+  } else if (server_connection_->connectionInfoProvider().remoteAddress()->ip()->version() ==
+             Envoy::Network::Address::IpVersion::v4) {
+    EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "127.0.0.1");
+  }
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
+  EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4) {
@@ -609,6 +748,7 @@ TEST_P(ProxyProtocolTest, V2ShortV4) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
@@ -622,6 +762,7 @@ TEST_P(ProxyProtocolTest, V2ShortV4WithAllowNoProxyProtocol) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
@@ -634,6 +775,7 @@ TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortV6) {
@@ -646,6 +788,7 @@ TEST_P(ProxyProtocolTest, V2ShortV6) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
@@ -660,6 +803,7 @@ TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
 
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2AF_UNIX) {
@@ -672,6 +816,7 @@ TEST_P(ProxyProtocolTest, V2AF_UNIX) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2BadCommand) {
@@ -684,6 +829,7 @@ TEST_P(ProxyProtocolTest, V2BadCommand) {
   write(buffer, sizeof(buffer));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2WrongVersion) {
@@ -695,6 +841,7 @@ TEST_P(ProxyProtocolTest, V2WrongVersion) {
   connect(false);
   write(buffer, sizeof(buffer));
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1TooLong) {
@@ -705,6 +852,8 @@ TEST_P(ProxyProtocolTest, V1TooLong) {
     write(buffer, sizeof(buffer));
   }
   expectProxyProtoError();
+  // Not tracked as v1 due to missing /r/n at end
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_disallowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
@@ -717,6 +866,11 @@ TEST_P(ProxyProtocolTest, V1TooLongWithAllowNoProxyProtocol) {
     write(buffer, sizeof(buffer));
   }
   expectProxyProtoError();
+  // Not allowed as unknown because of PROXY v1 signature match.
+  // Not tracked as v1 due to missing /r/n at end.
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 0);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 0);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_disallowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensions) {
@@ -737,6 +891,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensions) {
   write(data, sizeof(data));
   expectData("DATA");
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
@@ -761,6 +916,12 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
         return x;
       }));
 #else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -770,12 +931,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
         }
         return x;
       }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -785,6 +940,11 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -820,6 +980,18 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
       }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -847,6 +1019,7 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsFrag) {
   write(data, sizeof(data));
   expectData("DATA");
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, Fragmented) {
@@ -868,6 +1041,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented1) {
@@ -890,6 +1064,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented1) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented2) {
@@ -912,6 +1087,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented2) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented3) {
@@ -936,6 +1112,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented3) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
@@ -962,6 +1139,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
         return x;
       }));
 #else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -971,12 +1154,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
         }
         return x;
       }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -986,6 +1163,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -1021,6 +1203,18 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
       }));
   connect(false);
   write(buffer, 17);
@@ -1055,6 +1249,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
         return x;
       }));
 #else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
@@ -1064,12 +1264,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
         }
         return x;
       }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
-#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -1079,6 +1273,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -1115,6 +1314,18 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1143,6 +1354,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
@@ -1164,6 +1376,7 @@ TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
             "254.254.254.254");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
@@ -1189,6 +1402,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV1ReadWithAllowNoProxyProtocol) {
             "254.254.254.254");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2PartialRead) {
@@ -1214,6 +1428,7 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
@@ -1243,6 +1458,7 @@ TEST_P(ProxyProtocolTest, PartialV2ReadWithAllowNoProxyProtocol) {
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
@@ -1272,6 +1488,7 @@ TEST_P(ProxyProtocolTest, TinyPartialV2ReadWithAllowNoProxyProtocol) {
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
@@ -1315,9 +1532,14 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
   EXPECT_EQ(tlv_data, value_s);
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
+  });
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
@@ -1342,6 +1564,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   expectData("DATA");
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
@@ -1354,6 +1577,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   auto value_s = fields.at("PP2 type authority").string_value();
   ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataNamespace) {
@@ -1394,9 +1618,145 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   auto value_s = fields.at("PP2 type authority").string_value();
   ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
+  });
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // a TLV of type 0x00 with size of 4 (1 byte is value)
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // a TLV of type 0x02 with size of 10 bytes (7 bytes are value)
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  // a TLV of type 0x0f with size of 6 bytes (3 bytes are value)
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // a TLV of type 0xea with size of 25 bytes (22 bytes are value)
+  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
+                                    0x32, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
+                                    0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule_type_authority = proto_config.add_rules();
+  rule_type_authority->set_tlv_type(0x02);
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  auto rule_vpc_id = proto_config.add_rules();
+  rule_vpc_id->set_tlv_type(0xea);
+  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_vpc_id, sizeof(tlv_vpc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(2, fields.size());
+  EXPECT_EQ(1, fields.count("PP2 type authority"));
+  EXPECT_EQ(1, fields.count("PP2 vpc id"));
+
+  auto value_type_authority = fields.at("PP2 type authority").string_value();
+  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+
+  auto value_vpc_id = fields.at("PP2 vpc id").string_value();
+  ASSERT_THAT(value_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
+                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
+  });
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // A TLV of type 0x00 with size of 4 (1 byte is value).
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // A TLV of type 0x02 with size of 10 bytes (7 bytes are value). Second and last bytes in the
+  // value are non utf8 characters.
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0xfe,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0xc1};
+  // A TLV of type 0x0f with size of 6 bytes (3 bytes are value).
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // A TLV of type 0xea with size of 25 bytes (22 bytes are value). 7th and 21st bytes are non utf8
+  // characters.
+  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
+                                    0xc0, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
+                                    0x36, 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule_type_authority = proto_config.add_rules();
+  rule_type_authority->set_tlv_type(0x02);
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  auto rule_vpc_id = proto_config.add_rules();
+  rule_vpc_id->set_tlv_type(0xea);
+  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_vpc_id, sizeof(tlv_vpc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(2, fields.size());
+  EXPECT_EQ(1, fields.count("PP2 type authority"));
+  EXPECT_EQ(1, fields.count("PP2 vpc id"));
+
+  const char replacement = 0x21;
+  auto value_type_authority = fields.at("PP2 type authority").string_value();
+  // Non utf8 characters have been replaced with `0x21` (`!` character).
+  ASSERT_THAT(value_type_authority,
+              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement));
+
+  auto value_vpc_id = fields.at("PP2 vpc id").string_value();
+  ASSERT_THAT(value_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35, 0x74, 0x65, 0x73,
+                          0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndEmitTypedAndUntypedMetadata) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
@@ -1436,6 +1796,22 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
 
+  auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  EXPECT_EQ(1, typed_metadata.size());
+  EXPECT_EQ(1, typed_metadata.count(ProxyProtocol));
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+  auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
+  EXPECT_EQ(absl::OkStatus(), status);
+  EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
+
+  auto value_type_authority = (tlvs_metadata.typed_metadata()).at("PP2 type authority");
+  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
+
+  auto value_type_vpc_id = (tlvs_metadata.typed_metadata()).at("PP2 vpc id");
+  ASSERT_THAT(value_type_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
+                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
+
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
   EXPECT_EQ(1, metadata.count(ProxyProtocol));
@@ -1445,14 +1821,99 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
   EXPECT_EQ(1, fields.count("PP2 type authority"));
   EXPECT_EQ(1, fields.count("PP2 vpc id"));
 
-  auto value_type_authority = fields.at("PP2 type authority").string_value();
+  value_type_authority = fields.at("PP2 type authority").string_value();
   ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
 
-  auto value_vpc_id = fields.at("PP2 vpc id").string_value();
-  ASSERT_THAT(value_vpc_id,
+  value_type_vpc_id = fields.at("PP2 vpc id").string_value();
+  ASSERT_THAT(value_type_vpc_id,
               ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
                           0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest,
+       V2ExtractMultipleTlvsOfInterestWithNonUtf8CharsAndEmitTypedAndUntypedMetadata) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  // a TLV of type 0x00 with size of 4 (1 byte is value)
+  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
+  // a TLV of type 0x02 with size of 10 bytes (7 bytes are value).
+  // 2nd and 7th bytes in the value are not utf-8.
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0xfe,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0xc1};
+  // a TLV of type 0x0f with size of 6 bytes (3 bytes are value)
+  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
+  // a TLV of type 0xea with size of 25 bytes (22 bytes are value)
+  // 7th and 21st bytes in the value are not utf-8.
+  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
+                                    0xc0, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
+                                    0x36, 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule_type_authority = proto_config.add_rules();
+  rule_type_authority->set_tlv_type(0x02);
+  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  auto rule_vpc_id = proto_config.add_rules();
+  rule_vpc_id->set_tlv_type(0xea);
+  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv3, sizeof(tlv3));
+  write(tlv_vpc_id, sizeof(tlv_vpc_id));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
+  EXPECT_EQ(1, metadata.size());
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
+
+  auto fields = metadata.at(ProxyProtocol).fields();
+  EXPECT_EQ(2, fields.size());
+  EXPECT_EQ(1, fields.count("PP2 type authority"));
+  EXPECT_EQ(1, fields.count("PP2 vpc id"));
+
+  const char replacement = 0x21;
+  auto value_type_authority = fields.at("PP2 type authority").string_value();
+  // Non utf8 characters have been replaced with `0x21` (`!` character).
+  ASSERT_THAT(value_type_authority,
+              ElementsAre(0x66, replacement, 0x6f, 0x2e, 0x63, 0x6f, replacement));
+
+  auto value_type_vpc_id = fields.at("PP2 vpc id").string_value();
+  ASSERT_THAT(value_type_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, replacement, 0x35, 0x74, 0x65, 0x73,
+                          0x74, 0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, replacement, 0x37));
+
+  auto typed_metadata = server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata();
+  EXPECT_EQ(1, typed_metadata.size());
+  EXPECT_EQ(1, typed_metadata.count(ProxyProtocol));
+
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+  auto status = MessageUtil::unpackTo(typed_metadata[ProxyProtocol], tlvs_metadata);
+  EXPECT_EQ(absl::OkStatus(), status);
+  EXPECT_EQ(2, tlvs_metadata.typed_metadata().size());
+
+  value_type_authority = (tlvs_metadata.typed_metadata()).at("PP2 type authority");
+  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0xfe, 0x6f, 0x2e, 0x63, 0x6f, 0xc1));
+
+  value_type_vpc_id = (tlvs_metadata.typed_metadata()).at("PP2 vpc id");
+  ASSERT_THAT(value_type_vpc_id,
+              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0xc0, 0x35, 0x74, 0x65, 0x73, 0x74,
+                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0xf9, 0x37));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
@@ -1502,6 +1963,7 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
   ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
@@ -1524,6 +1986,7 @@ TEST_P(ProxyProtocolTest, V2WrongTLVLength) {
   write(tlv, sizeof(tlv));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
@@ -1553,6 +2016,136 @@ TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
   write(tlv2, sizeof(tlv2));
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0x02);
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  auto pass_through_tlvs = proto_config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
+  EXPECT_EQ(2, proxy_proto_data.tlv_vector_.size());
+  EXPECT_EQ(0x0, proxy_proto_data.tlv_vector_[0].type);
+  EXPECT_EQ(0xFF, proxy_proto_data.tlv_vector_[0].value[0]);
+  EXPECT_EQ(1, proxy_proto_data.tlv_vector_[0].value.size());
+  EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[1].type);
+  EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[1].value.begin(),
+                                   proxy_proto_data.tlv_vector_[1].value.end()));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+
+  auto pass_through_tlvs = proto_config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
+  EXPECT_EQ(0, proxy_proto_data.tlv_vector_.size());
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+
+  auto pass_through_tlvs = proto_config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+  pass_through_tlvs->add_tlv_type(0x02);
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
+  EXPECT_EQ(1, proxy_proto_data.tlv_vector_.size());
+  EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[0].type);
+  EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[0].value.begin(),
+                                   proxy_proto_data.tlv_vector_[0].value.end()));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
@@ -1563,6 +2156,22 @@ TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   write("\n");
 
   expectProxyProtoError();
+  // Tracked as v1 because of trailing \r\n
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, MalformedProxyLineWithAllowNoProxyProtocol) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  std::string msg = "BOGUS\r\n";
+  write(msg);
+  expectData(msg);
+  disconnect();
+  // Tracked as unknown because `set_allow_requests_without_proxy_protocol` matches v1 signature
+  // differently that previous test case.
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
@@ -1570,66 +2179,77 @@ TEST_P(ProxyProtocolTest, ProxyLineTooLarge) {
   write("012345678901234567890123456789012345678901234567890123456789"
         "012345678901234567890123456789012345678901234567890123456789");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_disallowed").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, NotEnoughFields) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, UnsupportedProto) {
   connect(false);
   write("PROXY UDP6 1:2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, InvalidSrcAddress) {
   connect(false);
   write("PROXY TCP4 230.0.0.1 10.1.1.3 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, InvalidDstAddress) {
   connect(false);
   write("PROXY TCP4 10.1.1.2 0.0.0.0 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, BadPort) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, NegativePort) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 -1 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, PortOutOfRange) {
   connect(false);
   write("PROXY TCP6 1:2:3::4 5:6::7:8 66776 1234\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, BadAddress) {
   connect(false);
   write("PROXY TCP6 1::2:3::4 5:6::7:8 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch) {
   connect(false);
   write("PROXY TCP4 [1:2:3::4] 1.2.3.4 1234 5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
   connect(false);
   write("PROXY TCP4 1.2.3.4 [1:2:3: 1234 4]:5678\r\nmore data");
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 
 TEST_P(ProxyProtocolTest, Truncated) {
@@ -1697,6 +2317,11 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return os_sys_calls_actual_.send(socket, buffer, length, flags);
+      }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
@@ -1732,13 +2357,296 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                                    socklen_t optlen) -> int {
+        return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
+            .return_value_;
+      }));
 
   connect(false);
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
 
   expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
 }
 #endif
+
+class ProxyProtocolDisallowedVersionsTest : public ProxyProtocolTest {
+public:
+  virtual envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol
+  createConfig(const std::vector<ProxyProtocolConfig::Version>& disallowed_versions) const {
+    envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+    for (const auto& version : disallowed_versions) {
+      proto_config.mutable_disallowed_versions()->Add(version);
+    }
+    return proto_config;
+  }
+};
+
+// Parameterize the listener socket address version.
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolDisallowedVersionsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2BasicRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.disallowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV2ShortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV2ShortRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.disallowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BasicRejected) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.disallowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V2DisallowedV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsTest, V1DisallowedV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectConnectionError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.disallowed").value(), 1);
+}
+
+// Tests a combination of `disallowed_versions` and `allow_requests_without_proxy_protocol`.
+class ProxyProtocolDisallowedVersionsWithNoProxyProtoTest
+    : public ProxyProtocolDisallowedVersionsTest {
+public:
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol createConfig(
+      const std::vector<ProxyProtocolConfig::Version>& disallowed_versions) const override {
+    auto proto_config = ProxyProtocolDisallowedVersionsTest::createConfig(disallowed_versions);
+    proto_config.set_allow_requests_without_proxy_protocol(true);
+    return proto_config;
+  }
+};
+
+// Parameterize the listener socket address version.
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolDisallowedVersionsWithNoProxyProtoTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV2BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  // A well-formed ipv4/tcp message, no extensions
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData(std::string(buffer, buffer + sizeof(buffer)));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV2ShortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(false, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV2ShortAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  // An ipv4/tcp connection that has incorrect addr-len encoded
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
+                                'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  write(buffer, sizeof(buffer));
+  expectData(std::string(buffer, buffer + sizeof(buffer)));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("more data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV1BasicAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  expectData("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedV1BadPortError) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2});
+  connect(false, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.error").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V1DisallowedV1BadPortAllowed) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  write("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  expectData("PROXY TCP6 1:2:3::4 5:6::7:8 1234 abc\r\nmore data");
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+}
+
+// In direct comparison to V1TooLongWithAllowNoProxyProtocol.
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest,
+       V1DisallowedAllowNoProxyProtocolAndV1NotMatched) {
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V1});
+  connect(true, &proto_config);
+
+  write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100 RANDOM ENDING");
+  expectData("PROXY TCP4 1.2.3.4 2.3.4.5 100 100 RANDOM ENDING");
+  disconnect();
+  // Not tracked as v1 due to missing /r/n at end.
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+}
+
+TEST_P(ProxyProtocolDisallowedVersionsWithNoProxyProtoTest, V2DisallowedAllowTinyNoProxyProtocol) {
+  // Allows a small request (less bytes than v1/v2 signature) through even though it doesn't use
+  // proxy protocol
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config =
+      createConfig({ProxyProtocolConfig::V2}); // Essentially NOOP.
+  connect(true, &proto_config);
+
+  std::string msg = "data";
+  write(msg);
+  expectData(msg);
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.not_found_allowed").value(), 1);
+}
 
 class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
@@ -1755,7 +2663,8 @@ public:
             socket_->connectionInfoProvider().localAddress()->ip()->port())),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
-        init_manager_(nullptr) {
+        init_manager_(nullptr),
+        listener_info_(std::make_shared<NiceMock<Network::MockListenerInfo>>()) {
     socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 socketType())
@@ -1766,7 +2675,7 @@ public:
     EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
                 getListenSocket(_))
         .WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this, runtime_);
+    connection_handler_->addListener(absl::nullopt, *this, runtime_, random_);
     conn_ = dispatcher_->createClientConnection(
         local_dst_address_, Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr, nullptr);
@@ -1777,7 +2686,7 @@ public:
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<Filter>(std::make_shared<Config>(
-                  listenerScope(),
+                  *stats_store_.rootScope(),
                   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           return true;
         }));
@@ -1795,30 +2704,33 @@ public:
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
   ResourceLimit& openConnections() override { return open_connections_; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
-  Stats::Scope& listenerScope() override { return stats_store_; }
+  Stats::Scope& listenerScope() override {
+    return *stats_store_.createScope("listener.test_listener");
+  }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  Network::UdpListenerConfigOptRef udpListenerConfig() override {
-    return Network::UdpListenerConfigOptRef();
-  }
-  Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return Network::InternalListenerConfigOptRef();
-  }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
+  const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
+    return listener_info_;
   }
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
+  uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
+    return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
+  }
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
+  bool shouldBypassOverloadManager() const override { return false; }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return filter_chain_.get();
   }
 
@@ -1827,7 +2739,7 @@ public:
     read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
     EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
         .WillOnce(Invoke([&](Network::Connection& connection,
-                             const std::vector<Network::FilterFactoryCb>&) -> bool {
+                             const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
           connection.addReadFilter(read_filter_);
@@ -1866,7 +2778,8 @@ public:
   }
 
   testing::NiceMock<Runtime::MockLoader> runtime_;
-  Stats::IsolatedStoreImpl stats_store_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
+  Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   BasicResourceLimitImpl open_connections_;
@@ -1883,8 +2796,9 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
-  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  const AccessLog::InstanceSharedPtrVector empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  const Network::ListenerInfoConstSharedPtr listener_info_;
 };
 
 // Parameterize the listener socket address version.
@@ -1905,6 +2819,7 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST_P(WildcardProxyProtocolTest, BasicV6) {
@@ -1920,6 +2835,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
   disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
 
 TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {

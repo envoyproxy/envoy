@@ -20,23 +20,16 @@ namespace TcpGrpc {
 
 AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::ListenerAccessLogFactoryContext& context) {
-  return createAccessLogInstance(
-      config, std::move(filter),
-      static_cast<Server::Configuration::CommonFactoryContext&>(context));
-}
-
-AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>&&) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
+  return std::make_shared<TcpGrpcAccessLog>(
+      std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
@@ -48,8 +41,8 @@ std::string TcpGrpcAccessLogFactory::name() const { return "envoy.access_loggers
 /**
  * Static registration for the TCP gRPC access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(TcpGrpcAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.tcp_grpc_access_log"};
+LEGACY_REGISTER_FACTORY(TcpGrpcAccessLogFactory, AccessLog::AccessLogInstanceFactory,
+                        "envoy.tcp_grpc_access_log");
 
 } // namespace TcpGrpc
 } // namespace AccessLoggers

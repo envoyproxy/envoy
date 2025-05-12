@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ostream>
 #include <string>
 
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
@@ -26,6 +27,8 @@ struct ParsedSegment {
   ParsedSegment(absl::string_view value, RewriteStringKind kind) : value_(value), kind_(kind) {}
   absl::string_view value_;
   RewriteStringKind kind_;
+
+  friend std::ostream& operator<<(std::ostream& os, const ParsedSegment& parsed_segment);
 };
 
 // Stores string literals and regex capture indexes for rewriting paths

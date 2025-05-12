@@ -52,7 +52,7 @@ void FineGrainLogContext::initFineGrainLogger(const std::string& key,
   } else {
     target = it->second.get();
   }
-  logger.store(target);
+  logger.store(target, std::memory_order_release);
 }
 
 bool FineGrainLogContext::setFineGrainLogger(absl::string_view key, level_enum log_level)
@@ -85,7 +85,9 @@ std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
   std::string info =
       absl::StrJoin(*fine_grain_log_map_, "\n", [](std::string* out, const auto& log_pair) {
-        absl::StrAppend(out, "  ", log_pair.first, ": ", log_pair.second->level());
+        auto level_str_view = spdlog::level::to_string_view(log_pair.second->level());
+        absl::StrAppend(out, "  ", log_pair.first, ": ",
+                        absl::string_view(level_str_view.data(), level_str_view.size()));
       });
   return info;
 }
@@ -93,14 +95,9 @@ std::string FineGrainLogContext::listFineGrainLoggers() ABSL_LOCKS_EXCLUDED(fine
 void FineGrainLogContext::setAllFineGrainLoggers(spdlog::level::level_enum level)
     ABSL_LOCKS_EXCLUDED(fine_grain_log_lock_) {
   absl::ReaderMutexLock l(&fine_grain_log_lock_);
-  if (verbosity_update_info_.empty()) {
-    for (const auto& it : *fine_grain_log_map_) {
-      it.second->set_level(level);
-    }
-  } else {
-    for (const auto& [key, logger] : *fine_grain_log_map_) {
-      logger->set_level(getLogLevel(key));
-    }
+  verbosity_update_info_.clear();
+  for (const auto& it : *fine_grain_log_map_) {
+    it.second->set_level(level);
   }
 }
 
@@ -174,9 +171,6 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
 void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
   {
     absl::WriterMutexLock wl(&fine_grain_log_lock_);
-    if (level == verbosity_default_level_) {
-      return;
-    }
     verbosity_default_level_ = level;
   }
 
@@ -229,18 +223,17 @@ level_enum FineGrainLogContext::getLogLevel(absl::string_view file) const {
     }
   }
 
-  absl::string_view stem = file, stem_basename = basename;
+  absl::string_view stem_basename = basename;
   {
     const size_t sep = stem_basename.find('.');
     if (sep != stem_basename.npos) {
-      stem.remove_suffix(stem_basename.size() - sep);
       stem_basename.remove_suffix(stem_basename.size() - sep);
     }
   }
   for (const auto& info : verbosity_update_info_) {
     if (info.update_is_path) {
       // If there are any slashes in the pattern, try to match the full path name.
-      if (safeFileNameMatch(info.update_pattern, stem)) {
+      if (safeFileNameMatch(info.update_pattern, file)) {
         return info.log_level;
       }
     } else if (safeFileNameMatch(info.update_pattern, stem_basename)) {

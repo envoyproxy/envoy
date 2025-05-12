@@ -42,7 +42,7 @@ void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
   close_connection_ =
       HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
   if (close_connection_) {
-    parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
+    parent_.parent().host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
   }
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
@@ -52,10 +52,10 @@ void ActiveClient::StreamWrapper::onDecodeComplete() {
   decode_complete_ = encode_complete_;
   ENVOY_CONN_LOG(debug, "response complete", *parent_.codec_client_);
 
-  if (!parent_.stream_wrapper_->encode_complete_) {
+  if (!encode_complete_) {
     ENVOY_CONN_LOG(debug, "response before request complete", *parent_.codec_client_);
     parent_.codec_client_->close();
-  } else if (parent_.stream_wrapper_->close_connection_ || parent_.codec_client_->remoteClosed()) {
+  } else if (close_connection_ || parent_.codec_client_->remoteClosed()) {
     ENVOY_CONN_LOG(debug, "saw upstream close connection", *parent_.codec_client_);
     parent_.codec_client_->close();
   } else {
@@ -76,7 +76,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
     : Envoy::Http::ActiveClient(parent, parent.host()->cluster().maxRequestsPerConnection(),
                                 /* effective_concurrent_stream_limit */ 1,
                                 /* configured_concurrent_stream_limit */ 1, data) {
-  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
+  parent.host()->cluster().trafficStats()->upstream_cx_http1_total_.inc();
 }
 
 ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }

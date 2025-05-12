@@ -6,7 +6,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/utility.h"
 
 #include "event2/event.h"
 #include "gtest/gtest.h"
@@ -28,8 +27,7 @@ protected:
   }
 
   void addTask(int64_t delay_ms, char marker, bool expect_monotonic = true) {
-    addCustomTask(
-        delay_ms, marker, []() {}, expect_monotonic);
+    addCustomTask(delay_ms, marker, []() {}, expect_monotonic);
   }
 
   void addCustomTask(int64_t delay_ms, char marker, std::function<void()> cb,

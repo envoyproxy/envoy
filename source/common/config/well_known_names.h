@@ -34,6 +34,12 @@ public:
   const std::string ENVOY_LB = "envoy.lb";
   // Filter namespace for built-in transport socket match in cluster.
   const std::string ENVOY_TRANSPORT_SOCKET_MATCH = "envoy.transport_socket_match";
+  // Filter namespace for storing custom upstream PP TLVs in metadata.
+  const std::string ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL =
+      "envoy.transport_sockets.proxy_protocol";
+  // Proxy address configuration namespace for HTTP/1.1 proxy transport sockets.
+  const std::string ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR =
+      "envoy.http11_proxy_transport_socket.proxy_address";
 };
 
 using MetadataFilters = ConstSingleton<MetadataFilterValues>;
@@ -91,6 +97,12 @@ public:
   const std::string HTTP_USER_AGENT = "envoy.http_user_agent";
   // SSL cipher for a connection
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
+  // SSL curve for a connection
+  const std::string SSL_CURVE = "envoy.ssl_curve";
+  // SSL signature algorithm for a connection
+  const std::string SSL_SIGALG = "envoy.ssl_sigalg";
+  // SSL version for a connection
+  const std::string SSL_VERSION = "envoy.ssl_version";
   // SSL cipher suite
   const std::string SSL_CIPHER_SUITE = "cipher_suite";
   // Stats prefix for the Client SSL Auth network filter
@@ -109,6 +121,18 @@ public:
   const std::string LOCAL_HTTP_RATELIMIT_PREFIX = "envoy.local_http_ratelimit_prefix";
   // Stats prefix for the Local Ratelimit network filter
   const std::string LOCAL_NETWORK_RATELIMIT_PREFIX = "envoy.local_network_ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit listener filter
+  const std::string LOCAL_LISTENER_RATELIMIT_PREFIX = "envoy.local_listener_ratelimit_prefix";
+  // Stats prefix for the dns filter
+  const std::string DNS_FILTER_PREFIX = "envoy.dns_filter_prefix";
+  // Stats prefix for the Connection limit filter
+  const std::string CONNECTION_LIMIT_PREFIX = "envoy.connection_limit_prefix";
+  // Stats prefix for the RBAC network filter
+  const std::string RBAC_PREFIX = "envoy.rbac_prefix";
+  // Stats prefix for the RBAC http filter
+  const std::string RBAC_HTTP_PREFIX = "envoy.rbac_http_prefix";
+  // Policy name for the RBAC http filter
+  const std::string RBAC_POLICY_NAME = "envoy.rbac_policy_name";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter
@@ -135,14 +159,24 @@ public:
   const std::string RESPONSE_CODE_CLASS = "envoy.response_code_class";
   // Route config name for RDS updates
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
+  // Scoped route config name for RDS updates
+  const std::string SCOPED_RDS_CONFIG = "envoy.scoped_rds_config";
   // Request route given by the Router http filter
   const std::string ROUTE = "envoy.route";
+  // Stats prefix for the ext_authz HTTP filter
+  const std::string EXT_AUTHZ_PREFIX = "envoy.ext_authz_prefix";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
   // Stats prefix for the Thrift Proxy network filter
   const std::string THRIFT_PREFIX = "envoy.thrift_prefix";
   // Stats prefix for the Redis Proxy network filter
   const std::string REDIS_PREFIX = "envoy.redis_prefix";
+  // Proxy Protocol version for a connection (Proxy Protocol listener filter).
+  const std::string PROXY_PROTOCOL_VERSION = "envoy.proxy_protocol_version";
+  // Stats prefix for the proxy protocol listener filter.
+  const std::string PROXY_PROTOCOL_PREFIX = "envoy.proxy_protocol_prefix";
+  // Stats prefix for Google GRPC client connections (used by ADS).
+  const std::string GOOGLE_GRPC_CLIENT_PREFIX = "envoy.google_grpc_client_prefix";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
@@ -172,6 +206,18 @@ private:
 };
 
 using TagNames = ConstSingleton<TagNameValues>;
+
+// This class holds extension points which will always be built into Envoy in
+// server mode, but may be excluded from Envoy Mobile.
+class ServerBuiltInExtensionValues {
+public:
+  // Extension point for the default listener.
+  const std::string DEFAULT_LISTENER = "envoy.listener_manager_impl.default";
+  // Extension point for the validation listener
+  const std::string VALIDATION_LISTENER = "envoy.listener_manager_impl.validation";
+};
+
+using ServerExtensionValues = ConstSingleton<ServerBuiltInExtensionValues>;
 
 } // namespace Config
 } // namespace Envoy

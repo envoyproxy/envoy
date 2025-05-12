@@ -16,4 +16,6 @@ admin:
       port_value: 0
 stats_sinks:
 - name: envoy.callbacks_stats_sink
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
 stats_flush_interval: 1s

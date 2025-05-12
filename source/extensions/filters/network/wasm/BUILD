@@ -18,10 +18,12 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_extension(

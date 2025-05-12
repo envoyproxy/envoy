@@ -3,6 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/registry/registry.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -65,6 +66,7 @@ public:
   defaultChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                             Api::Api& api);
 };
+DECLARE_FACTORY(DefaultGoogleGrpcCredentialsFactory);
 
 } // namespace Grpc
 } // namespace Envoy

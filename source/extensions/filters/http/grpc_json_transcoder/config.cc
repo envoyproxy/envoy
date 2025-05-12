@@ -14,16 +14,17 @@ namespace GrpcJsonTranscoder {
 Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   JsonTranscoderConfigSharedPtr filter_config =
-      std::make_shared<JsonTranscoderConfig>(proto_config, context.api());
-
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(*filter_config));
+      std::make_shared<JsonTranscoderConfig>(proto_config, context.serverFactoryContext().api());
+  auto stats = std::make_shared<GrpcJsonTranscoderFilterStats>(
+      GrpcJsonTranscoderFilterStats::generateStats(stats_prefix, context.scope()));
+  return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(filter_config, stats));
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 GrpcJsonTranscoderFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
@@ -35,8 +36,9 @@ GrpcJsonTranscoderFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the grpc transcoding filter. @see RegisterNamedHttpFilterConfigFactory.
  */
-REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.grpc_json_transcoder"};
+LEGACY_REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
+                        Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.grpc_json_transcoder");
 
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters

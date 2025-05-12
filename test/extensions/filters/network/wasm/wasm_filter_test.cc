@@ -28,7 +28,8 @@ using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+  TestFilter(Wasm* wasm, uint32_t root_context_id,
+             Common::Wasm::PluginHandleSharedPtr plugin_handle)
       : Context(wasm, root_context_id, plugin_handle) {}
   MOCK_CONTEXT_LOG_;
 
@@ -105,7 +106,7 @@ TEST_P(WasmNetworkFilterTest, BadCode) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onNewConnection());
 }
 
-TEST_P(WasmNetworkFilterTest, BadCodeFailOpen) {
+TEST_P(WasmNetworkFilterTest, DEPRECATED_FEATURE_TEST(BadCodeFailOpen)) {
   setupConfig("bad code", "", "", true);
   EXPECT_EQ(wasm_, nullptr);
   setupFilter();
@@ -178,7 +179,7 @@ TEST_P(WasmNetworkFilterTest, CloseStream) {
   filter().onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
+TEST_P(WasmNetworkFilterTest, DEPRECATED_FEATURE_TEST(SegvFailOpen)) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
@@ -434,11 +435,13 @@ TEST_P(WasmNetworkFilterTest, CloseDownstream) {
   EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
   Buffer::OwnedImpl fake_downstream_data("Fake");
   filter().onCreate(); // Create context without calling OnNewConnection.
-  EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_downstream_data, false));
+  EXPECT_CALL(read_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close"));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_downstream_data, false));
 
   // Should close downstream.
-  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
-  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
 }
 
 TEST_P(WasmNetworkFilterTest, CloseUpstream) {
@@ -448,11 +451,13 @@ TEST_P(WasmNetworkFilterTest, CloseUpstream) {
   EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
   Buffer::OwnedImpl fake_upstream_data("Fake");
   filter().onCreate(); // Create context without calling OnNewConnection.
-  EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_upstream_data, false));
+  EXPECT_CALL(write_filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close"));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_upstream_data, false));
 
-  // Should close downstream.
-  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
-  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  // Should close upstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
 }
 
 } // namespace Wasm

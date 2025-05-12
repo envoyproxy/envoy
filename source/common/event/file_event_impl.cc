@@ -158,7 +158,7 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
     }
   }
 
-  cb_(events);
+  THROW_IF_NOT_OK(cb_(events));
 }
 
 } // namespace Event

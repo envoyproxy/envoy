@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],
     extension_names = ["envoy.filters.http.file_system_buffer"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:fragment",
@@ -31,6 +32,7 @@ envoy_extension_cc_test(
         "filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
@@ -42,12 +44,17 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "file_system_buffer_integration_test",
+    size = "large",
     srcs = [
         "filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.file_system_buffer"],
-    shard_count = 2,
-    tags = ["skip_on_windows"],
+    rbe_pool = "6gig",
+    shard_count = 4,
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
     deps = [
         "//source/extensions/filters/http/file_system_buffer:config",
         "//test/integration:http_protocol_integration_lib",

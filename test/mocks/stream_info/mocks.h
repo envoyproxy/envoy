@@ -13,6 +13,33 @@
 
 #include "gmock/gmock.h"
 
+namespace testing {
+
+template <>
+class Matcher<Envoy::StreamInfo::ResponseFlag>
+    : public internal::MatcherBase<Envoy::StreamInfo::ResponseFlag> {
+public:
+  explicit Matcher() = default;
+
+  template <typename M, typename = typename std::remove_reference<M>::type::is_gtest_matcher>
+  Matcher(M&& m) : internal::MatcherBase<Envoy::StreamInfo::ResponseFlag>(std::forward<M>(m)) {}
+
+  Matcher(Envoy::StreamInfo::ResponseFlag value) { *this = Eq(value); }
+  Matcher(Envoy::StreamInfo::CoreResponseFlag value) {
+    *this = Eq(Envoy::StreamInfo::ResponseFlag(value));
+  }
+
+  explicit Matcher(const MatcherInterface<const Envoy::StreamInfo::ResponseFlag&>* impl)
+      : internal::MatcherBase<Envoy::StreamInfo::ResponseFlag>(impl) {}
+
+  template <typename U>
+  explicit Matcher(const MatcherInterface<U>* impl,
+                   typename std::enable_if<!std::is_same<U, const U&>::value>::type* = nullptr)
+      : internal::MatcherBase<Envoy::StreamInfo::ResponseFlag>(impl) {}
+};
+
+} // namespace testing
+
 namespace Envoy {
 namespace StreamInfo {
 
@@ -71,22 +98,26 @@ public:
   MOCK_METHOD(void, setResponseCode, (uint32_t));
   MOCK_METHOD(void, setResponseCodeDetails, (absl::string_view));
   MOCK_METHOD(void, setConnectionTerminationDetails, (absl::string_view));
-  MOCK_METHOD(bool, intersectResponseFlags, (uint64_t), (const));
   MOCK_METHOD(void, onUpstreamHostSelected, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(SystemTime, startTime, (), (const));
   MOCK_METHOD(MonotonicTime, startTimeMonotonic, (), (const));
+  MOCK_METHOD(TimeSource&, timeSource, (), (const));
   MOCK_METHOD(void, setUpstreamInfo, (std::shared_ptr<UpstreamInfo>));
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
   MOCK_METHOD(void, onRequestComplete, ());
+  MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, currentDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(OptRef<const DownstreamTiming>, downstreamTiming, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addBytesRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, bytesRetransmitted, (), (const));
+  MOCK_METHOD(void, addPacketsRetransmitted, (uint64_t));
+  MOCK_METHOD(uint64_t, packetsRetransmitted, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
-  MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(void, setVirtualClusterName,
               (const absl::optional<std::string>& virtual_cluster_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
@@ -102,7 +133,8 @@ public:
   MOCK_METHOD(uint64_t, wireBytesSent, (), (const));
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
-  MOCK_METHOD(uint64_t, responseFlags, (), (const));
+  MOCK_METHOD(absl::Span<const ResponseFlag>, responseFlags, (), (const));
+  MOCK_METHOD(uint64_t, legacyResponseFlags, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
@@ -112,6 +144,7 @@ public:
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD(void, setDynamicMetadata,
               (const std::string&, const std::string&, const std::string&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
   MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
@@ -119,15 +152,12 @@ public:
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));
-  MOCK_METHOD(const Http::RequestIdStreamInfoProvider*, getRequestIDProvider, (), (const));
-  MOCK_METHOD(void, setRequestIDProvider,
-              (const Http::RequestIdStreamInfoProviderSharedPtr& provider));
+  MOCK_METHOD(OptRef<const StreamIdProvider>, getStreamIdProvider, (), (const));
+  MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderSharedPtr provider));
   MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
   MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
   MOCK_METHOD(void, setConnectionID, (uint64_t));
-  MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
-  MOCK_METHOD(const std::string&, filterChainName, (), (const));
   MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
   MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
   MOCK_METHOD(const BytesMeterSharedPtr&, getUpstreamBytesMeter, (), (const));
@@ -136,6 +166,18 @@ public:
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   MOCK_METHOD(bool, isShadow, (), (const, override));
+  MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
+  MOCK_METHOD(void, setShouldSchemeMatchUpstream, (bool));
+  MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
+  MOCK_METHOD(void, setShouldDrainConnectionUponCompletion, (bool));
+  MOCK_METHOD(void, setParentStreamInfo, (const StreamInfo&), ());
+  MOCK_METHOD(void, clearParentStreamInfo, ());
+  MOCK_METHOD(OptRef<const StreamInfo>, parentStreamInfo, (), (const));
+  MOCK_METHOD(void, addCustomFlag, (absl::string_view));
+  MOCK_METHOD(absl::string_view, customFlags, (), (const));
+
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -144,8 +186,9 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::shared_ptr<UpstreamInfo> upstream_info_;
-  uint64_t response_flags_{};
+  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};
@@ -155,10 +198,11 @@ public:
   BytesMeterSharedPtr downstream_bytes_meter_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   std::string route_name_;
-  std::string filter_chain_name_;
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
+  std::string downstream_transport_failure_reason_;
+  std::string stream_flags_;
 };
 
 } // namespace StreamInfo

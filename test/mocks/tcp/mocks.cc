@@ -2,6 +2,7 @@
 
 #include "gmock/gmock.h"
 
+using testing::Return;
 using testing::ReturnRef;
 
 using testing::_;

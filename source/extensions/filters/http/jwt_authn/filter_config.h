@@ -46,6 +46,8 @@ public:
 
   virtual bool bypassCorsPreflightRequest() const PURE;
 
+  virtual bool stripFailureResponse() const PURE;
+
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
@@ -80,6 +82,8 @@ public:
 
   bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
 
+  bool stripFailureResponse() const override { return proto_config_.strip_failure_response(); }
+
   const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                const StreamInfo::FilterState& filter_state) const override {
     for (const auto& [matcher, verifier] : rule_pairs_) {
@@ -112,8 +116,9 @@ public:
   }
 
 private:
-  JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    const std::string final_prefix = prefix + "jwt_authn.";
+  JwtAuthnFilterStats generateStats(const std::string& prefix,
+                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
+    const std::string final_prefix = absl::StrCat(prefix, "jwt_authn.", filter_stats_prefix);
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
