@@ -432,6 +432,7 @@ initRateLimitEntriesReference(const std::vector<RateLimitPolicyEntryImpl>& rate_
       MAX_STAGE_NUMBER + 1);
   for (const auto& entry : rate_limit_entries) {
     const uint64_t stage = entry.stage();
+    // The stage value is validated by PGV.
     ASSERT(stage < references.size());
     references[stage].emplace_back(std::ref(entry));
   }
