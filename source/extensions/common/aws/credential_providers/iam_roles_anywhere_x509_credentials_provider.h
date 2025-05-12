@@ -23,10 +23,30 @@ public:
 protected:
   SystemTime last_updated_;
   X509Credentials cached_credentials_;
+  bool is_initialized_ = false;
 
+  /**
+   * @brief Cached credential wrapper function for calling refresh only if past the expiration time
+   *
+   * @param cm the cluster manager to use during AWS Metadata retrieval
+   * @param provider the AWS Metadata provider
+   * @return a MetadataFetcher instance
+   */
   void refreshIfNeeded();
 
+  /**
+   * @brief Checks the current time against the expiration time of the certificate, to determine if
+   * we need to attempt to retrieve a new certificate
+   *
+   * @return bool value which indicates if credential refresh is required
+   */
   virtual bool needsRefresh() PURE;
+
+  /**
+   * @brief Perform the actual load and validation of certificates, then convert them to a usable
+   * X509 credentials object for use by the IAMRolesAnywhereCredentialsProvider
+   *
+   */
   virtual void refresh() PURE;
 };
 

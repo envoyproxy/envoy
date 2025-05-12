@@ -13,6 +13,10 @@ using std::chrono::seconds;
 constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
+
+  // Initialize must be called for a successful refresh.
+  ASSERT(is_initialized_);
+
   if (needsRefresh()) {
     refresh();
   }
@@ -28,6 +32,8 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
       certificate_chain_data_source_(certificate_chain_data_source) {};
 
 absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
+  
+  is_initialized_ = true;
 
   absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
 

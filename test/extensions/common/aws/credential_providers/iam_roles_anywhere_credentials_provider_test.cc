@@ -455,7 +455,6 @@ public:
 
 // Test cases created from python implementation of iam roles anywhere session
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // This is what we expect to see requested by the signer
   auto headers =
