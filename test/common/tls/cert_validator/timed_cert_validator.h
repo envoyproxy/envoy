@@ -19,8 +19,7 @@ public:
   TimedCertValidator(std::chrono::milliseconds validation_time_out_ms,
                      const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                      Server::Configuration::CommonFactoryContext& context,
-                     absl::optional<std::string> expected_host_name,
-                     Stats::Scope& scope)
+                     absl::optional<std::string> expected_host_name, Stats::Scope& scope)
       : DefaultCertValidator(config, stats, context, scope),
         validation_time_out_ms_(validation_time_out_ms), expected_host_name_(expected_host_name) {}
 

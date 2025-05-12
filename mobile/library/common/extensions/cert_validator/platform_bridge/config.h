@@ -17,7 +17,7 @@ class PlatformBridgeCertValidatorFactory : public CertValidatorFactory,
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context, 
+                      Server::Configuration::CommonFactoryContext& context,
                       Stats::Scope& scope) override;
 
   std::string name() const override {

@@ -47,9 +47,10 @@ static const std::string INLINE_STRING = "<inline>";
 
 absl::StatusOr<TlsCertificateConfigImpl> TlsCertificateConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
+    const std::string& certificate_name) {
   absl::Status creation_status = absl::OkStatus();
-  TlsCertificateConfigImpl ret(config, factory_context, api, creation_status);
+  TlsCertificateConfigImpl ret(config, factory_context, api, creation_status, certificate_name);
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }

@@ -94,7 +94,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   auto validator_or_error = cert_validator_factory->createCertValidator(
-      config.certificateValidationContext(), stats_, factory_context_);
+      config.certificateValidationContext(), stats_, factory_context_, scope);
   SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
   cert_validator_ = std::move(*validator_or_error);
 
@@ -106,6 +106,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     auto& ctx = tls_contexts_[i];
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
     ssl_contexts[i] = ctx.ssl_ctx_.get();
+
+    // No need to store cert name for default tls context as there are no TLS certificates.
+    if (!tls_certificates.empty()) {
+      ctx.cert_name_ = tls_certificates[i].get().certificateName();
+      creation_status = ctx.createCertStats(scope, ctx.cert_name_);
+      if (!creation_status.ok()) {
+        return;
+      }
+    }
 
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
@@ -379,6 +388,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       return;
     }
   }
+
+  // Update certificate stats after all certificates are loaded
+  updateCertStats();
 }
 
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
@@ -570,6 +582,24 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
     }
   }
   return providers;
+}
+
+void ContextImpl::updateCertStats() {
+  // Update CA cert expiration time.
+  cert_validator_->refreshCertStatsWithExpirationTime();
+
+  // Update TLS certs' expiration time.
+  for (Ssl::TlsContext& ctx : tls_contexts_) {
+    absl::optional<uint64_t> expiration_unix_time =
+        Utility::getExpirationUnixTime(ctx.cert_chain_.get());
+    if (expiration_unix_time.has_value()) {
+      absl::Status status = ctx.setExpirationOnCertStats(
+          std::chrono::duration<uint64_t>(expiration_unix_time.value()));
+      if (!status.ok()) {
+        // ignore for now.
+      }
+    }
+  }
 }
 
 absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
@@ -804,6 +834,17 @@ absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
     } break;
     }
   }
+  return absl::OkStatus();
+}
+
+absl::Status TlsContext::createCertStats(Stats::Scope& scope, std::string cert_name) {
+  cert_stats_ = std::make_unique<Extensions::TransportSockets::Tls::CertStats>(
+      Extensions::TransportSockets::Tls::generateCertStats(scope, cert_name));
+  return absl::OkStatus();
+}
+
+absl::Status TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
+  cert_stats_->expiration_unix_time_.set(duration.count());
   return absl::OkStatus();
 }
 

@@ -419,30 +419,16 @@ Envoy::Ssl::ParsedX509NamePtr Utility::parseSubjectFromCertificate(X509& cert) {
   return parseX509NameFromCertificate(cert, CertName::Subject);
 }
 
-absl::optional<uint64_t> Utility::getSecondsUntilExpiration(const X509* cert,
-                                                            TimeSource& time_source) {
-  if (cert == nullptr) {
-    return absl::nullopt;
-  }
-  int days, seconds;
-  if (ASN1_TIME_diff(&days, &seconds, currentASN1Time(time_source).get(),
-                     X509_get0_notAfter(cert))) {
-    if (days >= 0 && seconds >= 0) {
-      return absl::make_optional(days * 24.L * 60.L * 60.L + seconds);
-    }
-  }
-  return 0.L;
-
 absl::optional<uint64_t> Utility::getExpirationUnixTime(const X509* cert) {
   if (cert == nullptr) {
     return absl::nullopt;
   }
 
   // Obtain the expiration time as system time
-  auto expiration_time = Utility::getExpirationTime(*cert);
+  SystemTime expiration_time = Utility::getExpirationTime(*cert);
 
   // Convert the time to duration since epoch
-  auto duration_since_epoch =
+  std::chrono::seconds duration_since_epoch =
       std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
 
   // Convert the duration to uint64_t and return

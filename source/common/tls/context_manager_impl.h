@@ -39,7 +39,6 @@ public:
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
-  void iterateContexts(std::function<void(Envoy::Ssl::Context&)> callback) override;
   Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_method_manager_;
   };

@@ -239,10 +239,12 @@ TagNameValues::TagNameValues() {
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
 
-  // Signing algorithms and ciphers have the same pattern so they use the same regex.
-  // listener.[<address>.]ssl.sigalgs.(<algorithm>)
-  addRe2(TLS_CERTIFICATE, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.certificate(\.(<TAG_VALUE>))$)",
-         ".ssl.certificate.");
+  // listener.[<address>.]ssl.certificate.(<cert_name>).expiration_unix_time or
+  // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).expiration_unix_time
+  addRe2(
+      TLS_CERTIFICATE,
+      R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.certificate(\.(<TAG_VALUE>)\.expiration_unix_time)$)",
+      ".ssl.certificate");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

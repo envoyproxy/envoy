@@ -39,7 +39,8 @@ struct SpiffeData {
 
 class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
 public:
-  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
+  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context,
+                  Stats::Scope& scope)
       : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
         time_source_(context.timeSource()), scope_(scope) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,

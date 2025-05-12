@@ -54,7 +54,8 @@ public:
     ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
 
     // Initialize SPIFFEValidator with mocked context and stats
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_, *store_.rootScope());
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope());
   }
 
   std::string compactJson(const std::string& json_string) {
@@ -105,10 +106,13 @@ public:
           }));
     }
 
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_, *store_.rootScope());
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope());
   }
 
-  void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_, *store_.rootScope()); }
+  void initialize() {
+    validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_, *store_.rootScope());
+  }
 
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }

@@ -284,10 +284,6 @@ void InstanceBase::updateServerStats() {
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
-
-  // Update certificate stats for each context.
-  ssl_context_manager_->iterateContexts(static_cast<std::function<void(Envoy::Ssl::Context&)>>(
-      [&](Envoy::Ssl::Context& context) -> void { context.updateCertStats(); }));
 }
 
 void InstanceBase::flushStatsInternal() {

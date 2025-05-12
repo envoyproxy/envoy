@@ -35,7 +35,8 @@ namespace Tls {
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                       SslStats& stats, Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope);
+                       SslStats& stats, Server::Configuration::CommonFactoryContext& context,
+                       Stats::Scope& scope);
 
   ~DefaultCertValidator() override = default;
 

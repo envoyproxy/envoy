@@ -159,7 +159,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope)
-    : api_(config->api()), cert_name_(config->caCertName()), stats_(stats), time_source_(context.timeSource()), scope_(scope) {
+    : api_(config->api()), cert_name_(config->caCertName()), stats_(stats),
+      time_source_(context.timeSource()), scope_(scope) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -445,16 +446,19 @@ void SPIFFEValidator::refreshCertStatsWithExpirationTime() {
   // Since we may have multiple certificates here, we will use the provided cert name and append
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
   int idx = 0;
-  for (auto& cert : ca_certs_) {
-    const absl::optional<uint32_t> expiration_unix_time =
+  for (bssl::UniquePtr<X509>& cert : spiffe_data_->ca_certs_) {
+    const absl::optional<uint64_t> expiration_unix_time =
         Utility::getExpirationUnixTime(cert.get());
     if (expiration_unix_time.has_value()) {
-      std::string cert_name = absl::StrCat(cert_name_, idx);
-      auto result = cert_stats_map_.insert({cert_name, nullptr});
-      if (result.second) {
-        result.first->second = std::make_unique<CertStats>(generateCertStats(scope_, cert_name));
+      // Add underscore between cert name and index to avoid collisions
+      std::string cert_name = absl::StrCat(cert_name_, "_", idx);
+
+      // Use operator[] and reference for cleaner code
+      std::unique_ptr<CertStats>& cert_stats = cert_stats_map_[cert_name];
+      if (cert_stats == nullptr) {
+        cert_stats = std::make_unique<CertStats>(generateCertStats(scope_, cert_name));
       }
-      result.first->second->expiration_unix_time_.set(expiration_unix_time.value());
+      cert_stats->expiration_unix_time_.set(expiration_unix_time.value());
     }
     idx++;
   }
@@ -492,7 +496,7 @@ class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context.
+                      Server::Configuration::CommonFactoryContext& context,
                       Stats::Scope& scope) override {
     return std::make_unique<SPIFFEValidator>(config, stats, context, scope);
   }

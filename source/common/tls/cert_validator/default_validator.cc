@@ -46,8 +46,8 @@ namespace Tls {
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
     Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
-    : config_(config), stats_(stats), context_(context),
-      auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false), scope_(scope) {
+    : config_(config), stats_(stats), context_(context), scope_(scope),
+      auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
                                    envoy::extensions::transport_sockets::tls::v3::
@@ -591,12 +591,20 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
 }
 
 void DefaultCertValidator::refreshCertStatsWithExpirationTime() {
-  auto expiration_unix_time = Utility::getExpirationUnixTime(ca_cert_.get());
+  // Early return if no certificate or no config
+  if (ca_cert_ == nullptr || config_ == nullptr) {
+    return;
+  }
+
+  absl::optional<uint64_t> expiration_unix_time = Utility::getExpirationUnixTime(ca_cert_.get());
+  if (!cert_stats_) {
+    cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope_, config_->caCertName()));
+  }
   if (expiration_unix_time.has_value()) {
-    if (!cert_stats_) {
-      cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope_, config_->caCertName()));
-    }
     cert_stats_->expiration_unix_time_.set(expiration_unix_time.value());
+  } else {
+    // For certificates with no expiration time, set to max uint64_t (effectively "never expires")
+    cert_stats_->expiration_unix_time_.set(std::numeric_limits<uint64_t>::max());
   }
 }
 
@@ -608,7 +616,8 @@ class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope) override {
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& scope) override {
     return std::make_unique<DefaultCertValidator>(config, stats, context, scope);
   }
 
