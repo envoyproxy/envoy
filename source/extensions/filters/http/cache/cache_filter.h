@@ -17,6 +17,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+// CacheFilterConfig contains everything which is shared by all CacheFilter
+// objects created from a given CacheConfig.
 class CacheFilterConfig : public CacheableResponseChecker, public CacheFilterStatsProvider {
 public:
   CacheFilterConfig(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
