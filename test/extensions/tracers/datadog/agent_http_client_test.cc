@@ -683,7 +683,7 @@ TEST_F(DatadogAgentHttpClientTest, ConfigJson) {
   const std::string config = client_.config();
   // Parse the config string to verify it's valid JSON
   EXPECT_NO_THROW({
-    auto json = nlohmann::json::parse(config);
+    const auto json = nlohmann::json::parse(config);
     EXPECT_TRUE(json.is_object());
   });
 }

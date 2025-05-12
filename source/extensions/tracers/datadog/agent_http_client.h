@@ -84,7 +84,7 @@ public:
   void drain(std::chrono::steady_clock::time_point) override;
 
   /**
-   * Implementation of the required config() method from datadog::tracing::HTTPClient
+   * Implementation of the required config() method from datadog::tracing::HTTPClient.
    */
   std::string config() const override;
 
@@ -92,7 +92,7 @@ public:
    * Return a JSON representation of this object's configuration. This function
    * is used in the startup banner logged by \c dd-trace-cpp.
    */
-  nlohmann::json config_json() const;
+  const nlohmann::json& config_json() const;
 
   // Http::AsyncClient::Callbacks
 

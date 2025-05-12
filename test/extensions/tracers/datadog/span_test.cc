@@ -64,7 +64,7 @@ public:
   }
 
   void log_error(datadog::tracing::StringView message) override {
-    errors_.push_back(std::string(message.data(), message.size()));
+    errors_.emplace_back(std::string(message.data(), message.size()));
   }
 
   const std::vector<std::string>& errors() const { return errors_; }

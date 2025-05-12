@@ -93,10 +93,11 @@ void AgentHTTPClient::drain(std::chrono::steady_clock::time_point) {}
 
 std::string AgentHTTPClient::config() const { return config_json().dump(); }
 
-nlohmann::json AgentHTTPClient::config_json() const {
-  return nlohmann::json::object({
+const nlohmann::json& AgentHTTPClient::config_json() const {
+  static const nlohmann::json config = nlohmann::json::object({
       {"type", "Envoy::Extensions::Tracers::Datadog::AgentHTTPClient"},
   });
+  return config;
 }
 
 // Http::AsyncClient::Callbacks
