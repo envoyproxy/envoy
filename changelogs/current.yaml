@@ -74,6 +74,7 @@ new_features:
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
 - area: http
   change: |
-    Added a new ``setDowstreamSocketOption`` function to the ``StreamDecoderFilterCallbacks`` interface that allows for setting a socket option on an existing dowstream connection.
+    Added a new ``setDowstreamSocketOption`` function to the ``StreamDecoderFilterCallbacks`` interface that allows
+    setting a socket option on an existing dowstream connection.
 
 deprecated:
