@@ -43,6 +43,8 @@ public:
   virtual ~HttpSource() = default;
 };
 
+using HttpSourcePtr = std::unique_ptr<HttpSource>;
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions
