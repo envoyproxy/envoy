@@ -130,7 +130,7 @@ public:
   void verifyDownstreamSSL() override;
 
   void closeConn();
-  bool isSwitchedToTls() {return switched_to_tls_; };
+  bool isSwitchedToTls() { return switched_to_tls_; };
 
   Network::FilterStatus doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);

@@ -5,12 +5,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-
-Envoy::Buffer::OwnedImpl EncoderImpl::buildErrorResponse(absl::string_view severity, absl::string_view message, absl::string_view code) {
+Envoy::Buffer::OwnedImpl EncoderImpl::buildErrorResponse(absl::string_view severity,
+                                                         absl::string_view message,
+                                                         absl::string_view code) {
   Buffer::OwnedImpl response;
   response.add("E");
   // Length of message contents in bytes, including self.
-  const uint32_t length = sizeof(uint32_t) + 3 + severity.length() + message.length() + code.length() + 3;
+  const uint32_t length =
+      sizeof(uint32_t) + 3 + severity.length() + message.length() + code.length() + 3;
   response.writeBEInt<uint32_t>(length);
 
   // Severity
@@ -33,7 +35,6 @@ Envoy::Buffer::OwnedImpl EncoderImpl::buildErrorResponse(absl::string_view sever
 
   return response;
 }
-
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

@@ -37,8 +37,8 @@ public:
 
     PostgresFilterConfig::PostgresFilterConfigOptions config_options{
         stat_prefix_, true, false,
-        envoy::extensions::filters::network::postgres_proxy::v3alpha::
-            PostgresProxy_SSLMode_DISABLE, false};
+        envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE,
+        false};
 
     config_ = std::make_shared<PostgresFilterConfig>(config_options, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
@@ -433,15 +433,14 @@ TEST_F(PostgresFilterTest, RequireDownstreamSsl) {
   // Make sure client has switched to TLS
   ASSERT_TRUE(filter_->isSwitchedToTls());
 
-  // connection shouldnt' be closed as client ssl was verified
+  // connection should not be closed as client ssl was verified
   EXPECT_CALL(connection_, close(_)).Times(0);
   // make sure envoy doesn't send back any error response
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
-  // client sends subsequent messseage
+  // client sends subsequent message
   createInitialPostgresRequest(data_);
   filter_->onData(data_, true);
 }
-
 
 // Test makes sure that filter verifies downstream ssl for unencrypted request
 TEST_F(PostgresFilterTest, DownstreamUnencryptedRequireSsl) {
@@ -449,25 +448,24 @@ TEST_F(PostgresFilterTest, DownstreamUnencryptedRequireSsl) {
   // require_downstream_ssl_ and terminate_ssl_ must be set to true at the same time
   filter_->getConfig()->require_downstream_ssl_ = true;
   // Before ssl negotiation, switched to tls initialized to false
-  ASSERT_FALSE( filter_->isSwitchedToTls());
+  ASSERT_FALSE(filter_->isSwitchedToTls());
 
   // envoy should send error response when client sends non-ssl init message
   EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
   Buffer::OwnedImpl buf;
-  
+
   // envoy is expected to send back error message to client
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false))
       .WillOnce(testing::SaveArg<0>(&buf));
   // envoy closes client connection
-  EXPECT_CALL(connection_, close(_)).Times(1);
-  
+  EXPECT_CALL(connection_, close(_));
+
   createInitialPostgresRequest(data_);
   filter_->onData(data_, true);
 
   ASSERT_THAT('E', buf.peekBEInt<char>(0));
   ASSERT_FALSE(filter_->isSwitchedToTls());
 }
-
 
 TEST_F(PostgresFilterTest, UpstreamSSL) {
   EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
