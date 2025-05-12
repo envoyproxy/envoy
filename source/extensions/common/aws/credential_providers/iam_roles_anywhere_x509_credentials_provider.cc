@@ -24,9 +24,9 @@ void CachedX509CredentialsProviderBase::refreshIfNeeded() {
 
 IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
-    envoy::config::core::v3::DataSource certificate_data_source,
-    envoy::config::core::v3::DataSource private_key_data_source,
-    absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source)
+    const envoy::config::core::v3::DataSource& certificate_data_source,
+    const envoy::config::core::v3::DataSource& private_key_data_source,
+    DataSourceOptRef certificate_chain_data_source)
     : context_(context), certificate_data_source_(certificate_data_source),
       private_key_data_source_(private_key_data_source),
       certificate_chain_data_source_(certificate_chain_data_source) {};
@@ -91,28 +91,31 @@ bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {
 }
 
 absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpiration(
-    std::string pem, X509Credentials::PublicKeySignatureAlgorithm& algorithm, std::string& serial,
+    absl::string_view pem, X509Credentials::PublicKeySignatureAlgorithm& algorithm, std::string& serial,
     SystemTime& time) {
   ASN1_INTEGER* ser = nullptr;
   BIGNUM* bnser = nullptr;
   char* bndec = nullptr;
   absl::Status status = absl::OkStatus();
 
-  auto pemstr = pem.c_str();
-  auto pemsize = pem.size();
+  const std::string pem_string = std::string(pem);
+  auto pem_size = pem.size();
 
   // We should not be able to get here with an empty certificate or one larger than the max size
   // defined in the header. This is a sanity check.
   
-  if (!pemsize || pemsize > X509_CERTIFICATE_MAX_BYTES) {
+  if (!pem_size || pem_size > X509_CERTIFICATE_MAX_BYTES) {
     return absl::InvalidArgumentError("Invalid certificate size");
   }
 
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pemstr, pemsize));
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_string.c_str(), pem_size));
 
-  // Not checking return code - we've already validated this certificate in previous call during der
-  // conversion
   bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+  if(cert == nullptr)
+  {
+    return absl::InvalidArgumentError("Invalid certificate - PEM read x509 failed");
+  }
+
   X509_ALGOR* alg;
   X509_PUBKEY_get0_param(nullptr, nullptr, nullptr, &alg, X509_get_X509_PUBKEY(cert.get()));
   int nid = OBJ_obj2nid(alg->algorithm);
@@ -122,8 +125,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   } else if (nid != NID_undef && nid == NID_X9_62_id_ecPublicKey) {
     algorithm = X509Credentials::PublicKeySignatureAlgorithm::ECDSA;
   } else {
-    status = absl::InvalidArgumentError("Invalid certificate public key signature algorithm");
+    return absl::InvalidArgumentError("Invalid certificate public key signature algorithm");
   }
+
   ser = X509_get_serialNumber(cert.get());
   bnser = ASN1_INTEGER_to_BN(ser, nullptr);
   bndec = BN_bn2dec(bnser);
@@ -147,42 +151,47 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
 /*TODO: @nbaws split this method and move common functionality into source/common/tls/utility.h */
 
-absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(std::string pem,
+absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_view pem,
                                                                   std::string& output, bool chain) {
-  absl::Status status = absl::OkStatus();
 
-  auto pemstr = pem.c_str();
-  auto pemsize = pem.size();
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pemstr, pemsize));
+  const std::string pem_string = std::string(pem);
+  auto pem_size = pem.size();
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_string.c_str(), pem_size));
 
   auto max_certs = 1;
+
   if (chain) {
     // Maximum trust chain depth is 5 per
     // https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
     max_certs = 5;
   }
+
   for (int i = 0; i < max_certs; i++) {
     unsigned char* cert_in_der = nullptr;
     bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
 
     if (cert == nullptr) {
-      break;
+      return absl::InvalidArgumentError(chain 
+          ? fmt::format("Certificate chain PEM #{} could not be parsed", i)
+          : "Certificate could not be parsed");
     }
+
     int der_length = i2d_X509(cert.get(), &cert_in_der);
     if (!(der_length > 0 && cert_in_der != nullptr)) {
-      status = absl::InvalidArgumentError("PEM could not be parsed");
+      return absl::InvalidArgumentError(chain 
+          ? fmt::format("Certificate chain PEM #{} could not be converted to DER", i)
+          : "Certificate could not be converted to DER");
     }
+
     output.append(Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length));
     output.append(",");
     OPENSSL_free(cert_in_der);
   }
-  if (!output.empty()) {
-    output.erase(output.size() - 1);
-  } else {
-    status = absl::InvalidArgumentError("PEM could not be parsed");
-  }
+  
+  // Remove trailing comma
+  output.erase(output.size() - 1);
 
-  return status;
+  return absl::OkStatus();
 }
 
 void IAMRolesAnywhereX509CredentialsProvider::refresh() {

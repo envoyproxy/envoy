@@ -12,6 +12,8 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+using DataSourceOptRef = OptRef<envoy::config::core::v3::DataSource>; 
+
 class CachedX509CredentialsProviderBase : public X509CredentialsProvider,
                                           public Logger::Loggable<Logger::Id::aws> {
 public:
@@ -65,9 +67,12 @@ class IAMRolesAnywhereX509CredentialsProvider : public CachedX509CredentialsProv
 public:
   IAMRolesAnywhereX509CredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      envoy::config::core::v3::DataSource certificate_data_source,
-      envoy::config::core::v3::DataSource private_key_data_source,
-      absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source);
+      const envoy::config::core::v3::DataSource& certificate_data_source,
+      const envoy::config::core::v3::DataSource& private_key_data_source,
+      DataSourceOptRef certificate_chain_data_source);
+
+  // Friend class for testing private pem functions
+  friend class IAMRolesAnywhereX509CredentialsProviderFriend;
 
   absl::Status initialize();
 
@@ -78,16 +83,16 @@ private:
   Config::DataSource::DataSourceProviderPtr private_key_data_source_provider_;
   absl::optional<Config::DataSource::DataSourceProviderPtr> certificate_chain_data_source_provider_;
   envoy::config::core::v3::DataSource private_key_data_source_;
-  absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source_;
+  DataSourceOptRef certificate_chain_data_source_;
   absl::optional<SystemTime> expiration_time_;
   std::chrono::seconds cache_duration_;
 
   bool needsRefresh() override;
   void refresh() override;
 
-  absl::Status pemToDerB64(std::string pem, std::string& output, bool chain = false);
+  absl::Status pemToDerB64(absl::string_view pem, std::string& output, bool chain = false);
   absl::Status
-  pemToAlgorithmSerialExpiration(std::string pem,
+  pemToAlgorithmSerialExpiration(absl::string_view pem,
                                  X509Credentials::PublicKeySignatureAlgorithm& algorithm,
                                  std::string& serial, SystemTime& time);
   std::chrono::seconds getCacheDuration();

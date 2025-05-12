@@ -5,10 +5,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 #include "test/mocks/filesystem/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
-
+#include "test/extensions/common/aws/mocks.h"
 #include "source/common/common/base64.h"
 
 #include "test/mocks/event/mocks.h"
@@ -23,9 +22,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class IAMRolesAnywhereX509CredentialsProviderTest : public testing::Test {
-public:
-  ~IAMRolesAnywhereX509CredentialsProviderTest() override = default;
 
   // Example certificates generated for test cases
 
@@ -400,6 +396,10 @@ RBqAC6sxyAYn2wbzuyINJdSLpehQKDkKxEnO4QLodClHYV1F9AlAfbSLmIlRFv/y
 -----END PRIVATE KEY-----
 )EOF";
 
+class IAMRolesAnywhereX509CredentialsProviderTest : public testing::Test {
+public:
+  ~IAMRolesAnywhereX509CredentialsProviderTest() override = default;
+
   void removeSubstrs(std::string& s, std::string p) {
     std::string::size_type n = p.length();
 
@@ -435,6 +435,7 @@ RBqAC6sxyAYn2wbzuyINJdSLpehQKDkKxEnO4QLodClHYV1F9AlAfbSLmIlRFv/y
   Event::DispatcherPtr dispatcher_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+
 };
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidSource) {
@@ -446,7 +447,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidSource) {
   auto watched_dir = std::make_unique<::envoy::config::core::v3::WatchedDirectory>();
 
   certificate_data_source.set_allocated_watched_directory(watched_dir.release());
-  NiceMock<ThreadLocal::MockInstance> tls;
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
@@ -462,7 +462,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidPath) {
   auto path = TestEnvironment::temporaryPath("testpath/path");
   TestEnvironment::removePath(path);
   certificate_data_source.set_filename(path);
-  NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
@@ -487,7 +486,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, PrivateKeyInvalidPath) {
   auto path = TestEnvironment::temporaryPath("testpath/path");
   TestEnvironment::removePath(path);
   private_key_data_source.set_filename(path);
-  NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
@@ -539,7 +537,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, UnsupportedAlgorithm) {
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_chain))
       .WillRepeatedly(Return(server_subordinate_chain_ecdsa_pem));
 
-  NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
@@ -579,7 +576,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, MissingSerial) {
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_chain))
       .WillRepeatedly(Return(server_subordinate_chain_ecdsa_pem));
 
-  NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
@@ -617,8 +613,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
                      pkey_env);
 
   TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source);
-
-  NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, absl::nullopt);
@@ -848,7 +842,87 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.certificateExpiration(), b);
 }
 
+TEST(emptyPem,pemToAlgorithmSerialExpiration) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  X509Credentials::PublicKeySignatureAlgorithm algorithm;
+  std::string serial;
+  SystemTime time;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status = provider_friend.pemToAlgorithmSerialExpiration("", algorithm, serial, time);
+  EXPECT_FALSE(status.ok());
+}
+
+TEST(PemTooLarge,pemToAlgorithmSerialExpiration) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  std::string large_cert(2048+10, 'a');
+
+  X509Credentials::PublicKeySignatureAlgorithm algorithm;
+  std::string serial;
+  SystemTime time;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status = provider_friend.pemToAlgorithmSerialExpiration(large_cert, algorithm, serial, time);
+  EXPECT_FALSE(status.ok());
+}
+
+TEST(JunkPem,pemToAlgorithmSerialExpiration) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  std::string junk_pem(2000, 'a');
+
+  X509Credentials::PublicKeySignatureAlgorithm algorithm;
+  std::string serial;
+  SystemTime time;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
+  EXPECT_FALSE(status.ok());
+}
+
+TEST(ChainParse,pemToDerB64) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  std::string chain;
+
+  // 5 legitimate certificates and one junk certificate in the chain
+  chain.append(server_root_cert_rsa_pem);
+  chain.append(server_root_cert_rsa_pem);
+  chain.append(server_root_cert_rsa_pem);
+  chain.append(server_root_cert_rsa_pem);
+  chain.append(std::string(50,'a'));
+
+  std::string out_chain;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status = provider_friend.pemToDerB64(chain, out_chain);
+  EXPECT_TRUE(status.ok());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions
 } // namespace Envoy
+

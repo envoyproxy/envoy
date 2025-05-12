@@ -10,6 +10,7 @@
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 #include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 
 #include "gmock/gmock.h"
 
@@ -159,6 +160,34 @@ public:
 
   void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
+};
+
+// Friend class for testing private pem functionality
+class IAMRolesAnywhereX509CredentialsProviderFriend {
+  public:
+
+  IAMRolesAnywhereX509CredentialsProviderFriend(std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider)
+    : provider_(std::move(provider)) {}
+
+  absl::Status pemToDerB64(absl::string_view pem, std::string& output, bool chain = false)
+  {
+    return provider_->pemToDerB64(pem, output, chain);
+  }
+
+  absl::Status
+  pemToAlgorithmSerialExpiration(absl::string_view pem,
+                                 X509Credentials::PublicKeySignatureAlgorithm& algorithm,
+                                 std::string& serial, SystemTime& time)
+                                 {
+                                  return provider_->pemToAlgorithmSerialExpiration(pem, algorithm, serial, time);
+                                 }
+
+  std::chrono::seconds getCacheDuration()
+  {
+    return provider_->getCacheDuration();
+  }
+
+  std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider_;
 };
 
 class MockIAMRolesAnywhereSigV4Signer : public IAMRolesAnywhereSigV4Signer {
