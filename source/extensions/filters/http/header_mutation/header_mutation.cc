@@ -50,7 +50,8 @@ Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status
   SET_AND_RETURN_IF_NOT_OK(response_mutations_or_error.status(), creation_status);
   response_mutations_ = std::move(response_mutations_or_error.value());
 
-  auto response_trailers_mutations_or_error = HeaderMutations::create(config.response_trailers_mutations());
+  auto response_trailers_mutations_or_error =
+      HeaderMutations::create(config.response_trailers_mutations());
   SET_AND_RETURN_IF_NOT_OK(response_trailers_mutations_or_error.status(), creation_status);
   response_trailers_mutations_ = std::move(response_trailers_mutations_or_error.value());
 
@@ -115,8 +116,8 @@ void Mutations::mutateResponseHeaders(Http::ResponseHeaderMap& headers,
 }
 
 void Mutations::mutateResponseTrailers(Http::ResponseTrailerMap& trailers,
-  const Formatter::HttpFormatterContext& context,
-  const StreamInfo::StreamInfo& stream_info) const {
+                                       const Formatter::HttpFormatterContext& context,
+                                       const StreamInfo::StreamInfo& stream_info) const {
   response_trailers_mutations_->evaluateHeaders(trailers, context, stream_info);
 }
 
@@ -186,14 +187,15 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
 }
 
 Http::FilterTrailersStatus HeaderMutation::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  Formatter::HttpFormatterContext context{encoder_callbacks_->requestHeaders().ptr(), encoder_callbacks_->responseHeaders().ptr(), &trailers};
+  Formatter::HttpFormatterContext context{encoder_callbacks_->requestHeaders().ptr(),
+                                          encoder_callbacks_->responseHeaders().ptr(), &trailers};
   config_->mutations().mutateResponseTrailers(trailers, context, encoder_callbacks_->streamInfo());
 
   maybeInitializeRouteConfigs(encoder_callbacks_);
 
   for (const PerRouteHeaderMutation& route_config : route_configs_) {
     route_config.mutations().mutateResponseTrailers(trailers, context,
-                                                   encoder_callbacks_->streamInfo());
+                                                    encoder_callbacks_->streamInfo());
   }
   return Http::FilterTrailersStatus::Continue;
 }

@@ -363,15 +363,13 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
         {":status", "200"},
     };
 
-    Http::RequestHeaderMapPtr request_headers_pointer{new Envoy::Http::TestRequestHeaderMapImpl{
-      {"req-flag-header", "req-header-value"}
-    }};
+    Http::RequestHeaderMapPtr request_headers_pointer{
+        new Envoy::Http::TestRequestHeaderMapImpl{{"req-flag-header", "req-header-value"}}};
     EXPECT_CALL(encoder_callbacks, requestHeaders())
         .WillOnce(testing::Return(makeOptRefFromPtr(request_headers_pointer.get())));
 
-    Http::ResponseHeaderMapPtr response_headers_pointer{new Envoy::Http::TestResponseHeaderMapImpl{
-      {"resp-flag-header", "resp-header-value"}
-    }};
+    Http::ResponseHeaderMapPtr response_headers_pointer{
+        new Envoy::Http::TestResponseHeaderMapImpl{{"resp-flag-header", "resp-header-value"}}};
     EXPECT_CALL(encoder_callbacks, responseHeaders())
         .WillOnce(testing::Return(makeOptRefFromPtr(response_headers_pointer.get())));
 
@@ -535,8 +533,7 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     };
 
     Envoy::Http::TestResponseTrailerMapImpl response_trailers{
-      {"another-flag-trailer", "another-flag-header-value"}
-    };
+        {"another-flag-trailer", "another-flag-header-value"}};
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, true));
