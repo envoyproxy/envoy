@@ -323,13 +323,6 @@ protected:
    */
   const HostVector& hostSourceToHosts(HostsSource hosts_source) const;
 
-  /**
-   * Explicitly enable locality weighted balancing.
-   */
-  void setLocalityWeightedBalancing(bool locality_weighted_balancing) {
-    locality_weighted_balancing_ = locality_weighted_balancing;
-  }
-
 private:
   enum class LocalityRoutingState {
     // Locality based routing is off.
@@ -438,7 +431,7 @@ private:
   const bool fail_traffic_on_panic_ : 1;
 
   // If locality weight aware routing is enabled.
-  bool locality_weighted_balancing_ : 1;
+  const bool locality_weighted_balancing_ : 1;
 
   friend class TestZoneAwareLoadBalancer;
 };

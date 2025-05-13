@@ -44,6 +44,7 @@ ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
       PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_expiration_period, 180000));
   weight_update_period =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
+  use_locality_weighted_lb = lb_proto.has_locality_weighted_lb_config();
 }
 
 ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
@@ -54,8 +55,6 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
     : RoundRobinLoadBalancer(priority_set, local_priority_set, stats, runtime, random,
                              common_config,
                              /*round_robin_config=*/std::nullopt, time_source) {
-  // Explicitly enable locality weighted balancing.
-  setLocalityWeightedBalancing(true);
   if (tls_shim.has_value()) {
     apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) {
       refresh(priority);
@@ -243,9 +242,13 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
 
 Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::create(
     Upstream::LoadBalancerParams params) {
+  auto lb_config = cluster_info_.lbConfig();
+  if (use_locality_weighted_lb_) {
+    lb_config.mutable_locality_weighted_lb_config();
+  }
   return std::make_unique<Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
       params.priority_set, params.local_priority_set, cluster_info_.lbStats(), runtime_, random_,
-      cluster_info_.lbConfig(), time_source_, tls_->get());
+      lb_config, time_source_, tls_->get());
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers(
@@ -268,9 +271,10 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
       dynamic_cast<const ClientSideWeightedRoundRobinLbConfig*>(lb_config.ptr());
   ASSERT(typed_lb_config != nullptr);
   report_handler_ = std::make_shared<OrcaLoadReportHandler>(*typed_lb_config, time_source_);
-  factory_ =
-      std::make_shared<WorkerLocalLbFactory>(cluster_info, priority_set, runtime, random,
-                                             time_source, typed_lb_config->tls_slot_allocator_);
+
+  factory_ = std::make_shared<WorkerLocalLbFactory>(
+      cluster_info, priority_set, runtime, random, time_source,
+      typed_lb_config->tls_slot_allocator_, typed_lb_config->use_locality_weighted_lb);
 
   initFromConfig(*typed_lb_config);
 

@@ -34,6 +34,7 @@ public:
   std::chrono::milliseconds blackout_period;
   std::chrono::milliseconds weight_expiration_period;
   std::chrono::milliseconds weight_update_period;
+  bool use_locality_weighted_lb;
 
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_slot_allocator_;
@@ -160,9 +161,10 @@ public:
     WorkerLocalLbFactory(const Upstream::ClusterInfo& cluster_info,
                          const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                          Envoy::Random::RandomGenerator& random, TimeSource& time_source,
-                         ThreadLocal::SlotAllocator& tls)
+                         ThreadLocal::SlotAllocator& tls, bool use_locality_weighted_lb)
         : cluster_info_(cluster_info), priority_set_(priority_set), runtime_(runtime),
-          random_(random), time_source_(time_source) {
+          random_(random), time_source_(time_source),
+          use_locality_weighted_lb_(use_locality_weighted_lb) {
       tls_ = ThreadLocal::TypedSlot<ThreadLocalShim>::makeUnique(tls);
       tls_->set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalShim>(); });
     }
@@ -180,6 +182,7 @@ public:
     Runtime::Loader& runtime_;
     Envoy::Random::RandomGenerator& random_;
     TimeSource& time_source_;
+    bool use_locality_weighted_lb_;
   };
 
 public:
