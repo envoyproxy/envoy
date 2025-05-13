@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 
+#include <sys/types.h>
+
 #include "source/common/common/base64.h"
 #include "source/common/tls/utility.h"
 
@@ -188,11 +190,19 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
   char error_data[256];     // OpenSSL error buffer
   unsigned long error_code; // OpenSSL error code
 
+  // If is_chain == true, then set maximum trust chain length to 5 per
+  // https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
+  // Otherwise we are parsing only a single certificate in the PEM string
+
+  const uint64_t max_certs = is_chain ? X509_CERTIFICATE_CHAIN_MAX_LENGTH : 1;
+  uint64_t cert_count = 0;
+
   // Up to X509_CERTIFICATE_CHAIN_MAX_LENGTH elements in a certificate chain
   const uint64_t max_size = is_chain
                                 ? X509_CERTIFICATE_MAX_BYTES * X509_CERTIFICATE_CHAIN_MAX_LENGTH
                                 : X509_CERTIFICATE_MAX_BYTES;
 
+  // Exit if pem is empty or too large
   if ((!pem_size) || (pem_size > max_size)) {
     return absl::InvalidArgumentError(is_chain ? "Invalid certificate chain size"
                                                : "Invalid certificate size");
@@ -200,29 +210,21 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
 
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_string.c_str(), pem_size));
 
-  auto max_certs = 1;
-  int cert_count = 0;
-
-  if (is_chain) {
-    // Maximum trust chain depth is 5 per
-    // https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
-    max_certs = X509_CERTIFICATE_CHAIN_MAX_LENGTH;
-  }
-
   while (cert_count < max_certs) {
     unsigned char* cert_in_der = nullptr;
+
     ERR_clear_error();
     bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
 
     if (cert == nullptr) {
       error_code = ERR_peek_last_error();
       ERR_error_string(error_code, error_data);
+
       // Error code = PEM_R_NO_START_LINE means we reached the end of the BIO
       if (ERR_GET_REASON(error_code) == PEM_R_NO_START_LINE) {
         break;
-      }
-      // Non zero error code means there is a legitimate certificate parsing error
-      else {
+      } else {
+        // Otherwise we have a legitimate certificate parsing error
         return absl::InvalidArgumentError(
             is_chain ? fmt::format("Certificate chain PEM #{} could not be parsed: {}", cert_count,
                                    error_data)
@@ -246,8 +248,8 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
 
     output.append(Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length));
     output.append(",");
-    OPENSSL_free(cert_in_der);
 
+    OPENSSL_free(cert_in_der);
     cert_count++;
   }
 
