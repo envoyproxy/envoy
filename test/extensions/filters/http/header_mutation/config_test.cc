@@ -46,12 +46,19 @@ TEST(FactoryTest, FactoryTest) {
           key: "flag-header"
           value: "%REQ(ANOTHER-FLAG-HEADER)%"
         append_action: APPEND_IF_EXISTS_OR_ADD
+    request_trailers_mutations:
+    - remove: "request-trailer"
+    - append:
+        header:
+          key: "request-trailer"
+          value: "value"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
     response_trailers_mutations:
     - remove: "flag-trailer"
     - append:
         header:
           key: "flag-trailer"
-          value: "%TRAILER(ANOTHER-FLAG-TRAILER)%"
+          value: "hardcoded-value"
         append_action: "APPEND_IF_EXISTS_OR_ADD"
   )EOF";
 

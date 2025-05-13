@@ -457,6 +457,13 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
           key: "flag-header"
           value: "%REQ(ANOTHER-FLAG-HEADER)%"
         append_action: "APPEND_IF_EXISTS_OR_ADD"
+    request_trailers_mutations:
+    - remove: "flag-request-trailer"
+    - append:
+        header:
+          key: "flag-request-trailer"
+          value: "hardcoded-value"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
     response_mutations:
     - remove: "flag-header"
     - append:
@@ -525,6 +532,8 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
         {":scheme", "http"},
         {":authority", "host"}};
 
+    Envoy::Http::TestRequestTrailerMapImpl request_trailers{{"flag-request-trailer", "value"}};
+
     Envoy::Http::TestResponseHeaderMapImpl response_headers = {
         {"global-flag-header", "global-flag-header-value"},
         {"flag-header", "flag-header-value"},
@@ -536,6 +545,7 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
         {"another-flag-trailer", "another-flag-header-value"}};
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, true));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(request_trailers));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, true));
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.encodeTrailers(response_trailers));
 
@@ -548,6 +558,9 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     auto params =
         Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(request_headers.getPathValue());
     EXPECT_EQ("another-flag-query-value", params.data().at("flag-query").front());
+
+    // Request trailer mutation.
+    EXPECT_EQ("hardcoded-value", request_trailers.get_("flag-request-trailer"));
 
     // Response header mutation.
     // 'flag-header' is removed and new 'flag-header' is added.
@@ -671,6 +684,168 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
     EXPECT_EQ("flag-query-6-value", params.data().at("flag-query-6").front());
     // global query parameter is added.
     EXPECT_EQ("global-param-value", params.data().at("global-param-key").front());
+  }
+}
+
+TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
+  const std::string route_config_yaml = R"EOF(
+  mutations:
+    request_trailers_mutations:
+    - remove: "flag-header"
+    - append:
+        header:
+          key: "flag-header-from-req"
+          value: "%REQ(REQ-FLAG-HEADER)%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-from-resp"
+          value: "%RESP(RESP-FLAG-HEADER)%"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-2"
+          value: "flag-header-2-value"
+        append_action: "APPEND_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-3"
+          value: "flag-header-3-value"
+        append_action: "ADD_IF_ABSENT"
+    - append:
+        header:
+          key: "flag-header-4"
+          value: "flag-header-4-value"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
+    - append:
+        header:
+          key: "flag-header-5"
+          value: "flag-header-5-value"
+        append_action: "OVERWRITE_IF_EXISTS"
+    - append:
+        header:
+          key: "flag-header-6"
+          value: "flag-header-6-value"
+        append_action: "OVERWRITE_IF_EXISTS"
+  )EOF";
+
+  const std::string config_yaml = R"EOF(
+  mutations:
+    request_trailers_mutations:
+    - remove: "global-flag-header"
+  )EOF";
+
+  PerRouteProtoConfig per_route_proto_config;
+  TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
+
+  absl::Status creation_status = absl::OkStatus();
+  PerRouteHeaderMutationSharedPtr config =
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config_yaml, proto_config);
+  HeaderMutationConfigSharedPtr global_config =
+      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+
+  // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
+  {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+    HeaderMutation filter{global_config};
+    filter.setDecoderFilterCallbacks(decoder_callbacks);
+    filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
+        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+          return {config.get()};
+        }));
+
+    Envoy::Http::TestRequestTrailerMapImpl trailers = {
+        {"flag-header", "flag-header-value"},
+        {"another-flag-header", "another-flag-header-value"},
+        {"global-flag-header", "global-flag-header-value"},
+        {"flag-header-2", "flag-header-2-value-old"},
+        {"flag-header-3", "flag-header-3-value-old"},
+        {"flag-header-4", "flag-header-4-value-old"},
+        {"flag-header-6", "flag-header-6-value-old"},
+        {":status", "200"},
+    };
+
+    Http::RequestHeaderMapPtr request_headers_pointer{
+        new Envoy::Http::TestRequestHeaderMapImpl{{"req-flag-header", "req-header-value"}}};
+    EXPECT_CALL(encoder_callbacks, requestHeaders())
+        .WillOnce(testing::Return(makeOptRefFromPtr(request_headers_pointer.get())));
+
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(trailers));
+
+    // 'flag-header' is removed.
+    EXPECT_FALSE(trailers.has("flag-header"));
+    // 'flag-header-from-req' is added by a request header.
+    EXPECT_EQ("req-header-value", trailers.get_("flag-header-from-req"));
+    // 'flag-header-2' is appended.
+    EXPECT_EQ(2, trailers.get(Envoy::Http::LowerCaseString("flag-header-2")).size());
+    // 'flag-header-3' is not appended and keep the old value.
+    EXPECT_EQ(1, trailers.get(Envoy::Http::LowerCaseString("flag-header-3")).size());
+    EXPECT_EQ("flag-header-3-value-old", trailers.get_("flag-header-3"));
+    // 'flag-header-4' is overwritten.
+    EXPECT_EQ(1, trailers.get(Envoy::Http::LowerCaseString("flag-header-4")).size());
+    EXPECT_EQ("flag-header-4-value", trailers.get_("flag-header-4"));
+    // 'flag-header-5' was not present, so will not be present after mutation.
+    EXPECT_FALSE(trailers.has("flag-header-5"));
+    // 'flag-header-6' was present and should be overwritten.
+    EXPECT_EQ("flag-header-6-value", trailers.get_("flag-header-6"));
+    // global header is removed.
+    EXPECT_FALSE(trailers.has("global-flag-header"));
+  }
+
+  // Case where the decodeHeaders() is not called and the encodeHeaders() is called and
+  // the request header map is nullptr.
+  {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+    HeaderMutation filter{global_config};
+    filter.setDecoderFilterCallbacks(decoder_callbacks);
+    filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
+        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+          return {config.get()};
+        }));
+
+    Envoy::Http::TestRequestTrailerMapImpl trailers = {
+        {"flag-header", "flag-header-value"},
+        {"another-flag-header", "another-flag-header-value"},
+        {"global-flag-header", "global-flag-header-value"},
+        {"flag-header-2", "flag-header-2-value-old"},
+        {"flag-header-3", "flag-header-3-value-old"},
+        {"flag-header-4", "flag-header-4-value-old"},
+        {"flag-header-6", "flag-header-6-value-old"},
+        {":status", "200"},
+    };
+
+    EXPECT_CALL(encoder_callbacks, requestHeaders())
+        .WillOnce(testing::Return(Http::RequestHeaderMapOptRef{}));
+
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(trailers));
+
+    // 'flag-header' is removed.
+    EXPECT_FALSE(trailers.has("flag-header"));
+    // 'flag-header-2' is appended.
+    EXPECT_EQ(2, trailers.get(Envoy::Http::LowerCaseString("flag-header-2")).size());
+    // 'flag-header-3' is not appended and keep the old value.
+    EXPECT_EQ(1, trailers.get(Envoy::Http::LowerCaseString("flag-header-3")).size());
+    EXPECT_EQ("flag-header-3-value-old", trailers.get_("flag-header-3"));
+    // 'flag-header-4' is overwritten.
+    EXPECT_EQ(1, trailers.get(Envoy::Http::LowerCaseString("flag-header-4")).size());
+    EXPECT_EQ("flag-header-4-value", trailers.get_("flag-header-4"));
+    // 'flag-header-5' was not present, so will not be present after mutation.
+    EXPECT_FALSE(trailers.has("flag-header-5"));
+    // 'flag-header-6' was present and should be overwritten.
+    EXPECT_EQ("flag-header-6-value", trailers.get_("flag-header-6"));
+    // global header is removed.
+    EXPECT_FALSE(trailers.has("global-flag-header"));
   }
 }
 
