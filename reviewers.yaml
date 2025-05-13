@@ -51,7 +51,8 @@ nezdolik:
   opsgenie: Kateryna
   slack: UDYUWRL13
 paul-r-gall:
-  first-pass: true
+  opsgenie: Paul
+  maintainer: true
   slack: U0246MUEE9F
 phlax:
   maintainer: true

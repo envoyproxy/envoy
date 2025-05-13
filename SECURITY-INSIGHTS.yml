@@ -20,6 +20,7 @@ project-lifecycle:
   - github:zuercher
   # Maintainers
   - github:adisuissa
+  - github:agrawroh
   - github:botengyao
   - github:jmarantz
   - github:KBaichoo
@@ -27,10 +28,10 @@ project-lifecycle:
   - github:kyessenov
   - github:mathetake
   - github:nezdolik
+  - github:paul-r-gall
   - github:ravenblackx
   - github:tonya11en
   - github:tyxia
-  - github:agrawroh
 contribution-policy:
   accepts-pull-requests: true
   accepts-automated-pull-requests: true
