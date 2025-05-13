@@ -75,6 +75,11 @@ TEST_F(MonitorTest, ReportNonError) {
   ASSERT_FALSE(callback_called);
 }
 
+TEST_F(MonitorTest, Reset) {
+  EXPECT_CALL(*monitor_, onReset);
+  monitor_->reset();
+}
+
 } // namespace Outlier
 } // namespace Extensions
 } // namespace Envoy

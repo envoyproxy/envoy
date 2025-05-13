@@ -50,8 +50,6 @@ public:
   absl::string_view name() const override { return config_->name(); }
   absl::string_view enforceRuntimeKey() const override { return config_->enforceRuntimeKey(); }
 
-  const ExtMonitorConfigSharedPtr& config() const { return config_; }
-
 protected:
   virtual bool onError() PURE;
   virtual void onSuccess() PURE;
