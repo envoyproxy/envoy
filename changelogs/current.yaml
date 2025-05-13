@@ -33,6 +33,9 @@ minor_behavior_changes:
   change: |
     Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
     <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
+- area: grpc-json-transcoding
+  change: |
+    Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -97,6 +100,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: stateful_session
+  change: |
+    Supports envelope stateful session extension to keep the exist session header value
+    from upstream server. See :ref:`mode
+    <envoy_v3_api_msg_extensions.http.stateful_session.envelope.v3.EnvelopeSessionState>`
+    for more details.
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See
