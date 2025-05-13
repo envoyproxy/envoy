@@ -7,6 +7,9 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/cleanup.h"
 #include "envoy/network/listener.h"
 
 #include "source/common/common/statusor.h"
@@ -357,6 +360,66 @@ public:
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, bool allow_gro,
                                                bool allow_mmsg, uint32_t& packets_dropped);
+
+  /**
+   * Changes the calling thread's network namespace to the one referenced by the file at `netns`,
+   * calls the function `f`, and returns its result after switching back to the original network
+   * namespace.
+   *
+   * @param f the function to execute in the specified network namespace.
+   * @param netns filepath referencing the network namespace in which `f` is executed.
+   * @return the result of 'f' wrapped in absl::StatusOr to any indicate syscall failures.
+   */
+  template <typename Func>
+  static auto execInNetworkNamespace(Func&& f, const char* netns)
+      -> absl::StatusOr<typename std::invoke_result_t<Func>> {
+#if defined(__linux__)
+    constexpr bool IS_LINUX = true;
+#else
+    constexpr bool IS_LINUX = false;
+#endif
+    static_assert(IS_LINUX, "Network namespaces are a Linux-only feature");
+
+    Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
+
+    // Open the original netns fd, so that we can return to it.
+    constexpr auto curr_netns_file = "/proc/self/ns/net";
+    auto og_netns_fd_result = posix.open(curr_netns_file, O_RDONLY);
+    int og_netns_fd = og_netns_fd_result.return_value_;
+    if (og_netns_fd_result.errno_ != 0) {
+      return absl::InternalError(fmt::format("failed to open netns file {}: {}", curr_netns_file,
+                                             strerror(og_netns_fd_result.errno_)));
+    }
+    Cleanup cleanup_og_fd([&og_netns_fd, &posix]() { posix.close(og_netns_fd); });
+
+    // Open the fd for the network namespace we want the socket in.
+    auto netns_fd_result = posix.open(netns, O_RDONLY);
+    const int netns_fd = netns_fd_result.return_value_;
+    if (netns_fd <= 0) {
+      return absl::InternalError(
+          fmt::format("failed to open netns file {}: {}", netns, strerror(netns_fd_result.errno_)));
+    }
+    Cleanup cleanup_netns_fd([&posix, &netns_fd]() { posix.close(netns_fd); });
+
+    // Change the network namespace of this thread.
+    auto setns_result = Api::LinuxOsSysCallsSingleton().get().setns(netns_fd, CLONE_NEWNET);
+    if (setns_result.return_value_ != 0) {
+      return absl::InternalError(
+          fmt::format("failed to set netns to {} (fd={}): {}", netns, netns_fd, strerror(errno)));
+    }
+
+    // Calling function from the specified network namespace.
+    auto result = std::forward<Func>(f)();
+
+    // Restore the original network namespace before returning the function result.
+    setns_result = Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
+    if (setns_result.return_value_ != 0) {
+      return absl::InternalError(
+          fmt::format("failed to restore original netns (fd={}): {}", netns_fd, strerror(errno)));
+    }
+
+    return result;
+  }
 
 private:
   /**

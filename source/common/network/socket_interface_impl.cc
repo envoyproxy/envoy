@@ -131,7 +131,6 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   return io_handle;
 }
 
-// @tallen
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
                                         const Address::InstanceConstSharedPtr addr,
                                         const SocketCreationOptions& options) const {

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <future>
-#include <fcntl.h>
 #include <unistd.h>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -23,6 +22,7 @@
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -288,32 +288,23 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
 
 #if defined(__linux__)
-  if (address->networkNamespace().has_value()) {
-    // To change the network namespace, we're going to kick off a thread temporarily and change its
-    // network namespace before creating the socket. In the current thread, we'll wait on the result
-    // and while remaining in the same netns.
-    auto f = std::async(std::launch::async, [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
-      // Get the fd for the network namespace we want the socket in.
-      int netns_fd = open(address->networkNamespace().value().c_str(), O_RDONLY);
-      if (netns_fd <= 0) {
-        return absl::InvalidArgumentError(fmt::format("failed to open netns file {}: {}",
-                                                      address->networkNamespace().value(),
-                                                      strerror(errno)));
-      }
-
-      // Change the network namespace of this launched thread.
-      if (setns(netns_fd, CLONE_NEWNET)) {
-        return absl::InvalidArgumentError(fmt::format("failed to set netns ({}) to {}: {}",
-                                                      netns_fd, address->networkNamespace().value(),
-                                                      strerror(errno)));
-      }
-
+  auto netns = address->networkNamespace();
+  if (netns.has_value()) {
+    auto fn = [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
       return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
                                         worker_index);
-    });
+    };
 
-    // Wait on the value and return.
-    return f.get();
+    auto result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
+
+    // We have a nested absl::StatusOr type, so if there were no issues with changing the namespace,
+    // we want to return the inner absl::StatusOr.
+    if (result->ok()) {
+      return result->value();
+    }
+
+    // The result was not ok, so we want to return the outer status.
+    return result.status();
   }
 #endif
 
