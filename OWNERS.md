@@ -28,6 +28,8 @@ routing PRs, questions, etc. to the right place.
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
+* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
+  * Stats, abseil, scalability, and performance.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
   * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
@@ -112,7 +114,6 @@ without further review.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
-* Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
 
 # Friends of Envoy
 
