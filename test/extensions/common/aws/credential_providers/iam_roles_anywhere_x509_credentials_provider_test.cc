@@ -897,19 +897,52 @@ TEST(JunkPem,pemToAlgorithmSerialExpiration) {
   EXPECT_FALSE(status.ok());
 }
 
-TEST(ChainParse,pemToDerB64) {
+TEST(ValidPemWithAppendedJunk,pemToAlgorithmSerialExpiration) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  std::string chain;
+  std::string junk_pem;
+  junk_pem.append(server_root_cert_rsa_pem);
+  junk_pem.append(std::string(4000,'a'));
 
-  // 5 legitimate certificates and one junk certificate in the chain
-  chain.append(server_root_cert_rsa_pem);
-  chain.append(server_root_cert_rsa_pem);
-  chain.append(server_root_cert_rsa_pem);
-  chain.append(server_root_cert_rsa_pem);
-  chain.append(std::string(50,'a'));
+  X509Credentials::PublicKeySignatureAlgorithm algorithm;
+  std::string serial;
+  SystemTime time;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
+  EXPECT_FALSE(status.ok());
+}
+
+
+TEST(SingleCertTooLarge,pemToDerB64) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  std::string in_cert(3000, 'a');
+
+  std::string out_cert;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
+  EXPECT_FALSE(status.ok());
+}
+
+TEST(ChainTooLarge,pemToDerB64) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  // This buffer is the size of 6 max size certificates, we only allow 5
+  std::string in_chain(2048 * 6, 'a');
 
   std::string out_chain;
 
@@ -917,8 +950,53 @@ TEST(ChainParse,pemToDerB64) {
   context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
-  auto status = provider_friend.pemToDerB64(chain, out_chain);
+  auto status = provider_friend.pemToDerB64(in_chain, out_chain, true);
+  EXPECT_FALSE(status.ok());
+}
+
+TEST(ChainParse,pemToDerB64) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  std::string converted_pem = "MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT"
+"MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz"
+"MzdaMFoxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNV"
+"BAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFjAUBgNVBAMMDXRlc3QtcnNhLnRlc3Qw"
+"ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqMEevBD9Ayp+kQL/uXsgB"
+"Zk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX+3RHWRyA"
+"X0B58jYHUaan+IB/7teUbfpcoC4yxmTRIuDdS+erBC2H1yHa5nBwA+YNp+KU6yb8"
+"ZVtbSTZbkJuRaKB1AFEc/aP+sukRgvpxeS6pFU9UO2AGh21YKOM7wnnp7k2OVeIZ"
+"y5BjmkaXOwQu+PoAh6blpqN7BdD8nUGQhzuhyr1/modQdtAVeIeiwW1riKZQxGle"
+"d+tvLuMrd8WiAmSD1PBaW6p6mt+ClNkr6gzXBt9rFA8rycYX+a95AiamQpKoqoRJ"
+"AgMBAAGjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUQeJl/2AyjV/Z7KCl0/rs"
+"sN6mws8wHQYDVR0OBBYEFKFKlXVNgU5R+9liRuI/LAJ5rZdRMA4GA1UdDwEB/wQE"
+"AwIFoDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDQYJKoZIhvcNAQEL"
+"BQADggEBAAHbzqfQ/3nccUimqgggsULDKEFtiNUaLAQnxKDvi1r5jtLpVktK/RqP"
+"Xwk+oTBrsNG+CeYpXpQFmYX+dPWRUMTKJy+2ZzxWqsv4exRxMp8oyq08gEym7F9t"
+"juygVLvPI2RugWVQ+0+tTtA+PPbwuwItq6Gg4vCHlmFmsY5LXfQIlVwTohKeiwiT"
+"vXfkLugngyPoZ8YjIvut6LYGI6SNlCnUx/M/VHNgz/3F8hDfHkjQU8fErucVLOUw"
+"C7A913wkxeuIOQVfAhXV2smAdz1RxAyyPOODUQiN7WkV9lLaLOODCoF7m/S7T7Gi"
+"Y8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=";
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  std::string chain;
+
+  // One legitimate certificate and junk appended to the chain
+  chain.append(server_root_cert_rsa_pem);
+  chain.append(std::string(4000,'a'));
+
+  std::string out_chain;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+  context, certificate_data_source, private_key_data_source, absl::nullopt);
+  auto status = provider->initialize();
+  EXPECT_FALSE(status.ok());
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  status = provider_friend.pemToDerB64(chain, out_chain, true);
   EXPECT_TRUE(status.ok());
+  EXPECT_EQ(out_chain, converted_pem);
+
 }
 
 } // namespace Aws

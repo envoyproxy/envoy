@@ -11,6 +11,7 @@ namespace Aws {
 using std::chrono::seconds;
 
 constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
+constexpr uint64_t X509_CERTIFICATE_CHAIN_MAX_LENGTH{5};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
 
@@ -152,42 +153,80 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 /*TODO: @nbaws split this method and move common functionality into source/common/tls/utility.h */
 
 absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_view pem,
-                                                                  std::string& output, bool chain) {
+                                                                  std::string& output, bool is_chain) {
 
   const std::string pem_string = std::string(pem);
   auto pem_size = pem.size();
+  char error_data[256]; // OpenSSL error buffer
+  unsigned long error_code; // OpenSSL error code
+
+  // Up to X509_CERTIFICATE_CHAIN_MAX_LENGTH elements in a certificate chain
+  const uint64_t max_size = is_chain 
+      ? X509_CERTIFICATE_MAX_BYTES * X509_CERTIFICATE_CHAIN_MAX_LENGTH
+      : X509_CERTIFICATE_MAX_BYTES;
+
+  if ((!pem_size) || (pem_size > max_size)) {
+    return absl::InvalidArgumentError(is_chain 
+        ? "Invalid certificate chain size" 
+        : "Invalid certificate size");
+  }
+
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_string.c_str(), pem_size));
 
   auto max_certs = 1;
-
-  if (chain) {
+  int cert_count = 0;
+  
+  if (is_chain) {
     // Maximum trust chain depth is 5 per
     // https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication.html
-    max_certs = 5;
+    max_certs = X509_CERTIFICATE_CHAIN_MAX_LENGTH;
   }
 
-  for (int i = 0; i < max_certs; i++) {
+  while (cert_count < max_certs) {
     unsigned char* cert_in_der = nullptr;
+    ERR_clear_error();
     bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
 
     if (cert == nullptr) {
-      return absl::InvalidArgumentError(chain 
-          ? fmt::format("Certificate chain PEM #{} could not be parsed", i)
-          : "Certificate could not be parsed");
+      error_code = ERR_peek_last_error();
+      ERR_error_string(error_code, error_data);
+      // Error code = PEM_R_NO_START_LINE means we reached the end of the BIO
+      if(ERR_GET_REASON(error_code) == PEM_R_NO_START_LINE)
+      {
+        break;
+      }
+      // Non zero error code means there is a legitimate certificate parsing error
+      else { 
+        return absl::InvalidArgumentError(is_chain 
+            ? fmt::format("Certificate chain PEM #{} could not be parsed: {}", cert_count, error_data)
+            : fmt::format("Certificate could not be parsed: {}",error_data));
+      }
     }
+
+    ERR_clear_error();
 
     int der_length = i2d_X509(cert.get(), &cert_in_der);
     if (!(der_length > 0 && cert_in_der != nullptr)) {
-      return absl::InvalidArgumentError(chain 
-          ? fmt::format("Certificate chain PEM #{} could not be converted to DER", i)
-          : "Certificate could not be converted to DER");
+
+      error_code = ERR_peek_last_error();
+      ERR_error_string(error_code, error_data);
+
+      return absl::InvalidArgumentError(is_chain 
+          ? fmt::format("Certificate chain PEM #{} could not be converted to DER: {}", cert_count, error_data)
+          : fmt::format("Certificate could not be converted to DER: {}", error_data));
     }
 
     output.append(Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length));
     output.append(",");
     OPENSSL_free(cert_in_der);
+
+    cert_count++;
   }
   
+  if (!cert_count) {
+    return absl::InvalidArgumentError("No certificates found in PEM data");
+  }
+
   // Remove trailing comma
   output.erase(output.size() - 1);
 
@@ -213,7 +252,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
 
   auto cert_pem = certificate_data_source_provider_->data();
   if (!cert_pem.empty()) {
-    status = pemToDerB64(cert_pem, cert_der_b64);
+    status = pemToDerB64(cert_pem, cert_der_b64, false);
     if (!status.ok()) {
       ENVOY_LOG(error, "IAMRolesAnywhere: Certificate PEM decoding failed: {}", status.message());
       cached_credentials_ = X509Credentials();
@@ -234,10 +273,13 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   if (certificate_chain_data_source_provider_.has_value()) {
     auto chain_pem = certificate_chain_data_source_provider_.value()->data();
     if (!chain_pem.empty()) {
+      // If a certificate chain is provided, it must be valid
       status = pemToDerB64(chain_pem, cert_chain_der_b64, true);
       if (!status.ok()) {
         ENVOY_LOG(error, "IAMRolesAnywhere: Certificate chain decoding failed: {}",
                   status.message());
+        cached_credentials_ = X509Credentials();
+        return;
       }
     }
   }
