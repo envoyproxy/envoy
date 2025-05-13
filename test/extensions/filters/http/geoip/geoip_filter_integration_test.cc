@@ -77,7 +77,7 @@ const std::string ConfigIspAndAsn = R"EOF(
         asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF";
 
-const std::string ConfigIspAndAsnNotUseAsn = R"EOF(
+const std::string ConfigIspAndCity = R"EOF(
     name: envoy.filters.http.geoip
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.geoip.v3.Geoip
@@ -191,7 +191,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIspAndAsn) {
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIsp) {
-  config_helper_.prependFilter(TestEnvironment::substitute(ConfigIspAndAsnNotUseAsn));
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigIspAndCity));
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},

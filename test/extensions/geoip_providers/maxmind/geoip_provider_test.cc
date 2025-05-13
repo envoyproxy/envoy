@@ -309,33 +309,6 @@ TEST_F(GeoipProviderTest, ValidConfigUsingAsnDbNotReadingIspDbsSuccessfulLookup)
   expectStats("isp_db", 0, 0, 0);
 }
 
-TEST_F(GeoipProviderTest, ValidConfigUsingIspAndAsnDbsSuccessfulLookup) {
-  const std::string config_yaml = R"EOF(
-    common_provider_config:
-      geo_headers_to_add:
-        asn: "x-geo-asn"
-        isp: "x-geo-isp"
-    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
-    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-  )EOF";
-
-  initializeProvider(config_yaml, cb_added_nullopt);
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("::1.128.0.1");
-  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
-  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
-  auto lookup_cb_std = lookup_cb.AsStdFunction();
-  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
-  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  EXPECT_EQ(2, captured_lookup_response_.size());
-  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
-  EXPECT_EQ("1221", asn_it->second);
-  const auto& isp_it = captured_lookup_response_.find("x-geo-isp");
-  EXPECT_EQ("Telstra Internet", isp_it->second);
-  expectStats("isp_db");
-  expectStats("asn_db");
-}
-
 TEST_F(GeoipProviderTest, ValidConfigIspDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
