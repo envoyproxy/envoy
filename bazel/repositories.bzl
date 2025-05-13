@@ -572,6 +572,10 @@ def _com_google_googletest():
         "com_google_googletest",
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@re2": "@com_googlesource_code_re2",
+        },
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just

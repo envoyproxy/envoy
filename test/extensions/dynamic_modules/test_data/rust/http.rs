@@ -24,6 +24,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
+    "config_init_failure" => None,
     _ => panic!("Unknown filter name: {}", name),
   }
 }
