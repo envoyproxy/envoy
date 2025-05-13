@@ -67,6 +67,7 @@ public:
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
   RouterTestBase(const envoy::extensions::filters::http::router::v3::Router& config);
 
+  void init();
   void expectResponseTimerCreate();
   void expectPerTryTimerCreate();
   void expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout);

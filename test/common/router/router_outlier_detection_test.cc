@@ -93,12 +93,13 @@ public:
   void init(envoy::extensions::filters::http::router::v3::Router router_proto) {
 
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
-                                             ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    config_ = FilterConfig::create(prefix.statName(), context_,
+                                   ShadowWriterPtr(new MockShadowWriter()), router_proto)
+                  .value();
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  std::shared_ptr<FilterConfig> config_;
+  std::unique_ptr<FilterConfig> config_;
 };
 
 // Test verifies in the router filter config is properly created based
@@ -164,20 +165,6 @@ public:
 // Next, the test verifies that HTTP event which does not match the matcher's
 // rules properly reports the event to the outlier detector.
 TEST_P(RouterOutlierDetectionProcessTest, HttpAndLocallyOriginatedEvents) {
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "300"}});
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(300));
-
   // The HTTP "match" result should be propagated to all registered
   // destinations.
   for (uint32_t i = 0; i < std::get<HTTP_DESTINATIONS>(GetParam()); i++) {
@@ -194,14 +181,39 @@ TEST_P(RouterOutlierDetectionProcessTest, HttpAndLocallyOriginatedEvents) {
     EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                 reportResult(fmt::format(destination, i), false));
   }
-  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        EXPECT_FALSE(headers.get(Http::Headers::get().EnvoyUpstreamServiceTime).empty());
-      }));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(300));
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "300"}});
+
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   // Recreate the filter and send non-matching HTTP event.
+  for (uint32_t i = 0; i < std::get<HTTP_DESTINATIONS>(GetParam()); i++) {
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+                reportResult(fmt::format(destination, i), false))
+        .Times(std::get<HTTP_EVENTS>(GetParam()));
+  }
+  for (uint32_t i = std::get<HTTP_DESTINATIONS>(GetParam());
+       i < std::get<LOCALLY_ORIGINATED_DESTINATIONS>(GetParam()); i++) {
+    // For destinations not specified under http matcher, but
+    // specified under local originated events, send
+    // event specifying "non-error".
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+                reportResult(fmt::format(destination, i), false));
+  }
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(500));
   recreateFilter();
   response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -209,17 +221,6 @@ TEST_P(RouterOutlierDetectionProcessTest, HttpAndLocallyOriginatedEvents) {
   router_->decodeHeaders(headers, true);
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(500));
-  for (uint32_t i = 0; i < std::get<HTTP_DESTINATIONS>(GetParam()); i++) {
-    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-                reportResult(fmt::format(destination, i), false))
-        .Times(std::get<HTTP_EVENTS>(GetParam()));
-  }
-  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
-        EXPECT_FALSE(headers.get(Http::Headers::get().EnvoyUpstreamServiceTime).empty());
-      }));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
 }
 

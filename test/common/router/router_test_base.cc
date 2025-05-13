@@ -25,49 +25,35 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
           flush_upstream_log_on_upstream_stream, std::move(strict_headers_to_check),
           test_time_.timeSystem(), http_context_, router_context_)),
       router_(std::make_unique<RouterTestFilter>(config_, config_->default_stats_)) {
-  router_->setDecoderFilterCallbacks(callbacks_);
-  upstream_locality_.set_zone("to_az");
-  cm_.initializeThreadLocalClusters({"fake_cluster"});
-  ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, address())
-      .WillByDefault(Return(host_address_));
-  ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
-      .WillByDefault(ReturnRef(upstream_locality_));
-  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-      ->setLocalAddress(host_address_);
-  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
-      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
-
-  // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
-  test_time_.setMonotonicTime(std::chrono::milliseconds(50));
-
-  // Allow any number of (append|pop)TrackedObject calls for the dispatcher strict mock.
-  EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
-  EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
-  EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
-
-  EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
-      .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
-  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
-    return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
-  }));
+  init();
 }
 
+// Constructor which initializes router based on protobuf config.
 RouterTestBase::RouterTestBase(const envoy::extensions::filters::http::router::v3::Router& config)
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()) {
+  ON_CALL(factory_context_, serverFactoryContext())
+      .WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(server_factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+
+  config_ =
+      std::shared_ptr<FilterConfig>(FilterConfig::create(pool_.add("test"), factory_context_,
+                                                         ShadowWriterPtr{shadow_writer_}, config)
+                                        .value()
+                                        .release());
+  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+
+  init();
+}
+
+void RouterTestBase::init() {
+  router_->setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
   cm_.initializeThreadLocalClusters({"fake_cluster"});
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, address())
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  ON_CALL(factory_context_, serverFactoryContext())
-      .WillByDefault(ReturnRef(server_factory_context_));
-  ON_CALL(server_factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
-  config_ = std::make_shared<FilterConfig>(pool_.add("test"), factory_context_,
-                                           ShadowWriterPtr{shadow_writer_}, config);
-  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
-  router_->setDecoderFilterCallbacks(callbacks_);
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
       ->setLocalAddress(host_address_);
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
@@ -83,6 +69,10 @@ RouterTestBase::RouterTestBase(const envoy::extensions::filters::http::router::v
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
       .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
+  // This must be here, because mock does not provide default chooseHost behavior.
+  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+    return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+  }));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
