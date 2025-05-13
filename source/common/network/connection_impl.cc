@@ -930,7 +930,7 @@ bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstSharedPtr optio
   }
   return option->setOption(
       *socket_,
-      envoy::config::core::v3::SocketOption::SocketState::SocketOption_SocketState_STATE_BOUND);
+      envoy::config::core::v3::SocketOption::SocketState::SocketOption_SocketState_STATE_LISTENING);
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
