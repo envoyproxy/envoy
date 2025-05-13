@@ -904,7 +904,7 @@ TEST(ValidPemWithAppendedJunk,pemToAlgorithmSerialExpiration) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string junk_pem;
   junk_pem.append(server_root_cert_rsa_pem);
-  junk_pem.append(std::string(4000,'a'));
+  junk_pem.append(std::string(100,'a'));
 
   X509Credentials::PublicKeySignatureAlgorithm algorithm;
   std::string serial;
@@ -915,7 +915,10 @@ TEST(ValidPemWithAppendedJunk,pemToAlgorithmSerialExpiration) {
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
-  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(serial, "131827979019394590882466519576505238184");
+  EXPECT_EQ(algorithm, X509Credentials::PublicKeySignatureAlgorithm::RSA);
+  EXPECT_EQ(time, SystemTime(std::chrono::seconds(1763425417)));
 }
 
 

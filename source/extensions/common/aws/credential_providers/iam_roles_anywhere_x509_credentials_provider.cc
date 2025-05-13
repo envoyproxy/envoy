@@ -97,6 +97,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   ASN1_INTEGER* ser = nullptr;
   BIGNUM* bnser = nullptr;
   char* bndec = nullptr;
+  char error_data[256]; // OpenSSL error buffer
+  unsigned long error_code; // OpenSSL error code
+
   absl::Status status = absl::OkStatus();
 
   const std::string pem_string = std::string(pem);
@@ -111,27 +114,51 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_string.c_str(), pem_size));
 
+  ERR_clear_error();
+
   bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+      
   if(cert == nullptr)
   {
-    return absl::InvalidArgumentError("Invalid certificate - PEM read x509 failed");
+    error_code = ERR_peek_last_error();
+    ERR_error_string(error_code, error_data);
+    return absl::InvalidArgumentError(fmt::format("Invalid certificate - PEM read x509 failed: {}",error_data));
   }
 
   X509_ALGOR* alg;
-  X509_PUBKEY_get0_param(nullptr, nullptr, nullptr, &alg, X509_get_X509_PUBKEY(cert.get()));
+  int param_status = X509_PUBKEY_get0_param(nullptr, nullptr, nullptr, &alg, X509_get_X509_PUBKEY(cert.get()));
+  if(param_status != 1)
+  {
+    error_code = ERR_peek_last_error();
+    ERR_error_string(error_code, error_data);
+    return absl::InvalidArgumentError(fmt::format("Invalid certificate - X509_PUBKEY_get0_param failed: {}", error_data));
+  }
+
   int nid = OBJ_obj2nid(alg->algorithm);
 
-  if (nid != NID_undef && nid == NID_rsaEncryption) {
-    algorithm = X509Credentials::PublicKeySignatureAlgorithm::RSA;
-  } else if (nid != NID_undef && nid == NID_X9_62_id_ecPublicKey) {
-    algorithm = X509Credentials::PublicKeySignatureAlgorithm::ECDSA;
-  } else {
-    return absl::InvalidArgumentError("Invalid certificate public key signature algorithm");
+  switch (nid) {
+    case NID_rsaEncryption:
+      algorithm = X509Credentials::PublicKeySignatureAlgorithm::RSA;
+      break;
+    case NID_X9_62_id_ecPublicKey:
+      algorithm = X509Credentials::PublicKeySignatureAlgorithm::ECDSA;
+      break;
+    default:
+      return absl::InvalidArgumentError("Invalid certificate public key signature algorithm");
   }
 
   ser = X509_get_serialNumber(cert.get());
+  if(ser == nullptr)
+  {
+    return absl::InvalidArgumentError("Certificate serial number could not be extracted");
+  }
+
   bnser = ASN1_INTEGER_to_BN(ser, nullptr);
+  // Asserts here as we cannot stub OpenSSL
+  ASSERT(bnser != nullptr);
   bndec = BN_bn2dec(bnser);
+  ASSERT(bndec != nullptr);
+
   serial.append(bndec);
 
   int days, seconds;
