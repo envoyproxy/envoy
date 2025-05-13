@@ -759,8 +759,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Create the xDS-Manager that will be passed to the cluster manager when it
   // is initialized below.
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, *local_info_,
-                                                          validation_context_, *this);
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
+                                                          *local_info_, validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
@@ -1015,6 +1015,9 @@ void InstanceBase::run() {
     watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                       "main_thread", *dispatcher_);
   }
+
+  main_dispatch_loop_started_.store(true);
+
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

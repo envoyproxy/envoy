@@ -5,6 +5,7 @@
 #include "envoy/config/config_validator.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/resolver_impl.h"
@@ -115,14 +116,13 @@ public:
       Server::Configuration::CommonFactoryContext& factory_context, Stats::Store& stats,
       ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server, Config::XdsManager& xds_manager, absl::Status& creation_status)
+      Server::Admin& admin, Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+      MockLocalHostsRemoved& local_hosts_removed, Http::Context& http_context,
+      Grpc::Context& grpc_context, Router::Context& router_context, Server::Instance& server,
+      Config::XdsManager& xds_manager, absl::Status& creation_status)
       : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
-                               log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context, grpc_context, router_context, server, xds_manager,
-                               creation_status),
+                               log_manager, main_thread_dispatcher, admin, api, http_context,
+                               grpc_context, router_context, server, xds_manager, creation_status),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -142,108 +142,16 @@ protected:
   MockLocalHostsRemoved& local_hosts_removed_;
 };
 
-// A gRPC MuxFactory that returns a MockGrpcMux instance when trying to instantiate a mux for the
-// `envoy.config_mux.grpc_mux_factory` type. This enables testing call expectations on the ADS gRPC
-// mux.
-class MockGrpcMuxFactory : public Config::MuxFactory {
-public:
-  MockGrpcMuxFactory() {
-    ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
-        .WillByDefault(Invoke(
-            [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-               Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-               const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-               std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-               OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-               bool) -> std::shared_ptr<Config::GrpcMux> {
-              return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-            }));
-  }
-
-  std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
-  void shutdownAll() override {}
-
-  MOCK_METHOD(std::shared_ptr<Config::GrpcMux>, create,
-              (std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-               Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-               const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-               std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-               OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>, bool));
-};
-
-// A fake cluster validator that exercises the code that uses ADS with
-// config_validators.
-class FakeConfigValidatorFactory : public Config::ConfigValidatorFactory {
-public:
-  FakeConfigValidatorFactory() = default;
-
-  Config::ConfigValidatorPtr createConfigValidator(const ProtobufWkt::Any&,
-                                                   ProtobufMessage::ValidationVisitor&) override {
-    return nullptr;
-  }
-
-  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Value instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Value()};
-  }
-
-  std::string name() const override { return "envoy.fake_validator"; }
-
-  std::string typeUrl() const override {
-    return "type.googleapis.com/envoy.fake_validator.v3.FakeValidator";
-  }
-};
-
-// A ClusterManagerImpl that overrides postThreadLocalClusterUpdate set up call expectations on the
-// ADS gRPC mux. The ADS mux should not be started until the ADS cluster has been initialized. This
-// solves the problem outlined in https://github.com/envoyproxy/envoy/issues/27702.
-class UpdateOverrideClusterManagerImpl : public TestClusterManagerImpl {
-public:
-  UpdateOverrideClusterManagerImpl(
-      const Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Server::Configuration::CommonFactoryContext& factory_context, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server, Config::XdsManager& xds_manager, absl::Status& creation_status)
-      : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
-                               log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context, grpc_context, router_context, server, xds_manager,
-                               creation_status) {}
-
-protected:
-  void postThreadLocalClusterUpdate(ClusterManagerCluster& cluster,
-                                    ThreadLocalClusterUpdateParams&& params) override {
-    int expected_start_call_count = 0;
-    if (cluster.cluster().info()->name() == "ads_cluster") {
-      // For the ADS cluster, we expect that the postThreadLocalClusterUpdate call below will
-      // invoke the ADS mux's start() method. Subsequent calls to postThreadLocalClusterUpdate()
-      // should not invoke the ADS mux's start() method.
-      if (!post_tls_update_for_ads_cluster_called_) {
-        expected_start_call_count = 1;
-      }
-      post_tls_update_for_ads_cluster_called_ = true;
-    }
-
-    EXPECT_CALL(dynamic_cast<Config::MockGrpcMux&>(*adsMux()), start())
-        .Times(expected_start_call_count);
-
-    // The ClusterManagerImpl::postThreadLocalClusterUpdate method calls ads_mux_->start() if the
-    // cluster is used in ADS for EnvoyGrpc.
-    TestClusterManagerImpl::postThreadLocalClusterUpdate(cluster, std::move(params));
-  }
-
-private:
-  bool post_tls_update_for_ads_cluster_called_ = false;
-};
-
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
       : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
         router_context_(factory_.stats_.symbolTable()),
-        registered_dns_factory_(dns_resolver_factory_) {}
+        registered_dns_factory_(dns_resolver_factory_) {
+    // Using the NullGrpcMuxImpl by default making the calls a no-op.
+    ON_CALL(xds_manager_, adsMux())
+        .WillByDefault(Return(std::make_shared<Config::NullGrpcMuxImpl>()));
+  }
 
   virtual void create(const Bootstrap& bootstrap) {
     // Override the bootstrap used by the mock Server::Instance object.
@@ -251,8 +159,7 @@ public:
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
-        xds_manager_);
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -319,19 +226,8 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, local_cluster_update_, local_hosts_removed_,
-        http_context_, grpc_context_, router_context_, server_, xds_manager_, creation_status);
-    THROW_IF_NOT_OK(creation_status);
-    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
-  }
-
-  void createWithUpdateOverrideClusterManager(const Bootstrap& bootstrap) {
-    absl::Status creation_status = absl::OkStatus();
-    cluster_manager_ = std::make_unique<UpdateOverrideClusterManagerImpl>(
-        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
-        xds_manager_, creation_status);
+        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
+        router_context_, server_, xds_manager_, creation_status);
     THROW_IF_NOT_OK(creation_status);
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
@@ -377,7 +273,6 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<TestClusterManagerFactory> factory_;
-  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
@@ -792,8 +687,11 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
 }
 
 TEST_F(ClusterManagerImplTest, AdsCluster) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the adsMux to have mocked GrpcMux object that later expectations
+  // can be set on.
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -820,12 +718,16 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
                   port_value: 11001
   )EOF";
 
-  createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
+  EXPECT_CALL(*ads_mux, start());
+  create(parseBootstrapFromV3Yaml(yaml));
 }
 
 TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the adsMux to have mocked GrpcMux object that later expectations
+  // can be set on.
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -852,7 +754,8 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
                   port_value: 11001
   )EOF";
 
-  createWithUpdateOverrideClusterManager(parseBootstrapFromV3Yaml(yaml));
+  EXPECT_CALL(*ads_mux, start());
+  create(parseBootstrapFromV3Yaml(yaml));
 
   const std::string update_static_ads_cluster_yaml = R"EOF(
     name: ads_cluster
@@ -4951,662 +4854,6 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
 
   EXPECT_CALL(*pool_mock, drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete));
   opt_cp.value().drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete);
-}
-
-// Validates that ADS replacement fails when ADS isn't configured.
-TEST_F(ClusterManagerImplTest, AdsReplacementNoPriorAdsRejection) {
-  createWithBasicStaticCluster();
-
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: cluster_1
-  )EOF",
-                            new_ads_config);
-
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(res.message(),
-            "Cannot replace an ADS config when one wasn't previously configured in the bootstrap");
-}
-
-// Validates that ADS replacement with primary source only works.
-TEST_F(ClusterManagerImplTest, AdsReplacementPrimaryOnly) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
-  InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_shared(
-      std::make_shared<NiceMock<Config::MockGrpcMux>>());
-  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&ads_mux_shared](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
-                            Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-                            const envoy::config::core::v3::ApiConfigSource&,
-                            const LocalInfo::LocalInfo&,
-                            std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                            OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                            bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_EQ(failover_async_client, nullptr);
-            return ads_mux_shared;
-          }));
-
-  // Start with 2 static clusters, and set the first to be the ADS cluster.
-  const std::string yaml = R"EOF(
-  dynamic_resources:
-    ads_config:
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster1
-  static_resources:
-    clusters:
-    - name: ads_cluster1
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ads_cluster1
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
-    - name: ads_cluster2
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ads_cluster2
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11002
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be the second ADS cluster.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster2
-  )EOF",
-                            new_ads_config);
-
-  Grpc::RawAsyncClientPtr failover_client;
-  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientPtr&& primary_async_client,
-                          Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope&,
-                          BackOffStrategyPtr&&,
-                          const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
-        EXPECT_NE(primary_async_client, nullptr);
-        EXPECT_EQ(failover_async_client, nullptr);
-        return absl::OkStatus();
-      }));
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_TRUE(res.ok());
-}
-
-// Validates that ADS replacement with primary and failover sources works.
-TEST_F(ClusterManagerImplTest, AdsReplacementPrimaryAndFailover) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
-  InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_shared(
-      std::make_shared<NiceMock<Config::MockGrpcMux>>());
-  NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&ads_mux_shared](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
-                            Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-                            const envoy::config::core::v3::ApiConfigSource&,
-                            const LocalInfo::LocalInfo&,
-                            std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                            OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                            bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_NE(failover_async_client, nullptr);
-            return ads_mux_shared;
-          }));
-
-  // Start with 2 static clusters, and set the first to be the ADS cluster.
-  const std::string yaml = R"EOF(
-  dynamic_resources:
-    ads_config:
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-      - envoy_grpc:
-          cluster_name: primary_ads_cluster
-      - envoy_grpc:
-          cluster_name: failover_ads_cluster
-  static_resources:
-    clusters:
-    - name: primary_ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: primary_ads_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
-    - name: failover_ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: failover_ads_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11002
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be the second ADS cluster.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-      - envoy_grpc:
-          cluster_name: primary_ads_cluster
-      - envoy_grpc:
-          cluster_name: failover_ads_cluster
-  )EOF",
-                            new_ads_config);
-
-  Grpc::RawAsyncClientPtr failover_client;
-  EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientPtr&& primary_async_client,
-                          Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope&,
-                          BackOffStrategyPtr&&,
-                          const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
-        EXPECT_NE(primary_async_client, nullptr);
-        EXPECT_NE(failover_async_client, nullptr);
-        return absl::OkStatus();
-      }));
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_TRUE(res.ok());
-}
-
-// Validates that ADS replacement with unknown cluster fails.
-TEST_F(ClusterManagerImplTest, AdsReplacementUnknownCluster) {
-  InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-
-  // Start with 2 static clusters, and set the first to be the ADS cluster.
-  const std::string yaml = R"EOF(
-  dynamic_resources:
-    ads_config:
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-  static_resources:
-    clusters:
-    - name: ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ads_cluster1
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be the second ADS cluster.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster2
-  )EOF",
-                            new_ads_config);
-
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'ads_cluster2'");
-}
-
-// Validates that ADS replacement with unknown failover cluster fails.
-TEST_F(ClusterManagerImplTest, AdsReplacementUnknownFailoverCluster) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
-  InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(
-          Invoke([](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                    std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
-                    Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-                    const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-                    std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-                    OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-                    bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            EXPECT_NE(failover_async_client, nullptr);
-            return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-          }));
-
-  // Start with 2 static clusters, and set the first to be the ADS cluster.
-  const std::string yaml = R"EOF(
-  dynamic_resources:
-    ads_config:
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-      - envoy_grpc:
-          cluster_name: primary_ads_cluster
-      - envoy_grpc:
-          cluster_name: failover_ads_cluster
-  static_resources:
-    clusters:
-    - name: primary_ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: primary_ads_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
-    - name: failover_ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: failover_ads_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11002
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be the second ADS cluster.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-      - envoy_grpc:
-          cluster_name: primary_ads_cluster
-      - envoy_grpc:
-          cluster_name: non_existent_failover_ads_cluster
-  )EOF",
-                            new_ads_config);
-
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'");
-}
-
-// Validates that ADS replacement fails when ADS type is different (SotW <-> Delta).
-TEST_F(ClusterManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-             const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-             bool) -> std::shared_ptr<Config::GrpcMux> {
-            return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-          }));
-
-  // Change between SotW -> Delta-xDS, and see that it fails.
-  const std::string yaml = R"EOF(
-    dynamic_resources:
-      ads_config:
-        api_type: GRPC
-        set_node_on_first_message_only: true
-        grpc_services:
-          envoy_grpc:
-            cluster_name: ads_cluster
-    static_resources:
-      clusters:
-      - name: ads_cluster
-        connect_timeout: 0.250s
-        type: static
-        lb_policy: round_robin
-        load_assignment:
-          cluster_name: ads_cluster
-          endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 11001
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be a delta-xDS one.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: DELTA_GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-  )EOF",
-                            new_ads_config);
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(res.message(),
-            "Cannot replace an ADS config with a different api_type (expected: GRPC)");
-}
-
-// Validates that ADS replacement fails when a wrong backoff strategy is used.
-TEST_F(ClusterManagerImplTest, AdsReplacementInvalidBackoffRejection) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-             const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-             bool) -> std::shared_ptr<Config::GrpcMux> {
-            return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-          }));
-
-  const std::string yaml = R"EOF(
-  dynamic_resources:
-    ads_config:
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-  static_resources:
-    clusters:
-    - name: ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ads_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config with an invalid backoff strategy.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-          retry_policy:
-            retry_back_off:
-              base_interval: 100s
-              max_interval: 10s
-  )EOF",
-                            new_ads_config);
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_EQ(res.message(), "max_interval must be greater than or equal to the base_interval");
-}
-
-// Validates that ADS replacement of unsupported API type is rejected.
-TEST_F(ClusterManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-             const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-             bool) -> std::shared_ptr<Config::GrpcMux> {
-            return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-          }));
-
-  // Use GRPC type which is supported, but make sure that it will return
-  // AGGREGATED_GRPC when invoking replaceAdsMux() to emulate a type which is not
-  // supported.
-  const std::string yaml = R"EOF(
-  dynamic_resources:
-    ads_config:
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-  static_resources:
-    clusters:
-    - name: ads_cluster
-      connect_timeout: 0.250s
-      type: static
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ads_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 11001
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config with an unsupported API type.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: AGGREGATED_GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-  )EOF",
-                            new_ads_config);
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(res.message(),
-            "Cannot replace an ADS config with a different api_type (expected: GRPC)");
-}
-
-// Validates that ADS replacement fails when there are a different number of custom validators
-// defined between the original ADS config and the replacement.
-TEST_F(ClusterManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  FakeConfigValidatorFactory fake_config_validator_factory;
-  Registry::InjectFactory<Config::ConfigValidatorFactory> registry2(fake_config_validator_factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-             const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-             bool) -> std::shared_ptr<Config::GrpcMux> {
-            return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-          }));
-
-  const std::string yaml = R"EOF(
-    dynamic_resources:
-      ads_config:
-        api_type: GRPC
-        set_node_on_first_message_only: true
-        grpc_services:
-          envoy_grpc:
-            cluster_name: ads_cluster
-        config_validators:
-        - name: envoy.fake_validator
-          typed_config:
-            "@type": type.googleapis.com/google.protobuf.Value
-    static_resources:
-      clusters:
-      - name: ads_cluster
-        connect_timeout: 0.250s
-        type: static
-        lb_policy: round_robin
-        load_assignment:
-          cluster_name: ads_cluster
-          endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 11001
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be a delta-xDS one.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-  )EOF",
-                            new_ads_config);
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
-  EXPECT_THAT(res.message(),
-              HasSubstr("Cannot replace config_validators in ADS config (different size)"));
-}
-
-// Validates that ADS replacement fails when a custom validators with some
-// different contents is used compared to the original ADS config.
-TEST_F(ClusterManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  FakeConfigValidatorFactory fake_config_validator_factory;
-  Registry::InjectFactory<Config::ConfigValidatorFactory> registry2(fake_config_validator_factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
-             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
-             const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
-             std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
-             OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-             bool) -> std::shared_ptr<Config::GrpcMux> {
-            return std::make_shared<NiceMock<Config::MockGrpcMux>>();
-          }));
-
-  const std::string yaml = R"EOF(
-    dynamic_resources:
-      ads_config:
-        api_type: GRPC
-        set_node_on_first_message_only: true
-        grpc_services:
-          envoy_grpc:
-            cluster_name: ads_cluster
-        config_validators:
-        - name: envoy.fake_validator
-          typed_config:
-            "@type": type.googleapis.com/google.protobuf.Value
-            value:
-              number_value: 5.0
-    static_resources:
-      clusters:
-      - name: ads_cluster
-        connect_timeout: 0.250s
-        type: static
-        lb_policy: round_robin
-        load_assignment:
-          cluster_name: ads_cluster
-          endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: 127.0.0.1
-                    port_value: 11001
-  )EOF";
-  create(parseBootstrapFromV3Yaml(yaml));
-
-  // Replace the ADS config to be a delta-xDS one.
-  envoy::config::core::v3::ApiConfigSource new_ads_config;
-  TestUtility::loadFromYaml(R"EOF(
-      api_type: GRPC
-      set_node_on_first_message_only: true
-      grpc_services:
-        envoy_grpc:
-          cluster_name: ads_cluster
-      config_validators:
-      - name: envoy.fake_validator
-        typed_config:
-          "@type": type.googleapis.com/google.protobuf.Value
-          value:
-            number_value: 7.0
-  )EOF",
-                            new_ads_config);
-  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
-  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
-  EXPECT_THAT(res.message(),
-              HasSubstr("Cannot replace config_validators in ADS config (different contents)"));
 }
 
 // Test that the read only cross-priority host map in the main thread is correctly synchronized to

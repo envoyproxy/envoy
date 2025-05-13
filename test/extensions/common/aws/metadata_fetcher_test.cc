@@ -1,16 +1,10 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/extensions/filters/http/common/mock.h"
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

@@ -207,6 +207,11 @@ private:
                                    filter_log_handlers.end());
       return combined_log_handlers;
     }
+
+    RequestDecoderHandlePtr getRequestDecoderHandle() override {
+      return std::make_unique<ActiveStreamHandle>(*this);
+    }
+
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
     //
