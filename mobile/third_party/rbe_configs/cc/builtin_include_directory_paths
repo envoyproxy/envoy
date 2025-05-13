@@ -9,8 +9,8 @@ declared action inputs or the action commandline changes.
 /usr/include/x86_64-linux-gnu
 /usr/include
 /opt/llvm/lib/clang/18/share
-/usr/include/c++/11
-/usr/include/x86_64-linux-gnu/c++/11
-/usr/include/c++/11/backward
+/usr/include/c++/13
+/usr/include/x86_64-linux-gnu/c++/13
+/usr/include/c++/13/backward
 /opt/llvm/include/x86_64-unknown-linux-gnu/c++/v1
 /opt/llvm/include/c++/v1
