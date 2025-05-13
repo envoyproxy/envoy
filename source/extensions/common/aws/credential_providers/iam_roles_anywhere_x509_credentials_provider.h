@@ -12,7 +12,7 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-using DataSourceOptRef = OptRef<envoy::config::core::v3::DataSource>; 
+using DataSourceOptRef = OptRef<const envoy::config::core::v3::DataSource>; 
 
 class CachedX509CredentialsProviderBase : public X509CredentialsProvider,
                                           public Logger::Loggable<Logger::Id::aws> {
@@ -90,11 +90,11 @@ public:
 private:
   Server::Configuration::ServerFactoryContext& context_;
   envoy::config::core::v3::DataSource certificate_data_source_;
+  envoy::config::core::v3::DataSource private_key_data_source_;
+  DataSourceOptRef certificate_chain_data_source_;
   Config::DataSource::DataSourceProviderPtr certificate_data_source_provider_;
   Config::DataSource::DataSourceProviderPtr private_key_data_source_provider_;
   absl::optional<Config::DataSource::DataSourceProviderPtr> certificate_chain_data_source_provider_;
-  envoy::config::core::v3::DataSource private_key_data_source_;
-  DataSourceOptRef certificate_chain_data_source_;
   absl::optional<SystemTime> expiration_time_;
   std::chrono::seconds cache_duration_;
 

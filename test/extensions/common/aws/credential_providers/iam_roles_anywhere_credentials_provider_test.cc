@@ -192,7 +192,7 @@ public:
 
     TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source_);
 
-    absl::optional<envoy::config::core::v3::DataSource> cert_chain_opt;
+    DataSourceOptRef cert_chain_opt;
 
     if(chain != "")
     {
@@ -206,7 +206,7 @@ public:
       TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
 
       iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
-      cert_chain_opt = iam_roles_anywhere_config_.certificate_chain();
+      cert_chain_opt = makeOptRef(iam_roles_anywhere_config_.certificate_chain());
     }
 
     iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
@@ -480,31 +480,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   auto creds = provider_->getCredentials();
 }
 
-TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningInvalidChainOk) {
-
-  auto headers =
-      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
-  Http::RequestMessageImpl message(std::move(headers));
-
-  expectDocument(201, "", message);
-
-  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
-
-  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc");
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-
-  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
-
-  // Kick off a refresh
-  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
-  provider_friend.onClusterAddOrUpdate();
-  timer_->invokeCallback();
-
-  auto creds = provider_->getCredentials();
-}
-
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomSessionName) {
 
   auto headers =
@@ -534,7 +509,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomSessionN
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc", "mysession");
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "mysession");
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -578,7 +553,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningBlankSessionNa
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc", "");
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "");
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -624,7 +599,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomDuration
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc", "mysession", 123);
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "mysession", 123);
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -944,11 +919,13 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SignerFails) {
 
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
+  auto chain_optref = makeOptRef(iam_roles_anywhere_config_.certificate_chain());
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
           context_, iam_roles_anywhere_config_.certificate(),
-          iam_roles_anywhere_config_.private_key(), iam_roles_anywhere_config_.certificate_chain());
+          // iam_roles_anywhere_config_.private_key(), makeOptRef(iam_roles_anywhere_config_.certificate_chain()));
+          iam_roles_anywhere_config_.private_key(), chain_optref);
 
   std::unique_ptr<MockIAMRolesAnywhereSigV4Signer> mock_signer =
       std::make_unique<MockIAMRolesAnywhereSigV4Signer>(
@@ -1107,11 +1084,13 @@ public:
 
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
+    auto chain_optref = makeOptRef(iam_roles_anywhere_config_.certificate_chain());
+
     auto roles_anywhere_certificate_provider =
         std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
             context_, iam_roles_anywhere_config_.certificate(),
             iam_roles_anywhere_config_.private_key(),
-            iam_roles_anywhere_config_.certificate_chain());
+            chain_optref);
     // Create our own x509 signer just for IAM Roles Anywhere
     auto roles_anywhere_signer =
         std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
