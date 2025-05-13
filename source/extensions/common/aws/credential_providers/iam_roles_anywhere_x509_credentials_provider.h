@@ -12,7 +12,7 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-using DataSourceOptRef = OptRef<const envoy::config::core::v3::DataSource>; 
+using DataSourceOptRef = OptRef<const envoy::config::core::v3::DataSource>;
 
 class CachedX509CredentialsProviderBase : public X509CredentialsProvider,
                                           public Logger::Loggable<Logger::Id::aws> {
@@ -65,17 +65,16 @@ protected:
  */
 class IAMRolesAnywhereX509CredentialsProvider : public CachedX509CredentialsProviderBase {
 public:
-
-/**
- * @brief Constructs an IAM Roles Anywhere X509 credentials provider
- *
- * @param context The server factory context
- * @param certificate_data_source The Envoy DataSource for the signing certificate
- * @param private_key_data_source The Envoy DataSource for the matching private key
- * @param certificate_chain_data_source An optional DataSource for the certificate chain. If no 
- *        certificate chain is provided, the IAM Roles Anywhere signing algorithm will not add 
- *        the X-Amz-X509-Chain header
- */
+  /**
+   * @brief Constructs an IAM Roles Anywhere X509 credentials provider
+   *
+   * @param context The server factory context
+   * @param certificate_data_source The Envoy DataSource for the signing certificate
+   * @param private_key_data_source The Envoy DataSource for the matching private key
+   * @param certificate_chain_data_source An optional DataSource for the certificate chain. If no
+   *        certificate chain is provided, the IAM Roles Anywhere signing algorithm will not add
+   *        the X-Amz-X509-Chain header
+   */
   IAMRolesAnywhereX509CredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
       const envoy::config::core::v3::DataSource& certificate_data_source,
@@ -105,11 +104,12 @@ private:
    * @brief Convert a PEM certificate to DER format
    *
    * @param [in] pem The PEM formatted certificate(s)
-   * @param [out] output The DER + Base64 encoded certificate(s), comma seperated
-   * @param [in] is_chain If true, this is a certificate chain. We will parse a maximum of 5 certificates in a provided chain
+   * @param [out] output The DER + Base64 encoded certificate(s), comma separated
+   * @param [in] is_chain If true, this is a certificate chain. We will parse a maximum of 5
+   * certificates in a provided chain
    *
-   * @return Status indicating success or failure. If at least one certificate can be parsed from the provided PEM or PEM chain, the status
-   * will be returned as ok
+   * @return Status indicating success or failure. If at least one certificate can be parsed from
+   * the provided PEM or PEM chain, the status will be returned as ok
    */
 
   absl::Status pemToDerB64(absl::string_view pem, std::string& output, bool is_chain);

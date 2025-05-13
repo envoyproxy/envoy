@@ -194,14 +194,13 @@ public:
 
     DataSourceOptRef cert_chain_opt;
 
-    if(chain != "")
-    {
+    if (chain != "") {
       auto chain_env = std::string("CHAIN");
       TestEnvironment::setEnvVar(chain_env, chain, 1);
       yaml = fmt::format(R"EOF(
       environment_variable: "{}"
     )EOF",
-                        chain_env);
+                         chain_env);
 
       TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
 
@@ -226,15 +225,14 @@ public:
     auto roles_anywhere_certificate_provider =
         std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
             context_, iam_roles_anywhere_config_.certificate(),
-            iam_roles_anywhere_config_.private_key(),
-            cert_chain_opt);
+            iam_roles_anywhere_config_.private_key(), cert_chain_opt);
     EXPECT_EQ(roles_anywhere_certificate_provider->initialize(), absl::OkStatus());
     // Create our own x509 signer just for IAM Roles Anywhere
     auto roles_anywhere_signer =
         std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
             absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
             roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
-    
+
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context_, mock_manager_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         [this](Upstream::ClusterManager&, absl::string_view) {
@@ -924,7 +922,8 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SignerFails) {
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
           context_, iam_roles_anywhere_config_.certificate(),
-          // iam_roles_anywhere_config_.private_key(), makeOptRef(iam_roles_anywhere_config_.certificate_chain()));
+          // iam_roles_anywhere_config_.private_key(),
+          // makeOptRef(iam_roles_anywhere_config_.certificate_chain()));
           iam_roles_anywhere_config_.private_key(), chain_optref);
 
   std::unique_ptr<MockIAMRolesAnywhereSigV4Signer> mock_signer =
@@ -979,7 +978,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, Coverage) {
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
-
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
@@ -1089,8 +1087,7 @@ public:
     auto roles_anywhere_certificate_provider =
         std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
             context_, iam_roles_anywhere_config_.certificate(),
-            iam_roles_anywhere_config_.private_key(),
-            chain_optref);
+            iam_roles_anywhere_config_.private_key(), chain_optref);
     // Create our own x509 signer just for IAM Roles Anywhere
     auto roles_anywhere_signer =
         std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(

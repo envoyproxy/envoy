@@ -39,8 +39,9 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       profile_arn_(iam_roles_anywhere_config.profile_arn()),
       trust_anchor_arn_(iam_roles_anywhere_config.trust_anchor_arn()), region_(region),
       session_duration_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
-        iam_roles_anywhere_config, session_duration,
-        Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration)), roles_anywhere_signer_(std::move(roles_anywhere_signer)) {}
+          iam_roles_anywhere_config, session_duration,
+          Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration)),
+      roles_anywhere_signer_(std::move(roles_anywhere_signer)) {}
 
 void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   ENVOY_LOG(debug, "AWS IAM Roles Anywhere fetch success, calling callback func");

@@ -30,8 +30,8 @@ envoy_cc_library(
     ],
     deps = [
         "//source/extensions/common/aws:credentials_provider_interface",
-        "//source/extensions/common/aws:signer_base_impl",
         "//source/extensions/common/aws:iam_roles_anywhere_signer_base_impl",
+        "//source/extensions/common/aws:signer_base_impl",
         "//source/extensions/common/aws:signer_interface",
         "//source/extensions/common/aws:utility_lib",
     ],
