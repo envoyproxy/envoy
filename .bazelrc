@@ -111,11 +111,8 @@ build:gcc --copt=-fno-debug-types-section
 build:gcc --copt=-Wno-error=restrict
 build:gcc --copt=-Wno-error=uninitialized
 build:gcc --cxxopt=-Wno-missing-requires
-# We need this because -Wno-missing-requires options is rather new
-# in GCC, so flags -Wno-missing-requires exists in GCC 12, but does
-# not in GCC 11 and GCC 11 is what is used in docker-gcc
-# configuration currently
-build:gcc --cxxopt=-Wno-unknown-warning
+build:gcc --cxxopt=-Wno-dangling-reference
+build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang-tidy
