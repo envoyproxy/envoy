@@ -3,7 +3,7 @@
 #include <memory>
 #include <tuple>
 
-#include "envoy/extensions/http/stateful_session/header/v3/header.pb.h"
+#include "envoy/extensions/http/stateful_session/envelope/v3/envelope.pb.h"
 #include "envoy/http/stateful_session.h"
 
 #include "source/common/common/base64.h"
@@ -14,17 +14,18 @@ namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace StatefulSession {
-namespace Header {
+namespace Envelope {
 
-using HeaderBasedSessionStateProto =
-    envoy::extensions::http::stateful_session::header::v3::HeaderBasedSessionState;
+using EnvelopeSessionStateProto =
+    envoy::extensions::http::stateful_session::envelope::v3::EnvelopeSessionState;
 
-class HeaderBasedSessionStateFactory : public Envoy::Http::SessionStateFactory {
+class EnvelopeSessionStateFactory : public Envoy::Http::SessionStateFactory,
+                                    public Logger::Loggable<Logger::Id::http> {
 public:
   class SessionStateImpl : public Envoy::Http::SessionState {
   public:
     SessionStateImpl(absl::optional<std::string> address,
-                     const HeaderBasedSessionStateFactory& factory)
+                     const EnvelopeSessionStateFactory& factory)
         : upstream_address_(std::move(address)), factory_(factory) {}
 
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
@@ -32,33 +33,21 @@ public:
 
   private:
     absl::optional<std::string> upstream_address_;
-    const HeaderBasedSessionStateFactory& factory_;
+    const EnvelopeSessionStateFactory& factory_;
   };
 
-  HeaderBasedSessionStateFactory(const HeaderBasedSessionStateProto& config);
+  EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config);
 
   Envoy::Http::SessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const override {
     return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
   }
 
 private:
-  absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-    auto hdr = headers.get(Envoy::Http::LowerCaseString(name_));
-    if (hdr.empty()) {
-      return absl::nullopt;
-    }
-
-    auto header_value = hdr[0]->value().getStringView();
-    std::string address = Envoy::Base64::decode(header_value);
-    return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
-  }
-
-  const Envoy::Http::LowerCaseString& getHeaderName() const { return name_; }
-
+  absl::optional<std::string> parseAddress(Envoy::Http::RequestHeaderMap& headers) const;
   const Envoy::Http::LowerCaseString name_;
 };
 
-} // namespace Header
+} // namespace Envelope
 } // namespace StatefulSession
 } // namespace Http
 } // namespace Extensions
