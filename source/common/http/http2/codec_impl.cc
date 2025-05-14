@@ -1781,8 +1781,7 @@ OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId str
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
   // TODO PERF: Can reference count here to avoid copies.
-  ENVOY_CONN_LOG(trace, "Http2Visitor::OnHeaderForStream(`{}` : `{}`)", connection_->connection_,
-                 name_view, value_view);
+  std::cerr << "`" << name_view << "` : `" << value_view << "`\n";
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
   HeaderString value;

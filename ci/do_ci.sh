@@ -384,7 +384,7 @@ case $CI_TARGET in
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
-            --build_tests_only --test_arg="--" --test_arg="-l trace"
+            --build_tests_only
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
