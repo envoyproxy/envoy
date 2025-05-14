@@ -27,7 +27,6 @@ TEST(CookieBasedSessionStateFactoryTest, EmptyCookieName) {
 }
 
 TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
-  testing::NiceMock<Envoy::Upstream::MockHostDescription> mock_host;
   Event::SimulatedTimeSystem time_simulator;
   time_simulator.setMonotonicTime(std::chrono::seconds(1000));
 
@@ -41,9 +40,6 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     auto session_state = factory.create(request_headers);
     EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
-    auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
-
     // No valid address then update it by set-cookie.
     std::string cookie_content;
     envoy::Cookie cookie;
@@ -53,7 +49,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
     // Check the format of the cookie sent back to client.
-    session_state->onUpdate(mock_host, response_headers);
+    session_state->onUpdate("1.2.3.4:80", response_headers);
     Envoy::Http::CookieAttributeRefVector cookie_attributes;
     EXPECT_EQ(response_headers.get_("set-cookie"),
               Envoy::Http::Utility::makeSetCookieValue(
@@ -87,19 +83,13 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     auto session_state = factory.create(request_headers);
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
-    auto upstream_host = std::make_shared<Envoy::Network::Address::Ipv4Instance>("1.2.3.4", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host));
-
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate(mock_host, response_headers);
+    session_state->onUpdate("1.2.3.4:80", response_headers);
 
     // Session state is not updated and then do nothing.
     EXPECT_EQ(response_headers.get_("set-cookie"), "");
 
-    auto upstream_host_2 = std::make_shared<Envoy::Network::Address::Ipv4Instance>("2.3.4.5", 80);
-    EXPECT_CALL(mock_host, address()).WillOnce(testing::Return(upstream_host_2));
-
-    session_state->onUpdate(mock_host, response_headers);
+    session_state->onUpdate("2.3.4.5:80", response_headers);
 
     // Update session state because the current request is routed to a new upstream host.
     cookie.set_address("2.3.4.5:80");
