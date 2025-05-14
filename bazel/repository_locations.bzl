@@ -130,17 +130,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "BoringSSL",
         project_desc = "Minimal OpenSSL fork",
         project_url = "https://github.com/google/boringssl",
-        # To update BoringSSL, which tracks Chromium releases:
-        # 1. Open https://chromiumdash.appspot.com/releases?platform=Linux and find the latest Stable release.
-        # 2. In the info for that release, open the "Branch Base Commit" link, then open DEPS, and use the <boringssl_revision>.
-        #
-        # chromium-135.0.7049.84 (linux/stable)
-        version = "673e61fc215b178a90c0e67858bbf162c8158993",
-        sha256 = "5f84f1d01a278a5cadf51acc11a0c4519f2f57277cff33d154917083c68463b4",
+        # To update BoringSSL, which tracks BCR tags, open https://registry.bazel.build/modules/boringssl
+        # and select an appropriate tag for the new version.
+        version = "0.20250415.0",
+        sha256 = "b2d64c4d52c505d60b0fb86833568dc4762445910d7a7757ff9b172e5556cb01",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-02-28",
+        release_date = "2025-04-15",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
