@@ -63,8 +63,9 @@ config:
   TestUtility::loadFromYaml(yaml, *proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager,
           findStaticGenericSecretProvider(failed_secret_name == "token" ? "hmac" : "token"))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
@@ -127,8 +128,9 @@ config:
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -138,7 +140,6 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context, initManager()).Times(2);
-  EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -266,8 +267,9 @@ config:
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -322,8 +324,9 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -368,8 +371,9 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
@@ -407,8 +411,9 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"foo"}, {});
 
-  auto& secret_manager =
-      context.server_factory_context_.cluster_manager_.cluster_manager_factory_.secretManager();
+  NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context.server_factory_context_, secretManager())
+      .WillByDefault(ReturnRef(secret_manager));
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
