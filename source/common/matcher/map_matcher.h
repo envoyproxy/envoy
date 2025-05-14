@@ -31,7 +31,7 @@ public:
       return {MatchState::MatchComplete, on_no_match_};
     }
 
-    const auto result = doMatch(absl::get<std::string>(input.data_), data);
+    const auto result = doMatch(absl::get<std::string>(input.data_));
     if (result) {
       if (result->matcher_) {
         return result->matcher_->match(data);
@@ -67,8 +67,7 @@ protected:
   // The inner match method. Attempts to match against the resulting data string. If the match
   // result was determined, the OnMatch will be returned. If a match result was determined to be no
   // match, {} will be returned.
-  virtual absl::optional<OnMatch<DataType>> doMatch(absl::string_view target,
-                                                    const DataType& data) PURE;
+  virtual absl::optional<OnMatch<DataType>> doMatch(const std::string& data) PURE;
 };
 
 } // namespace Matcher

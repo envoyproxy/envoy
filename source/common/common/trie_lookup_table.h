@@ -144,17 +144,22 @@ public:
   }
 
   /**
-   * Returns the length of the longest matching prefix. See findMatchingPrefix for details.
+   * Returns the set of entries that are prefixes of the specified key, longest last.
+   * Complexity is O(min(longest key prefix, key length)).
+   * @param key the key used to find.
+   * @return a vector of values whose keys are a prefix of the specified key, longest last.
    */
-  size_t findLongestPrefixLength(absl::string_view key) const {
+  absl::InlinedVector<Value, 4> findMatchingPrefixes(absl::string_view key) const {
+    absl::InlinedVector<Value, 4> result;
     int32_t current = 0;
-    size_t result = 0;
-    for (auto it = key.begin(); it < key.end(); it++) {
-      current = getChildIndex(current, *it);
+
+    for (uint8_t c : key) {
+      current = getChildIndex(current, c);
+
       if (current == NoNode) {
         return result;
       } else if (nodes_[current].value_) {
-        result = it - key.begin() + 1;
+        result.push_back(nodes_[current].value_);
       }
     }
     return result;
