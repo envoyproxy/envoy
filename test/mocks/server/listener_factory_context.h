@@ -22,7 +22,6 @@ public:
   ~MockListenerFactoryContext() override;
 
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
