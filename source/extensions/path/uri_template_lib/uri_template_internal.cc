@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "source/common/common/fmt.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/flags/flag.h"
@@ -45,6 +46,16 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        "!$&'()+,;"     // sub-delims excluding *=
                                        ":@"
                                        "="; // user included "=" allowed
+
+// Additional literal that allows "*" in the pattern.
+// This should replace "kLiteral" after removal of
+// "reloadable_features.uri_template_match_on_asterisk" runtime guard.
+// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
+constexpr absl::string_view kLiteralWithAsterisk = "a-zA-Z0-9-._~" // Unreserved
+                                                   "%"             // pct-encoded
+                                                   "!$&'()+,;"     // sub-delims excluding *=
+                                                   ":@"
+                                                   "=*"; // reserved characters
 
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
@@ -122,17 +133,30 @@ std::string ParsedPathPattern::debugString() const {
 }
 
 bool isValidLiteral(absl::string_view literal) {
+  static const std::string* kValidLiteralRegexAsterisk =
+      new std::string(absl::StrCat("^[", kLiteralWithAsterisk, "]+$"));
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "]+$"));
+  static const LazyRE2 literal_regex_asterisk = {kValidLiteralRegexAsterisk->data()};
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(literal, *literal_regex);
+
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
+             ? RE2::FullMatch(literal, *literal_regex_asterisk)
+             : RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidRewriteLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
+  static const std::string* kValidLiteralRegexAsterisk =
+      new std::string(absl::StrCat("^[", kLiteralWithAsterisk, "/]+$"));
+
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  return RE2::FullMatch(literal, *literal_regex);
+  static const LazyRE2 literal_regex_asterisk = {kValidLiteralRegexAsterisk->data()};
+
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
+             ? RE2::FullMatch(literal, *literal_regex_asterisk)
+             : RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidVariableName(absl::string_view variable) {
@@ -360,11 +384,26 @@ std::string toRegexPattern(absl::string_view pattern) {
 std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
   static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
-  switch (pattern) {
-  case Operator::PathGlob: // "*"
-    return *kPathGlobRegex;
-  case Operator::TextGlob: // "**"
-    return *kTextGlobRegex;
+
+  static const std::string* kPathGlobRegexAsterisk =
+      new std::string(absl::StrCat("[", kLiteralWithAsterisk, "]+"));
+  static const std::string* kTextGlobRegexAsterisk =
+      new std::string(absl::StrCat("[", kLiteralWithAsterisk, "/]*"));
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")) {
+    switch (pattern) {
+    case Operator::PathGlob: // "*"
+      return *kPathGlobRegexAsterisk;
+    case Operator::TextGlob: // "**"
+      return *kTextGlobRegexAsterisk;
+    }
+  } else {
+    switch (pattern) {
+    case Operator::PathGlob: // "*"
+      return *kPathGlobRegex;
+    case Operator::TextGlob: // "**"
+      return *kTextGlobRegex;
+    }
   }
   return "";
 }

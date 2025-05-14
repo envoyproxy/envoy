@@ -20,7 +20,7 @@ namespace TapCommon = Extensions::Common::Tap;
 class UdpTapSink : public TapCommon::Sink {
 public:
   UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink& config);
-  ~UdpTapSink();
+  ~UdpTapSink() override;
 
   // Sink
   TapCommon::PerTapSinkHandlePtr

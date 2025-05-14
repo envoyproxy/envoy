@@ -48,6 +48,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "client_lib",
+    srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
     deps = [
         "//envoy/grpc:async_client_manager_interface",

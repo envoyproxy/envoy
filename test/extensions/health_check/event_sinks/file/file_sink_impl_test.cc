@@ -75,7 +75,7 @@ TEST(HealthCheckEventFileSink, logTest) {
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
       "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
-      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+      "\"ipv4_compat\":false,\"network_namespace_filepath\":\"\"}},\"cluster_name\":\"fake_"
       "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
       "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n");
 
@@ -101,7 +101,7 @@ TEST(HealthCheckEventFileSink, logTest) {
       file_log_data.value(),
       "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
       "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"port_value\":443,\"resolver_name\":\"\","
-      "\"ipv4_compat\":false}},\"cluster_name\":\"fake_"
+      "\"ipv4_compat\":false,\"network_namespace_filepath\":\"\"}},\"cluster_name\":\"fake_"
       "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
       "\"2009-02-13T23:31:31.234Z\"}\n");
 }

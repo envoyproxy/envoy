@@ -19,15 +19,61 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using test::integration::filters::LoggingTestFilterConfig;
+
+Grpc::Status::WellKnownGrpcStatus
+GrpcStatusFromProto(LoggingTestFilterConfig::GrpcStatus grpc_status) {
+  switch (grpc_status) {
+  case LoggingTestFilterConfig::OK:
+    return Grpc::Status::WellKnownGrpcStatus::Ok;
+  case LoggingTestFilterConfig::CANCELLED:
+    return Grpc::Status::WellKnownGrpcStatus::Canceled;
+  case LoggingTestFilterConfig::UNKNOWN:
+    return Grpc::Status::WellKnownGrpcStatus::Unknown;
+  case LoggingTestFilterConfig::INVALID_ARGUMENT:
+    return Grpc::Status::WellKnownGrpcStatus::InvalidArgument;
+  case LoggingTestFilterConfig::DEADLINE_EXCEEDED:
+    return Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded;
+  case LoggingTestFilterConfig::NOT_FOUND:
+    return Grpc::Status::WellKnownGrpcStatus::NotFound;
+  case LoggingTestFilterConfig::ALREADY_EXISTS:
+    return Grpc::Status::WellKnownGrpcStatus::AlreadyExists;
+  case LoggingTestFilterConfig::PERMISSION_DENIED:
+    return Grpc::Status::WellKnownGrpcStatus::PermissionDenied;
+  case LoggingTestFilterConfig::RESOURCE_EXHAUSTED:
+    return Grpc::Status::WellKnownGrpcStatus::ResourceExhausted;
+  case LoggingTestFilterConfig::FAILED_PRECONDITION:
+    return Grpc::Status::WellKnownGrpcStatus::FailedPrecondition;
+  case LoggingTestFilterConfig::ABORTED:
+    return Grpc::Status::WellKnownGrpcStatus::Aborted;
+  case LoggingTestFilterConfig::OUT_OF_RANGE:
+    return Grpc::Status::WellKnownGrpcStatus::OutOfRange;
+  case LoggingTestFilterConfig::UNIMPLEMENTED:
+    return Grpc::Status::WellKnownGrpcStatus::Unimplemented;
+  case LoggingTestFilterConfig::INTERNAL:
+    return Grpc::Status::WellKnownGrpcStatus::Internal;
+  case LoggingTestFilterConfig::UNAVAILABLE:
+    return Grpc::Status::WellKnownGrpcStatus::Unavailable;
+  case LoggingTestFilterConfig::DATA_LOSS:
+    return Grpc::Status::WellKnownGrpcStatus::DataLoss;
+  case LoggingTestFilterConfig::UNAUTHENTICATED:
+    return Grpc::Status::WellKnownGrpcStatus::Unauthenticated;
+  default:
+    return Grpc::Status::WellKnownGrpcStatus::InvalidCode;
+  }
+}
+
 // A test filter that retrieve the logging info on encodeComplete.
 class LoggingTestFilter : public Http::PassThroughFilter {
 public:
-  LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name,
-                    bool expect_stats, bool expect_envoy_grpc_specific_stats,
-                    bool expect_response_bytes, const ProtobufWkt::Struct& filter_metadata)
-      : logging_id_(logging_id), expected_cluster_name_(cluster_name), expect_stats_(expect_stats),
-        expect_envoy_grpc_specific_stats_(expect_envoy_grpc_specific_stats),
-        expect_response_bytes_(expect_response_bytes), filter_metadata_(filter_metadata) {}
+  LoggingTestFilter(const LoggingTestFilterConfig& proto_config)
+      : logging_id_(proto_config.logging_id()),
+        expected_cluster_name_(proto_config.upstream_cluster_name()),
+        expect_stats_(proto_config.expect_stats()),
+        expect_envoy_grpc_specific_stats_(proto_config.expect_envoy_grpc_specific_stats()),
+        expect_response_bytes_(proto_config.expect_response_bytes()),
+        filter_metadata_(proto_config.filter_metadata()),
+        expect_grpc_status_(proto_config.expect_grpc_status()) {}
   void encodeComplete() override {
     ASSERT(decoder_callbacks_ != nullptr);
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
@@ -62,6 +108,12 @@ public:
       }
       ASSERT_NE(ext_authz_logging_info->upstreamHost(), nullptr);
       EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
+      if (expect_grpc_status_ != LoggingTestFilterConfig::UNSPECIFIED) {
+        ASSERT_TRUE(ext_authz_logging_info->grpcStatus().has_value());
+        EXPECT_EQ(ext_authz_logging_info->grpcStatus(), GrpcStatusFromProto(expect_grpc_status_));
+      } else {
+        EXPECT_FALSE(ext_authz_logging_info->grpcStatus().has_value());
+      }
     }
   }
 
@@ -72,21 +124,20 @@ private:
   const bool expect_envoy_grpc_specific_stats_;
   const bool expect_response_bytes_;
   const absl::optional<ProtobufWkt::Struct> filter_metadata_;
+  // The gRPC status returned by the authorization server when it is making a gRPC call.
+  const LoggingTestFilterConfig::GrpcStatus expect_grpc_status_;
 };
 
-class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
-                                     test::integration::filters::LoggingTestFilterConfig> {
+class LoggingTestFilterFactory
+    : public Extensions::HttpFilters::Common::FactoryBase<LoggingTestFilterConfig> {
 public:
   LoggingTestFilterFactory() : FactoryBase("logging-test-filter") {};
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::LoggingTestFilterConfig& proto_config, const std::string&,
-      Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const LoggingTestFilterConfig& proto_config, const std::string&,
+                                    Server::Configuration::FactoryContext&) override {
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(
-          proto_config.logging_id(), proto_config.upstream_cluster_name(),
-          proto_config.expect_stats(), proto_config.expect_envoy_grpc_specific_stats(),
-          proto_config.expect_response_bytes(), proto_config.filter_metadata()));
+      callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(proto_config));
     };
   }
 };

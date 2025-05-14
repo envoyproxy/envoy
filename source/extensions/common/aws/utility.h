@@ -1,17 +1,10 @@
 #pragma once
 
+#include "envoy/common/matchers.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
-#include "envoy/http/message.h"
+#include "envoy/json/json_object.h"
 
-#include "source/common/common/matchers.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
-
-#include "curl/curl.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -93,19 +86,6 @@ public:
    * @return an sts endpoint url.
    */
   static std::string getSTSEndpoint(absl::string_view region);
-
-  /**
-   * Fetch AWS instance or task metadata with curl.
-   *
-   * @param message An HTTP request.
-   * @return Metadata document or nullopt in case if unable to fetch it.
-   *
-   * @note In case of an error, function will log ENVOY_LOG_MISC(debug) message.
-   *
-   * @note This is not main loop safe method as it is blocking. It is intended to be used from the
-   * gRPC auth plugins that are able to schedule blocking plugins on a different thread.
-   */
-  static absl::optional<std::string> fetchMetadataWithCurl(Http::RequestMessage& message);
 
   /**
    * @brief Creates the prototype for a static cluster towards a credentials provider

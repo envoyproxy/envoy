@@ -1,4 +1,7 @@
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -374,6 +377,49 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   return true;
 }
 
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  stream_info->filterState()->setData(key_view,
+                                      std::make_unique<Router::StringAccessorImpl>(value_view),
+                                      StreamInfo::FilterState::StateType::ReadOnly);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  auto filter_state = stream_info->filterState()->getDataReadOnly<Router::StringAccessor>(key_view);
+  if (!filter_state) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        fmt::format("key not found in filter state", key_view));
+    return false;
+  }
+  absl::string_view str = filter_state->asString();
+  *result = const_cast<char*>(str.data());
+  *result_length = str.size();
+  return true;
+}
+
 bool envoy_dynamic_module_callback_http_get_request_body_vector(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
@@ -586,6 +632,21 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_RequestId: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      auto stream_id_provider = stream_info->getStreamIdProvider();
+      if (stream_id_provider.has_value()) {
+        const absl::optional<absl::string_view> request_id = stream_id_provider->toStringView();
+        if (request_id.has_value()) {
+          *result = const_cast<char*>(request_id->data());
+          *result_length = request_id->size();
+          ok = true;
+        }
+      }
+    }
+    break;
+  }
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as string",
@@ -653,6 +714,41 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
   }
   return ok;
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_http_callout(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
+    uint64_t timeout_milliseconds) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  // Try to get the cluster from the cluster manager for the given cluster name.
+  absl::string_view cluster_name_view(cluster_name, cluster_name_length);
+
+  // Construct the request message, starting with the headers, checking for required headers, and
+  // adding the body if present.
+  std::unique_ptr<RequestHeaderMapImpl> hdrs = Http::RequestHeaderMapImpl::create();
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = &headers[i];
+    const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+    const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                  header->value_length);
+    hdrs->addCopy(Http::LowerCaseString(key), value);
+  }
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(hdrs)));
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+  if (body_size > 0) {
+    message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
+    message->headers().setContentLength(body_size);
+  }
+  return filter->sendHttpCallout(callout_id, cluster_name_view, std::move(message),
+                                 timeout_milliseconds);
 }
 }
 } // namespace HttpFilters

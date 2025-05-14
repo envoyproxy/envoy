@@ -71,6 +71,9 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
 /*/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
+# tracers.fluentd extension
+/*/extensions/common/fluentd @kevintan250 @yanavlasov
+/*/extensions/tracers/fluentd @kevintan250 @yanavlasov
 # quic extension
 /*/extensions/quic/ @ryantheoptimist @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer
@@ -146,6 +149,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo @nix1n
+/*/extensions/resource_monitors/cgroup_memory @botengyao @kbaichoo @alesabater
 /*/extensions/retry/priority @ravenblackx @mattklein123
 /*/extensions/retry/priority/previous_priorities @ravenblackx @mattklein123
 /*/extensions/retry/host @ravenblackx @mattklein123
@@ -169,7 +173,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 extensions/upstreams/http @yanavlasov @mattklein123
 extensions/upstreams/tcp @ggreenway @mattklein123
 # OAuth2
-extensions/filters/http/oauth2 @derekargueta @mattklein123
+/*/extensions/filters/http/oauth2 @bplotnick @derekargueta @mattklein123
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/common/local_ratelimit @mattklein123 @wbpcode
@@ -334,6 +338,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
+/*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -356,6 +361,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 # Match delegate extension
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
+/*/extensions/filters/network/match_delegate @botengyao @yanavlasov
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
