@@ -49,7 +49,8 @@ typed_config:
     object_key: "test_key"
     factory_key: "envoy.string"
     format_string:
-      text_format: "deny_value"
+      text_format_source:
+        inline_string: "deny_value"
     read_only: false
 )EOF";
 
