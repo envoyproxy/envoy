@@ -2,6 +2,7 @@
 
 #include "source/common/common/trie_lookup_table.h"
 #include "source/common/matcher/map_matcher.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -16,17 +17,7 @@ public:
   create(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<PrefixMapMatcher<DataType>>(
-        new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status, false));
-    RETURN_IF_NOT_OK_REF(creation_status);
-    return ret;
-  }
-
-  static absl::StatusOr<std::unique_ptr<PrefixMapMatcher>>
-  createWithRetry(DataInputPtr<DataType>&& data_input,
-                  absl::optional<OnMatch<DataType>> on_no_match) {
-    absl::Status creation_status = absl::OkStatus();
-    auto ret = std::unique_ptr<PrefixMapMatcher<DataType>>(
-        new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status, true));
+        new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status));
     RETURN_IF_NOT_OK_REF(creation_status);
     return ret;
   }
@@ -37,19 +28,17 @@ public:
 
 protected:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
-                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status,
-                   bool retry_shorter)
-      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status),
-        retry_shorter_(retry_shorter) {}
+                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
+      : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
-  absl::optional<OnMatch<DataType>> doMatch(absl::string_view target,
-                                            const DataType& data) override {
-    while (true) {
-      const std::shared_ptr<OnMatch<DataType>> result = children_.findLongestPrefix(target);
-      if (result == nullptr) {
-        return absl::nullopt;
-      }
-      if (result->action_cb_ || !retry_shorter_) {
+  absl::optional<OnMatch<DataType>> doMatch(absl::string_view key, const DataType& data) override {
+    const absl::InlinedVector<std::shared_ptr<OnMatch<DataType>>, 4> results =
+        children_.findMatchingPrefixes(key);
+    bool retry_shorter = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss");
+    for (auto it = results.rbegin(); it != results.rend(); ++it) {
+      const auto& result = *it;
+      if (result->action_cb_ || !retry_shorter) {
         return *result;
       }
       ASSERT(result->matcher_);
@@ -57,18 +46,8 @@ protected:
       if (match.match_state_ != MatchState::MatchComplete || match.on_match_.has_value()) {
         return match.on_match_;
       }
-      // If a subtree lookup found neither match nor on_no_match, and retry_shorter_ is set,
-      // we want to try again with a shorter matching prefix if one can be found.
-      size_t prev_length = matchedPrefixLength(target);
-      if (prev_length == 0) {
-        return absl::nullopt;
-      }
-      target = target.substr(0, prev_length - 1);
     }
-  }
-
-  size_t matchedPrefixLength(absl::string_view str) {
-    return children_.findLongestPrefixLength(str);
+    return absl::nullopt;
   }
 
 private:

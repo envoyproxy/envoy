@@ -14,6 +14,7 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -187,7 +188,10 @@ matcher_tree:
   EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
-TEST_F(MatcherTest, TestPrefixMatcherInnerMissDoesNotPerformOuterOnNoMatch) {
+TEST_F(MatcherTest, TestPrefixMatcherInnerMissDoesNotPerformOuterOnNoMatchWhenDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss", "false"}});
   const std::string yaml = R"EOF(
 on_no_match:
   action:
@@ -253,7 +257,7 @@ matcher_tree:
     name: outer_input
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
-  prefix_match_map_with_retry:
+  prefix_match_map:
     map:
       "":
         matcher:
@@ -319,7 +323,7 @@ matcher_tree:
     name: outer_input
     typed_config:
       "@type": type.googleapis.com/google.protobuf.StringValue
-  prefix_match_map_with_retry:
+  prefix_match_map:
     map:
       val:
         matcher:
