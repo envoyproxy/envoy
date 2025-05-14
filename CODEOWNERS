@@ -137,10 +137,10 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/grpc_credentials/example @wozz @yanavlasov
 /*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
 /*/extensions/internal_redirect @botengyao @penguingao
-/*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
+/*/extensions/stat_sinks/dog_statsd @taiki45 @paul-r-gall
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
-/*/extensions/stat_sinks/hystrix @trabetti @jmarantz
-/*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
+/*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
+/*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
@@ -201,9 +201,9 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/io_socket/user_space @kyessenov @lambdai
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
-/*/extensions/request_id/uuid @mattklein123 @jmarantz
+/*/extensions/request_id/uuid @mattklein123 @botengyao
 # HTTP header formatters
-/*/extensions/http/header_formatters/preserve_case @mattklein123 @jmarantz
+/*/extensions/http/header_formatters/preserve_case @mattklein123 @yanavlasov
 # External Rate Limit
 /*/extensions/filters/common/ratelimit @esmet @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
@@ -237,7 +237,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
-/*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @ggreenway @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
