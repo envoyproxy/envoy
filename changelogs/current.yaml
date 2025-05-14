@@ -133,5 +133,8 @@ new_features:
 - area: rbac filter
   change: |
     allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
+- area: rbac filter
+  change: |
+    allow listed ``FilterStateInput`` to be used with the xDS matcher in the Network RBAC filter.
 
 deprecated:
