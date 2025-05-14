@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
 #include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
+#include <elf.h>
 
 namespace Envoy {
 namespace Extensions {
@@ -70,7 +71,7 @@ AwsRequestSigningFilterFactory::createSigner(
       credential_file_config = config.credential_provider().credentials_file_provider();
     }
   }
-
+  
   if (region.empty()) {
     auto region_provider =
         std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
@@ -89,50 +90,52 @@ AwsRequestSigningFilterFactory::createSigner(
   }
 
   absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderChainSharedPtr>
-      credentials_provider =
+      credentials_provider_chain =
           absl::InvalidArgumentError("No credentials provider settings configured.");
 
-  const bool has_credential_provider_settings =
-      config.has_credential_provider() &&
-      (config.credential_provider().has_assume_role_with_web_identity_provider() ||
-       config.credential_provider().has_credentials_file_provider());
-
-  if (config.has_credential_provider()) {
-    if (config.credential_provider().has_inline_credential()) {
-      // If inline credential provider is set, use it instead of the default or custom credentials
-      // chain
-      const auto& inline_credential = config.credential_provider().inline_credential();
-      credentials_provider = std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
-      auto inline_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
-          inline_credential.access_key_id(), inline_credential.secret_access_key(),
-          inline_credential.session_token());
-      credentials_provider.value()->add(inline_provider);
-
-    } else if (config.credential_provider().custom_credential_provider_chain()) {
-      // Custom credential provider chain
-      if (has_credential_provider_settings) {
-        credentials_provider =
-            std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
-                server_context, region, config.credential_provider());
-      }
-    } else {
-      // Override default credential provider chain settings with any provided settings
-      if (has_credential_provider_settings) {
-        credential_provider_config = config.credential_provider();
-      }
-      credentials_provider =
-          std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-              server_context.api(), server_context, region, credential_provider_config);
-    }
-  } else {
-    // No credential provider settings provided, so make the default credentials provider chain
-    credentials_provider =
-        std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-            server_context.api(), server_context, region, credential_provider_config);
+  if (config.has_credential_provider() && config.credential_provider().has_inline_credential()) {
+    // If inline credential provider is set, use it instead of a credentials chain
+    const auto& inline_credential = config.credential_provider().inline_credential();
+    credentials_provider_chain = std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
+    auto inline_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
+        inline_credential.access_key_id(), inline_credential.secret_access_key(),
+        inline_credential.session_token());
+    credentials_provider_chain.value()->add(inline_provider);
   }
-
-  if (!credentials_provider.ok()) {
-    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
+  else if(config.has_credential_provider() && config.credential_provider().custom_credential_provider_chain())
+  {
+    // Custom credential provider chain is true, so use configuration that has been provided
+    credentials_provider_chain =
+    std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+        server_context, region, config.credential_provider());
+  }
+  else
+  {
+    // Custom credential provider chain is false or does not exist at all, so create the default, but override with specific settings
+    envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
+    if(config.has_credential_provider() && config.credential_provider().has_credentials_file_provider())
+    {
+      defaults.mutable_credentials_file_provider()->CopyFrom(config.credential_provider().credentials_file_provider());
+    }
+    if(config.has_credential_provider() && config.credential_provider().has_assume_role_with_web_identity_provider())
+    {
+      defaults.mutable_assume_role_with_web_identity_provider()->CopyFrom(config.credential_provider().assume_role_with_web_identity_provider());
+    }
+    if(config.has_credential_provider() && config.credential_provider().has_iam_roles_anywhere_provider())
+    {
+      defaults.mutable_iam_roles_anywhere_provider()->CopyFrom(config.credential_provider().iam_roles_anywhere_provider());
+    }
+    if(config.has_credential_provider() && config.credential_provider().has_assume_role_provider())
+    {
+      defaults.mutable_assume_role_provider()->CopyFrom(config.credential_provider().assume_role_provider());
+    }
+    credentials_provider_chain =
+    std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+        server_context, region, defaults);
+  }
+  
+  if (!credentials_provider_chain.ok()) {
+    return absl::InvalidArgumentError(std::string(credentials_provider_chain.status().message()));
   }
 
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
@@ -148,7 +151,7 @@ AwsRequestSigningFilterFactory::createSigner(
 
   if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     return std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), region, credentials_provider.value(), server_context, matcher_config,
+        config.service_name(), region, credentials_provider_chain.value(), server_context, matcher_config,
         query_string, expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
@@ -158,7 +161,7 @@ AwsRequestSigningFilterFactory::createSigner(
           "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     return std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        config.service_name(), region, credentials_provider.value(), server_context, matcher_config,
+        config.service_name(), region, credentials_provider_chain.value(), server_context, matcher_config,
         query_string, expiration_time);
   }
 }

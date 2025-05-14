@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:webidentity_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:assume_role_credentials_provider_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

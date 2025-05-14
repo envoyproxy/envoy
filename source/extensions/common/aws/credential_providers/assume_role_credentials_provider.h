@@ -25,7 +25,7 @@ public:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer,
-      envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider iam_roles_anywhere_config);
+      envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider assume_role_config);
 
   std::string providerName() override { return "AssumeRoleCredentialsProvider"; };
 

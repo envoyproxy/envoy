@@ -22,7 +22,7 @@ constexpr char TOKEN[] = "Token";
 constexpr char SESSION_TOKEN[] = "SessionToken";
 constexpr char EXPIRATION[] = "Expiration";
 constexpr char CREDENTIALS[] = "Credentials";
-
+constexpr char STS_SERVICE_NAME[] = "sts";
 /**
  * AWS credentials containers
  *

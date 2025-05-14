@@ -105,6 +105,7 @@ envoy_cc_library(
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:utility_lib",
+        "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

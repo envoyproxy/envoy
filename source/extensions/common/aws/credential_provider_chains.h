@@ -15,11 +15,10 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class CredentialsProviderChainFactories: public Logger::Loggable<Logger::Id::aws> {
+class CredentialsProviderChainFactories {
 public:
   virtual ~CredentialsProviderChainFactories() = default;
 
-private:
   virtual CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const PURE;
 
   virtual CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
@@ -46,12 +45,18 @@ private:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
 
+     virtual     CredentialsProviderSharedPtr createAssumeRoleCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider&
+        web_identity_config) PURE;
+    
 protected:
   std::string stsClusterName(absl::string_view region) {
     return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
   }
 
-  std::string sessionName(Server::Configuration::ServerFactoryContext& context) {
+  std::string sessionName(Api::Api& api) {
     const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
     std::string actual_session_name;
     if (!role_session_name.empty()) {
@@ -60,39 +65,13 @@ protected:
       // In practice, this value will be provided by the environment, so the placeholder value is
       // not important. Some AWS SDKs use time in nanoseconds, so we'll just use that.
       const auto now_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 context.api().timeSource().systemTime().time_since_epoch())
+                                 api.timeSource().systemTime().time_since_epoch())
                                  .count();
       actual_session_name = fmt::format("{}", now_nanos);
     }
     return actual_session_name;
   }
-
 };
-
-class CredentialsProviderChainFactoriesCommon {
-  private:
-    void commonCreateContainerCredentialsProvider(Server::Configuration::ServerFactoryContext& context, 
-      AwsClusterManagerPtr& aws_cluster_manager,
-      CredentialsProviderChainFactories &factories, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer);
-
-};
-
-// class CustomCredentialsProviderChainFactories {
-// public:
-//   virtual ~CustomCredentialsProviderChainFactories() = default;
-
-//   virtual CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
-//       Server::Configuration::ServerFactoryContext& context,
-//       const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
-//           credential_file_config = {}) const PURE;
-
-//   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-//       Server::Configuration::ServerFactoryContext& context,
-//       AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
-//       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-//           web_identity_config) PURE;
-// };
 
 /**
  * Default AWS credentials provider chain.
@@ -100,17 +79,17 @@ class CredentialsProviderChainFactoriesCommon {
  * Reference implementation:
  * https://github.com/aws/aws-sdk-cpp/blob/master/aws-cpp-sdk-core/source/auth/AWSCredentialsProviderChain.cpp#L44
  */
-class DefaultCredentialsProviderChain : public CredentialsProviderChain,
-public CredentialsProviderChainFactoriesCommon,
+class CommonCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
-  DefaultCredentialsProviderChain(Server::Configuration::ServerFactoryContext& context,
+  CommonCredentialsProviderChain(
+                                  Server::Configuration::ServerFactoryContext& context,
                                   absl::string_view region,
                                   const envoy::extensions::common::aws::v3::AwsCredentialProvider&
                                       credential_provider_config = {})
-      : DefaultCredentialsProviderChain(context, region, credential_provider_config, *this) {}
+      : CommonCredentialsProviderChain(context, region, credential_provider_config, *this) {}
 
-  DefaultCredentialsProviderChain(
+  CommonCredentialsProviderChain(
       Server::Configuration::ServerFactoryContext& context, absl::string_view region,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
       CredentialsProviderChainFactories& factories);
@@ -148,76 +127,11 @@ private:
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) override;
 
-  AwsClusterManagerPtr aws_cluster_manager_;
-};
-
-class CustomCredentialsProviderChain : public CredentialsProviderChain,
-public CredentialsProviderChainFactoriesCommon,
-                                       public CredentialsProviderChainFactories {
-public:
-  CustomCredentialsProviderChain(
-      Server::Configuration::ServerFactoryContext& context, absl::string_view region,
-      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
-      CredentialsProviderChainFactories& factories);
-
-  CustomCredentialsProviderChain(
-      Server::Configuration::ServerFactoryContext& context, absl::string_view region,
-      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config)
-      : CustomCredentialsProviderChain(context, region, credential_provider_config, *this) {}
-
-protected:
-  std::string sessionName(Api::Api& api) {
-    const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
-    std::string actual_session_name;
-    if (!role_session_name.empty()) {
-      actual_session_name = std::string(role_session_name);
-    } else {
-      // In practice, this value will be provided by the environment, so the placeholder value is
-      // not important. Some AWS SDKs use time in nanoseconds, so we'll just use that.
-      const auto now_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 api.timeSource().systemTime().time_since_epoch())
-                                 .count();
-      actual_session_name = fmt::format("{}", now_nanos);
-    }
-    return actual_session_name;
-  }
-  std::string stsClusterName(absl::string_view region) {
-    return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
-  }
-
-private:
-  CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
-    return std::make_shared<EnvironmentCredentialsProvider>();
-  }
-
-  CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      absl::string_view cluster_name, absl::string_view credential_uri,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer, absl::string_view authorization_token) override;
-
-  CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer, absl::string_view cluster_name) override;
-
-    CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
-        Server::Configuration::ServerFactoryContext& context,
-        const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
-            credential_file_config = {}
-
-    ) const override {
-
-      return std::make_shared<CredentialsFileCredentialsProvider>(context, credential_file_config);
-    };
-
-  CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config) override;
+         CredentialsProviderSharedPtr createAssumeRoleCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider&
+        web_identity_config) override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };

@@ -159,7 +159,7 @@ void InstanceProfileCredentialsProvider::extractCredentialsAsync(
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");
 
-  last_updated_ = context->api()).timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   stats_->credential_refreshes_succeeded_.inc();

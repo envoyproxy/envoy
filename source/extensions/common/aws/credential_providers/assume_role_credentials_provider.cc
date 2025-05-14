@@ -26,7 +26,7 @@ AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
     std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer,
     envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider assume_role_config)
 
-    : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(assume_role_config.role_arn()),
@@ -175,7 +175,7 @@ void AssumeRoleCredentialsProvider::extractCredentials(
     expiration_time_.reset();
   }
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   handleFetchDone();
 }
 
