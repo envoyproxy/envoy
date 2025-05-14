@@ -1786,17 +1786,17 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveWithDnsPreresolveHostnames) {
 // DNS cache manager config tests.
 class DnsCacheManagerImplTest : public testing::Test {
 public:
-  DnsCacheManagerImplTest() : registered_dns_factory_(dns_resolver_factory_),
-                              dns_resolver_(new Network::MockDnsResolver()) {
+  DnsCacheManagerImplTest()
+      : registered_dns_factory_(dns_resolver_factory_),
+        dns_resolver_(new Network::MockDnsResolver()) {
     EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
-            .WillRepeatedly(Return(dns_resolver_));
+        .WillRepeatedly(Return(dns_resolver_));
   }
 
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_;
 };
-
 
 TEST_F(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;

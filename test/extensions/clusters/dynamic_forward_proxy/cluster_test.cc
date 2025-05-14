@@ -650,10 +650,11 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
 
 class ClusterFactoryTest : public testing::Test {
 public:
-  ClusterFactoryTest() : registered_dns_factory_(dns_resolver_factory_),
-                         dns_resolver_(new Network::MockDnsResolver()) {
+  ClusterFactoryTest()
+      : registered_dns_factory_(dns_resolver_factory_),
+        dns_resolver_(new Network::MockDnsResolver()) {
     EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
-            .WillRepeatedly(Return(dns_resolver_));
+        .WillRepeatedly(Return(dns_resolver_));
   }
 
 protected:
