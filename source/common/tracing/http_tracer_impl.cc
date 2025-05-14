@@ -21,7 +21,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
-
+#include "source/common/http/utility.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -140,24 +140,75 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId, request_headers->getRequestIdValue());
     }
+
+    std::string originalUrl = Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength());
     span.setTag(
-        Tracing::Tags::get().HttpUrl,
-        Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength()));
-    span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
+        Tracing::Tags::get().urlFull(tracing_config.useSemanticConventions()),
+        originalUrl);
+    span.setTag(Tracing::Tags::get().httpRequestMethod(tracing_config.useSemanticConventions()), request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
-    span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
-    span.setTag(
-        Tracing::Tags::get().HttpProtocol,
-        Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
-
+    span.setTag(Tracing::Tags::get().userAgent(tracing_config.useSemanticConventions()), valueOrDefault(request_headers->UserAgent(), "-"));
+    
+    // set peer address
     const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
-
+    std::string peer_address_str;
     if (remote_address->type() == Network::Address::Type::Ip) {
       const auto remote_ip = remote_address->ip();
-      span.setTag(Tracing::Tags::get().PeerAddress, remote_ip->addressAsString());
+      peer_address_str = remote_ip->addressAsString();
     } else {
-      span.setTag(Tracing::Tags::get().PeerAddress, remote_address->logicalName());
+      peer_address_str = remote_address->logicalName();
+    }
+    span.setTag(Tracing::Tags::get().peerAddress(tracing_config.useSemanticConventions()), peer_address_str);
+
+    if (tracing_config.useSemanticConventions()) {
+      // set url path, excluding params
+      absl::string_view host_from_url;
+      absl::string_view path;
+      Http::Utility::extractHostPathFromUri(originalUrl, host_from_url, path);
+      span.setTag(Tracing::Tags::get().UrlPath, path);
+
+      // set client address
+      absl::string_view final_client_address;
+      Network::Address::InstanceConstSharedPtr original_client_address = Envoy::Http::Utility::getLastAddressFromXFF(*request_headers, 1).address_;
+      if (original_client_address == nullptr) {
+        final_client_address = peer_address_str;
+      } else {
+        final_client_address = original_client_address->asString();
+      }
+      span.setTag(Tracing::Tags::get().ClientAddress, final_client_address);
+
+      // set server address
+      absl::string_view server_address_and_port = request_headers->getHostValue();
+      const auto xfh = request_headers->getForwardedHostValue();
+      if (!xfh.empty()) {
+        const auto xfh_split = StringUtil::splitToken(xfh, ",");
+        if (!xfh_split.empty()) {
+          server_address_and_port = xfh_split.back();
+        }
+      }
+      if (!server_address_and_port.empty()) {
+        const auto host_attributes = Http::Utility::parseAuthority(server_address_and_port);
+        const auto server_address = host_attributes.host_;
+        const auto server_port = host_attributes.port_;
+        span.setTag(Tracing::Tags::get().ServerAddress, server_address);
+        if (server_port.has_value()) {
+          span.setTag(Tracing::Tags::get().ServerPort, absl::StrCat(*server_port));
+        }
+      }
+
+      // set http protocol
+      const absl::string_view scheme = request_headers->getForwardedProtoValue();
+      if (!scheme.empty()) {
+        span.setTag(Tracing::Tags::get().UrlScheme, scheme);
+      } else {
+        span.setTag(Tracing::Tags::get().UrlScheme, Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
+      }
+    } else {
+      // set legacy envoy format http protocol
+      span.setTag(
+        Tracing::Tags::get().HttpProtocol,
+        Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
     }
 
     if (request_headers->ClientTraceId()) {
@@ -170,8 +221,8 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     }
   }
 
-  span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
-  span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
+  span.setTag(Tracing::Tags::get().requestSize(tracing_config.useSemanticConventions()), std::to_string(stream_info.bytesReceived()));
+  span.setTag(Tracing::Tags::get().responseSize(tracing_config.useSemanticConventions()), std::to_string(stream_info.bytesSent()));
 
   setCommonTags(span, stream_info, tracing_config);
   onUpstreamResponseHeaders(span, response_headers);
@@ -183,7 +234,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
 void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
   span.setTag(
-      Tracing::Tags::get().HttpProtocol,
+      Tracing::Tags::get().urlScheme(tracing_config.useSemanticConventions()),
       Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
   if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
@@ -192,7 +243,7 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::Strea
     // But for the upstream span, `peer.address` should be used.
     span.setTag(Tracing::Tags::get().UpstreamAddress, upstream_address->asStringView());
     // TODO(wbpcode): may be set this tag in the setCommonTags.
-    span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
+    span.setTag(Tracing::Tags::get().peerAddress(tracing_config.useSemanticConventions()), upstream_address->asStringView());
   }
 
   setCommonTags(span, stream_info, tracing_config);

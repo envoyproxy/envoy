@@ -57,6 +57,7 @@ public:
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
   // This EgressConfigImpl is only used for async client tracing. Return false here is OK.
   bool spawnUpstreamSpan() const override { return false; }
+  bool useSemanticConventions() const override { return false; }
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;

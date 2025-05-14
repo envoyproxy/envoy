@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

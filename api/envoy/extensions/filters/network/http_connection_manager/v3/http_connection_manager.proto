@@ -129,7 +129,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -207,6 +207,13 @@ message HttpConnectionManager {
     //
     // The default value is false for now for backward compatibility.
     google.protobuf.BoolValue spawn_upstream_span = 10;
+
+    // Whether to use opentelemetry semantic conventions
+    // Default to false. If it's enabled to true, legacy envoy
+    // span attributes will be replaced with semantic conventions
+    // according to [Semantic
+    // conventions for HTTP spans](https://github.com/open-telemetry/semantic-conventions/blob/main/docs/http/http-spans.md)
+    bool use_semantic_conventions = 11;
   }
 
   message InternalAddressConfig {

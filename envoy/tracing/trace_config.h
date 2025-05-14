@@ -41,6 +41,11 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
+
+  /**
+   * @return true if span attributes should follow semantic conventions
+   */
+  virtual bool useSemanticConventions() const PURE;
 };
 
 /**
@@ -100,6 +105,12 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
+
+
+  /**
+   * @return true if span attributes should follow semantic conventions
+   */
+  virtual bool useSemanticConventions() const PURE;
 };
 
 using ConnectionManagerTracingConfigPtr = std::unique_ptr<ConnectionManagerTracingConfig>;
