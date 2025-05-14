@@ -130,5 +130,8 @@ new_features:
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+- area: rbac filter
+  change: |
+    allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
 
 deprecated:
