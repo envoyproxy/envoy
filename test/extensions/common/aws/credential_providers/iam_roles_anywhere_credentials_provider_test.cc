@@ -131,11 +131,11 @@ public:
                        << "\n";
     }
     if (!expected_message_.bodyAsString().empty()) {
-      if (message.bodyAsString() != expected_message_.bodyAsString()) {
+      if (const std::string body = expected_message_.bodyAsString(); !body.empty()) {
         equal = 0;
         *result_listener << "\n"
                          << TestUtility::addLeftAndRightPadding("Expected message body:") << "\n"
-                         << expected_message_.bodyAsString()
+                         << body
                          << TestUtility::addLeftAndRightPadding(
                                 "is not equal to actual message body:")
                          << "\n"
@@ -452,6 +452,7 @@ public:
 };
 
 // Test cases created from python implementation of iam roles anywhere session
+// Please see iam_roles_anywhere_test_generator.py in this directory to replicate these test cases
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
 
   // This is what we expect to see requested by the signer

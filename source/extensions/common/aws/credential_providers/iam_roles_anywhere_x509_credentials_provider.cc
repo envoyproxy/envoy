@@ -163,15 +163,10 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   serial.append(bndec);
 
-  int days, seconds;
-
-  int rc = ASN1_TIME_diff(&days, &seconds,
-                          &Envoy::Extensions::TransportSockets::Tls::Utility::epochASN1Time(),
-                          X509_get0_notAfter(cert.get()));
-  ASSERT(rc == 1);
-  // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
-  // beyond 2038-01-19T03:14:08Z.
-  time = std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
+  time = Envoy::Extensions::TransportSockets::Tls::Utility::getExpirationTime(*cert.get());
+  if (time < context_.api().timeSource().systemTime()) {
+    status = absl::InvalidArgumentError("Certificate has already expired");
+  }
 
   OPENSSL_free(bndec);
   BN_free(bnser);
