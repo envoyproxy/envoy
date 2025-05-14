@@ -17,25 +17,9 @@ namespace Upstream {
 
 using MaglevLbProto = envoy::extensions::load_balancing_policies::maglev::v3::Maglev;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
-using LegacyMaglevLbProto = ClusterProto::MaglevLbConfig;
 
-/**
- * Load balancer config that used to wrap legacy maglev config.
- */
-class LegacyMaglevLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyMaglevLbConfig(const ClusterProto& cluster);
-
-  OptRef<const LegacyMaglevLbProto> lbConfig() const {
-    if (lb_config_.has_value()) {
-      return lb_config_.value();
-    }
-    return {};
-  };
-
-private:
-  absl::optional<LegacyMaglevLbProto> lb_config_;
-};
+using CommonLbConfigProto = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using LegacyMaglevLbProto = envoy::config::cluster::v3::Cluster::MaglevLbConfig;
 
 /**
  * Load balancer config that used to wrap typed maglev config.
@@ -43,8 +27,10 @@ private:
 class TypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
 public:
   TypedMaglevLbConfig(const MaglevLbProto& config);
+  TypedMaglevLbConfig(const CommonLbConfigProto& common_lb_config,
+                      const LegacyMaglevLbProto& lb_config);
 
-  const MaglevLbProto lb_config_;
+  MaglevLbProto lb_config_;
 };
 
 /**
