@@ -67,9 +67,9 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
       context, chain_to_create.credentials_file_provider()));
   }
 
-  if(chain_to_create.has_assume_role_provider())
+  if(chain_to_create.has_assume_role_credential_provider())
   {
-      const auto& assume_role_config = chain_to_create.assume_role_provider();
+      const auto& assume_role_config = chain_to_create.assume_role_credential_provider();
 
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
       const auto cluster_name = stsClusterName(region);
