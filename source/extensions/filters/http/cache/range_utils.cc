@@ -68,48 +68,41 @@ RangeUtils::getRangeHeader(const Envoy::Http::RequestHeaderMap& headers) {
 RangeDetails
 RangeUtils::createAdjustedRangeDetails(const std::vector<RawByteRange>& request_range_spec,
                                        uint64_t content_length) {
-  RangeDetails result;
   if (request_range_spec.empty()) {
     // No range header, so the request can proceed.
-    result.satisfiable_ = true;
-    return result;
+    return {true, {}};
   }
 
   if (content_length == 0) {
     // There is a range header, but it's unsatisfiable.
-    result.satisfiable_ = false;
-    return result;
+    return {false, {}};
   }
 
+  RangeDetails result;
   for (const RawByteRange& spec : request_range_spec) {
     if (spec.isSuffix()) {
       // spec is a suffix-byte-range-spec.
       if (spec.suffixLength() == 0) {
-        // This range is unsatisfiable, so skip it.
-        continue;
+        // This range is unsatisfiable.
+        return {false, {}};
       }
       if (spec.suffixLength() >= content_length) {
         // All bytes are being requested, so we may as well send a '200
         // OK' response.
-        result.ranges_.clear();
-        result.satisfiable_ = true;
-        return result;
+        return {true, {}};
       }
       result.ranges_.emplace_back(content_length - spec.suffixLength(), content_length);
     } else {
       // spec is a byte-range-spec
       if (spec.firstBytePos() >= content_length) {
-        // This range is unsatisfiable, so skip it.
-        continue;
+        // This range is unsatisfiable.
+        return {false, {}};
       }
       if (spec.lastBytePos() >= content_length - 1) {
         if (spec.firstBytePos() == 0) {
           // All bytes are being requested, so we may as well send a '200
           // OK' response.
-
-          result.ranges_.clear();
-          result.satisfiable_ = true;
-          return result;
+          return {true, {}};
         }
         result.ranges_.emplace_back(spec.firstBytePos(), content_length);
       } else {

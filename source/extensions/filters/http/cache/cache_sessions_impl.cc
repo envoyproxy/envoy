@@ -407,10 +407,11 @@ void CacheSession::abortBodyOutOfRangeSubscribers() {
     return;
   }
   // For any subscribers whose requested range has been revealed to be invalid
-  // (we only get here in the case where the content length was not known after
-  // headers), reset their requests. Subscribers who asked for body starting at
-  // or beyond the end of the available range should receive null body rather
-  // than reset.
+  // (we only get here in the case where content length was specified in the
+  // headers, but the actual body was shorter, i.e. the upstream response was
+  // actually invalid), reset their requests.
+  // Subscribers who asked for body starting at or beyond the end of the
+  // real size receive null body rather than reset.
   EndStream end_stream = endStreamAfterBody();
   auto cache_sessions = cache_sessions_.lock();
   body_subscribers_.erase(
