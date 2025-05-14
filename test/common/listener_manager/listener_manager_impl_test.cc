@@ -5887,11 +5887,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 
   // Unit test PerListenerFactoryContextImpl for coverage.
   ASSERT_TRUE(listener_factory_context != nullptr);
-  ListenerFactoryContextBaseImpl& parent_context =
-      static_cast<PerListenerFactoryContextImpl*>(listener_factory_context)->parentFactoryContext();
   EXPECT_EQ(&listener_factory_context->initManager(), &listener.initManager());
-  EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),
-            &parent_context.getTransportSocketFactoryContext());
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;

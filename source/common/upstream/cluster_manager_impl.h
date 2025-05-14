@@ -56,11 +56,10 @@ public:
                             Stats::Store& stats, ThreadLocal::Instance& tls,
                             Http::Context& http_context, LazyCreateDnsResolver dns_resolver_fn,
                             Ssl::ContextManager& ssl_context_manager,
-                            Secret::SecretManager& secret_manager,
                             Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
-        secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
+        quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()),
         server_(server) {}
 
@@ -90,8 +89,6 @@ public:
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
                                       ClusterManager& cm) override;
-  Secret::SecretManager& secretManager() override { return secret_manager_; }
-  Singleton::Manager& singletonManager() override { return context_.singletonManager(); }
 
 protected:
   Server::Configuration::ServerFactoryContext& context_;
@@ -101,7 +98,6 @@ protected:
 
   LazyCreateDnsResolver dns_resolver_fn_;
   Ssl::ContextManager& ssl_context_manager_;
-  Secret::SecretManager& secret_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
   Server::Instance& server_;
@@ -322,8 +318,6 @@ public:
                    const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) override;
-
-  ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   // TODO(adisuissa): remove this method, and switch all the callers to invoke
   // it directly via the XdsManger.
@@ -668,7 +662,7 @@ private:
       //
       // If multiple bit fields are set, it is acceptable as long as the status of override host is
       // in any of these statuses.
-      const HostUtility::HostStatusSet override_host_statuses_{};
+      const HostUtility::HostStatusSet override_host_statuses_;
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
@@ -954,7 +948,7 @@ private:
 
   bool initialized_{};
   bool ads_mux_initialized_{};
-  std::atomic<bool> shutdown_{};
+  std::atomic<bool> shutdown_;
 
   // Keep all the ClusterMaps at the end, so that they get destroyed first.
   // Clusters may keep references to the cluster manager and in destructor can call
