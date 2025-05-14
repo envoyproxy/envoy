@@ -130,5 +130,9 @@ new_features:
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+- area: outlier detection
+  change: |
+    Added :ref:`extensions framework<envoy_v3_api_field_config.cluster.v3.OutlierDetection.monitors>` and implementation of
+    :ref:`consecutive errors extension<envoy_v3_api_msg_extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors>`.
 
 deprecated:

@@ -378,6 +378,10 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Lua cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 
+# Outlier detection monitors
+/*/extensions/extensions/outlier_detection_monitors/common @cpakulski @nezdolik @wbpcode
+/*/extensions/extensions/outlier_detection_monitors/consecutive_errors @cpakulski @nezdolik @wbpcode
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
