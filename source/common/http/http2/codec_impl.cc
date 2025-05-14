@@ -249,6 +249,8 @@ ConnectionImpl::StreamImpl::buildHeaders(const HeaderMap& headers) {
   std::vector<http2::adapter::Header> out;
   out.reserve(headers.size());
   headers.iterate([&out](const HeaderEntry& header) -> HeaderMap::Iterate {
+    std::cerr << "-> `" << header.key().getStringView() << "` : `" << header.value().getStringView()
+              << "`\n";
     out.push_back({getRep(header.key()), getRep(header.value())});
     return HeaderMap::Iterate::Continue;
   });
