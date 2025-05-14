@@ -1,5 +1,6 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/assume_role_credentials_provider.h"
@@ -14,8 +15,31 @@ SINGLETON_MANAGER_REGISTRATION(aws_cluster_manager);
 
 CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
-    const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
+    AwsCredentialProviderOptRef credential_provider_config,
     CredentialsProviderChainFactories& factories) {
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider chain_to_create;
+
+  // If a credential provider config is provided, then we will use that as the definition of our chain
+  if(credential_provider_config.has_value())
+  {
+    chain_to_create.CopyFrom(credential_provider_config.value());
+    ENVOY_LOG(debug, "Using custom credentials provider chain");
+  }
+  else {
+  // No chain configuration provided, so use the following providers as the default:
+  //  - Environment credentials provider
+  //  - Credentials file provider
+  //  - Container credentials provider
+  //  - Instance profile credentials provider
+  //  - Assume role with web identity provider
+    chain_to_create.mutable_environment_credential_provider();
+    chain_to_create.mutable_credentials_file_provider();
+    chain_to_create.mutable_container_credential_provider();
+    chain_to_create.mutable_instance_profile_credential_provider();
+    chain_to_create.mutable_assume_role_with_web_identity_provider();
+    ENVOY_LOG(debug, "Using default credentials provider chain");
+  }
 
   aws_cluster_manager_ =
       context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
@@ -25,7 +49,7 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
           },
           true);
 
-  if(credential_provider_config.has_environment_credential_provider())
+  if(chain_to_create.has_environment_credential_provider())
   {
     ENVOY_LOG(debug, "Using environment credentials provider");
     add(factories.createEnvironmentCredentialsProvider());
@@ -36,16 +60,30 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   // Initial amount of time for async credential receivers to wait for an initial refresh to succeed
   auto initialization_timer = std::chrono::seconds(2);
 
-  if(credential_provider_config.has_credentials_file_provider())
+  if(chain_to_create.has_credentials_file_provider())
   {
   ENVOY_LOG(debug, "Using credentials file credentials provider");
   add(factories.createCredentialsFileCredentialsProvider(
-      context, credential_provider_config.credentials_file_provider()));
+      context, chain_to_create.credentials_file_provider()));
   }
 
-  if(credential_provider_config.has_assume_role_with_web_identity_provider())
+  if(chain_to_create.has_assume_role_provider())
   {
-    auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
+      const auto& assume_role_config = chain_to_create.assume_role_provider();
+
+      const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+      const auto cluster_name = stsClusterName(region);
+
+      ENVOY_LOG(debug,
+                "Using assumerole credentials provider with STS endpoint: {} and session name: {}",
+                sts_endpoint, assume_role_config.role_session_name());
+      add(factories.createAssumeRoleCredentialsProvider(context, aws_cluster_manager_, region,
+                                                        assume_role_config));
+  }
+
+  if(chain_to_create.has_assume_role_with_web_identity_provider())
+  {
+    auto web_identity = chain_to_create.assume_role_with_web_identity_provider();
 
     // Configure defaults if nothing is set in the config
     if (!web_identity.has_web_identity_token_data_source()) {
@@ -78,12 +116,11 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     }
   }
 
-  if(credential_provider_config.has_container_credential_provider())
+  if(chain_to_create.has_container_credential_provider())
   {
     const auto relative_uri =
         absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
     const auto full_uri = absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_FULL_URI));
-    const auto metadata_disabled = absl::NullSafeStringView(std::getenv(AWS_EC2_METADATA_DISABLED));
 
     if (!relative_uri.empty()) {
       const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
@@ -108,12 +145,15 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
              context, aws_cluster_manager_, MetadataFetcher::create, CONTAINER_METADATA_CLUSTER,
             full_uri, refresh_state, initialization_timer));
       }
-    } else if (metadata_disabled != "true") {
+    } 
+  }
+  const auto metadata_disabled = absl::NullSafeStringView(std::getenv(AWS_EC2_METADATA_DISABLED));
+
+  if (chain_to_create.has_instance_profile_credential_provider() && metadata_disabled != "true") {
       ENVOY_LOG(debug, "Using instance profile credentials provider");
       add(factories.createInstanceProfileCredentialsProvider(
            context, aws_cluster_manager_, MetadataFetcher::create, refresh_state,
           initialization_timer, EC2_METADATA_CLUSTER));
-    }
   }
 }
 
@@ -135,38 +175,26 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
-    envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
-        auto credentials_provider_chain =
-    std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-        context, region, defaults);
+  envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
+  envoy::extensions::common::aws::v3::InstanceProfileCredentialProvider ins;
+  defaults.mutable_instance_profile_credential_provider()->CopyFrom(ins);
+      auto credentials_provider_chain =
+  std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+      context, region, defaults);
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector{};
 
-    auto s = Extensions::Common::Aws::SigV4SignerImpl(
-        STS_SERVICE_NAME, region, credentials_provider_chain, context, matcher_config);
-
-    auto signer = std::make_unique<SigV4SignerImpl>(
-        STS_SERVICE_NAME, region, credentials_provider_chain, context, matcher_config);
-
-// AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
-//     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
-//     absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-//     absl::string_view region, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-//     std::chrono::seconds initialization_timer,
-//     std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer,
-//     envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider assume_role_config)
-
-        auto a = AssumeRoleCredentialsProvider(
-      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
-      initialization_timer, signer, assume_role_config);
+  auto signer = std::make_unique<SigV4SignerImpl>(
+      STS_SERVICE_NAME, region, credentials_provider_chain, context, matcher_config);
+      
   auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
-      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, refresh_state, region,
-      initialization_timer, signer, assume_role_config);
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, std::move(signer), assume_role_config);
+
   auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
 
   if (handleOr.ok()) {
-
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 

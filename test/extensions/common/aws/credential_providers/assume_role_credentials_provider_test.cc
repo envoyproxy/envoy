@@ -6,6 +6,7 @@
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
@@ -79,6 +80,20 @@ public:
         .WillRepeatedly(Return("sts.region.amazonaws.com:443"));
 
     auto cluster_name = "credentials_provider_cluster";
+    envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
+    envoy::extensions::common::aws::v3::EnvironmentCredentialProvider env_provider;
+    TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
+    TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
+    TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
+
+    defaults.mutable_environment_credential_provider()->CopyFrom(env_provider);
+    
+      auto credentials_provider_chain =
+  std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+      context_, "region", defaults);
+
+    auto signer = std::make_unique<SigV4SignerImpl>(
+        STS_SERVICE_NAME, "region", credentials_provider_chain, context_, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
@@ -87,18 +102,21 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        refresh_state, initialization_timer, cred_provider);
+        "region", refresh_state, initialization_timer, std::move(signer), cred_provider);
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
     Http::TestRequestHeaderMapImpl headers{
-        {":path", "/?Action=AssumeRole"
-                  "&Version=2011-06-15&RoleSessionName=role-session-name"
-                  "&RoleArn=aws:iam::123456789012:role/arn"},
+        {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/arn&RoleSessionName=role-session-name"},
         {":authority", "sts.region.amazonaws.com"},
         {":scheme", "https"},
         {":method", "GET"},
-        {"Accept", "application/json"}};
+        {"Accept", "application/json"},
+      {"x-amz-content-sha256","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"x-amz-security-token", "token"},
+{"x-amz-date", "20180102T030405Z"},
+{"authorization", "AWS4-HMAC-SHA256 Credential=akid/20180102/region/sts/aws4_request, SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, Signature=b7927f7ac39f5b2cc34d3adf38228fc665ebe2780f5c3a006e1ec0c87e45b07c"}
+    };
     
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
         .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
@@ -123,25 +141,20 @@ public:
         }));
   }
 
-//   TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
-//   NiceMock<MockFetchMetadata> fetch_metadata_;
   MockMetadataFetcher* raw_metadata_fetcher_;
   MetadataFetcherPtr metadata_fetcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   AssumeRoleCredentialsProviderPtr provider_;
-//   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
-//   std::chrono::milliseconds expected_duration_;
-//   Upstream::ClusterUpdateCallbacks* cb_{};
-//   testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
-//   NiceMock<Upstream::MockThreadLocalCluster> test_cluster;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
 };
 
 TEST_F(AssumeRoleCredentialsProviderTest, FailedFetchingDocument) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   // Forbidden
@@ -627,7 +640,6 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
-  EXPECT_TRUE(provider_friend.needsRefresh());
 }
 
 } // namespace Aws

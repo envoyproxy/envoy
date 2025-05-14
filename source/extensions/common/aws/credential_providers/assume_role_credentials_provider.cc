@@ -57,26 +57,12 @@ void AssumeRoleCredentialsProvider::refresh() {
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
-  message.headers().setMethod(Http::Headers::get().MethodValues.Post);
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
-  message.headers().setPath("&Action=AssumeRole");
-  message.headers().setContentType("application/json");
-
-  auto json_message = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *json_message->mutable_fields();
-  fields["RoleArn"].set_string_value(role_arn_);
-
-  if (session_duration_.has_value()) {
-    fields["durationSeconds"].set_number_value(session_duration_.value());
-  }
-  if (!role_session_name_.empty()) {
-    fields["roleSessionName"].set_string_value(role_session_name_);
-  }
-
-  auto body_data = Json::Factory::loadFromProtobufStruct(*json_message);
-
-  message.body().add(body_data->asJsonString());
-  ENVOY_LOG(debug, "AssumeRole payload: {}", body_data->asJsonString());
+  message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",Envoy::Http::Utility::PercentEncoding::encode(role_arn_),Envoy::Http::Utility::PercentEncoding::encode(role_session_name_)));
+  // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
+  message.headers().setReference(Http::CustomHeaders::get().Accept,
+                                 Http::Headers::get().ContentTypeValues.Json);
 
   auto status = assume_role_signer_->sign(message, true, region_);
   if (!status.ok()) {

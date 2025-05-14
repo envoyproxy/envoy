@@ -15,6 +15,8 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+using AwsCredentialProviderOptRef = OptRef<const envoy::extensions::common::aws::v3::AwsCredentialProvider>;
+
 class CredentialsProviderChainFactories {
 public:
   virtual ~CredentialsProviderChainFactories() = default;
@@ -45,11 +47,11 @@ public:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
 
-     virtual     CredentialsProviderSharedPtr createAssumeRoleCredentialsProvider(
+  virtual CredentialsProviderSharedPtr createAssumeRoleCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
     absl::string_view region,
     const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider&
-        web_identity_config) PURE;
+        assume_role_config) PURE;
     
 protected:
   std::string stsClusterName(absl::string_view region) {
@@ -79,19 +81,18 @@ protected:
  * Reference implementation:
  * https://github.com/aws/aws-sdk-cpp/blob/master/aws-cpp-sdk-core/source/auth/AWSCredentialsProviderChain.cpp#L44
  */
+
 class CommonCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
-  CommonCredentialsProviderChain(
-                                  Server::Configuration::ServerFactoryContext& context,
+  CommonCredentialsProviderChain( Server::Configuration::ServerFactoryContext& context,
                                   absl::string_view region,
-                                  const envoy::extensions::common::aws::v3::AwsCredentialProvider&
-                                      credential_provider_config = {})
+                                  AwsCredentialProviderOptRef credential_provider_config)
       : CommonCredentialsProviderChain(context, region, credential_provider_config, *this) {}
 
   CommonCredentialsProviderChain(
       Server::Configuration::ServerFactoryContext& context, absl::string_view region,
-      const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
+      AwsCredentialProviderOptRef credential_provider_config,
       CredentialsProviderChainFactories& factories);
 
 private:
@@ -131,7 +132,7 @@ private:
     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
     absl::string_view region,
     const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider&
-        web_identity_config) override;
+        assume_role_config) override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };

@@ -75,9 +75,6 @@ public:
 private:
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
-  // TODO: @nbaws remove the inheritance that requires this method from
-  // cached_credential_provider
-  bool needsRefresh() override { return true; };
 
   const std::string role_arn_;
   const std::string role_session_name_;

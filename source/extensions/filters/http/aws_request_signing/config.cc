@@ -111,27 +111,9 @@ AwsRequestSigningFilterFactory::createSigner(
   }
   else
   {
-    // Custom credential provider chain is false or does not exist at all, so create the default, but override with specific settings
-    envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
-    if(config.has_credential_provider() && config.credential_provider().has_credentials_file_provider())
-    {
-      defaults.mutable_credentials_file_provider()->CopyFrom(config.credential_provider().credentials_file_provider());
-    }
-    if(config.has_credential_provider() && config.credential_provider().has_assume_role_with_web_identity_provider())
-    {
-      defaults.mutable_assume_role_with_web_identity_provider()->CopyFrom(config.credential_provider().assume_role_with_web_identity_provider());
-    }
-    if(config.has_credential_provider() && config.credential_provider().has_iam_roles_anywhere_provider())
-    {
-      defaults.mutable_iam_roles_anywhere_provider()->CopyFrom(config.credential_provider().iam_roles_anywhere_provider());
-    }
-    if(config.has_credential_provider() && config.credential_provider().has_assume_role_provider())
-    {
-      defaults.mutable_assume_role_provider()->CopyFrom(config.credential_provider().assume_role_provider());
-    }
     credentials_provider_chain =
     std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-        server_context, region, defaults);
+        server_context, region, absl::nullopt);
   }
   
   if (!credentials_provider_chain.ok()) {
