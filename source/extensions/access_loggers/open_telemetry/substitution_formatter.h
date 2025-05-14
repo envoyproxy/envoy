@@ -53,11 +53,11 @@ private:
   };
 
   using OpenTelemetryFormatMapVisitor = OpenTelemetryFormatMapVisitorHelper<
-      const std::function<::opentelemetry::proto::common::v1::AnyValue(
+      std::function<::opentelemetry::proto::common::v1::AnyValue(
           const std::vector<Formatter::FormatterProviderPtr>&)>,
-      const std::function<::opentelemetry::proto::common::v1::AnyValue(
+      std::function<::opentelemetry::proto::common::v1::AnyValue(
           const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper&)>,
-      const std::function<::opentelemetry::proto::common::v1::AnyValue(
+      std::function<::opentelemetry::proto::common::v1::AnyValue(
           const OpenTelemetryFormatter::OpenTelemetryFormatListWrapper&)>>;
 
   // Methods for building the format map.
