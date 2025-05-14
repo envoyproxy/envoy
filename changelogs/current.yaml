@@ -127,7 +127,7 @@ new_features:
     Add :ref:`response trailers mutations
     <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_trailers_mutations>` and
     :ref:`quest trailers mutations
-    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.quest_trailers_mutations>`
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_trailers_mutations>`
     to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
     for adding/removing trailers from the request and the response.
 - area: url_template
