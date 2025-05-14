@@ -21,24 +21,31 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   envoy::extensions::common::aws::v3::AwsCredentialProvider chain_to_create;
 
   // If a credential provider config is provided, then we will use that as the definition of our chain
-  if(credential_provider_config.has_value())
+  if(credential_provider_config.has_value() && credential_provider_config->custom_credential_provider_chain())
   {
     chain_to_create.CopyFrom(credential_provider_config.value());
-    ENVOY_LOG(debug, "Using custom credentials provider chain");
+    ENVOY_LOG(debug, "Creating custom credentials provider chain");
   }
   else {
-  // No chain configuration provided, so use the following providers as the default:
+  // No chain configuration provided, so use the following credential providers as the default:
   //  - Environment credentials provider
   //  - Credentials file provider
   //  - Container credentials provider
   //  - Instance profile credentials provider
   //  - Assume role with web identity provider
+  // These credential providers can all be instantiated with no additional configuration required
     chain_to_create.mutable_environment_credential_provider();
     chain_to_create.mutable_credentials_file_provider();
     chain_to_create.mutable_container_credential_provider();
     chain_to_create.mutable_instance_profile_credential_provider();
     chain_to_create.mutable_assume_role_with_web_identity_provider();
-    ENVOY_LOG(debug, "Using default credentials provider chain");
+    if(credential_provider_config.has_value())
+    {
+      ENVOY_LOG(debug, "Creating default credentials provider chain with custom configuration");
+    }
+    else {
+      ENVOY_LOG(debug, "Creating default credentials provider chain");    
+    }
   }
 
   aws_cluster_manager_ =
@@ -69,7 +76,7 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
 
   if(chain_to_create.has_assume_role_credential_provider())
   {
-      const auto& assume_role_config = chain_to_create.assume_role_provider();
+      const auto& assume_role_config = chain_to_create.assume_role_credential_provider();
 
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
       const auto cluster_name = stsClusterName(region);
@@ -175,16 +182,29 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
   auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
-  envoy::extensions::common::aws::v3::AwsCredentialProvider defaults;
-  envoy::extensions::common::aws::v3::InstanceProfileCredentialProvider ins;
-  defaults.mutable_instance_profile_credential_provider()->CopyFrom(ins);
-      auto credentials_provider_chain =
-  std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-      context, region, defaults);
-  const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector{};
+  CredentialsProviderChainSharedPtr credentials_provider_chain;
 
+  if(assume_role_config.has_credential_provider())
+  {
+    // If a custom chain has been configured in the assume role provider, ensure we do not allow the user to specify another
+    // assume role provider.
+
+    envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config;
+    credential_provider_config.CopyFrom(assume_role_config.credential_provider());
+    credential_provider_config.clear_assume_role_credential_provider();
+    credentials_provider_chain =
+    std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+        context, region, credential_provider_config);
+  }
+  else {
+    credentials_provider_chain =
+    std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+        context, region, absl::nullopt);
+  }
+
+  // Create our own signer specifically for signing AssumeRole API call
   auto signer = std::make_unique<SigV4SignerImpl>(
-      STS_SERVICE_NAME, region, credentials_provider_chain, context, matcher_config);
+      STS_SERVICE_NAME, region, credentials_provider_chain, context, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
       
   auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
