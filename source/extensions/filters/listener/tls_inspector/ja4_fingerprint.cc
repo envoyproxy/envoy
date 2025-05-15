@@ -3,6 +3,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
+#include "source/common/common/hex.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
 #include "openssl/ssl.h"
@@ -79,11 +80,11 @@ bool JA4Fingerprinter::hasSNI(const SSL_CLIENT_HELLO* ssl_client_hello) {
                                               &size);
 }
 
-int JA4Fingerprinter::countCiphers(const SSL_CLIENT_HELLO* ssl_client_hello) {
+uint32_t JA4Fingerprinter::countCiphers(const SSL_CLIENT_HELLO* ssl_client_hello) {
   CBS cipher_suites;
   CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
 
-  int count = 0;
+  uint32_t count = 0;
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher;
     if (!CBS_get_u16(&cipher_suites, &cipher)) {
@@ -97,11 +98,11 @@ int JA4Fingerprinter::countCiphers(const SSL_CLIENT_HELLO* ssl_client_hello) {
   return count;
 }
 
-int JA4Fingerprinter::countExtensions(const SSL_CLIENT_HELLO* ssl_client_hello) {
+uint32_t JA4Fingerprinter::countExtensions(const SSL_CLIENT_HELLO* ssl_client_hello) {
   CBS extensions;
   CBS_init(&extensions, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
 
-  int count = 0;
+  uint32_t count = 0;
   while (CBS_len(&extensions) > 0) {
     uint16_t type;
     CBS extension;
@@ -116,8 +117,8 @@ int JA4Fingerprinter::countExtensions(const SSL_CLIENT_HELLO* ssl_client_hello) 
   return count;
 }
 
-std::string JA4Fingerprinter::formatTwoDigits(int value) {
-  return absl::StrFormat("%02d", std::min(value, 99));
+std::string JA4Fingerprinter::formatTwoDigits(uint32_t value) {
+  return absl::StrFormat("%02d", std::min(value, 99u));
 }
 
 std::string JA4Fingerprinter::getJA4AlpnChars(const SSL_CLIENT_HELLO* ssl_client_hello) {
@@ -179,7 +180,7 @@ std::string JA4Fingerprinter::getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_clien
 
   std::sort(ciphers.begin(), ciphers.end());
 
-  // Pre-allocate a buffer for the cipher list with a reasonable size estimation
+  // Pre-allocates a buffer for the cipher list with a reasonable size estimation
   // Format: "0000,0000,0000..." - 5 bytes per cipher (4 hex + delimiter)
   std::string cipher_list;
   cipher_list.reserve(ciphers.size() * 5);
@@ -198,7 +199,7 @@ std::string JA4Fingerprinter::getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_clien
   std::array<uint8_t, SHA256_DIGEST_LENGTH> hash;
   EVP_Digest(cipher_list.data(), cipher_list.length(), hash.data(), nullptr, EVP_sha256(), nullptr);
 
-  return Hex::encode(hash.data(), JA4_HASH_LENGTH / 2);
+  return Envoy::Hex::encode(hash.data(), JA4_HASH_LENGTH / 2);
 }
 
 std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
@@ -260,8 +261,6 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
 
   if (!sig_algs.empty()) {
     extension_list.push_back('_');
-    // Don't sort `sig_algs` to maintain compatibility with original implementation
-
     for (size_t i = 0; i < sig_algs.size(); ++i) {
       if (i > 0) {
         extension_list.push_back(',');
@@ -278,44 +277,41 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
   EVP_Digest(extension_list.data(), extension_list.length(), hash.data(), nullptr, EVP_sha256(),
              nullptr);
 
-  return Hex::encode(hash.data(), JA4_HASH_LENGTH / 2);
+  return Envoy::Hex::encode(hash.data(), JA4_HASH_LENGTH / 2);
 }
 
 std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  std::string fingerprint;
-  absl::StrAppend(&fingerprint,
-                  // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
-                  // In this implementation, we only handle TLS
-                  "t",
+  return absl::StrCat(
+      // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
+      // In this implementation, we only handle TLS
+      "t",
 
-                  // TLS Version
-                  getJA4TlsVersion(ssl_client_hello),
+      // TLS Version
+      getJA4TlsVersion(ssl_client_hello),
 
-                  // SNI presence
-                  hasSNI(ssl_client_hello) ? "d" : "i",
+      // SNI presence
+      hasSNI(ssl_client_hello) ? "d" : "i",
 
-                  // Cipher count
-                  formatTwoDigits(countCiphers(ssl_client_hello)),
+      // Cipher count
+      formatTwoDigits(countCiphers(ssl_client_hello)),
 
-                  // Extension count
-                  formatTwoDigits(countExtensions(ssl_client_hello)),
+      // Extension count
+      formatTwoDigits(countExtensions(ssl_client_hello)),
 
-                  // ALPN first/last chars
-                  getJA4AlpnChars(ssl_client_hello),
+      // ALPN first/last chars
+      getJA4AlpnChars(ssl_client_hello),
 
-                  // Separator
-                  "_",
+      // Separator
+      "_",
 
-                  // Cipher hash
-                  getJA4CipherHash(ssl_client_hello),
+      // Cipher hash
+      getJA4CipherHash(ssl_client_hello),
 
-                  // Separator
-                  "_",
+      // Separator
+      "_",
 
-                  // Extension and signature algorithm hash
-                  getJA4ExtensionHash(ssl_client_hello));
-
-  return fingerprint;
+      // Extension and signature algorithm hash
+      getJA4ExtensionHash(ssl_client_hello));
 }
 
 } // namespace TlsInspector

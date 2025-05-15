@@ -28,7 +28,7 @@ TEST(JA4Fingerprinter, GreaseValueFiltering) {
   EXPECT_TRUE(JA4Fingerprinter::isNotGrease(0xffff)); // Not a GREASE value
 }
 
-// This will test the JA4 fingerprinting integration with the TLS Inspector code
+// This will test the ``JA4`` fingerprinting integration with the TLS Inspector code
 class TlsInspectorJA4IntegrationTest : public testing::Test {
 public:
   void SetUp() override {
@@ -48,14 +48,14 @@ protected:
   std::vector<uint8_t> tls_v13_data_;
 };
 
-// This test verifies that the JA4 hashes have the correct format
+// This test verifies that the ``JA4`` hashes have the correct format
 TEST_F(TlsInspectorJA4IntegrationTest, JA4HashFormat) {
   // The real implementation will be tested by the tls_inspector_test.cc and
-  // tls_inspector_ja4_test.cc Here we mainly test the integration and the format of the JA4
-  // fingerprint This helps ensure that the format of JA4 fingerprints is consistent with the
+  // tls_inspector_ja4_test.cc Here we mainly test the integration and the format of the ``JA4``
+  // fingerprint This helps ensure that the format of ``JA4`` fingerprints is consistent with the
   // specification
 
-  // Expected pattern: "t[0-9]{2}[di][0-9]{2}[0-9]{2}[0-9a-z]{2}_[0-9a-f]{12}_[0-9a-f]{12}"
+  // Expected pattern: ``"t[0-9]{2}[di][0-9]{2}[0-9]{2}[0-9a-z]{2}_[0-9a-f]{12}_[0-9a-f]{12}"``
   // We'll check individual components in the actual tests
 
   // Verify TLS 1.2 without SNI should have "i" flag
