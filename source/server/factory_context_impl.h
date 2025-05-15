@@ -19,7 +19,6 @@ public:
   Configuration::ServerFactoryContext& serverFactoryContext() override;
   Stats::Scope& scope() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const Network::ListenerInfo& listenerInfo() const override;
 
   Stats::Scope& listenerScope() override;
