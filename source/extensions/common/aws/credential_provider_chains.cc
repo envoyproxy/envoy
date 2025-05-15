@@ -42,6 +42,22 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     if(credential_provider_config.has_value())
     {
       ENVOY_LOG(debug, "Creating default credentials provider chain with custom configuration");
+      // Merge in any credential providers that have custom configuration
+      if(credential_provider_config->has_assume_role_with_web_identity_provider())
+      {
+        chain_to_create.mutable_assume_role_with_web_identity_provider()->MergeFrom(
+            credential_provider_config->assume_role_with_web_identity_provider());
+      }
+      if(credential_provider_config->has_credentials_file_provider())
+      {
+        chain_to_create.mutable_credentials_file_provider()->MergeFrom(
+            credential_provider_config->credentials_file_provider());
+      }
+      if(credential_provider_config->has_iam_roles_anywhere_credential_provider())
+      {
+        chain_to_create.mutable_iam_roles_anywhere_credential_provider()->MergeFrom(
+            credential_provider_config->iam_roles_anywhere_credential_provider());
+      }
     }
     else {
       ENVOY_LOG(debug, "Creating default credentials provider chain");    

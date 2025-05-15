@@ -79,5 +79,8 @@ new_features:
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
-
+- area: aws
+  change: |
+    Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
+    assume an additional role before SigV4 signing occurs.
 deprecated:
