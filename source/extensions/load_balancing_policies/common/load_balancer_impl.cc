@@ -450,6 +450,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
+      use_host_weight_(locality_config.has_value()
+                           ? locality_config->zone_aware_lb_config().use_host_weight()
+                           : false),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -512,8 +515,9 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
   const HostsPerLocality& localHostsPerLocality = localHostSet().healthyHostsPerLocality();
-  auto locality_percentages =
-      calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
+  auto locality_percentages = use_host_weight_
+    ? calculateLocalityPercentagesWithWeight(localHostsPerLocality, upstreamHostsPerLocality)
+    : calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
 
   if (upstreamHostsPerLocality.hasLocalLocality()) {
     // If we have lower percent of hosts in the local cluster in the same locality,
@@ -701,6 +705,70 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
         total_local_hosts > 0 ? 10000ULL * local_count / total_local_hosts : 0;
     const uint64_t upstream_percentage =
         total_upstream_hosts > 0 ? 10000ULL * upstream_hosts.size() / total_upstream_hosts : 0;
+
+    percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
+  }
+
+  return percentages;
+}
+
+absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
+ZoneAwareLoadBalancerBase::calculateLocalityPercentagesWithWeight(
+    const HostsPerLocality& local_hosts_per_locality,
+    const HostsPerLocality& upstream_hosts_per_locality) {
+  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_weights;
+  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> upstream_weights;
+
+  uint64_t total_local_weights = 0;
+  for (const auto& locality_hosts : local_hosts_per_locality.get()) {
+    uint64_t locality_weight = 0;
+    for (const auto& host : locality_hosts) {
+      // The weight of the host is used to calculate the locality percentage.
+      locality_weight += host->weight();
+    }
+    total_local_weights += locality_weight;
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      local_weights.insert(std::make_pair(locality_hosts[0]->locality(), locality_weight));
+    }
+  }
+  uint64_t total_upstream_hosts = 0;
+  for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
+    uint64_t locality_weight = 0;
+    for (const auto& host : locality_hosts) {
+      // The weight of the host is used to calculate the locality percentage.
+      locality_weight += host->weight();
+    }
+    total_upstream_hosts += locality_weight;
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      upstream_weights.insert(std::make_pair(locality_hosts[0]->locality(), locality_weight));
+    }
+  }
+
+  absl::FixedArray<LocalityPercentages> percentages(upstream_hosts_per_locality.get().size());
+  for (uint32_t i = 0; i < upstream_hosts_per_locality.get().size(); ++i) {
+    const auto& upstream_hosts = upstream_hosts_per_locality.get()[i];
+    if (upstream_hosts.empty()) {
+      // If there are no upstream hosts in a given locality, the upstream percentage is 0.
+      // We can't determine the locality of this group, so we can't find the corresponding local
+      // count. However, if there are no upstream hosts in a locality, the local percentage doesn't
+      // matter.
+      percentages[i] = LocalityPercentages{0, 0};
+      continue;
+    }
+    const auto& locality = upstream_hosts[0]->locality();
+
+    const auto& local_count_it = local_weights.find(locality);
+    const uint64_t local_count = local_count_it == local_weights.end() ? 0 : local_count_it->second;
+    const auto& upstream_count_it = upstream_weights.find(locality);
+    const uint64_t upstream_count =
+        upstream_count_it == upstream_weights.end() ? 0 : upstream_count_it->second;
+
+    const uint64_t local_percentage =
+        total_local_weights > 0 ? 10000ULL * local_count / total_local_weights : 0;
+    const uint64_t upstream_percentage =
+        total_upstream_hosts > 0 ? 10000ULL * upstream_count / total_upstream_hosts : 0;
 
     percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
   }
