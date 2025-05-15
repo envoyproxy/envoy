@@ -63,6 +63,8 @@ FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:d1fc914c43cea489c26c89
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /etc/envoy /etc/envoy
 COPY --from=binary --chown=0:0 --chmod=644 \
     /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
 COPY --from=binary --chown=0:0 --chmod=755 \

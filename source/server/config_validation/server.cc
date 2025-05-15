@@ -151,7 +151,7 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
-      sslContextManager(), *secret_manager_, quic_stat_names_, *this);
+      sslContextManager(), quic_stat_names_, *this);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

@@ -929,10 +929,6 @@ ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValida
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() {
   return listener_factory_context_base_->serverFactoryContext();
 }
-Configuration::TransportSocketFactoryContext&
-PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return listener_factory_context_base_->getTransportSocketFactoryContext();
-}
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }

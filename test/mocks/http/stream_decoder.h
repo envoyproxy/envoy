@@ -6,6 +6,14 @@
 namespace Envoy {
 namespace Http {
 
+class MockRequestDecoderHandle : public RequestDecoderHandle {
+public:
+  MockRequestDecoderHandle();
+  ~MockRequestDecoderHandle() override = default;
+
+  MOCK_METHOD(OptRef<RequestDecoder>, get, ());
+};
+
 class MockRequestDecoder : public RequestDecoder {
 public:
   MockRequestDecoder();
@@ -32,6 +40,7 @@ public:
   MOCK_METHOD(void, decodeHeaders_, (RequestHeaderMapSharedPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (RequestTrailerMapPtr & trailers));
   MOCK_METHOD(AccessLog::InstanceSharedPtrVector, accessLogHandlers, ());
+  MOCK_METHOD(RequestDecoderHandlePtr, getRequestDecoderHandle, ());
 };
 
 class MockResponseDecoder : public ResponseDecoder {

@@ -420,11 +420,6 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
   /**
-   * Return the factory to use for creating cluster manager related objects.
-   */
-  virtual ClusterManagerFactory& clusterManagerFactory() PURE;
-
-  /**
    * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
    * upstream component, the factory is a facet of the cluster manager.
    *
@@ -609,16 +604,6 @@ public:
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
             const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
-
-  /**
-   * Returns the secret manager.
-   */
-  virtual Secret::SecretManager& secretManager() PURE;
-
-  /**
-   * Returns the singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
 };
 
 /**

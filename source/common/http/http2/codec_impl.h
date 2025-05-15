@@ -324,7 +324,7 @@ protected:
     // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
     // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
     virtual bool useDeferredReset() const PURE;
-    virtual StreamDecoder& decoder() PURE;
+    virtual StreamDecoder* decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
@@ -523,7 +523,7 @@ protected:
     HeadersState headersState() const override { return headers_state_; }
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
-    StreamDecoder& decoder() override { return response_decoder_; }
+    StreamDecoder* decoder() override { return &response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -585,7 +585,7 @@ protected:
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
     bool useDeferredReset() const override { return true; }
-    StreamDecoder& decoder() override { return *request_decoder_; }
+    StreamDecoder* decoder() override { return request_decoder_handle_->get().ptr(); }
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
@@ -610,7 +610,9 @@ protected:
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
-    void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+    void setRequestDecoder(Http::RequestDecoder& decoder) override {
+      request_decoder_handle_ = decoder.getRequestDecoderHandle();
+    }
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
                                               Http::ResponseHeaderMapConstSharedPtr,
                                               Http::ResponseTrailerMapConstSharedPtr,
@@ -626,7 +628,7 @@ protected:
     }
 
   private:
-    RequestDecoder* request_decoder_{};
+    RequestDecoderHandlePtr request_decoder_handle_;
     HeadersState headers_state_ = HeadersState::Request;
   };
 
