@@ -56,6 +56,10 @@ bug_fixes:
   change: |
     Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
     with the lifetime of the codec stream.
+- area: rbac filter
+  change: |
+    Fixed an issue where metadata wasn't being set when the RBAC HTTP filter's enforced engine allowed access
+    (returned ``Continue``) and there was no shadow engine configured.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
