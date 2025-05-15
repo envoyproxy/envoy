@@ -1924,9 +1924,6 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   const std::string query =
       Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   ASSERT_FALSE(query.empty());
-  // Generate a new "random" value different from the original 3. Otherwise the first address is
-  // always returned.
-  ON_CALL(random_, random()).WillByDefault(Return(5));
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);

@@ -196,7 +196,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_ = &client_->newStream(*this);
   request_encoder_->getStream().addCallbacks(*this);
 
-  absl::string_view authority =
+  const std::string& authority =
       getHostname(host_, parent_.authority_value_, parent_.cluster_.info());
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),

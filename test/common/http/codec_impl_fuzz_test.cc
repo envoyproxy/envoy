@@ -485,23 +485,13 @@ public:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-static const uint8_t g_payload[] = {
-  0x0, 0x0, 0x43, 0x1, 0x62, 0x0, 0x0, 0x0, 0x1,
-  0x20, 0x0,  0x85, 0xb9, 0x49, 0x53, 0x39, 0xe4, 0x84, 0x92, 0xda, 0x69,
-  0xf5, 0x0,  0x88, 0xb8, 0x3b, 0x53, 0x39, 0xec, 0x32, 0x7d, 0x7f, 0x84,
-  0x92, 0xda, 0x69, 0xf5, 0x0,  0x84, 0xb9, 0x58, 0xd3, 0x3f, 0x84, 0x92,
-  0xda, 0x69, 0xf5, 0x0,  0x85, 0xb6, 0xb9, 0xac, 0x1c, 0x85, 0x84, 0xb9,
-  0x58, 0xd3, 0x3f, 0x0,  0x87, 0x21, 0xea, 0xa8, 0xa4, 0x49, 0x8f, 0x57,
-  0x86, 0xb6, 0xb9, 0xb6, 0x8e, 0x42, 0xff};
-
-
 // Buffer between client and server H1/H2 codecs. This models each write operation
 // as adding a distinct fragment that might be reordered with other fragments in
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(absl::string_view name, Connection& connection, const bool& should_close_connection)
-      : connection_(connection), should_close_connection_(should_close_connection), name_(name) {}
+  ReorderBuffer(Connection& connection, const bool& should_close_connection)
+      : connection_(connection), should_close_connection_(should_close_connection) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -518,16 +508,6 @@ public:
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
           return codecClientError("preventing buffer drain due to connection closure");
         }
-        if (buf_length_old == 55) {
-          buf.drain(buf_length_old);
-          buf.add(g_payload, sizeof(g_payload));
-        }
-        uint8_t* p = reinterpret_cast<uint8_t*>(buf.linearize(buf_length_old));
-        std::cerr << name_ << " dispatching " << buf_length_old << "\n";
-        for (uint64_t i = 0; i < buf_length_old; ++i) {
-          fprintf(stderr, "%x ", p[i]);
-        }
-        std::cerr << "\n";
         status = connection_.dispatch(buf);
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
@@ -576,7 +556,6 @@ public:
   // A reference to a flag indicating whether the reorder buffer is allowed to dispatch data to
   // the connection (reference to should_close_connection).
   const bool& should_close_connection_;
-  const std::string name_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
@@ -659,8 +638,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   // The buffers will be blocked from dispatching data if should_close_connection is set to true.
   // This prevents sending data if a stream reset occurs during the test cleanup when using HTTP/1.
-  ReorderBuffer client_write_buf{"Client", *server, should_close_connection};
-  ReorderBuffer server_write_buf{"Server", *client, should_close_connection};
+  ReorderBuffer client_write_buf{*server, should_close_connection};
+  ReorderBuffer server_write_buf{*client, should_close_connection};
 
   ON_CALL(client_connection, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
