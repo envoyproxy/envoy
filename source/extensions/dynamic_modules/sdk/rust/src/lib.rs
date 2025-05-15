@@ -119,7 +119,7 @@ pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
 
 /// The function signature for the new HTTP filter per-route configuration function.
 ///
-/// This is called when a new HTTP filter per-route configuration is created.It must return an
+/// This is called when a new HTTP filter per-route configuration is created. It must return an
 /// object representing the filter's per-route configuration. Returning `None` will cause the HTTP
 /// filter configuration to be rejected.
 /// This config can be later retried by the filter via
