@@ -13,7 +13,19 @@ fi
 
 CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
-export PPROF_PATH=/thirdparty_build/bin/pprof
+# For gperftools 2.16+, use Go-based pprof
+# Check if we already have a Go pprof installed
+if command -v pprof &> /dev/null; then
+    export PPROF_PATH=$(which pprof)
+else
+    # If Go-based pprof isn't found, we'll need to install it
+    export NEED_INSTALL_PPROF=1
+fi
+
+# Keep the old path as a fallback
+if [[ -z "${PPROF_PATH}" ]]; then
+    export PPROF_PATH=/thirdparty_build/bin/pprof
+fi
 
 if [[ -z "${NUM_CPUS}" ]]; then
     if [[ "${OSTYPE}" == darwin* ]]; then
@@ -56,6 +68,21 @@ export BUILD_DIR
 export ENVOY_TEST_TMPDIR="${ENVOY_TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
+
+# If Go-based pprof needs to be installed, check if we have Go and install it
+if [[ -n "${NEED_INSTALL_PPROF}" ]]; then
+    if command -v go &> /dev/null; then
+        echo "Installing go-based pprof..."
+        go install github.com/google/pprof@latest
+        # Update PATH to include Go binaries
+        export PATH=$PATH:$HOME/go/bin
+        export PPROF_PATH=$(which pprof)
+        echo "Installed go-based pprof at ${PPROF_PATH}"
+    else
+        echo "Go is not installed. Cannot install go-based pprof." >&2
+        echo "Please install Go to use gperftools 2.16+ with pprof." >&2
+    fi
+fi
 
 if [[ -f "/etc/redhat-release" ]]; then
   BAZEL_BUILD_EXTRA_OPTIONS+=("--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1")
