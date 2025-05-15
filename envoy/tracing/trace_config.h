@@ -106,7 +106,6 @@ public:
    */
   virtual uint32_t maxPathTagLength() const PURE;
 
-
   /**
    * @return true if span attributes should follow semantic conventions
    */
