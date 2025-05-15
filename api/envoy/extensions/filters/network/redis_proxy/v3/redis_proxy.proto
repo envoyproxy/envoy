@@ -386,6 +386,12 @@ message RedisProtocolOptions {
   // Upstream server username as defined by the ``user`` directive
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+  AwsIam aws_iam = 3;
+}
+
+message AwsIam {
+  string username = 1 [(validate.rules).string = {min_len: 1}];
+  common.aws.v3.AwsCredentialProvider credential_provider = 2;
 }
 
 // RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.
