@@ -125,6 +125,9 @@ new_features:
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+- area: postgres
+  change: |
+    added support for requiring downstream SSL.
 - area: url_template
   change: |
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
