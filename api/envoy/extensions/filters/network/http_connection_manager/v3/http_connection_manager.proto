@@ -99,33 +99,43 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
-  // Determines the action for request that contain %2F, %2f, %5C or %5c sequences in the URI path.
+  // Determines the action for request that contain ``%2F``, ``%2f``, ``%5C`` or ``%5c`` sequences in the URI path.
   // This operation occurs before URL normalization and the merge slashes transformations if they were enabled.
   enum PathWithEscapedSlashesAction {
     // Default behavior specific to implementation (i.e. Envoy) of this configuration option.
     // Envoy, by default, takes the KEEP_UNCHANGED action.
-    // NOTE: the implementation may change the default behavior at-will.
+    //
+    // .. note::
+    //
+    //   The implementation may change the default behavior at-will.
     IMPLEMENTATION_SPECIFIC_DEFAULT = 0;
 
     // Keep escaped slashes.
     KEEP_UNCHANGED = 1;
 
     // Reject client request with the 400 status. gRPC requests will be rejected with the INTERNAL (13) error code.
-    // The "httpN.downstream_rq_failed_path_normalization" counter is incremented for each rejected request.
+    // The ``httpN.downstream_rq_failed_path_normalization`` counter is incremented for each rejected request.
     REJECT_REQUEST = 2;
 
-    // Unescape %2F and %5C sequences and redirect request to the new path if these sequences were present.
+    // Unescape ``%2F`` and ``%5C`` sequences and redirect request to the new path if these sequences were present.
     // Redirect occurs after path normalization and merge slashes transformations if they were configured.
-    // NOTE: gRPC requests will be rejected with the INTERNAL (13) error code.
-    // This option minimizes possibility of path confusion exploits by forcing request with unescaped slashes to
-    // traverse all parties: downstream client, intermediate proxies, Envoy and upstream server.
-    // The "httpN.downstream_rq_redirected_with_normalized_path" counter is incremented for each
-    // redirected request.
+    //
+    // .. note::
+    //
+    //   gRPC requests will be rejected with the INTERNAL (13) error code. This option minimizes possibility of path
+    //   confusion exploits by forcing request with unescaped slashes to traverse all parties: downstream client,
+    //   intermediate proxies, Envoy and upstream server. The ``httpN.downstream_rq_redirected_with_normalized_path``
+    //   counter is incremented for each redirected request.
+    //
     UNESCAPE_AND_REDIRECT = 3;
 
-    // Unescape %2F and %5C sequences.
-    // Note: this option should not be enabled if intermediaries perform path based access control as
-    // it may lead to path confusion vulnerabilities.
+    // Unescape ``%2F`` and ``%5C`` sequences.
+    //
+    // .. note::
+    //
+    //   This option should not be enabled if intermediaries perform path based access control as it may lead to path
+    //   confusion vulnerabilities.
+    //
     UNESCAPE_AND_FORWARD = 4;
   }
 
@@ -258,13 +268,12 @@ message HttpConnectionManager {
   //
   // .. warning::
   //
-  //    The current implementation of upgrade headers does not handle
-  //    multi-valued upgrade headers. Support for multi-valued headers may be
-  //    added in the future if needed.
+  //    The current implementation of upgrade headers does not handle multi-valued upgrade headers. Support for
+  //    multi-valued headers may be added in the future if needed.
   //
   // .. warning::
-  //    The current implementation of upgrade headers does not work with HTTP/2
-  //    upstreams.
+  //    The current implementation of upgrade headers does not work with HTTP/2 upstreams.
+  //
   message UpgradeConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager."
@@ -296,7 +305,10 @@ message HttpConnectionManager {
   // <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`) will apply to the ``:path`` header
   // destined for the upstream.
   //
-  // Note: access logging and tracing will show the original ``:path`` header.
+  // .. note::
+  //
+  //   Access logging and tracing will show the original ``:path`` header.
+  //
   message PathNormalizationOptions {
     // [#not-implemented-hide:] Normalization applies internally before any processing of requests by
     // HTTP filters, routing, and matching *and* will affect the forwarded ``:path`` header. Defaults
@@ -488,9 +500,13 @@ message HttpConnectionManager {
   // The default value can be overridden by setting runtime key ``envoy.reloadable_features.max_request_headers_size_kb``.
   // Requests that exceed this limit will receive a 431 response.
   //
-  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
-  //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
-  //   HTTP/3 limits a single header to around 1024kb.
+  // .. note::
+  //
+  //   Currently some protocol codecs impose limits on the maximum size of a single header.
+  //
+  //   * HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   * HTTP/3 limits a single header to around 1024kb.
+  //
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
@@ -568,11 +584,13 @@ message HttpConnectionManager {
   // during which Envoy will wait for the peer to close (i.e., a TCP FIN/RST is received by Envoy
   // from the downstream connection) prior to Envoy closing the socket associated with that
   // connection.
-  // NOTE: This timeout is enforced even when the socket associated with the downstream connection
-  // is pending a flush of the write buffer. However, any progress made writing data to the socket
-  // will restart the timer associated with this timeout. This means that the total grace period for
-  // a socket in this state will be
-  // <total_time_waiting_for_write_buffer_flushes>+<delayed_close_timeout>.
+  //
+  // .. note::
+  //
+  //   This timeout is enforced even when the socket associated with the downstream connection is pending a flush of
+  //   the write buffer. However, any progress made writing data to the socket will restart the timer associated with
+  //   this timeout. This means that the total grace period for a socket in this state will be
+  //   <total_time_waiting_for_write_buffer_flushes>+<delayed_close_timeout>.
   //
   // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
@@ -584,15 +602,16 @@ message HttpConnectionManager {
   //
   // The default timeout is 1000 ms if this option is not specified.
   //
-  // .. NOTE::
+  // .. note::
   //    To be useful in avoiding the race condition described above, this timeout must be set
   //    to *at least* <max round trip time expected between clients and Envoy>+<100ms to account for
   //    a reasonable "worst" case processing time for a full iteration of Envoy's event loop>.
   //
-  // .. WARNING::
+  // .. warning::
   //    A value of 0 will completely disable delayed close processing. When disabled, the downstream
   //    connection's socket will be closed immediately after the write flush is completed or will
   //    never close if the write flush does not complete.
+  //
   google.protobuf.Duration delayed_close_timeout = 26;
 
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
@@ -659,7 +678,7 @@ message HttpConnectionManager {
   // the request. If the request isn't rejected nor any extension succeeds, the HCM will
   // fallback to using the remote address.
   //
-  // .. WARNING::
+  // .. warning::
   //    Extensions cannot be used in conjunction with :ref:`use_remote_address
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
   //    nor :ref:`xff_num_trusted_hops
