@@ -51,7 +51,20 @@ void AssumeRoleCredentialsProvider::onMetadataError(Failure reason) {
 }
 
 void AssumeRoleCredentialsProvider::refresh() {
+  // We can have assumerole credentials pending at this point, as the signers credential provider
+  // chain is potentially async
+  if (assume_role_signer_->addCallbackIfCredentialsPending(
+          [this](){ continueRefresh(); })
+           == false) {
+    // We're not pending credentials, so sign immediately
+    return continueRefresh();
+  } else {
+    // Leave and let our callback handle the rest of the processing
+    return;
+  }
+}
 
+void AssumeRoleCredentialsProvider::continueRefresh() {
   const auto uri = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
   ENVOY_LOG(debug, "Getting AWS credentials from STS at URI: {}", uri.value());
 
