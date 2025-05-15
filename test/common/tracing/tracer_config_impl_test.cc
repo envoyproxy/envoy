@@ -18,6 +18,7 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     tracing_config.mutable_overall_sampling()->set_value(50);
     tracing_config.set_verbose(true);
     tracing_config.mutable_max_path_tag_length()->set_value(128);
+    tracing_config.set_use_semantic_conventions(true);
 
     auto* custom_tag = tracing_config.add_custom_tags();
     custom_tag->set_tag("foo");
@@ -28,6 +29,7 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
     EXPECT_EQ(true, config.verbose());
     EXPECT_EQ(128, config.maxPathTagLength());
+    EXPECT_EQ(true, config.useSemanticConventions());
     EXPECT_EQ(1, config.getCustomTags().size());
 
     EXPECT_EQ(50, config.getClientSampling().numerator());
@@ -40,6 +42,7 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
         envoy::config::core::v3::TrafficDirection::OUTBOUND;
     ConnectionManagerTracingConfigProto tracing_config;
     tracing_config.set_verbose(true);
+    tracing_config.set_use_semantic_conventions(true);
 
     auto* custom_tag = tracing_config.add_custom_tags();
     custom_tag->set_tag("foo");
@@ -50,6 +53,7 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
     EXPECT_EQ(true, config.verbose());
     EXPECT_EQ(256, config.maxPathTagLength());
+    EXPECT_EQ(true, config.useSemanticConventions());
     EXPECT_EQ(1, config.getCustomTags().size());
 
     EXPECT_EQ(100, config.getClientSampling().numerator());

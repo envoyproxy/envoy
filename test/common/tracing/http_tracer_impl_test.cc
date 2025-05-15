@@ -759,6 +759,134 @@ TEST(HttpTraceContextTest, HttpTraceContextTest) {
   }
 }
 
+class HttpConnManFinalizerWithSemanticConventionsImplTest : public HttpConnManFinalizerImplTest {
+protected:
+  HttpConnManFinalizerWithSemanticConventionsImplTest() : HttpConnManFinalizerImplTest() {
+    config.use_semantic_conventions_ = true;
+  }
+};
+
+TEST_F(HttpConnManFinalizerWithSemanticConventionsImplTest, XForwardHeaderNotPresent) {
+  const std::string path(300, 'a');
+  const std::string path_prefix = "http://";
+  const std::string expected_path(255, 'a');
+  const std::string expected_ip = "10.0.0.100";
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/" + path}, {":method", "GET"}, {":scheme", "http"}};
+  request_headers.setUserAgent("agent");
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  absl::optional<uint32_t> response_code(200);
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
+
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span,
+              setTag(Eq(Tracing::Tags::get().UrlFull), Eq(path_prefix + "/" + expected_path)));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpRequestMethod), Eq("GET")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UserAgentOriginal), Eq("agent")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UrlPath), Eq("/" + expected_path)));
+  // client:address is the remote peer ip because there is no xff header
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ClientAddress), Eq(expected_ip)));
+
+  // ServerAddress should not be set if neither host nor X-Forwarded-Host header exist
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ServerAddress), _)).Times(0);
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ServerPort), _)).Times(0);
+
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UrlScheme), Eq("HTTP/1.0")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().NetworkPeerAddress), Eq(expected_ip)));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpResponseSize), Eq("11")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpRequestSize), Eq("10")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpResponseStatusCode), Eq("200")));
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
+}
+
+TEST_F(HttpConnManFinalizerWithSemanticConventionsImplTest, UrlPathNoParams) {
+  const std::string path = "/foo/bar?p1=v1";
+  const std::string expected_url_path = "/foo/bar";
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", path}, {":method", "GET"}, {":scheme", "http"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UrlPath), Eq(expected_url_path)));
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
+}
+
+TEST_F(HttpConnManFinalizerWithSemanticConventionsImplTest, ServerAddressWithHostHeader) {
+  const std::string expected_ip = "10.0.0.100";
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", ""}, {":method", "GET"}, {":scheme", "http"}, {":authority", "blah.com:8000"}};
+  request_headers.setHost("blah.com:8000");
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  // if x-forwarded-host not present, use host header
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ServerAddress), Eq("blah.com")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ServerPort), Eq("8000")));
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
+}
+
+TEST_F(HttpConnManFinalizerWithSemanticConventionsImplTest, XForwardHeaderPresent) {
+  const std::string expected_ip = "10.0.0.100";
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", ""},
+      {":method", "GET"},
+      {":scheme", "http"},
+      {"x-forwarded-for", "198.51.100.2, 198.51.100.1"},
+      {"x-forwarded-proto", "https"},
+      {"x-forwarded-host", "host.com:8000,dns.name:8000"},
+      {":authority", "blah.com:8000"}};
+  request_headers.setHost("blah.com:8000");
+  request_headers.setUserAgent("agent");
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(remote_address);
+
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  // client:address should be the first ip in xff header if present
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ClientAddress), Eq("198.51.100.2")));
+
+  // url:scheme should be the value of X-Forwarded-Proto if present
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UrlScheme), Eq("https")));
+  // if both x-forwarded-host and host header exists,
+  // ServerAddress should use x-forwarded-host
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ServerAddress), Eq("host.com")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ServerPort), Eq("8000")));
+
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().NetworkPeerAddress), Eq(expected_ip)));
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
+                                            &response_trailers, stream_info, config);
+}
+
 } // namespace
 } // namespace Tracing
 } // namespace Envoy

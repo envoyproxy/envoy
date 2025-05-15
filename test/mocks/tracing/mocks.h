@@ -22,11 +22,13 @@ public:
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
   MOCK_METHOD(bool, spawnUpstreamSpan, (), (const));
+  bool useSemanticConventions() const override { return use_semantic_conventions_; }
 
   OperationName operation_name_{OperationName::Ingress};
   CustomTagMap custom_tags_;
   bool verbose_{false};
   bool spawn_upstream_span_{false};
+  bool use_semantic_conventions_{false};
 };
 
 class MockSpan : public Span {

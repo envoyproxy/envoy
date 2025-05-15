@@ -101,7 +101,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
           parent_.callbacks()->dispatcher().timeSource().systemTime());
       if (parent.attemptCount() != 1) {
         // This is a retry request, add this metadata to span.
-        span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
+        span_->setTag(Tracing::Tags::get().httpRetry(tracing_config->useSemanticConventions()),
+                      std::to_string(parent.attemptCount() - 1));
       }
     }
   }
