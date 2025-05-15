@@ -1302,6 +1302,10 @@ public:
     cluster1->info_->name_ = "cluster_0";
     cluster1->info_->lb_factory_ =
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
+    auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
+    cluster1->info_->typed_lb_config_ =
+        cluster1->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
+            .value();
 
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
@@ -1670,6 +1674,10 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   cluster2->info_->lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.ring_hash");
+  auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
+  cluster1->info_->typed_lb_config_ =
+      cluster1->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
+          .value();
 
   // This part tests static init.
   InSequence s;
