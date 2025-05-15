@@ -417,6 +417,12 @@ message Bootstrap {
   MemoryAllocatorManager memory_allocator_manager = 41;
 }
 
+message AllowListedRoutesArray {
+
+  repeated string routes = 1
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+}
+
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
 // [#next-free-field: 8]
@@ -450,8 +456,9 @@ message Admin {
   // should apply to the admin interface or not.
   bool ignore_global_conn_limit = 6;
 
-  repeated string allow_listed_routes = 7
-      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+  // routes list for admin which are accessible
+  // if not specified, the allow list check will be skippped
+  optional AllowListedRoutesArray allow_listed_routes = 7;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
