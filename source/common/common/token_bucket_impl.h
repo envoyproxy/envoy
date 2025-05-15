@@ -115,6 +115,12 @@ public:
    */
   double remainingTokens() const;
 
+  /**
+   * Get the time to next token available. This is a snapshot and may change after the call.
+   * @return the time to next token available.
+   */
+  std::chrono::milliseconds nextTokenAvailable() const;
+
 private:
   double timeNowInSeconds() const;
 

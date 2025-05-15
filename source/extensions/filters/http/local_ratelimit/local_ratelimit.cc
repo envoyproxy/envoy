@@ -206,6 +206,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     headers.addReferenceKey(
         HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
         token_bucket_context_->remainingTokens());
+    if (token_bucket_context_->remainingTokens() == 0) {
+      headers.addReferenceKey(
+          HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+          token_bucket_context_->resetSeconds());
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
