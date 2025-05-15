@@ -91,11 +91,20 @@ public:
   void mutateResponseHeaders(Http::ResponseHeaderMap& headers,
                              const Formatter::HttpFormatterContext& context,
                              const StreamInfo::StreamInfo& stream_info) const;
+  void mutateResponseTrailers(Http::ResponseTrailerMap& trailers,
+                              const Formatter::HttpFormatterContext& context,
+                              const StreamInfo::StreamInfo& stream_info) const;
+  void mutateRequestTrailers(Http::RequestTrailerMap& trailers,
+                             const Formatter::HttpFormatterContext& context,
+                             const StreamInfo::StreamInfo& stream_info) const;
 
 private:
   std::unique_ptr<HeaderMutations> request_mutations_;
   std::vector<QueryParameterMutationPtr> query_query_parameter_mutations_;
   std::unique_ptr<HeaderMutations> response_mutations_;
+
+  std::unique_ptr<HeaderMutations> response_trailers_mutations_;
+  std::unique_ptr<HeaderMutations> request_trailers_mutations_;
 };
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
@@ -132,6 +141,12 @@ public:
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
+
+  // Http::StreamEncoderFilter
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
+
+  // Http::StreamEncoderFilter
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
 private:
   void maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* callbacks);
