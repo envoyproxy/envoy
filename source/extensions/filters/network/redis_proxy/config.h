@@ -23,7 +23,7 @@ public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
           proto_config)
-      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()) {
+      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()), proto_config_(proto_config) {
   }
 
   std::string authUsername(Api::Api& api) const {
@@ -32,6 +32,10 @@ public:
 
   std::string authPassword(Api::Api& api) const {
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
+  }
+
+  std::string iamAuthPassword() {
+    return proto_config_
   }
 
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
@@ -54,9 +58,29 @@ public:
     return EMPTY_STRING;
   }
 
+  static const std::string iamAuthPassword(const Upstream::ClusterInfoConstSharedPtr info,
+                                        Api::Api& api) {
+  auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->iamAuthPassword(api);
+    }
+    return EMPTY_STRING;  
+  }
+
+  static const std::string iamAuthUsername(const Upstream::ClusterInfoConstSharedPtr info,
+                                        Api::Api& api) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->authPassword(api);
+    }
+    return EMPTY_STRING;
+  }
 private:
   envoy::config::core::v3::DataSource auth_username_;
   envoy::config::core::v3::DataSource auth_password_;
+  const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions& proto_config_;
 };
 
 /**

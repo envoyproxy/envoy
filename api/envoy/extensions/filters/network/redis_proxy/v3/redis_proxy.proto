@@ -4,6 +4,7 @@ package envoy.extensions.filters.network.redis_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/extensions/common/aws/v3/credential_provider.proto";
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "google/protobuf/duration.proto";
@@ -386,11 +387,13 @@ message RedisProtocolOptions {
   // Upstream server username as defined by the ``user`` directive
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+
   AwsIam aws_iam = 3;
 }
 
 message AwsIam {
   string username = 1 [(validate.rules).string = {min_len: 1}];
+
   common.aws.v3.AwsCredentialProvider credential_provider = 2;
 }
 
