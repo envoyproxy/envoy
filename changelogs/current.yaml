@@ -110,6 +110,9 @@ new_features:
     added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
     memory pressure, with configurable max_memory_bytes limit
     :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`.
+- area: tracing
+  change: |
+    supported aligning attributes with OTel HTTP semantic conventions using the new field ``use_semantic_conventions``.
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
