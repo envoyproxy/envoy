@@ -9,6 +9,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "openssl/ssl.h"
 

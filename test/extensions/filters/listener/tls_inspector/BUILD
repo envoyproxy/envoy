@@ -17,6 +17,17 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "ja4_fingerprint_test",
+    srcs = ["ja4_fingerprint_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":tls_utility_lib",
+        "//source/common/common:hex_lib",
+        "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
     rbe_pool = "6gig",
