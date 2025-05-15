@@ -490,8 +490,8 @@ public:
 // the buffer via swap() or modified with mutate().
 class ReorderBuffer {
 public:
-  ReorderBuffer(Connection& connection, const bool& should_close_connection)
-      : connection_(connection), should_close_connection_(should_close_connection) {}
+  ReorderBuffer(absl::string_view name, Connection& connection, const bool& should_close_connection)
+      : connection_(connection), should_close_connection_(should_close_connection), name_(name) {}
 
   void add(Buffer::Instance& data) {
     bufs_.emplace_back();
@@ -508,6 +508,12 @@ public:
           ENVOY_LOG_MISC(trace, "Buffer dispatch disabled, stopping drain");
           return codecClientError("preventing buffer drain due to connection closure");
         }
+        uint8_t* p = reinterpret_cast<uint8_t*>(buf.linearize(buf_length_old));
+        std::cerr << name_ << " dispatching " << buf_length_old << "\n";
+        for (uint64_t i = 0; i < buf_length_old; ++i) {
+          fprintf(stderr, "%x ", p[i]);
+        }
+        std::cerr << "\n";
         status = connection_.dispatch(buf);
         if (!status.ok()) {
           ENVOY_LOG_MISC(trace, "Error status: {}", status.message());
@@ -556,6 +562,7 @@ public:
   // A reference to a flag indicating whether the reorder buffer is allowed to dispatch data to
   // the connection (reference to should_close_connection).
   const bool& should_close_connection_;
+  const std::string name_;
 };
 
 using HttpStreamPtr = std::unique_ptr<HttpStream>;
@@ -638,8 +645,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   // The buffers will be blocked from dispatching data if should_close_connection is set to true.
   // This prevents sending data if a stream reset occurs during the test cleanup when using HTTP/1.
-  ReorderBuffer client_write_buf{*server, should_close_connection};
-  ReorderBuffer server_write_buf{*client, should_close_connection};
+  ReorderBuffer client_write_buf{"Client", *server, should_close_connection};
+  ReorderBuffer server_write_buf{"Server", *client, should_close_connection};
 
   ON_CALL(client_connection, write(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {

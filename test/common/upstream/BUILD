@@ -83,17 +83,45 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "cluster_manager_impl_test_common",
+    srcs = [
+        "cluster_manager_impl_test_common.cc",
+    ],
+    hdrs = [
+        "cluster_manager_impl_test_common.h",
+    ],
+    deps = [
+        ":test_cluster_manager",
+        "//envoy/common:matchers_interface",
+        "//envoy/network:dns_resolver_interface",
+        "//envoy/upstream:host_description_interface",
+        "//source/common/config:null_grpc_mux_lib",
+        "//source/common/grpc:context_lib",
+        "//source/common/http:context_lib",
+        "//source/common/router:context_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/config:xds_manager_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
     rbe_pool = "4core",
     deps = [
-        ":metadata_writer_lb_proto_cc_proto",
+        ":cluster_manager_impl_test_common",
         ":test_cluster_manager",
         "//envoy/config:config_validator_interface",
         "//source/common/router:context_lib",
-        "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -104,8 +132,6 @@ envoy_cc_test(
         "//source/extensions/health_checkers/http:health_checker_lib",
         "//source/extensions/health_checkers/tcp:health_checker_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
-        "//source/extensions/load_balancing_policies/least_request:config",
-        "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -116,21 +142,64 @@ envoy_cc_test(
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
-        "//test/mocks/upstream:cluster_real_priority_set_mocks",
-        "//test/mocks/upstream:cluster_update_callbacks_mocks",
-        "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
-        "//test/mocks/upstream:od_cds_api_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:status_utility_lib",
-        "//test/test_common:test_runtime_lib",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "odcd_test",
+    srcs = ["odcd_test.cc"],
+    deps = [
+        ":cluster_manager_impl_test_common",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/config:xds_resource_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/upstream:od_cds_api_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_manager_lifecycle_test",
+    srcs = ["cluster_manager_lifecycle_test.cc"],
+    deps = [
+        ":cluster_manager_impl_test_common",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/network/dns_resolver/cares:config",
+        "//test/mocks/upstream:cds_api_mocks",
+        "//test/mocks/upstream:cluster_real_priority_set_mocks",
+        "//test/mocks/upstream:cluster_update_callbacks_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_manager_misc_test",
+    srcs = ["cluster_manager_misc_test.cc"],
+    deps = [
+        ":cluster_manager_impl_test_common",
+        ":metadata_writer_lb_proto_cc_proto",
+        "//source/common/upstream:load_balancer_factory_base_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/load_balancing_policies/least_request:config",
+        "//source/extensions/load_balancing_policies/maglev:config",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
+        "//source/extensions/load_balancing_policies/subset:config",
+        "//test/mocks/upstream:cluster_update_callbacks_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
