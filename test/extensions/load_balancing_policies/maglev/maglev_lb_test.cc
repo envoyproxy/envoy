@@ -151,6 +151,41 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
   }
 }
 
+// Test bounded load. This test only ensures that the
+// hash balancer factory won't break the normal load balancer process.
+TEST_F(MaglevLoadBalancerTest, BasicWithBoundedLoad) {
+  host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  config_.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor()->set_value(200);
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
+  // maglev: i=0 host=92
+  // maglev: i=1 host=95
+  // maglev: i=2 host=90
+  // maglev: i=3 host=93
+  // maglev: i=4 host=94
+  // maglev: i=5 host=91
+  // maglev: i=6 host=90
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  const std::vector<uint32_t> expected_assignments{2, 5, 0, 3, 4, 1, 0};
+  for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
+              lb->chooseHost(&context).host);
+  }
+}
+
 // Basic with hostname.
 TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
   host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),

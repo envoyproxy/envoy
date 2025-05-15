@@ -316,6 +316,76 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 
+// Test bounded load. This test only ensures that the
+// hash balancer factory won't break the normal load balancer process.
+TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
+  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_.mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor()->set_value(200);
+
+  init();
+
+  EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
+  EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
+  EXPECT_EQ("ring_hash_lb.max_hashes_per_host", lb_->stats().max_hashes_per_host_.name());
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_hashes_per_host_.value());
+
+  // hash ring:
+  // host | position
+  // ---------------------------
+  // 95 | 1975508444536362413
+  // 95 | 2376063919839173711
+  // 93 | 2386806903309390596
+  // 94 | 6749904478991551885
+  // 93 | 6803900775736438537
+  // 92 | 7225015537174310577
+  // 90 | 8787465352164086522
+  // 92 | 11282020843382717940
+  // 91 | 13723418369486627818
+  // 90 | 13776502110861797421
+  // 91 | 14338313586354474791
+  // 94 | 15364271037087512980
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context).host);
+  }
+  {
+    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context).host);
+  }
+  {
+    TestLoadBalancerContext context(7225015537174310577);
+    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(&context).host);
+  }
+  {
+    TestLoadBalancerContext context(6803900775736438537);
+    EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
+  }
+  { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+
+  hostSet().healthy_hosts_.clear();
+  hostSet().runCallbacks({}, {});
+  lb = lb_->factory()->create(lb_params_);
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context).host);
+  }
+  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+}
+
 // Expect reasonable results with hostname.
 TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
