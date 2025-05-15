@@ -12,7 +12,9 @@
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/thread_local/thread_local.h"
 
+#include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/common/stats/symbol_table.h"
@@ -30,7 +32,11 @@ public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                Stats::StatNameSetPtr& stat_name_set);
 
-  LcTrieSharedPtr loadTags(const std::string& ip_tags_path, absl::Status& creation_status);
+  LcTrieSharedPtr loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
+                           Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+                           absl::Status& creation_status);
+
+  LcTrieSharedPtr refreshTags(absl::Status& refresh_status);
 
   LcTrieSharedPtr
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
@@ -38,6 +44,8 @@ public:
 
 private:
   Api::Api& api_;
+  Envoy::Config::DataSource::DataSourceProviderPtr data_source_provider_;
+  std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
 };
@@ -47,29 +55,27 @@ using IpTagsReloadErrorCb = std::function<void()>;
 
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
-  IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+  IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
+                 IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner,
-                 absl::Status& creation_status);
+                 Event::Dispatcher& dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+                 Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
 
-  LcTrieSharedPtr ipTags() const ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
-
-  absl::Status onIpTagsFileUpdate();
-  absl::Status ipTagsReload(const LcTrieSharedPtr reloaded_tags, absl::Status& reload_status);
-  void updateIpTags(const LcTrieSharedPtr reloaded_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
+  LcTrieSharedPtr ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
 private:
   const std::string ip_tags_path_;
   IpTagsLoader& tags_loader_;
+  bool needs_refresh_{false};
+  TimeSource& time_source_;
+  MonotonicTime last_reloaded_time_;
+  const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
   IpTagsReloadSuccessCb reload_success_cb_;
   IpTagsReloadErrorCb reload_error_cb_;
   mutable absl::Mutex ip_tags_mutex_;
   LcTrieSharedPtr tags_ ABSL_GUARDED_BY(ip_tags_mutex_);
-  Thread::ThreadPtr ip_tags_reload_thread_;
-  Event::DispatcherPtr ip_tags_reload_dispatcher_;
-  Filesystem::WatcherPtr ip_tags_file_watcher_;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
 };
@@ -85,33 +91,12 @@ class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
   IpTagsRegistrySingleton() {}
 
-  std::shared_ptr<IpTagsProvider> get(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
-                                      IpTagsReloadSuccessCb reload_success_cb,
-                                      IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
-                                      Event::Dispatcher& dispatcher,
-                                      std::shared_ptr<IpTagsRegistrySingleton> singleton,
-                                      absl::Status& creation_status) {
-    std::shared_ptr<IpTagsProvider> ip_tags_provider;
-    const uint64_t key = std::hash<std::string>()(ip_tags_path);
-    absl::MutexLock lock(&mu_);
-    auto it = ip_tags_registry_.find(key);
-    if (it != ip_tags_registry_.end()) {
-      if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
-        ip_tags_provider = provider;
-      } else {
-        ip_tags_provider = std::make_shared<IpTagsProvider>(
-            ip_tags_path, tags_loader, reload_success_cb, reload_error_cb, dispatcher, api,
-            singleton, creation_status);
-        ip_tags_registry_[key] = ip_tags_provider;
-      }
-    } else {
-      ip_tags_provider = std::make_shared<IpTagsProvider>(
-          ip_tags_path, tags_loader, reload_success_cb, reload_error_cb, dispatcher, api, singleton,
-          creation_status);
-      ip_tags_registry_[key] = ip_tags_provider;
-    }
-    return ip_tags_provider;
-  }
+  std::shared_ptr<IpTagsProvider>
+  get(const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
+      uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
+      IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+      Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton,
+      absl::Status& creation_status);
 
 private:
   absl::Mutex mu_;
@@ -136,8 +121,8 @@ public:
   static absl::StatusOr<std::shared_ptr<IpTaggingFilterConfig>>
   create(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
          const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-         Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
-         ProtobufMessage::ValidationVisitor& validation_visitor);
+         Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+         Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
@@ -175,7 +160,7 @@ private:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Singleton::Manager& singleton_manager,
                         Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
-                        Event::Dispatcher& dispatcher,
+                        ThreadLocal::SlotAllocator& tls, Event::Dispatcher& dispatcher,
                         ProtobufMessage::ValidationVisitor& validation_visitor,
                         absl::Status& creation_status);
 
