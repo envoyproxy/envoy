@@ -154,14 +154,20 @@ def custom_duration():
 boto3.set_stream_logger('', logging.DEBUG)
 
 if sys.argv[1] == "1":
+# used for StandardRSASigning test
     no_chain()
 if sys.argv[1] == "2":
+# used for StandardRSASigningWithChain test
     chain()
 if sys.argv[1] == "3":
+# used for CredentialExpiration test
     fast_forward()
 if sys.argv[1] == "4":
+# used for StandardRSASigningCustomSessionName test
     custom_session()
 if sys.argv[1] == "5":
+# used for StandardRSASigningBlankSessionName test
     blank_session()
 if sys.argv[1] == "6":
+# used for StandardRSASigningCustomDuration test
     custom_duration()

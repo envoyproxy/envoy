@@ -22,6 +22,9 @@
 
 #include "gtest/gtest.h"
 
+// Test cases created from python implementation of iam roles anywhere session
+// Please see iam_roles_anywhere_test_generator.py in this directory to replicate these test cases
+
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
@@ -451,8 +454,6 @@ public:
   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config_;
 };
 
-// Test cases created from python implementation of iam roles anywhere session
-// Please see iam_roles_anywhere_test_generator.py in this directory to replicate these test cases
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
 
   // This is what we expect to see requested by the signer
