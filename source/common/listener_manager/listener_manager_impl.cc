@@ -1,8 +1,6 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 
 #include <algorithm>
-#include <future>
-#include <unistd.h>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
