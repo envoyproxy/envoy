@@ -1,9 +1,10 @@
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
+#include "source/common/common/hex.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
-#include "source/common/common/hex.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
 #include "openssl/ssl.h"
