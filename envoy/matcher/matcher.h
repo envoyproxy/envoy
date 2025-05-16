@@ -139,6 +139,8 @@ enum class MatchState {
   MatchComplete,
 };
 
+// Callback to execute against skipped matches' actions.
+template <class DataType> using SkippedMatchCb = std::function<void(const OnMatch<DataType>&)>;
 /**
  * MatchTree provides the interface for performing matches against the data provided by DataType.
  */
@@ -155,16 +157,42 @@ public:
   struct MatchResult {
     const MatchState match_state_;
     const absl::optional<OnMatch<DataType>> on_match_;
-    // Non-null if the match was completed and the match tree can be re-entered to check for
-    // additional matches from where the initial matching stopped.
-    MatchTreePtr<DataType> matcher_reentrant_ = nullptr;
   };
 
   // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements). If the match couldn't be completed, {false, {}} will be returned.
   // If a match result was determined, {true, action} will be returned. If a match result was
   // determined to be no match, {true, {}} will be returned.
-  virtual MatchResult match(const DataType& matching_data) PURE;
+  virtual MatchResult match(const DataType& matching_data,
+                            SkippedMatchCb<DataType> skipped_match_cb = nullptr) PURE;
+
+protected:
+  // Internally handle recursion & keep_matching logic in matcher implementations.
+  // This should be called against initial matching & on-no-match results.
+  static inline MatchResult handleRecursionAndSkips(const MatchResult& result, const DataType& data,
+                                                    SkippedMatchCb<DataType> skipped_match_cb) {
+    if (result.match_state_ != MatchState::MatchComplete || !result.on_match_.has_value()) {
+      return result;
+    }
+    if (result.on_match_->matcher_) {
+      auto nested_result = result.on_match_->matcher_->match(data, skipped_match_cb);
+      // Parent result's keep_matching skips the nested result.
+      if (result.on_match_->keep_matching_ &&
+          nested_result.match_state_ == MatchState::MatchComplete &&
+          nested_result.on_match_.has_value()) {
+        if (skipped_match_cb)
+          skipped_match_cb(*nested_result.on_match_);
+        return {MatchState::MatchComplete, absl::nullopt};
+      }
+      return nested_result;
+    }
+    if (result.on_match_->action_cb_ && result.on_match_->keep_matching_) {
+      if (skipped_match_cb)
+        skipped_match_cb(*result.on_match_);
+      return {MatchState::MatchComplete, absl::nullopt};
+    }
+    return result;
+  }
 };
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;

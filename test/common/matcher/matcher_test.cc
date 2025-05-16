@@ -21,6 +21,9 @@
 
 namespace Envoy {
 namespace Matcher {
+
+using ::testing::ElementsAre;
+
 class MatcherTest : public ::testing::Test {
 public:
   MatcherTest()
@@ -35,105 +38,6 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   MatchTreeFactory<TestData, absl::string_view> factory_;
 };
-
-MATCHER_P(IsStringAction, m, "") {
-  // Accepts an ActionFactoryCb argument.
-  if (arg == nullptr) {
-    *result_listener << "action callback is nullptr";
-    return false;
-  }
-  ActionPtr action = arg();
-  StringAction string_action = action->getTyped<StringAction>();
-  return ::testing::ExplainMatchResult(m, string_action.string_, result_listener);
-}
-
-MATCHER_P(HasStringAction, m, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ == absl::nullopt) {
-    *result_listener << "on_match_ is nullopt";
-    return false;
-  }
-  return ExplainMatchResult(IsStringAction(m), arg.on_match_->action_cb_, result_listener);
-}
-
-MATCHER(HasNoMatch, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ != absl::nullopt) {
-    *result_listener << "on_match_ was not nullopt";
-    return false;
-  }
-  return true;
-}
-
-MATCHER(HasSubMatcher, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ == absl::nullopt) {
-    *result_listener << "on_match_ is nullopt";
-    return false;
-  }
-  if (arg.on_match_->matcher_ == nullptr) {
-    *result_listener << "on_match_->matcher_ is nullptr, expected it to not be.";
-    if (arg.on_match_->action_cb_ != nullptr) {
-      *result_listener << "\non_match_->action_cb_ is not nullptr.";
-    }
-    return false;
-  }
-  return true;
-}
-
-MATCHER_P(HasResult, m, "") {
-  // Accepts a MaybeMatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.result_ == nullptr) {
-    *result_listener << "result_ is null";
-    return false;
-  }
-  return ExplainMatchResult(m, arg.result_, result_listener);
-}
-
-MATCHER(HasNoMatchResult, "") {
-  // Accepts a MaybeMatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.result_ != nullptr) {
-    *result_listener << "result_ is not null";
-    return false;
-  }
-  return true;
-}
-
-MATCHER(HasFailureResult, "") {
-  // Accepts a MaybeMatchResult argument.
-  if (arg.match_state_ != MatchState::UnableToMatch) {
-    *result_listener << "match_state_ is not UnableToMatch";
-    return false;
-  }
-  if (arg.result_ != nullptr) {
-    *result_listener << "result_ is not null";
-    return false;
-  }
-  return true;
-}
-
-using ::testing::ElementsAre;
-using ::testing::IsEmpty;
 
 TEST_F(MatcherTest, TestMatcher) {
   const std::string yaml = R"EOF(
@@ -695,13 +599,9 @@ matcher_list:
       .Times(2);
   auto match_tree = factory_.create(matcher);
 
-  // Show that a single match() call returns a sub-matcher instead of recursing.
+  // Show that a single match() call handles sub-matching internally.
   const auto result = match_tree()->match(TestData());
-  EXPECT_THAT(result, HasSubMatcher());
-
-  // evaluateMatch() handles recursion internally to return a final action.
-  const auto recursive_result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(recursive_result, HasResult(IsStringAction("expected!")));
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
@@ -734,11 +634,13 @@ public:
     if (GetParam()) {
       xds::type::matcher::v3::Matcher xds_matcher;
       MessageUtil::loadFromYaml(yaml, xds_matcher, ProtobufMessage::getStrictValidationVisitor());
+      EXPECT_TRUE(validation_visitor_.errors().empty());
       TestUtility::validate(xds_matcher);
       return factory_.create(xds_matcher);
     } else {
       envoy::config::common::matcher::v3::Matcher envoy_matcher;
       MessageUtil::loadFromYaml(yaml, envoy_matcher, ProtobufMessage::getStrictValidationVisitor());
+      EXPECT_TRUE(validation_visitor_.errors().empty());
       TestUtility::validate(envoy_matcher);
       return factory_.create(envoy_matcher);
     }
@@ -746,7 +648,9 @@ public:
 };
 INSTANTIATE_TEST_SUITE_P(UseXdsMatcherType, MatcherAmbiguousTest, ::testing::Bool());
 
-TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
+// Test that keep_matching is supported via re-entry, even in evaluateMatch(...), that callers
+// cannot re-enter afterwards.
+TEST_P(MatcherAmbiguousTest, KeepMatchingSupportInEvaluation) {
   const std::string yaml = R"EOF(
     matcher_list:
       matchers:
@@ -755,19 +659,64 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
             matcher_list:
               matchers:
               - on_match:
+                  keep_matching: true
                   action:
                     name: test_action
                     typed_config:
                       "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: match-1
+                      value: keep-matching
                 predicate:
                   single_predicate:
                     input:
                       name: inner_input
                       typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        "@type": type.googleapis.com/google.protobuf.BoolValue
                     value_match:
                       exact: foo
+        predicate:
+          single_predicate:
+            input:
+              name: inner_input
+              typed_config:
+                "@type": type.googleapis.com/google.protobuf.StringValue
+            value_match:
+              exact: value
+    on_no_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: on-no-match
+      )EOF";
+
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("foo");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  validation_visitor_.setSupportKeepMatching(true);
+  std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
+
+  std::vector<ActionFactoryCb> skipped_results;
+  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
+    skipped_results.push_back(match.action_cb_);
+  };
+  const auto result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
+  EXPECT_THAT(result, HasResult(IsStringAction("on-no-match")));
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep-matching")));
+}
+
+TEST_P(MatcherAmbiguousTest, KeepMatchingWithRecursiveMatcher) {
+  const std::string yaml = R"EOF(
+    matcher_list:
+      matchers:
+      - on_match:
+          keep_matching: true
+          matcher:
+            matcher_list:
+              matchers:
               - on_match:
                   action:
                     name: test_action
@@ -783,11 +732,12 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
                     value_match:
                       exact: bar
               - on_match:
+                  keep_matching: true
                   action:
                     name: test_action
                     typed_config:
                       "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: match-2
+                      value: nested-keep-matching-1
                 predicate:
                   single_predicate:
                     input:
@@ -815,163 +765,12 @@ TEST_P(MatcherAmbiguousTest, ReentryWithRecursiveMatcher) {
             matcher_list:
               matchers:
               - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: match-3
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: foo
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: no-match-2
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: bar
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: match-4
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: foo
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: no-match-3
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: bar
-        predicate:
-          single_predicate:
-            input:
-              name: inner_input
-              typed_config:
-                "@type": type.googleapis.com/google.protobuf.StringValue
-            value_match:
-              exact: foo
-    on_no_match:
-      action:
-        name: test_action
-        typed_config:
-          "@type": type.googleapis.com/google.protobuf.StringValue
-          value: on-no-match
-      )EOF";
-
-  auto inner_factory = TestDataInputStringFactory("foo");
-  EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(9);
-  std::shared_ptr<MatchTree<TestData>> top_matcher = createMatcherFromYaml(yaml)();
-
-  // Expect to hit each match once via repeated re-entry, including the recursive on-no-match.
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher);
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
-  };
-  MaybeMatchResult result_1 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_1, HasResult(IsStringAction("match-1")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  MaybeMatchResult result_2 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_2, HasResult(IsStringAction("match-2")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  MaybeMatchResult on_no_match_result_1 =
-      reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(on_no_match_result_1, HasResult(IsStringAction("on-no-match-nested-1")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  MaybeMatchResult result_3 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_3, HasResult(IsStringAction("match-3")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  MaybeMatchResult result_4 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_4, HasResult(IsStringAction("match-4")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  MaybeMatchResult on_no_match_result_2 =
-      reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(on_no_match_result_2, HasResult(IsStringAction("on-no-match")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  // Expect to hit the top-level on_no_match after the sub-matcher returns no-match (after checking
-  // 'no-match-3').
-  MaybeMatchResult no_remaining_reentrants_result =
-      reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(no_remaining_reentrants_result, HasNoMatchResult());
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-}
-
-TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
-  // First parent matcher is set with keep_matching, so all underlying matches are also skipped but
-  // recorded. Second parent matcher is not set to skip matches, so nested matchers determine
-  // skipping behaviors.
-  const std::string yaml = R"EOF(
-    matcher_list:
-      matchers:
-      - on_match:
-          keep_matching: true
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: skipped - no match 1
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: bar
-              - on_match:
                   keep_matching: true
                   action:
                     name: test_action
                     typed_config:
                       "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: skipped - keep matching 1
+                      value: nested-keep-matching-2
                 predicate:
                   single_predicate:
                     input:
@@ -985,68 +784,7 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
                     name: test_action
                     typed_config:
                       "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: skipped - match 2
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: foo
-            on_no_match:
-              action:
-                name: test_action
-                typed_config:
-                  "@type": type.googleapis.com/google.protobuf.StringValue
-                  value: skipped - nested on no match 1
-        predicate:
-          single_predicate:
-            input:
-              name: inner_input
-              typed_config:
-                "@type": type.googleapis.com/google.protobuf.StringValue
-            value_match:
-              exact: foo
-      - on_match:
-          matcher:
-            matcher_list:
-              matchers:
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: match 3
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: foo
-              - on_match:
-                  keep_matching: true
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: keep matching 2
-                predicate:
-                  single_predicate:
-                    input:
-                      name: inner_input
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                    value_match:
-                      exact: foo
-              - on_match:
-                  action:
-                    name: test_action
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.StringValue
-                      value: match 4
+                      value: nested-match-2
                 predicate:
                   single_predicate:
                     input:
@@ -1063,58 +801,30 @@ TEST_P(MatcherAmbiguousTest, ReentryWithNestedPreviewMatchers) {
                 "@type": type.googleapis.com/google.protobuf.StringValue
             value_match:
               exact: foo
-    on_no_match:
-      action:
-        name: test_action
-        typed_config:
-          "@type": type.googleapis.com/google.protobuf.StringValue
-          value: on no match
       )EOF";
 
   auto inner_factory = TestDataInputStringFactory("foo");
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
-      .Times(8);
+      .Times(6);
   validation_visitor_.setSupportKeepMatching(true);
-  std::shared_ptr<MatchTree<TestData>> top_matcher = createMatcherFromYaml(yaml)();
+  std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
-  // Expect the first nested match (`skipped - keep matching 1`) to be skipped and recorded due to
-  // its own keep_matching setting, and the second (`skipped - match 2`) to skip due to its parent's
-  // keep_matching setting. The third nested match and on_no_match are not reached as the parent
-  // matcher has finished recursion with the second match, which would have been its returned action
-  // if the parent matcher wasn't skipped.
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(top_matcher);
+  // Expect the nested matchers with keep_matching to be skipped and also the top-level
+  // keep_matching setting to skip the result of the first sub-matcher.
   std::vector<ActionFactoryCb> skipped_results;
   SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
     skipped_results.push_back(match.action_cb_);
   };
-  MaybeMatchResult result_1 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_1, HasResult(IsStringAction("match 3")));
-  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("skipped - keep matching 1"),
-                                           IsStringAction("skipped - match 2")));
-  skipped_results.clear();
-
-  // Expect only the keep_matching nested matcher to be skipped from the second parent.
-  MaybeMatchResult result_2 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_2, HasResult(IsStringAction("match 4")));
-  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep matching 2")));
-  skipped_results.clear();
-
-  MaybeMatchResult result_3 = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(result_3, HasResult(IsStringAction("on no match")));
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
-
-  MaybeMatchResult no_remaining_reentrants_result =
-      reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
-  EXPECT_THAT(no_remaining_reentrants_result, HasNoMatchResult());
-  EXPECT_THAT(skipped_results, IsEmpty());
-  skipped_results.clear();
+  MaybeMatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
+  EXPECT_THAT(result, HasResult(IsStringAction(("nested-match-2"))));
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("nested-keep-matching-1"),
+                                           IsStringAction("on-no-match-nested-1"),
+                                           IsStringAction("nested-keep-matching-2")));
 }
 
 TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
-  // ExactMapMatcher does not support reentry, so we expect a no-match result when hitting a
-  // keep_matching matcher.
+  // ExactMapMatcher cannot give a second match, so keep_matching results in a no-match.
   const std::string yaml = R"EOF(
     matcher_tree:
       input:
@@ -1138,12 +848,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   validation_visitor_.setSupportKeepMatching(true);
   std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher);
   std::vector<ActionFactoryCb> skipped_results;
   SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
     skipped_results.push_back(match.action_cb_);
   };
-  MaybeMatchResult result = reenterable_matcher.evaluateMatch(TestData(), skipped_match_cb);
+  MaybeMatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasNoMatchResult());
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep matching")));
 }
@@ -1200,11 +909,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
 }
 
 // Ensure that a nested matcher that has an internal failure surfaces the error.
-TEST_P(MatcherAmbiguousTest, ReentryWithFailingNestedMatcher) {
+TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
   auto matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
 
   matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
-                      stringOnMatch<TestData>("match"));
+                      stringOnMatch<TestData>("match", /*keep_matching=*/true));
 
   auto nested_matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
   nested_matcher->addMatcher(
@@ -1214,20 +923,16 @@ TEST_P(MatcherAmbiguousTest, ReentryWithFailingNestedMatcher) {
 
   matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                       OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/nested_matcher,
-                                        /*.keep_matching=*/false});
-
-  // Expect the first match to be fine.
-  ReenterableMatchEvaluator<TestData> reenterable_matcher(matcher);
-  MaybeMatchResult result = reenterable_matcher.evaluateMatch(TestData(), nullptr);
-  EXPECT_THAT(result, HasResult(IsStringAction("match")));
+                                        /*.keep_matching=*/true});
 
   // Expect re-entry to fail due to the nested matcher.
-  MaybeMatchResult reentry_result = reenterable_matcher.evaluateMatch(TestData(), nullptr);
-  EXPECT_THAT(reentry_result, HasFailureResult());
-
-  // Expect further re-entry to fail instead of an undefined behavior.
-  MaybeMatchResult reentry_result_2 = reenterable_matcher.evaluateMatch(TestData(), nullptr);
-  EXPECT_THAT(reentry_result_2, HasFailureResult());
+  std::vector<ActionFactoryCb> skipped_results;
+  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
+    skipped_results.push_back(match.action_cb_);
+  };
+  MaybeMatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
+  EXPECT_THAT(result, HasFailureResult());
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("match")));
 }
 
 } // namespace Matcher

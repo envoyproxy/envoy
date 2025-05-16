@@ -19,7 +19,8 @@ public:
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
+  typename MatchTree<DataType>::MatchResult
+  match(const DataType& data, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
@@ -28,20 +29,34 @@ public:
 
     // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
-      return {MatchState::MatchComplete, on_no_match_};
+      return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
+                                                          data, skipped_match_cb);
     }
 
     const absl::optional<OnMatch<DataType>> result = doMatch(absl::get<std::string>(input.data_));
-    if (result.has_value()) {
-      return {MatchState::MatchComplete, *result};
-    } else if (input.data_availability_ ==
-               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      // It's possible that we were attempting a lookup with a partial value, so delay matching
-      // until we know that we actually failed.
-      return {MatchState::UnableToMatch, absl::nullopt};
+    // No match.
+    if (!result.has_value()) {
+      // Match failed.
+      if (input.data_availability_ ==
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+        return {MatchState::UnableToMatch, absl::nullopt};
+      }
+      // No-match, return on_no_match after keep_matching and/or recursion handling.
+      return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
+                                                          data, skipped_match_cb);
     }
 
-    return {MatchState::MatchComplete, on_no_match_};
+    // Handle recursion and keep_matching.
+    auto processed_result = MatchTree<DataType>::handleRecursionAndSkips(
+        {MatchState::MatchComplete, *result}, data, skipped_match_cb);
+    // Matched or failed nested matching.
+    if (processed_result.match_state_ != MatchState::MatchComplete ||
+        processed_result.on_match_.has_value()) {
+      return processed_result;
+    }
+    // No-match, return on_no_match after keep_matching and/or recursion handling.
+    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
+                                                        data, skipped_match_cb);
   }
 
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;

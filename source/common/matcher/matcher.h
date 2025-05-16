@@ -41,170 +41,23 @@ struct MaybeMatchResult {
   const MatchState match_state_;
 };
 
-template <class DataType> using SkippedMatchCb = std::function<void(const OnMatch<DataType>&)>;
-
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
 template <class DataType>
 static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
                                              SkippedMatchCb<DataType> skipped_match_cb = nullptr) {
-  std::unique_ptr<MatchTree<DataType>> reentrant = nullptr;
-  for (auto* current_tree = &match_tree; current_tree; current_tree = reentrant.get()) {
-    typename MatchTree<DataType>::MatchResult result = current_tree->match(data);
-    if (result.match_state_ == MatchState::UnableToMatch) {
-      return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
-    }
-
-    if (!result.on_match_.has_value()) {
-      return {nullptr, MatchState::MatchComplete};
-    }
-    // Safety note: expect reentrant to be nullptr if re-entry is not available.
-    reentrant = std::move(result.matcher_reentrant_);
-
-    if (result.on_match_->matcher_) {
-      auto nested_result = evaluateMatch(*result.on_match_->matcher_, data, skipped_match_cb);
-      // If sub-matcher got back a no-match, it's not a definitive answer, so continue to the next
-      // reentrant (if available).
-      if (!nested_result.result_) {
-        continue;
-      }
-      return nested_result;
-    }
-
-    if (result.on_match_->keep_matching_) {
-      if (skipped_match_cb)
-        skipped_match_cb(*result.on_match_);
-      continue;
-    }
-    return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
+  const auto result = match_tree.match(data, skipped_match_cb);
+  if (result.match_state_ == MatchState::UnableToMatch) {
+    return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
   }
-  // Final result was skipped, without available re-entry.
-  return MaybeMatchResult{nullptr, MatchState::MatchComplete};
+
+  if (!result.on_match_) {
+    return {nullptr, MatchState::MatchComplete};
+  }
+
+  // Note: does not handle sub-matchers or keep_matching, MatchTree::match(...) implementations are
+  // expected to do so.
+  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
 }
-
-// Re-entry helper class to track and match against nested reentrants for a MatchTree.
-template <class DataType> class ReenterableMatchEvaluator {
-public:
-  ReenterableMatchEvaluator(std::shared_ptr<MatchTree<DataType>> match_tree)
-      : match_tree_(match_tree) {}
-
-  // Match against the reentrant stack (bottom up), cleaning up any that no longer find a match.
-  MaybeMatchResult evaluateMatch(const DataType& data,
-                                 SkippedMatchCb<DataType> skipped_match_cb = nullptr) {
-    // For the first run, use the top-level MatchTree.
-    if (!reentrant_stack_) {
-      reentrant_stack_ = std::make_unique<ReentrantEntry>();
-      // Recursion & keep_matching handled internally.
-      return processMatchResult(
-          evaluateMatchForRecursion(match_tree_.get(), *reentrant_stack_, data, skipped_match_cb));
-    }
-    // If past matching has already failed, repeat the failure.
-    if (error_result_.has_value()) {
-      return *error_result_;
-    }
-    // Otherwise, use the top reentrant if available. If no reentrant is available, all further
-    // evaluateMatch(...) calls result in no-match.
-    if (!reentrant_stack_->reentrant) {
-      return MaybeMatchResult{nullptr, MatchState::MatchComplete};
-    }
-    return processMatchResult(evaluateMatchForRecursion(reentrant_stack_->reentrant.get(),
-                                                        *reentrant_stack_, data, skipped_match_cb));
-  }
-
-private:
-  using MatchResult = typename MatchTree<DataType>::MatchResult;
-  struct ReentrantEntry {
-    MatchTreePtr<DataType> reentrant = nullptr;
-    std::unique_ptr<ReentrantEntry> child = nullptr;
-  };
-
-  // Note: this assumes that `result` is actionable, and will not check for sub-matchers or
-  // keep_matching.
-  inline MaybeMatchResult processMatchResult(const MatchResult& result) {
-    // If the match failed, return the failure and save it for any future calls.
-    if (result.match_state_ == MatchState::UnableToMatch) {
-      error_result_.emplace(MaybeMatchResult{nullptr, MatchState::UnableToMatch});
-      return *error_result_;
-    }
-    if (!result.on_match_.has_value()) {
-      return MaybeMatchResult{nullptr, MatchState::MatchComplete};
-    }
-    return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
-  }
-
-  // Evaluate the Tree from the given entry, and handle any resulting recursion.
-  // This function should only return a final MatchResult, handling recursion & keep_matching
-  // internally. `tree` should be the top-level MatchTree for the first evaluateMatch(...), and the
-  // targeted entry's reentrant for all subsequent calls.
-  MatchResult evaluateMatchForRecursion(MatchTree<DataType>* tree, ReentrantEntry& entry,
-                                        const DataType& data,
-                                        SkippedMatchCb<DataType> skipped_match_cb = nullptr) {
-    // If there are existing child reentrants, handle those before entering the given tree.
-    if (entry.child && entry.child->reentrant) {
-      MatchResult child_result = evaluateMatchForRecursion(entry.child->reentrant.get(),
-                                                           *entry.child, data, skipped_match_cb);
-      // Skip no-match results just like how they're skipped normally during sub-matcher recursion.
-      if (child_result.match_state_ != MatchState::MatchComplete ||
-          child_result.on_match_.has_value()) {
-        return child_result;
-      }
-      // The child entry exists but re-entry isn't available, so clean it (and its children) up.
-      entry.child = nullptr;
-    }
-
-    // Keep the entry's reentrant updated for continued use internally or for the caller to use
-    // later.
-    MatchTreePtr<DataType>& current_reentrant = entry.reentrant;
-    for (MatchTree<DataType>* current_tree = tree; current_tree;
-         current_tree = current_reentrant.get()) {
-      MatchResult result = current_tree->match(data);
-      // Immediately update the entry's reentrant. If missed, further evaluations will repeatedly
-      // hit the same reentrant.
-      current_reentrant = std::move(result.matcher_reentrant_);
-      if (result.match_state_ == MatchState::UnableToMatch || !result.on_match_.has_value()) {
-        return result;
-      }
-      // Handle sub-matcher recursion.
-      if (result.on_match_->matcher_) {
-        entry.child = std::make_unique<ReentrantEntry>();
-        MatchResult nested_result = evaluateMatchForRecursion(result.on_match_->matcher_.get(),
-                                                              *entry.child, data, skipped_match_cb);
-        if (nested_result.match_state_ == MatchState::UnableToMatch) {
-          return nested_result;
-        }
-        // Sub-matcher got back a no-match, so the top matcher should continue to its reentrant if
-        // possible.
-        if (!nested_result.on_match_.has_value()) {
-          entry.child = nullptr;
-          continue;
-        }
-        // `nested_result` will not have keep_matching set but the top level result can still cause
-        // the nested_result to be skipped.
-        if (result.on_match_->keep_matching_) {
-          if (skipped_match_cb)
-            skipped_match_cb(*nested_result.on_match_);
-          // No re-entry into an already skipped sub-matcher.
-          entry.child = nullptr;
-          continue;
-        }
-        return nested_result;
-      }
-      // Skip the returned action.
-      if (result.on_match_->keep_matching_) {
-        if (skipped_match_cb)
-          skipped_match_cb(*result.on_match_);
-        continue;
-      }
-      return result;
-    }
-    return MatchResult{MatchState::MatchComplete, absl::nullopt};
-  }
-
-  // MatchTree to use for the initial match.
-  std::shared_ptr<MatchTree<DataType>> match_tree_;
-  std::unique_ptr<ReentrantEntry> reentrant_stack_ = nullptr;
-  // If a match returns an error, store it here to return on all subsequent calls.
-  absl::optional<MaybeMatchResult> error_result_ = absl::nullopt;
-};
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
 
@@ -218,8 +71,10 @@ public:
   explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
       : on_no_match_(std::move(on_no_match)) {}
 
-  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
-    return {MatchState::MatchComplete, on_no_match_};
+  typename MatchTree<DataType>::MatchResult
+  match(const DataType&, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
+    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
+                                                        data, skipped_match_cb);
   }
   const absl::optional<OnMatch<DataType>> on_no_match_;
 };

@@ -55,63 +55,40 @@ public:
     MessageUtil::loadFromYaml(config, matcher_, ProtobufMessage::getStrictValidationVisitor());
     TestUtility::validate(matcher_);
   }
-  void traverseNestedMatchers(MatchTree<TestData>* match_tree, size_t expected_nesting_depth,
-                              MatchTreeSharedPtr<TestData>& sub_tree_out) {
-    MatchTree<TestData>* current_tree = match_tree;
-    for (size_t i = 0; i < expected_nesting_depth; ++i) {
-      auto result = current_tree->match(TestData());
-      ASSERT_TRUE(result.on_match_.has_value()) << "Missing on_match at tree nesting depth: " << i;
-      ASSERT_NE(result.on_match_->matcher_, nullptr)
-          << "Missing sub-matcher at tree nesting depth: " << i;
-      sub_tree_out = result.on_match_->matcher_;
-      current_tree = sub_tree_out.get();
-    }
-  }
 
-  void validateMatch(MatchTree<TestData>* match_tree, const std::string& output) {
-    auto result = match_tree->match(TestData());
-    ASSERT_TRUE(result.on_match_.has_value());
-    reentrant_ = std::move(result.matcher_reentrant_);
-    ASSERT_NE(result.on_match_->action_cb_, nullptr);
-    auto action = result.on_match_->action_cb_();
+  void validateOnMatch(const OnMatch<TestData>& on_match, const std::string& output) {
+    ASSERT_NE(on_match.action_cb_, nullptr);
+    auto action = on_match.action_cb_();
     ASSERT_NE(action, nullptr);
     const auto value = action->getTyped<StringAction>();
     EXPECT_EQ(value.string_, output);
   }
-  void validateMatch(const std::string& output, size_t expected_nesting_depth = 0) {
-    MatchTreePtr<TestData> top_tree = factory_.create(matcher_)();
-    MatchTreeSharedPtr<TestData> sub_tree = nullptr;
-    traverseNestedMatchers(top_tree.get(), expected_nesting_depth, sub_tree);
-    auto* match_tree = (expected_nesting_depth ? sub_tree.get() : top_tree.get());
-
-    validateMatch(match_tree, output);
+  void validateMatch(MatchTree<TestData>* match_tree, const std::string& output) {
+    auto result = match_tree->match(TestData());
+    ASSERT_TRUE(result.on_match_.has_value());
+    validateOnMatch(*result.on_match_, output);
+  }
+  void validateMatch(const std::string& output) {
+    MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
+    validateMatch(match_tree.get(), output);
   }
   void validateNoMatch(MatchTree<TestData>* match_tree) {
     auto result = match_tree->match(TestData());
     EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-    reentrant_ = std::move(result.matcher_reentrant_);
     EXPECT_FALSE(result.on_match_.has_value());
   }
-  void validateNoMatch(size_t expected_nesting_depth = 0) {
-    MatchTreePtr<TestData> top_tree = factory_.create(matcher_)();
-    MatchTreeSharedPtr<TestData> sub_tree = nullptr;
-    traverseNestedMatchers(top_tree.get(), expected_nesting_depth, sub_tree);
-
-    auto match_tree = (expected_nesting_depth ? sub_tree.get() : top_tree.get());
-    validateNoMatch(match_tree);
+  void validateNoMatch() {
+    MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
+    validateNoMatch(match_tree.get());
   }
   void validateUnableToMatch(MatchTree<TestData>* match_tree) {
     auto result = match_tree->match(TestData());
-    reentrant_ = std::move(result.matcher_reentrant_);
     EXPECT_EQ(result.match_state_, MatchState::UnableToMatch);
   }
-  void validateUnableToMatch(size_t expected_nesting_depth = 0) {
-    MatchTreePtr<TestData> top_tree = factory_.create(matcher_)();
-    MatchTreeSharedPtr<TestData> sub_tree = nullptr;
-    traverseNestedMatchers(top_tree.get(), expected_nesting_depth, sub_tree);
+  void validateUnableToMatch() {
+    MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
 
-    auto match_tree = (expected_nesting_depth ? sub_tree.get() : top_tree.get());
-    validateUnableToMatch(match_tree);
+    validateUnableToMatch(match_tree.get());
   }
 
   StringActionFactory action_factory_;
@@ -124,9 +101,8 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   MatchTreeFactory<TestData, absl::string_view> factory_;
   xds::type::matcher::v3::Matcher matcher_;
-
-  // Updated with each validation.
-  std::unique_ptr<MatchTree<TestData>> reentrant_ = nullptr;
+  // If expecting keep_matching matchers, set this cb & mark its support in the validation_visitor_.
+  SkippedMatchCb<TestData> skipped_match_cb_ = nullptr;
 };
 
 TEST_F(TrieMatcherTest, TestMatcher) {
@@ -364,18 +340,18 @@ matcher_tree:
                       typed_config:
                         "@type": type.googleapis.com/google.protobuf.StringValue
                         value: bar
-  )EOF";
+      )EOF";
   loadConfig(yaml);
 
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("baz");
-    validateMatch("bar", 1);
+    validateMatch("bar");
   }
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("");
-    validateNoMatch(1);
+    validateMatch("foo");
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
@@ -430,12 +406,12 @@ matcher_tree:
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("baz");
-    validateMatch("bar", 1);
+    validateMatch("bar");
   }
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("");
-    validateNoMatch(1);
+    validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
@@ -503,12 +479,12 @@ matcher_tree:
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("baz");
-    validateMatch("baz", 2);
+    validateMatch("baz");
   }
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("bar");
-    validateMatch("bar", 1);
+    validateMatch("bar");
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
@@ -565,7 +541,7 @@ matcher_tree:
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
         {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
-    validateNoMatch(1);
+    validateNoMatch();
   }
   {
     auto input = TestDataInputStringFactory(
@@ -577,11 +553,11 @@ matcher_tree:
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
         {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
-    validateUnableToMatch(1);
+    validateUnableToMatch();
   }
 }
 
-TEST_F(TrieMatcherTest, ExerciseReentrant) {
+TEST_F(TrieMatcherTest, ExerciseKeepMatching) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -601,20 +577,38 @@ matcher_tree:
             name: test_action
             typed_config:
               "@type": type.googleapis.com/google.protobuf.StringValue
-              value: baz
+              value: bar
       - ranges:
         - address_prefix: 192.0.0.0
           prefix_len: 2
         on_match:
-          action:
-            name: test_action
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: bar
+          keep_matching: true
+          matcher:
+            matcher_tree:
+              input:
+                name: nested
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
+              exact_match_map:
+                map:
+                  baz:
+                    keep_matching: true
+                    action:
+                      name: test_action
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: baz
+            on_no_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: bag
       - ranges:
         - address_prefix: 192.101.0.0
           prefix_len: 10
         on_match:
+          keep_matching: true
           action:
             name: test_action
             typed_config:
@@ -628,21 +622,30 @@ on_no_match:
       value: bat
   )EOF";
 
+  validation_visitor_.setSupportKeepMatching(true);
   loadConfig(yaml);
 
+  // Skip foo because keep_matching is set on the top-level matcher.
+  // Skip baz because the nested matcher is set with keep_matching.
+  // Skip bag because the nested matcher returns on_no_match, but the top-level matcher is set to
+  // keep_matching.
+  int skip_count = 0;
+  skipped_match_cb_ = [&](const OnMatch<TestData>& on_match) {
+    if (skip_count == 0) {
+      validateOnMatch(on_match, "foo");
+    } else if (skip_count == 1) {
+      validateOnMatch(on_match, "baz");
+    } else if (skip_count == 2) {
+      validateOnMatch(on_match, "bag");
+    } else {
+      FAIL() << "Unexpected skip count: " << skip_count;
+    }
+    skip_count++;
+  };
   auto input = TestDataInputStringFactory("192.101.0.1");
+  auto nested = TestDataInputBoolFactory("baz");
   // Matches 192.101.0.0, 192.0.0.0, and 0.0.0.0.
-  validateMatch("foo");
-  ASSERT_NE(reentrant_, nullptr);
-  // Re-enters at 192.0.0.0.
-  validateMatch(reentrant_.get(), "bar");
-  ASSERT_NE(reentrant_, nullptr);
-  // Re-enters at 0.0.0.0.
-  validateMatch(reentrant_.get(), "baz");
-  ASSERT_NE(reentrant_, nullptr);
-  // Re-enters at no match.
-  validateMatch(reentrant_.get(), "bat");
-  EXPECT_EQ(reentrant_, nullptr);
+  validateMatch("bar");
 }
 
 TEST(TrieMatcherIntegrationTest, NetworkMatchingData) {

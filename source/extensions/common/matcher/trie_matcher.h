@@ -19,12 +19,12 @@ namespace Matcher {
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
-using ::Envoy::Matcher::evaluateMatch;
 using ::Envoy::Matcher::MatchState;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 using ::Envoy::Matcher::OnMatchFactory;
 using ::Envoy::Matcher::OnMatchFactoryCb;
+using ::Envoy::Matcher::SkippedMatchCb;
 
 template <class DataType> struct TrieNode {
   size_t index_;
@@ -55,8 +55,6 @@ template <class DataType> struct TrieNodeComparator {
   }
 };
 
-template <class DataType> class TrieMatcherReentrant;
-
 /**
  * Implementation of a `sublinear` LC-trie matcher.
  */
@@ -73,7 +71,8 @@ public:
     }
   }
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
+  typename MatchTree<DataType>::MatchResult
+  match(const DataType& data, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
@@ -86,55 +85,37 @@ public:
     if (!addr) {
       return {MatchState::MatchComplete, on_no_match_};
     }
-    std::vector<TrieNode<DataType>> values = trie_->getData(addr);
+    auto values = trie_->getData(addr);
     // The candidates returned by the LC trie are not in any specific order, so we
     // sort them by the prefix length first (longest first), and the order of declaration second.
     std::sort(values.begin(), values.end(), TrieNodeComparator<DataType>());
-    return iterateOverNodes(values, 0, on_no_match_);
-  }
-
-  // Reentrant takes ownership of the values vector input for future iterations.
-  static typename MatchTree<DataType>::MatchResult
-  iterateOverNodes(std::vector<TrieNode<DataType>>& values, size_t starting_index,
-                   const absl::optional<OnMatch<DataType>>& on_no_match) {
-    for (size_t i = starting_index; i < values.size(); ++i) {
-      const TrieNode<DataType>& node = values.at(i);
-      if (i > 0 && node.exclusive_) {
+    bool first = true;
+    for (const auto& node : values) {
+      if (!first && node.exclusive_) {
         continue;
       }
-      if (node.on_match_ && (node.on_match_->matcher_ || node.on_match_->action_cb_)) {
-        // Reentrant needed if a sub-matcher gave back a non-answer & iteration over these nodes
-        // must continue.
-        return {MatchState::MatchComplete, *node.on_match_,
-                std::make_unique<TrieMatcherReentrant<DataType>>(values, i + 1, on_no_match)};
+      // handleRecursionAndSkips should only return match-failure, no-match, or an action cb.
+      typename MatchTree<DataType>::MatchResult processed_match =
+          MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, *node.on_match_},
+                                                       data, skipped_match_cb);
+
+      if (processed_match.match_state_ != MatchState::MatchComplete ||
+          processed_match.on_match_.has_value()) {
+        return processed_match;
+      }
+      // No-match isn't definitive, so continue checking nodes.
+      if (first) {
+        first = false;
       }
     }
-    return {MatchState::MatchComplete, on_no_match, nullptr};
+    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
+                                                        data, skipped_match_cb);
   }
 
 private:
   const DataInputPtr<DataType> data_input_;
   const absl::optional<OnMatch<DataType>> on_no_match_;
   std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>> trie_;
-};
-
-// Enables trie-matcher re-entry to continue iteration over the matched nodes.
-template <class DataType> class TrieMatcherReentrant : public MatchTree<DataType> {
-public:
-  // Takes ownership of the matches vector input.
-  TrieMatcherReentrant(std::vector<TrieNode<DataType>>& matches, size_t starting_index,
-                       const absl::optional<OnMatch<DataType>> on_no_match)
-      : matches_(std::move(matches)), index_(starting_index), on_no_match_(on_no_match) {}
-
-  // Note: this assumes that the match input data is the same as the original match.
-  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
-    return TrieMatcher<DataType>::iterateOverNodes(matches_, index_, on_no_match_);
-  }
-
-private:
-  std::vector<TrieNode<DataType>> matches_;
-  size_t index_;
-  const absl::optional<OnMatch<DataType>> on_no_match_;
 };
 
 template <class DataType>
