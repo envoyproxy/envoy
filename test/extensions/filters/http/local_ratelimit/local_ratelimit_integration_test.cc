@@ -1,4 +1,5 @@
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/extensions/filters/http/common/ratelimit_headers.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -181,6 +182,36 @@ name: envoy.filters.http.local_ratelimit
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
   stat_prefix: http_local_rate_limiter
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    runtime_key: local_rate_limit_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    runtime_key: local_rate_limit_enforced
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  response_headers_to_add:
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      header:
+        key: x-local-rate-limit
+        value: 'true'
+  local_rate_limit_per_downstream_connection: {}
+)EOF";
+
+
+static constexpr absl::string_view limit_header_filter_config_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  enableXRatelimitHeaders: DRAFT_VERSION_03
   token_bucket:
     max_tokens: 1
     tokens_per_fill: 1
@@ -489,6 +520,43 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {
   EXPECT_EQ(18, response->body().size());
 }
 
+TEST_P(LocalRateLimitFilterIntegrationTest, LimitHeaderTest) {
+  initializeFilter(fmt::format(limit_header_filter_config_, "true"));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, 1);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0, response->body().size());
+  EXPECT_THAT(
+      response->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, "1"));
+
+  response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("429", response->headers().getStatusValue());
+  EXPECT_EQ(18, response->body().size());
+  EXPECT_THAT(
+      response->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining, "0"));
+  EXPECT_THAT(
+      response->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset, "1000"));
+}
+
 TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnections) {
   initializeFilter(fmt::format(filter_config_, "true"));
 
@@ -562,7 +630,6 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0, response->body().size());
-
   cleanupUpstreamAndDownstream();
 
   cleanUpXdsConnection();
