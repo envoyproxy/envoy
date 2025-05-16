@@ -392,9 +392,7 @@ message RedisProtocolOptions {
 }
 
 message AwsIam {
-  string username = 1 [(validate.rules).string = {min_len: 1}];
-
-  common.aws.v3.AwsCredentialProvider credential_provider = 2;
+  common.aws.v3.AwsCredentialProvider credential_provider = 1;
 }
 
 // RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.

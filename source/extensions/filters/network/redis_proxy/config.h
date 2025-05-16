@@ -34,9 +34,21 @@ public:
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
   }
 
-  std::string iamAuthPassword() {
-    return proto_config_
-  }
+  std::string iamAuthPassword() const {
+    if (proto_config_.has_aws_iam())
+    {
+      return "test";
+    }
+    return EMPTY_STRING;
+  };
+
+  std::string iamAuthUsername() const {
+    if (proto_config_.has_aws_iam())
+    {
+      return proto_config_.aws_iam().username();
+    }
+    return EMPTY_STRING;
+  };
 
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
                                         Api::Api& api) {
@@ -58,25 +70,24 @@ public:
     return EMPTY_STRING;
   }
 
-  static const std::string iamAuthPassword(const Upstream::ClusterInfoConstSharedPtr info,
-                                        Api::Api& api) {
+  static const std::string iamAuthPassword(const Upstream::ClusterInfoConstSharedPtr info ) {
   auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options) {
-      return options->iamAuthPassword(api);
-    }
-    return EMPTY_STRING;  
-  }
-
-  static const std::string iamAuthUsername(const Upstream::ClusterInfoConstSharedPtr info,
-                                        Api::Api& api) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->authPassword(api);
+      return options->iamAuthPassword();
     }
     return EMPTY_STRING;
   }
+
+  static const std::string iamAuthUsername(const Upstream::ClusterInfoConstSharedPtr info ) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->iamAuthUsername();
+    }
+    return EMPTY_STRING;
+  }
+  
 private:
   envoy::config::core::v3::DataSource auth_username_;
   envoy::config::core::v3::DataSource auth_password_;
