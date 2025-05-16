@@ -6,8 +6,6 @@
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/environment_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/webidentity_credentials_provider.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
@@ -53,7 +51,7 @@ createIAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) PURE;
+        iam_roles_anywhere_config) const PURE;
         
 protected:
   std::string stsClusterName(absl::string_view region) {
@@ -92,12 +90,12 @@ public:
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) PURE;
 
-virtual CredentialsProviderSharedPtr
-createIAMRolesAnywhereCredentialsProvider(
+virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) PURE;
+        iam_roles_anywhere_config) const PURE;
+
         };
 
 /**
@@ -158,7 +156,7 @@ private:
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) override;
+        iam_roles_anywhere_config) const override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };
@@ -198,7 +196,7 @@ createIAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) override;
+        iam_roles_anywhere_config) const override;
 
 protected:
   std::string sessionName(Api::Api& api) {

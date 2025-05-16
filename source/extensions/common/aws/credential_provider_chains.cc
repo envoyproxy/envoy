@@ -2,8 +2,11 @@
 
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
-
+#include "absl/strings/str_replace.h"
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -290,7 +293,7 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
   const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
 
-  auto status = aws_cluster_manager.ref()->addManagedCluster(
+  auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
   auto roles_anywhere_certificate_provider =
@@ -306,7 +309,7 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
   auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
       initialization_timer, std::move(roles_anywhere_signer), iam_roles_anywhere_config);
-  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
   if (handleOr.ok()) {
@@ -319,7 +322,7 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 CredentialsProviderSharedPtr
 CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
         iam_roles_anywhere_config) const {
 
@@ -331,7 +334,7 @@ CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
   const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
 
-  const auto status = aws_cluster_manager.ref()->addManagedCluster(
+  const auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
   auto roles_anywhere_certificate_provider =
