@@ -66,6 +66,11 @@ public:
   static constexpr uint64_t DefaultTableSize = 65537;
   static constexpr uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
 
+  /**
+   * Log each entry of the maglev table (useful for debugging).
+   */
+  virtual void logMaglevTable(bool use_hostname_for_hashing) const PURE;
+
 protected:
   struct TableBuildEntry {
     TableBuildEntry(const HostConstSharedPtr& host, uint64_t offset, uint64_t skip, double weight)
@@ -98,11 +103,6 @@ private:
    */
   virtual void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                                 double max_normalized_weight) PURE;
-
-  /**
-   * Log each entry of the maglev table (useful for debugging).
-   */
-  virtual void logMaglevTable(bool use_hostname_for_hashing) const PURE;
 };
 
 /**
@@ -123,11 +123,12 @@ public:
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                         double max_normalized_weight) override;
 
-  void logMaglevTable(bool use_hostname_for_hashing) const override;
   std::vector<HostConstSharedPtr> table_;
 };
 
@@ -147,10 +148,11 @@ public:
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                         double max_normalized_weight) override;
-  void logMaglevTable(bool use_hostname_for_hashing) const override;
 
   // Leverage a BitArray to more compactly fit represent the MaglevTable.
   // The BitArray will index into the host_table_ which will provide the given
@@ -177,12 +179,13 @@ public:
   const MaglevLoadBalancerStats& stats() const { return stats_; }
   uint64_t tableSize() const { return table_size_; }
 
+  static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
+
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override;
-  static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
 
   Stats::ScopeSharedPtr scope_;
   MaglevLoadBalancerStats stats_;

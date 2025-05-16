@@ -329,6 +329,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
   hostSet().runCallbacks({}, {});
 
   config_.mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
   config_.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor()->set_value(200);
 
   init();

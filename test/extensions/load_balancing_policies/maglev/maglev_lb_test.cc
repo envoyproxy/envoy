@@ -43,6 +43,30 @@ public:
   HostPredicate should_select_another_host_;
 };
 
+TEST(MaglevTableLogMaglevTableTest, MaglevTableLogMaglevTableTest) {
+  Stats::IsolatedStoreImpl stats_store;
+  MaglevLoadBalancerStats stats = MaglevLoadBalancer::generateStats(*stats_store.rootScope());
+
+  auto host1 = std::make_shared<NiceMock<MockHost>>();
+  auto host2 = std::make_shared<NiceMock<MockHost>>();
+  const std::string hostname1 = "host1";
+  const std::string hostname2 = "host2";
+  ON_CALL(*host1, hostname()).WillByDefault(testing::ReturnRef(hostname1));
+  ON_CALL(*host2, hostname()).WillByDefault(testing::ReturnRef(hostname2));
+
+  NormalizedHostWeightVector normalized_host_weights = {{host1, 0.5}, {host2, 0.5}};
+
+  {
+    OriginalMaglevTable table(normalized_host_weights, 0.5, 6, true, stats);
+    table.logMaglevTable(true);
+  }
+
+  {
+    CompactMaglevTable table(normalized_host_weights, 0.5, 6, true, stats);
+    table.logMaglevTable(true);
+  }
+}
+
 // Note: ThreadAwareLoadBalancer base is heavily tested by RingHashLoadBalancerTest. Only basic
 //       functionality is covered here.
 class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
@@ -162,6 +186,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithBoundedLoad) {
                       makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
   config_.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor()->set_value(200);
   init(7);
 
