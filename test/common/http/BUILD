@@ -293,7 +293,22 @@ envoy_cc_test(
         # Split to avoid compiler OOM, especially on ASAN.
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
+        "conn_manager_impl_test_3.cc",
     ],
+    rbe_pool = "2core",
+    shard_count = 5,
+    deps = [
+        ":conn_manager_impl_test_base_lib",
+        ":custom_header_extension_lib",
+        "//envoy/network:proxy_protocol_options_lib",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
+        "//test/server:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "conn_manager_misc_test",
+    srcs = ["conn_manager_misc_test.cc"],
     rbe_pool = "2core",
     shard_count = 5,
     deps = [
@@ -533,7 +548,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:test_runtime_lib",
         "//source/common/quic:quic_client_factory_lib",

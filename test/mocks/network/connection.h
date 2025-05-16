@@ -78,6 +78,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const));                                            \
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const));                                            \
   MOCK_METHOD(State, state, (), (const));                                                          \
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
@@ -147,6 +148,7 @@ public:
   MOCK_METHOD(StreamBuffer, getReadBuffer, ());
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
   MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, closeConnection, (ConnectionCloseAction close_action));
 };
 
 } // namespace Network

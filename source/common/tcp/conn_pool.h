@@ -87,7 +87,7 @@ public:
   };
 
   ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
-                  const Upstream::HostConstSharedPtr& host, uint64_t concurrent_stream_limit,
+                  const Upstream::HostConstSharedPtr& host, uint32_t concurrent_stream_limit,
                   absl::optional<std::chrono::milliseconds> idle_timeout);
   ~ActiveTcpClient() override;
 

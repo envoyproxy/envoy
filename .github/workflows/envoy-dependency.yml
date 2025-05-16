@@ -213,7 +213,7 @@ jobs:
       with:
         base: main
         body: Created by Envoy dependency bot
-        branch: dependency-envoy/build-image/latest
+        branch: dependency-envoy/build-image/${{ inputs.version || 'latest' }}
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         commit-message: |
