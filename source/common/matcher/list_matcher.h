@@ -32,7 +32,7 @@ public:
       }
 
       MatchResult processed_result = MatchTree<DataType>::handleRecursionAndSkips(
-          {MatchState::MatchComplete, matcher.second}, matching_data, skipped_match_cb);
+          matcher.second, matching_data, skipped_match_cb);
       // Continue to next matcher if the result is a no-match or is skipped.
       if (processed_result.match_state_ != MatchState::MatchComplete ||
           processed_result.on_match_.has_value()) {
@@ -41,8 +41,8 @@ public:
     }
 
     // Return on-no-match, after keep_matching and/or recursion handling.
-    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
-                                                        matching_data, skipped_match_cb);
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, matching_data,
+                                                        skipped_match_cb);
   }
 
   void addMatcher(FieldMatcherPtr<DataType>&& matcher, OnMatch<DataType> action) {

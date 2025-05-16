@@ -47,7 +47,7 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree, co
                                              SkippedMatchCb<DataType> skipped_match_cb = nullptr) {
   const auto result = match_tree.match(data, skipped_match_cb);
   if (result.match_state_ == MatchState::UnableToMatch) {
-    return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
+    return {nullptr, MatchState::UnableToMatch};
   }
 
   if (!result.on_match_) {
@@ -56,7 +56,7 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree, co
 
   // Note: does not handle sub-matchers or keep_matching, MatchTree::match(...) implementations are
   // expected to do so.
-  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
+  return {result.on_match_->action_cb_, MatchState::MatchComplete};
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
@@ -72,9 +72,8 @@ public:
       : on_no_match_(std::move(on_no_match)) {}
 
   typename MatchTree<DataType>::MatchResult
-  match(const DataType&, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
-    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
-                                                        data, skipped_match_cb);
+  match(const DataType& data, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
   const absl::optional<OnMatch<DataType>> on_no_match_;
 };

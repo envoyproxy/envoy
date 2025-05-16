@@ -96,8 +96,7 @@ public:
       }
       // handleRecursionAndSkips should only return match-failure, no-match, or an action cb.
       typename MatchTree<DataType>::MatchResult processed_match =
-          MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, *node.on_match_},
-                                                       data, skipped_match_cb);
+          MatchTree<DataType>::handleRecursionAndSkips(*node.on_match_, data, skipped_match_cb);
 
       if (processed_match.match_state_ != MatchState::MatchComplete ||
           processed_match.on_match_.has_value()) {
@@ -108,8 +107,7 @@ public:
         first = false;
       }
     }
-    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
-                                                        data, skipped_match_cb);
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
 
 private:

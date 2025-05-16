@@ -169,16 +169,16 @@ public:
 protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.
   // This should be called against initial matching & on-no-match results.
-  static inline MatchResult handleRecursionAndSkips(const MatchResult& result, const DataType& data,
-                                                    SkippedMatchCb<DataType> skipped_match_cb) {
-    if (result.match_state_ != MatchState::MatchComplete || !result.on_match_.has_value()) {
-      return result;
+  static inline MatchResult
+  handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
+                          SkippedMatchCb<DataType> skipped_match_cb) {
+    if (!on_match.has_value()) {
+      return {MatchState::MatchComplete, absl::nullopt};
     }
-    if (result.on_match_->matcher_) {
-      auto nested_result = result.on_match_->matcher_->match(data, skipped_match_cb);
+    if (on_match->matcher_) {
+      auto nested_result = on_match->matcher_->match(data, skipped_match_cb);
       // Parent result's keep_matching skips the nested result.
-      if (result.on_match_->keep_matching_ &&
-          nested_result.match_state_ == MatchState::MatchComplete &&
+      if (on_match->keep_matching_ && nested_result.match_state_ == MatchState::MatchComplete &&
           nested_result.on_match_.has_value()) {
         if (skipped_match_cb)
           skipped_match_cb(*nested_result.on_match_);
@@ -186,12 +186,12 @@ protected:
       }
       return nested_result;
     }
-    if (result.on_match_->action_cb_ && result.on_match_->keep_matching_) {
+    if (on_match->action_cb_ && on_match->keep_matching_) {
       if (skipped_match_cb)
-        skipped_match_cb(*result.on_match_);
+        skipped_match_cb(*on_match);
       return {MatchState::MatchComplete, absl::nullopt};
     }
-    return result;
+    return {MatchState::MatchComplete, on_match};
   }
 };
 

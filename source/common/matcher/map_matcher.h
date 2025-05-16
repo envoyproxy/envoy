@@ -29,8 +29,7 @@ public:
 
     // Returns `on_no_match` when input data is empty. (i.e., is absl::monostate).
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
-      return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
-                                                          data, skipped_match_cb);
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
     const absl::optional<OnMatch<DataType>> result = doMatch(absl::get<std::string>(input.data_));
@@ -42,21 +41,19 @@ public:
         return {MatchState::UnableToMatch, absl::nullopt};
       }
       // No-match, return on_no_match after keep_matching and/or recursion handling.
-      return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
-                                                          data, skipped_match_cb);
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
     // Handle recursion and keep_matching.
-    auto processed_result = MatchTree<DataType>::handleRecursionAndSkips(
-        {MatchState::MatchComplete, *result}, data, skipped_match_cb);
+    auto processed_result =
+        MatchTree<DataType>::handleRecursionAndSkips(result, data, skipped_match_cb);
     // Matched or failed nested matching.
     if (processed_result.match_state_ != MatchState::MatchComplete ||
         processed_result.on_match_.has_value()) {
       return processed_result;
     }
     // No-match, return on_no_match after keep_matching and/or recursion handling.
-    return MatchTree<DataType>::handleRecursionAndSkips({MatchState::MatchComplete, on_no_match_},
-                                                        data, skipped_match_cb);
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
 
   template <class DataType2, class ActionFactoryContext> friend class MatchTreeFactory;
