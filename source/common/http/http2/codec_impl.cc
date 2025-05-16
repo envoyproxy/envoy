@@ -1780,6 +1780,15 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
+  // Validate the header name and value before setting them
+  const bool valid_name = HeaderUtility::headerNameIsValid(name_view);
+  const bool valid_value = HeaderUtility::headerValueIsValid(value_view);
+
+  if (!valid_name || !valid_value) {
+    ENVOY_LOG(debug, "Invalid header name or value received: [{}:{}]", name_view, value_view);
+    return OnHeaderResult::HEADER_CONNECTION_ERROR;
+  }
+
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
