@@ -228,6 +228,8 @@ public:
   const LowerCaseString Range{"range"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
+  const LowerCaseString SecWebSocketKey{"sec-websocket-key"};
+  const LowerCaseString SecWebSocketVersion{"sec-websocket-version"};
   const LowerCaseString Server{"server"};
   const LowerCaseString SetCookie{"set-cookie"};
   const LowerCaseString Status{":status"};
