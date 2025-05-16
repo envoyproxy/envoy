@@ -3,6 +3,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 #include "extensions/regex_functions.h"
 
 #include "cel/expr/syntax.pb.h"
@@ -111,6 +113,11 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   options.enable_string_conversion = false;
   options.enable_string_concat = false;
   options.enable_list_concat = false;
+
+  // Performance-oriented defaults
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_cel_regex_precompilation")) {
+    options.enable_regex_precompilation = true;
+  }
 
   // Enable constant folding (performance optimization)
   if (arena != nullptr) {

@@ -185,6 +185,10 @@ TEST_F(ZlibCompressorImplTest, CallingChecksum) {
   compressor.compressThenFlush(buffer);
   expectValidFlushedBuffer(buffer);
 
+  // Add an empty buffer finish call to finalize the checksum
+  Buffer::OwnedImpl empty_buffer;
+  compressor.finish(empty_buffer);
+
   drainBuffer(buffer);
   EXPECT_TRUE(compressor.checksum() > 0);
 }

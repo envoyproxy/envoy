@@ -126,7 +126,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -231,6 +231,9 @@ message OAuth2Config {
 
   // Controls for attributes that can be set on the cookies.
   CookieConfigs cookie_configs = 21;
+
+  // Optional additional prefix to use when emitting statistics.
+  string stat_prefix = 22;
 }
 
 // Filter config.

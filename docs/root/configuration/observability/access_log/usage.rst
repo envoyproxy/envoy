@@ -267,10 +267,11 @@ The following command operators are supported:
 
 .. _config_access_log_format_response_code_details:
 
-%RESPONSE_CODE_DETAILS%
+%RESPONSE_CODE_DETAILS(X)%
   HTTP
     HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why.
+    who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
+    will be converted to underscore '_', unless optional parameter X is ALLOW_WHITESPACES.
 
   TCP/UDP
     Not implemented ("-")
@@ -1223,6 +1224,28 @@ UDP
     extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
   UDP
     Not implemented (``-``).
+
+%TLS_JA4_FINGERPRINT%
+  HTTP/TCP/THRIFT
+    The JA4 fingerprint of the TLS Client Hello message from the downstream connection. JA4 is an advanced TLS client
+    fingerprinting method that provides more granularity than JA3 by including the protocol version, cipher preference
+    order, and ALPN (Application-Layer Protocol Negotiation) protocols. This enhanced fingerprinting facilitates
+    improved threat hunting and security analysis.
+
+    The JA4 fingerprint follows the format `a_b_c`, where:
+
+    - **a**: Represents the TLS protocol version and cipher preference order.
+    - **b**: Encodes the list of cipher suites offered by the client.
+    - **c**: Contains the ALPN protocols advertised by the client.
+
+    This structured format allows for detailed analysis of client applications based on their TLS handshake
+    characteristics. It enables the identification of specific applications, underlying TLS libraries, and even
+    potential malicious activities by comparing fingerprints against known profiles.
+
+    If TLS is not used or the handshake is incomplete, the value of ``%TLS_JA4_FINGERPRINT%`` will be ``"-"``.
+
+  UDP
+    Not implemented ("-").
 
 .. _config_access_log_format_downstream_peer_cert_v_start:
 

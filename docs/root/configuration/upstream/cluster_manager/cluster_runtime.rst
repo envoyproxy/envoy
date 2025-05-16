@@ -166,6 +166,11 @@ upstream.zone_routing.min_cluster_size
   is 6. If the upstream cluster size is smaller than *min_cluster_size* zone aware routing will not
   be performed.
 
+upstream.zone_routing.force_local_zone.min_size
+  Enables *force_local_zone* and configures the minimum number of the upstream hosts in the local zone for
+  *force_local_zone* to be respected. If the upstream zone size is smaller than *force_local_zone_min_size*
+  routing logic falls back to default zone aware routing behavior.
+
 Circuit breaking
 ----------------
 
