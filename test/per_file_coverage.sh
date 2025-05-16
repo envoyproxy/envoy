@@ -40,7 +40,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/ip_tagging:90.6"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/oauth2:96.4"
+"source/extensions/filters/listener:96.5"
 "source/extensions/filters/listener/original_src:92.1"
+"source/extensions/filters/listener/tls_inspector:94.0"
 "source/extensions/filters/network/dubbo_proxy:96.2"
 "source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"

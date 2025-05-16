@@ -44,6 +44,9 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
               ->full_name())},
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
+              ->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::FilterStateInput::descriptor()
               ->full_name())}};
   if (allowed_inputs_set.contains(type_url)) {
     return absl::OkStatus();

@@ -110,7 +110,6 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/load_balancing_policies/subset:config",
-        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http/generic:config",
         "//test/config:v2_link_hacks",
