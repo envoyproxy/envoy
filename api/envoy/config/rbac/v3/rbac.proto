@@ -384,7 +384,7 @@ message Principal {
     // .. note::
     //
     //   This is always the physical peer even if the
-    //   :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is inferred from for example the
+    //   :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` is inferred from the
     //   x-forwarder-for header, proxy protocol, etc.
     //
     core.v3.CidrRange direct_remote_ip = 10;
