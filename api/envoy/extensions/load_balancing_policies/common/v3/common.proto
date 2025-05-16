@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.common.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/hash_policy.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
