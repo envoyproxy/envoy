@@ -953,7 +953,6 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusCloseHandling) {
 // Test connection status CLOSE_RST handling in responses
 TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   initialize();
-  // Create a new HTTP connection since the previous one was closed
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
   ASSERT_TRUE(tcp_client->write("client_data", false));
 
