@@ -34,6 +34,10 @@ minor_behavior_changes:
     Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
     <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
 
+- area: ext_authz
+  change: |
+    Implement support for ext_authz grpc check to use `append_action` when given in upstream header handling to support multi header fields
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: conn_pool
