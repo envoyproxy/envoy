@@ -204,8 +204,7 @@ typed_config:
   local_rate_limit_per_downstream_connection: {}
 )EOF";
 
-
-static constexpr absl::string_view limit_header_filter_config_ =
+  static constexpr absl::string_view limit_header_filter_config_ =
       R"EOF(
 name: envoy.filters.http.local_ratelimit
 typed_config:
@@ -539,7 +538,8 @@ TEST_P(LocalRateLimitFilterIntegrationTest, LimitHeaderTest) {
   EXPECT_THAT(
       response->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, "1"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
+          "1"));
 
   response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
 
@@ -550,11 +550,13 @@ TEST_P(LocalRateLimitFilterIntegrationTest, LimitHeaderTest) {
   EXPECT_THAT(
       response->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining, "0"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
+          "0"));
   EXPECT_THAT(
       response->headers(),
       Http::HeaderValueOf(
-          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset, "1000"));
+          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+          "1000"));
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnections) {
