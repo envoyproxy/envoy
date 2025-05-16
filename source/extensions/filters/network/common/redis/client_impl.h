@@ -108,7 +108,6 @@ private:
     }
 
     ClientImpl& parent_;
-    std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
   };
 
   struct PendingRequest : public PoolRequest {
@@ -152,6 +151,7 @@ private:
   const RedisCommandStatsSharedPtr redis_command_stats_;
   Stats::Scope& scope_;
   bool is_transaction_client_;
+  std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
 };
 
 class ClientFactoryImpl : public ClientFactory {
