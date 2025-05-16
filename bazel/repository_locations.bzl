@@ -1161,15 +1161,28 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
-        version = "10.7.193.13",
+        version = "13.6.233.8",
         # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
         strip_prefix = "v8-{version}",
-        sha256 = "6fb91b839e9c36ca4c151268f772e7a6a888a75bcb947f37be9758e49f485db7",
+        sha256 = "2fdfbc95b4ae87bbed1f1af4fedc982c072191f696d542978f1579d20620903a",
         urls = ["https://github.com/v8/v8/archive/refs/tags/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-09-28",
+        release_date = "2025-04-22",
         cpe = "cpe:2.3:a:google:v8:*",
+    ),
+    com_github_google_highway = dict(
+        project_name = "Highway",
+        project_desc = "Efficient and performance-portable vector software",
+        project_url = "https://github.com/google/highway",
+        # Same version as used by V8
+        version = "00fe003dac355b979f36157f9407c7c46448958e",
+        sha256 = "7ef3f89053f50f88d4603670bb9a915d252bd93314ced691ddf5913edbc4e75b",
+        urls = ["https://github.com/google/highway/archive/{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2024-10-25",
+        cpe = "N/A",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
         project_name = "Chromium's trace event headers",
