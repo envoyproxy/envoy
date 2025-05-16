@@ -80,6 +80,21 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         config, config.listenSocketFactories()[0]->localAddress(), listener_reject_fraction_,
         disable_listeners_, std::move(internal_listener),
         config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
+  } else if (config.reverseConnectionListenerConfig().has_value()) {
+    ENVOY_LOG(debug, "adding reverse connection listener with name: {} tag: {}", config.name(),
+              config.listenerTag());
+    Network::RevConnRegistry& reverse_conn_registry =
+        config.reverseConnectionListenerConfig()->reverseConnRegistry();
+    ENVOY_LOG(debug, "Obtaining thread local reverse conn registry");
+    local_reverse_conn_registry_ = reverse_conn_registry.getLocalRegistry();
+    RELEASE_ASSERT(local_reverse_conn_registry_ != nullptr,
+                   "Failed to get local reverse conn listener registry");
+    auto rc_listener = local_reverse_conn_registry_->createActiveReverseConnectionListener(
+        *this, dispatcher(), config);
+    details->addActiveListener(
+        config, config.listenSocketFactories()[0]->localAddress(), listener_reject_fraction_,
+        disable_listeners_, std::move(rc_listener),
+        config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
     auto overload_state =
         config.shouldBypassOverloadManager()
@@ -155,6 +170,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
     }
   }
+  details->setName(config.name());
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
 }
 
@@ -309,6 +325,29 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
+void ConnectionHandlerImpl::saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,
+                                                   uint64_t listener_tag) {
+  auto listener = findActiveListenerByTag(listener_tag);
+  if (listener.has_value()) {
+    ENVOY_LOG(debug, "saving reverse connection for {} to listener {} tag {}",
+              upstream_socket->connectionInfoProvider().remoteAddress()->asString(),
+              listener->get().name_, listener_tag);
+    for (auto address_list : listener->get().per_address_details_list_) {
+      if (address_list->reverseConnectionListener().has_value()) {
+        ENVOY_LOG(debug, "passing reverse connection to listener {} tag {}", listener->get().name_,
+                  listener_tag);
+        address_list->reverseConnectionListener()->onAccept(std::move(upstream_socket));
+        ENVOY_LOG(debug, "reverse connection passed to listener {} tag {}", listener->get().name_,
+                  listener_tag);
+        return;
+      } else {
+        ENVOY_LOG(debug, "no reverse connection listener for name {} tag {}", listener->get().name_,
+                  listener_tag);
+      }
+    }
+  }
+}
+
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
@@ -335,6 +374,13 @@ ConnectionHandlerImpl::PerAddressActiveListenerDetails::udpListener() {
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::InternalListener>>(&typed_listener_);
+  return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
+}
+
+OptRef<Network::ReverseConnectionListener>
+ConnectionHandlerImpl::PerAddressActiveListenerDetails::reverseConnectionListener() {
+  auto* val =
+      absl::get_if<std::reference_wrapper<Network::ReverseConnectionListener>>(&typed_listener_);
   return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
 

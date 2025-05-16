@@ -208,14 +208,18 @@ protected:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
-  void disconnect(bool wait_for_remote_close) {
+  void disconnect(bool wait_for_remote_close, bool client_socket_closed = false) {
     if (client_write_buffer_) {
       EXPECT_CALL(*client_write_buffer_, drain(_))
           .Times(AnyNumber())
           .WillRepeatedly(
               Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
     }
-    EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+    // client_socket_closed is set when the client socket has been moved,
+    // and the LocalClose won't be raised.
+    if (!client_socket_closed) {
+      EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+    }
     client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -355,6 +359,23 @@ TEST_P(ConnectionImplTest, GetCongestionWindow) {
 #endif
 
   disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, TestMoveSocket) {
+  setUpBasicConnection();
+  connect();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+  // Mark the client connection's socket as reused.
+  client_connection_->setSocketReused(true);
+  // Call moveSocket and verify the behavior.
+  auto moved_socket = client_connection_->moveSocket();
+  EXPECT_NE(moved_socket, nullptr); // Ensure the socket is moved.
+  EXPECT_EQ(client_connection_->state(), Connection::State::Closed); // Connection should be closed.
+
+  // Mark the socket dead to raise a close() event on the server connection.
+  moved_socket->close();
+  disconnect(true /* wait_for_remote_close */, true /* client_socket_closed */);
 }
 
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {

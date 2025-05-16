@@ -116,6 +116,9 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
+      Network::ConnectionSocketPtr moveSocket() override { PANIC("not implemented"); }
+      void setSocketReused(bool) override { PANIC("not implemented"); }
+      bool isSocketReused() override { PANIC("not implemented"); }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         IS_ENVOY_BUG("Unexpected function call");
       }

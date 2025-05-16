@@ -19,6 +19,8 @@
 namespace Envoy {
 namespace Network {
 
+class LocalRevConnRegistry;
+
 // This interface allows for a listener to perform an alternative behavior when a
 // packet can't be routed correctly during draining; for example QUIC packets that
 // are not for an existing connection.
@@ -126,6 +128,20 @@ public:
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * Pass the reverse connection socket to the listener that initiated it.
+   * @param upstream_socket the socket to be passed.
+   * @param listener_tag the tag of the listener that initiated the reverse
+   * connection.
+   */
+  virtual void saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,
+                                      uint64_t listener_tag) PURE;
+
+  /**
+   * @return the thread local registry.
+   */
+  virtual Network::LocalRevConnRegistry& reverseConnRegistry() const PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.
@@ -304,6 +320,29 @@ using InternalListenerPtr = std::unique_ptr<InternalListener>;
 using InternalListenerOptRef = OptRef<InternalListener>;
 
 /**
+ * Reverse connection listener callbacks.
+ */
+class ReverseConnectionListener : public virtual ConnectionHandler::ActiveListener {
+public:
+  /**
+   * Helper method that triggers the reverse connection workflow.
+   * @param dispatcher the thread local dispatcher.
+   * @param conn_handler the thread local connection handler.
+   * @param config the listener config that triggers the reverse connection.
+   */
+  virtual void startRCWorkflow(Event::Dispatcher& dispatcher,
+                               Network::ConnectionHandler& conn_handler,
+                               Network::ListenerConfig& config) PURE;
+
+  /**
+   * Called when a new connection is accepted.
+   * @param socket supplies the socket that is moved into the callee.
+   */
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+};
+using ReverseConnectionListenerPtr = std::unique_ptr<ReverseConnectionListener>;
+
+/**
  * The query interface of the registered internal listener callbacks.
  */
 class InternalListenerManager {
@@ -349,6 +388,36 @@ public:
    * @return The thread local registry.
    */
   virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
+};
+
+// The thread local registry.
+class LocalRevConnRegistry {
+public:
+  virtual ~LocalRevConnRegistry() = default;
+
+  virtual Network::ReverseConnectionListenerPtr
+  createActiveReverseConnectionListener(Network::ConnectionHandler& conn_handler,
+                                        Event::Dispatcher& dispatcher,
+                                        Network::ListenerConfig& config) PURE;
+};
+
+// The central reverse conn registry interface providing the thread local accessor.
+class RevConnRegistry {
+public:
+  virtual ~RevConnRegistry() = default;
+
+  /**
+   * @return The thread local registry.
+   */
+  virtual LocalRevConnRegistry* getLocalRegistry() PURE;
+
+  /**
+   * Helper function to create a ReverseConnectionListenerConfig from a ProtobufWkt.Any.
+   * @param config is the reverse connection listener config.
+   * @return the ReverseConnectionListenerConfig object.
+   */
+  virtual absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>
+  fromAnyConfig(const ProtobufWkt::Any& config) PURE;
 };
 
 } // namespace Network

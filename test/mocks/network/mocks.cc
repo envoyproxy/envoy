@@ -44,10 +44,13 @@ MockListenerConfig::MockListenerConfig()
       .WillByDefault(Return(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, versionInfo()).WillByDefault(ReturnRef(version_info_));
   ON_CALL(*this, maxConnectionsToAcceptPerSocketEvent())
       .WillByDefault(Return(Network::DefaultMaxConnectionsToAcceptPerSocketEvent));
   ON_CALL(*this, ignoreGlobalConnLimit()).WillByDefault(Return(false));
   ON_CALL(*this, bindToPort()).WillByDefault(Return(true));
+  ON_CALL(*this, reverseConnectionListenerConfig())
+      .WillByDefault(Return(Network::ReverseConnectionListenerConfigOptRef()));
 }
 MockListenerConfig::~MockListenerConfig() = default;
 

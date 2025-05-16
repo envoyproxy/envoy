@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/upstream/upstream.h"
 
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -37,11 +37,12 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
 }
 
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
-                           OptRef<Upstream::Host::CreateConnectionData> data)
+                           OptRef<Upstream::Host::CreateConnectionData> data,
+                           CreateConnectionDataFn connection_fn)
     : MultiplexedActiveClientBase(
           parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(),
-          parent.host()->cluster().trafficStats()->upstream_cx_http2_total_, data) {}
+          parent.host()->cluster().trafficStats()->upstream_cx_http2_total_, data, connection_fn) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,

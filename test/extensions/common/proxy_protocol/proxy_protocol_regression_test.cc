@@ -73,6 +73,11 @@ public:
     return socket_factories_;
   }
   bool bindToPort() const override { return true; }
+  Network::ReverseConnectionListenerConfigOptRef reverseConnectionListenerConfig() const override {
+    ENVOY_LOG_MISC(info,
+                   "Reverse connection config is not supported for ProxyProtocolRegressionTest.");
+    return Network::ReverseConnectionListenerConfigOptRef();
+  }
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
   }
@@ -83,6 +88,9 @@ public:
   Stats::Scope& listenerScope() override { return *stats_store_.rootScope(); }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
+  const std::string& versionInfo() const override {
+    PANIC("Not implemented for ProxyProtocolRegressionTest.");
+  }
   Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }
   Network::InternalListenerConfigOptRef internalListenerConfig() override { return {}; }
   ResourceLimit& openConnections() override { return open_connections_; }

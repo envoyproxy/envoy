@@ -247,6 +247,9 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
   if (config.has_internal_listener()) {
     return absl::StrCat("envoy_internal_", config.name());
   }
+  if (config.has_reverse_connection_listener_config()) {
+    return absl::StrCat("reverse_connection_listener_", config.name());
+  }
   auto address_or_error = Network::Address::resolveProtoAddress(config.address());
   if (address_or_error.status().ok()) {
     return address_or_error.value()->asString();
@@ -411,6 +414,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildOriginalDstListenerFilter(config);
     buildProxyProtocolListenerFilter(config);
     SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
+    SET_AND_RETURN_IF_NOT_OK(buildReverseConnectionListener(config), creation_status);
   }
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
@@ -478,6 +482,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   SET_AND_RETURN_IF_NOT_OK(validateFilterChains(config), creation_status);
   SET_AND_RETURN_IF_NOT_OK(buildFilterChains(config), creation_status);
   SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(buildReverseConnectionListener(config), creation_status);
   if (socket_type_ == Network::Socket::Type::Stream) {
     // Apply the options below only for TCP.
     buildSocketOptions(config);
@@ -587,6 +592,47 @@ ListenerImpl::buildInternalListener(const envoy::config::listener::v3::Listener&
                     "field instead of address for internal listeners",
                     name_));
   }
+  return absl::OkStatus();
+}
+
+absl::Status
+ListenerImpl::buildReverseConnectionListener(const envoy::config::listener::v3::Listener& config) {
+
+  ENVOY_LOG(debug, "Listener: {}; Reverse conn metadata : {}", config.name(),
+            config.reverse_connection_listener_config().DebugString());
+
+  if (!config.has_reverse_connection_listener_config()) {
+    ENVOY_LOG(info,
+              "Listener: {}; Reverse connection listener config is not present. Listener will bind "
+              "to port",
+              config.name());
+    return absl::OkStatus();
+  }
+  // Reverse connection listener should not bind to port.
+  bind_to_port_ = false;
+
+  ENVOY_LOG(debug, "Building reverse connection config for listener: {} tag: {}", config.name(),
+            listener_tag_);
+  std::shared_ptr<Network::RevConnRegistry> reverse_conn_registry =
+      parent_.server_.singletonManager().getTyped<Network::RevConnRegistry>(
+          "reverse_conn_registry_singleton");
+  if (reverse_conn_registry == nullptr) {
+    ENVOY_LOG(
+        error,
+        "Cannot build reverse conn listener name: {} tag: {}. Reverse conn registry not found",
+        config.name(), listener_tag_);
+    return absl::OkStatus();
+  }
+  auto config_or_error =
+      reverse_conn_registry->fromAnyConfig(config.reverse_connection_listener_config());
+  if (!config_or_error.ok() || *config_or_error == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Cannot build reverse conn listener name: {} tag: {} Error {} : failed to "
+                    "unpack reverse connection "
+                    "config",
+                    config.name(), listener_tag_, config_or_error.status()));
+  }
+  reverse_connection_listener_config_ = std::move(*config_or_error);
   return absl::OkStatus();
 }
 
