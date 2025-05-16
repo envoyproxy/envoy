@@ -482,6 +482,46 @@ TEST(ABIImpl, dynamic_metadata) {
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
 }
 
+TEST(ABIImpl, filter_state) {
+  DynamicModuleHttpFilter filter{nullptr};
+  const std::string key_str = "key";
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr = const_cast<char*>(key_str.data());
+  size_t key_length = key_str.size();
+  const std::string value_str = "value";
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr = const_cast<char*>(value_str.data());
+  size_t value_length = value_str.size();
+  char* result_str_ptr = nullptr;
+  size_t result_str_length = 0;
+
+  // No stream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, key_ptr, key_length, value_ptr, value_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, key_ptr, key_length, &result_str_ptr, &result_str_length));
+
+  // With stream info but non existing key.
+  const char* non_existing_key = "non_existing";
+  envoy_dynamic_module_type_buffer_module_ptr non_existing_key_ptr =
+      const_cast<char*>(non_existing_key);
+  size_t non_existing_key_length = strlen(non_existing_key);
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter.setDecoderFilterCallbacks(callbacks);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_filter_state_bytes(
+      &filter, key_ptr, key_length, value_ptr, value_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, non_existing_key_ptr, non_existing_key_length, &result_str_ptr, &result_str_length));
+
+  // With key.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_filter_state_bytes(
+      &filter, key_ptr, key_length, &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, value_length);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str);
+}
+
 std::string
 bufferVectorToString(const std::vector<envoy_dynamic_module_type_envoy_buffer>& buffer_vector) {
   std::string result;
@@ -671,6 +711,9 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(testing::Return(Http::Protocol::Http11));
   EXPECT_CALL(stream_info, upstreamInfo()).Times(testing::AtLeast(1));
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(testing::Return(200));
+  StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
+  EXPECT_CALL(stream_info, getStreamIdProvider())
+      .WillRepeatedly(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(stream_info, downstreamAddressProvider())
@@ -725,6 +768,13 @@ TEST(ABIImpl, GetAttributes) {
       &result_str_length));
   EXPECT_EQ(result_str_length, 14);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "127.0.0.2:4321");
+
+  // envoy_dynamic_module_type_attribute_id_RequestId
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestId, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 36);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "ffffffff-0012-0110-00ff-0c00400600ff");
 
   // envoy_dynamic_module_type_attribute_id_ResponseCode
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(

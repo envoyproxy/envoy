@@ -23,8 +23,10 @@ JSON mapping
 
 The protobuf to JSON mapping is defined `here <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
 
-* **NOTE:** The gRPC-JSON reverse transcoder ignores the ``json_name`` option and uses the proto field names
-  as the JSON names by default.
+* **NOTE:** The gRPC-JSON reverse transcoder uses the proto field names as the JSON field names by default.
+  This behavior can be overridden by setting ``use_canonical_field_names`` field to ``true``.
+  With this the transcoder will convert the proto field names to ``json_name`` annotation value,  or lower camel case
+  in absence of ``json_name`` annotation.
 
 .. _config_grpc_json_reverse_transcoder_generate_proto_descriptor_set:
 

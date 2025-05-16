@@ -67,6 +67,7 @@ actual mechanics of the release itself.
 | 2023 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
 | 2024 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2024 Q3 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2025 Q1 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 
 ## Major release schedule
 
@@ -98,7 +99,8 @@ deadline of 3 weeks.
 | 1.31.0  | 2024/07/16 | 2024/07/19 |   +3 days  | 2025/07/19  |
 | 1.32.0  | 2024/10/15 | 2024/10/15 |    0 days  | 2025/10/15  |
 | 1.33.0  | 2025/01/14 | 2025/01/14 |    0 days  | 2026/01/14  |
-| 1.34.0  | 2025/04/15 |            |            |             |
+| 1.34.0  | 2025/04/15 | 2025/04/15 |    0 days  | 2026/04/15  |
+| 1.35.0  | 2025/07/15 |            |            |             |
 
 ### Cutting a major release
 

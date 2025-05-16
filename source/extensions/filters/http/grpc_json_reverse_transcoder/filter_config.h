@@ -24,6 +24,7 @@
 // libraries as the grpc_json_transcoder filter, so the request and response
 // translators are reversed.
 using RequestTranslator = ::google::grpc::transcoding::ResponseToJsonTranslator;
+using RequestTranslateOptions = ::google::grpc::transcoding::JsonResponseTranslateOptions;
 using ResponseTranslator = ::google::grpc::transcoding::JsonRequestTranslator;
 using ::google::grpc::transcoding::MessageStream;
 using ::google::grpc::transcoding::Transcoder;
@@ -83,6 +84,11 @@ public:
                    TranscoderInputStream& request_input,
                    TranscoderInputStream& response_input) const;
 
+  // Changes the body field to its `json_name` value or to camelCase if the filter
+  // is not configured to preserve the proto field names.
+  absl::StatusOr<std::string> ChangeBodyFieldName(absl::string_view path,
+                                                  absl::string_view body_field) const;
+
   absl::optional<uint32_t> max_request_body_size_;
   absl::optional<uint32_t> max_response_body_size_;
   absl::optional<std::string> api_version_header_;
@@ -90,6 +96,7 @@ public:
 private:
   Protobuf::DescriptorPool descriptor_pool_;
   std::unique_ptr<TypeHelper> type_helper_;
+  RequestTranslateOptions request_translate_options_;
 };
 
 } // namespace GrpcJsonReverseTranscoder

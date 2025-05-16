@@ -108,12 +108,20 @@ public:
     }
   }
 
+  // Only sets if not-null.
+  void setHttpResponseCodeDetails(const absl::optional<std::string>& http_response_code_details) {
+    if (http_response_code_details) {
+      http_response_code_details_ = http_response_code_details.value();
+    }
+  }
+
   uint64_t bytesSent() const { return bytes_sent_; }
   uint64_t bytesReceived() const { return bytes_received_; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
@@ -125,6 +133,8 @@ private:
   uint64_t bytes_sent_{0}, bytes_received_{0};
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
+  std::string http_response_code_details_;
 };
 
 // Changes to headers are normally tested against the MutationRules supplied
@@ -421,7 +431,7 @@ public:
     return config_with_hash_key_.config();
   }
 
-  ExtProcFilterStats& stats() { return stats_; }
+  const ExtProcFilterStats& stats() const { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
@@ -548,7 +558,7 @@ private:
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
-  ExtProcFilterStats stats_;
+  const ExtProcFilterStats& stats_;
   ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;

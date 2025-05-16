@@ -50,6 +50,43 @@ The overload manager uses Envoy's :ref:`extension <extending>` framework for def
 resource monitors. Envoy's builtin resource monitors are listed
 :ref:`here <v3_config_resource_monitors>`.
 
+.. _config_overload_manager_cgroup_memory:
+
+Cgroup Memory
+^^^^^^^^^^^^^
+
+The cgroup memory resource monitor tracks memory pressure by reading memory usage and limits from the cgroup memory subsystem.
+This monitor supports both cgroup v1 and cgroup v2.
+
+The monitor reports memory pressure as a ratio of current memory usage to the memory limit. The limit is determined by:
+
+1. The cgroup memory limit as reported by the monitor. This is the typical case.
+2. If max_memory_bytes is configured, the minimum between the configured max_memory_bytes value and the cgroup memory limit.
+   In this case, max_memory_bytes serves as an upper bound on the memory limit used for pressure calculations.
+
+When no memory limit is set in cgroup (indicated by -1 in v1 or "max" in v2), the pressure is reported as 0.
+
+Example configuration:
+
+.. code-block:: yaml
+
+   resource_monitors:
+     - name: "envoy.resource_monitors.cgroup_memory"
+       typed_config:
+         "@type": type.googleapis.com/envoy.extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig
+         max_memory_bytes: 1073741824  # 1GB
+
+This can be combined with actions to shed load when memory pressure increases:
+
+.. code-block:: yaml
+
+   actions:
+     - name: "envoy.overload_actions.stop_accepting_requests"
+       triggers:
+         - name: "envoy.resource_monitors.cgroup_memory"
+           threshold:
+             value: 0.95  # Trigger at 95% memory utilization
+
 .. _config_overload_manager_triggers:
 
 Triggers

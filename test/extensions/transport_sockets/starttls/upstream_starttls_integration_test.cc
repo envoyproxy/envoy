@@ -89,7 +89,7 @@ public:
       read_callbacks_ = &callbacks;
     }
 
-    std::weak_ptr<StartTlsSwitchFilter> parent_{};
+    std::weak_ptr<StartTlsSwitchFilter> parent_;
     Network::ReadFilterCallbacks* read_callbacks_{};
   };
 
@@ -118,10 +118,10 @@ private:
                        Network::ConnectionCallbacks* upstream_callbacks)
       : upstream_connection_cb_(upstream_callbacks), cluster_manager_(cluster_manager) {}
 
-  std::weak_ptr<StartTlsSwitchFilter> self_{};
+  std::weak_ptr<StartTlsSwitchFilter> self_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
-  Network::ClientConnectionPtr upstream_connection_{};
+  Network::ClientConnectionPtr upstream_connection_;
   Network::ConnectionCallbacks* upstream_connection_cb_;
   Upstream::ClusterManager& cluster_manager_;
 };

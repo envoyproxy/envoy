@@ -25,9 +25,11 @@ LedsSubscription::LedsSubscription(
       xds::core::v3::ResourceLocator);
   const auto resource_name = getResourceName();
   subscription_ = THROW_OR_RETURN_VALUE(
-      factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
-          leds_resource_locator, leds_config.leds_config(), resource_name, *stats_scope_, *this,
-          resource_decoder_),
+      factory_context.serverFactoryContext()
+          .clusterManager()
+          .subscriptionFactory()
+          .collectionSubscriptionFromUrl(leds_resource_locator, leds_config.leds_config(),
+                                         resource_name, *stats_scope_, *this, resource_decoder_),
       Config::SubscriptionPtr);
   subscription_->start({});
 }

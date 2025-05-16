@@ -13,7 +13,7 @@ namespace Golang {
 
 using GolangClusterProto = envoy::extensions::router::cluster_specifier::golang::v3alpha::Config;
 
-class ClusterConfig : Logger::Loggable<Logger::Id::http> {
+class ClusterConfig : Logger::Loggable<Logger::Id::golang> {
 public:
   ClusterConfig(const GolangClusterProto& config);
   uint64_t getPluginId() { return plugin_id_; };
@@ -32,7 +32,7 @@ private:
 using ClusterConfigSharedPtr = std::shared_ptr<ClusterConfig>;
 
 class GolangClusterSpecifierPlugin : public ClusterSpecifierPlugin,
-                                     Logger::Loggable<Logger::Id::http> {
+                                     Logger::Loggable<Logger::Id::golang> {
 public:
   GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config) {};
 

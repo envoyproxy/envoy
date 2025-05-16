@@ -3,12 +3,14 @@
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
+using testing::MockFunction;
 using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -71,9 +73,7 @@ public:
   WebIdentityCredentialsProviderPtr provider_;
   Event::MockTimer* timer_{};
   NiceMock<Upstream::MockClusterManager> cm_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
   Http::RequestMessagePtr message_;
 };
 
@@ -90,13 +90,11 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
   cred_provider.set_role_session_name("role-session-name");
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
+      context_, mock_manager_, "cluster_2",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
@@ -138,13 +136,11 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
   cred_provider.set_role_session_name("role-session-name");
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
+      context_, mock_manager_, "cluster_2",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
@@ -209,13 +205,10 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   cred_provider.set_role_session_name("role-session-name");
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-  manager_optref_.emplace(base_manager_);
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
+      context_, mock_manager_, "cluster_2",
       [this](Upstream::ClusterManager&, absl::string_view) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
@@ -270,6 +263,51 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   // We now have credentials so sign should complete immediately
   auto result = signer->sign(*message_, false, "");
   ASSERT_TRUE(result.ok());
+}
+
+class ControlledCredentialsProvider : public CredentialsProvider {
+public:
+  ControlledCredentialsProvider(CredentialSubscriberCallbacks* cb) : cb_(cb) {}
+
+  Credentials getCredentials() override {
+    Thread::LockGuard guard(mu_);
+    return credentials_;
+  }
+
+  bool credentialsPending() override {
+    Thread::LockGuard guard(mu_);
+    return pending_;
+  }
+
+  std::string providerName() override { return "Controlled Credentials Provider"; }
+
+  void refresh(const Credentials& credentials) {
+    {
+      Thread::LockGuard guard(mu_);
+      credentials_ = credentials;
+      pending_ = false;
+    }
+    if (cb_) {
+      cb_->onCredentialUpdate();
+    }
+  }
+
+private:
+  CredentialSubscriberCallbacks* cb_;
+  Thread::MutexBasicLockable mu_;
+  Credentials credentials_ ABSL_GUARDED_BY(mu_);
+  bool pending_ ABSL_GUARDED_BY(mu_) = true;
+};
+
+TEST(CredentialsProviderChainTest, SignerCallbacksCalledWhenCredentialsReturned) {
+  MockFunction<void()> signer_callback;
+  EXPECT_CALL(signer_callback, Call());
+
+  CredentialsProviderChain chain;
+  auto provider = std::make_shared<ControlledCredentialsProvider>(&chain);
+  chain.add(provider);
+  ASSERT_TRUE(chain.addCallbackIfChainCredentialsPending(signer_callback.AsStdFunction()));
+  provider->refresh(Credentials());
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {

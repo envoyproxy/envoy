@@ -1,5 +1,4 @@
 #include "rbac_filter.h"
-#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "envoy/stats/scope.h"
 
@@ -16,44 +15,49 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+// Define the static allowed_inputs_set
+const absl::flat_hash_set<std::string> ActionValidationVisitor::allowed_inputs_set_{
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::SourcePortInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::ssl::v3::UriSanInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::ssl::v3::DnsSanInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput::descriptor()
+            ->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name())},
+    {TypeUtil::descriptorFullNameToTypeUrl(
+        envoy::extensions::matching::common_inputs::network::v3::FilterStateInput::descriptor()
+            ->full_name())}};
+
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
-  static absl::flat_hash_set<std::string> allowed_inputs_set{
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
-                                                 v3::DestinationPortInput::descriptor()
-                                                     ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::network::v3::SourceIPInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::network::v3::SourcePortInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::type::matcher::v3::HttpRequestHeaderMatchInput::descriptor()->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::ssl::v3::UriSanInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::ssl::v3::DnsSanInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          envoy::extensions::matching::common_inputs::ssl::v3::SubjectInput::descriptor()
-              ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(envoy::extensions::matching::common_inputs::network::
-                                                 v3::DynamicMetadataInput::descriptor()
-                                                     ->full_name())},
-      {TypeUtil::descriptorFullNameToTypeUrl(
-          xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name())}};
-  if (allowed_inputs_set.contains(type_url)) {
+    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+  if (allowed_inputs_set_.contains(type_url)) {
     return absl::OkStatus();
   }
 
@@ -139,6 +143,102 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
       per_route_config.rbac(), context, validation_visitor, action_validation_visitor_);
 }
 
+// Evaluates the shadow engine policy and updates metrics accordingly
+bool RoleBasedAccessControlFilter::evaluateShadowEngine(Http::RequestHeaderMap& headers,
+                                                        ProtobufWkt::Struct& metrics) {
+  const auto shadow_engine =
+      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
+  if (shadow_engine == nullptr) {
+    return false;
+  }
+
+  auto& fields = *metrics.mutable_fields();
+  std::string effective_policy_id;
+  std::string shadow_response_code =
+      Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
+
+  const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
+
+  if (shadow_engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
+                                  &effective_policy_id)) {
+    ENVOY_LOG(debug, "shadow allowed, matched policy {}",
+              effective_policy_id.empty() ? "none" : effective_policy_id);
+    config_->stats().shadow_allowed_.inc();
+    if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+      config_->stats().incPolicyShadowAllowed(effective_policy_id);
+    }
+  } else {
+    ENVOY_LOG(debug, "shadow denied, matched policy {}",
+              effective_policy_id.empty() ? "none" : effective_policy_id);
+    config_->stats().shadow_denied_.inc();
+    if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+      config_->stats().incPolicyShadowDenied(effective_policy_id);
+    }
+    shadow_response_code =
+        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
+  }
+
+  if (!effective_policy_id.empty()) {
+    *fields[config_->shadowEffectivePolicyIdField(callbacks_)].mutable_string_value() =
+        effective_policy_id;
+  }
+
+  *fields[config_->shadowEngineResultField(callbacks_)].mutable_string_value() =
+      shadow_response_code;
+
+  return true;
+}
+
+// Evaluates the enforced engine policy and returns the appropriate filter status
+Http::FilterHeadersStatus
+RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
+                                                     ProtobufWkt::Struct& metrics) const {
+  const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
+  if (engine == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  auto& fields = *metrics.mutable_fields();
+  std::string effective_policy_id;
+  const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
+
+  const bool allowed = engine->handleAction(*callbacks_->connection(), headers,
+                                            callbacks_->streamInfo(), &effective_policy_id);
+
+  const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+
+  if (!effective_policy_id.empty()) {
+    *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
+        effective_policy_id;
+  }
+
+  if (allowed) {
+    ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
+    config_->stats().allowed_.inc();
+    if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+      config_->stats().incPolicyAllowed(effective_policy_id);
+    }
+
+    *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
+        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
+
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
+  callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr, absl::nullopt,
+                             Filters::Common::RBAC::responseDetail(log_policy_id));
+  config_->stats().denied_.inc();
+  if (!effective_policy_id.empty() && per_rule_stats_enabled) {
+    config_->stats().incPolicyDenied(effective_policy_id);
+  }
+
+  *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
+      Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
+
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
 Http::FilterHeadersStatus
 RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(
@@ -160,86 +260,23 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
           : "none",
       headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
-  std::string effective_policy_id;
-  const auto shadow_engine =
-      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
-  const auto per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
-
+  // Create metrics structure to hold results
   ProtobufWkt::Struct metrics;
-  auto& fields = *metrics.mutable_fields();
 
-  if (shadow_engine != nullptr) {
-    std::string shadow_resp_code =
-        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
-    if (shadow_engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
-                                    &effective_policy_id)) {
-      ENVOY_LOG(debug, "shadow allowed, matched policy {}",
-                effective_policy_id.empty() ? "none" : effective_policy_id);
-      config_->stats().shadow_allowed_.inc();
-      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
-        config_->stats().incPolicyShadowAllowed(effective_policy_id);
-      }
-    } else {
-      ENVOY_LOG(debug, "shadow denied, matched policy {}",
-                effective_policy_id.empty() ? "none" : effective_policy_id);
-      config_->stats().shadow_denied_.inc();
-      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
-        config_->stats().incPolicyShadowDenied(effective_policy_id);
-      }
-      shadow_resp_code =
-          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
-    }
+  // Evaluate shadow engine if it exists
+  const bool shadow_engine_evaluated = evaluateShadowEngine(headers, metrics);
 
-    if (!effective_policy_id.empty()) {
-      *fields[config_->shadowEffectivePolicyIdField(callbacks_)].mutable_string_value() =
-          effective_policy_id;
-    }
+  // Evaluate enforced engine if it exists
+  Http::FilterHeadersStatus status = evaluateEnforcedEngine(headers, metrics);
 
-    *fields[config_->shadowEngineResultField(callbacks_)].mutable_string_value() = shadow_resp_code;
+  // If we evaluated either engine, set the dynamic metadata
+  if (shadow_engine_evaluated || status == Http::FilterHeadersStatus::StopIteration) {
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
+    return status;
   }
 
-  const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
-  if (engine != nullptr) {
-    std::string effective_policy_id;
-    bool allowed = engine->handleAction(*callbacks_->connection(), headers,
-                                        callbacks_->streamInfo(), &effective_policy_id);
-    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
-    if (!effective_policy_id.empty()) {
-      *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
-          effective_policy_id;
-    }
-    if (allowed) {
-      ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
-      config_->stats().allowed_.inc();
-      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
-        config_->stats().incPolicyAllowed(effective_policy_id);
-      }
-
-      *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
-          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
-      callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
-
-      return Http::FilterHeadersStatus::Continue;
-    } else {
-      ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
-      callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt,
-                                 Filters::Common::RBAC::responseDetail(log_policy_id));
-      config_->stats().denied_.inc();
-      if (!effective_policy_id.empty() && per_rule_stats_enabled) {
-        config_->stats().incPolicyDenied(effective_policy_id);
-      }
-
-      *fields[config_->enforcedEngineResultField(callbacks_)].mutable_string_value() =
-          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
-      callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
-
-      return Http::FilterHeadersStatus::StopIteration;
-    }
-  }
-  // engine == nullptr, but if shadow_engine != nullptr, there are metrics to put in dynamic
-  // metadata.
-  if (shadow_engine != nullptr) {
+  // Special case: shadow engine evaluated but no enforced engine
+  if (shadow_engine_evaluated) {
     callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
   }
 
