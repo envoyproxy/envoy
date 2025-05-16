@@ -373,12 +373,9 @@ public:
   template <typename Func>
   static auto execInNetworkNamespace(Func&& f, const char* netns)
       -> absl::StatusOr<typename std::invoke_result_t<Func>> {
-#if defined(__linux__)
-    constexpr bool IS_LINUX = true;
-#else
-    constexpr bool IS_LINUX = false;
+#if !defined(__linux__)
+    static_assert(false, "Network namespaces are a Linux-only feature");
 #endif
-    static_assert(IS_LINUX, "Network namespaces are a Linux-only feature");
 
     Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
 
