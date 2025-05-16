@@ -73,6 +73,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/bootstrap/reverse_connection/v3alpha:pkg",
+        "//contrib/envoy/extensions/clusters/reverse_connection/v3alpha:pkg",
         "//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
