@@ -102,6 +102,11 @@ envoy.clusters.reverse_connection:
   status: wip
   type_urls:
   - envoy.extensions.clusters.reverse_connection.v3alpha.RevConClusterConfig
+envoy.reverse_connection.conn_pool:
+  categories:
+  - envoy.reverse_connection
+  security_posture: unknown
+  status: wip
 envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap
