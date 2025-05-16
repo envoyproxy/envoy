@@ -42,8 +42,8 @@ Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromPro
   if (!result.ok()) {
     throw EnvoyException(std::string(result.message()));
   }
-
-  ConfigConstSharedPtr ext_proc_config = std::make_shared<const Config>(proto_config);
+  ConfigConstSharedPtr ext_proc_config =
+      std::make_shared<const Config>(proto_config, context.scope());
 
   return [ext_proc_config, &context](Network::FilterManager& filter_manager) -> void {
     auto client = createExternalProcessorClient(

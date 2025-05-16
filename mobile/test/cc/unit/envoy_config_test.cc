@@ -386,6 +386,42 @@ TEST(TestConfig, UdpSocketSendBufferSize) {
   EXPECT_EQ(snd_buf_option->int_value(), 1452 * 20);
 }
 
+TEST(TestConfig, AdditionalSocketOptions) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+  envoy::config::core::v3::SocketOption socket_opt;
+  socket_opt.set_level(SOL_SOCKET);
+  socket_opt.set_name(123);
+  socket_opt.set_int_value(456);
+  socket_opt.mutable_type()->mutable_datagram();
+  engine_builder.setAdditionalSocketOptions({socket_opt});
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* additional_socket_opt = nullptr;
+  for (const auto& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == 123) {
+      additional_socket_opt = &sock_opt;
+      break;
+    }
+  }
+
+  ASSERT_THAT(additional_socket_opt, NotNull());
+  EXPECT_EQ(additional_socket_opt->level(), SOL_SOCKET);
+  EXPECT_TRUE(additional_socket_opt->type().has_datagram());
+  EXPECT_EQ(additional_socket_opt->int_value(), 456);
+}
+
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
   engine_builder.enablePlatformCertificatesValidation(false);

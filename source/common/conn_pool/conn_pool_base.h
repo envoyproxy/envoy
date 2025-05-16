@@ -279,11 +279,11 @@ public:
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
   void decrClusterStreamCapacity(uint32_t delta) {
-    state_.decrConnectingAndConnectedStreamCapacity(delta);
+    cluster_connectivity_state_.decrConnectingAndConnectedStreamCapacity(delta);
     connecting_and_connected_stream_capacity_ -= delta;
   }
   void incrClusterStreamCapacity(uint32_t delta) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
+    cluster_connectivity_state_.incrConnectingAndConnectedStreamCapacity(delta);
     connecting_and_connected_stream_capacity_ += delta;
   }
   void dumpState(std::ostream& os, int indent_level = 0) const {
@@ -303,8 +303,6 @@ public:
 
   // Helper for use as the 2nd argument to ASSERT.
   std::string dumpState() const;
-
-  Upstream::ClusterConnectivityState& state() { return state_; }
 
   void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
   void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
@@ -349,13 +347,11 @@ protected:
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
     LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-    state_.incrPendingStreams(1);
+    cluster_connectivity_state_.incrPendingStreams(1);
     return pending_streams_.front().get();
   }
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
-
-  Upstream::ClusterConnectivityState& state_;
 
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
@@ -398,6 +394,8 @@ private:
   void drainClients(std::list<ActiveClientPtr>& clients);
 
   void assertCapacityCountsAreCorrect();
+
+  Upstream::ClusterConnectivityState& cluster_connectivity_state_;
 
   std::list<PendingStreamPtr> pending_streams_;
 

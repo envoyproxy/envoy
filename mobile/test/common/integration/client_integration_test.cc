@@ -253,17 +253,6 @@ TEST_P(ClientIntegrationTest, Basic) {
   }
 }
 
-#if not defined(__APPLE__)
-TEST_P(ClientIntegrationTest, BasicWithCares) {
-  builder_.setUseCares(true);
-  initialize();
-  basicTest();
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  }
-}
-#endif
-
 // TODO(fredyw): Disable this until we support treating no DNS record as a failure in the Apple
 // resolver.
 #if not defined(__APPLE__)

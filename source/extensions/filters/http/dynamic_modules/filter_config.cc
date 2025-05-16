@@ -13,7 +13,11 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {};
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
-  (*on_http_filter_config_destroy_)(in_module_config_);
+  // When the initialization of the dynamic module fails, the in_module_config_ is nullptr,
+  // and there's nothing to destroy from the module's point of view.
+  if (on_http_filter_config_destroy_) {
+    (*on_http_filter_config_destroy_)(in_module_config_);
+  }
 };
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
