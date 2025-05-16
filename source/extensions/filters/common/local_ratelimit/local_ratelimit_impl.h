@@ -124,7 +124,7 @@ public:
     return static_cast<uint64_t>(token_bucket_.remainingTokens());
   }
   uint64_t resetSeconds() const override {
-    return static_cast<uint64_t>(token_bucket_.nextTokenAvailable().count() / 1000);
+    return static_cast<uint64_t>(std::ceil(token_bucket_.nextTokenAvailable().count() / 1000));
   }
 
 private:

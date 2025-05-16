@@ -48,8 +48,10 @@ public:
    * @param init_fill supplies whether the bucket should be initialized with max_tokens.
    */
   explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
-                                 double fill_rate = 1.0, bool init_fill = true);
-  explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate,
+                                 std::chrono::milliseconds fill_interval, double fill_rate = 1.0,
+                                 bool init_fill = true);
+  explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
+                                 std::chrono::milliseconds fill_interval, double fill_rate,
                                  uint64_t initial_tokens);
 
   // This reference https://github.com/facebook/folly/blob/main/folly/TokenBucket.h.
@@ -126,8 +128,9 @@ private:
 
   const double max_tokens_;
   const double fill_rate_;
+  const double fill_interval_;
 
-  std::atomic<double> time_in_seconds_{};
+  std::atomic<double> time_in_seconds_;
   TimeSource& time_source_;
 };
 

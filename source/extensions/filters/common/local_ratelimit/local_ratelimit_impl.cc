@@ -79,7 +79,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
 RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                                            std::chrono::milliseconds fill_interval,
                                            TimeSource& time_source)
-    : token_bucket_(max_tokens, time_source,
+    : token_bucket_(max_tokens, time_source, fill_interval,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
       fill_interval_(fill_interval) {}
