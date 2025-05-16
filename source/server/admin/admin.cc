@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -394,6 +395,12 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
   }
+  if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
+    ENVOY_LOG(info, "Admin Allow list filter check");
+    Buffer::OwnedImpl error_response;
+    error_response.add("route not allowed");
+    return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
+  }
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
@@ -511,17 +518,14 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
-    return Http::Code::Forbidden;
-  }
 
+  Buffer::OwnedImpl response;
   AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
   request_headers->setPath(path_and_query);
   filter.decodeHeaders(*request_headers, false);
-  Buffer::OwnedImpl response;
 
   Http::Code code = runCallback(response_headers, response, filter);
   Utility::populateFallbackResponseHeaders(code, response_headers);

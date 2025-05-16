@@ -128,7 +128,7 @@ public:
     return request_id_extension_;
   }
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
-  bool acceptTargetRoute(absl::string_view route_name) {
+  bool acceptTargetRoute(absl::string_view route_name) const {
     return allow_listed_route_.contains(route_name);
   }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
