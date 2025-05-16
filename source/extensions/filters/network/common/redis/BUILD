@@ -52,6 +52,7 @@ envoy_cc_library(
         ":codec_lib",
         ":redis_command_stats_lib",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/common/aws/signers:sigv4_signer_impl_lib"
     ],
 )
 

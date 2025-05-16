@@ -16,6 +16,7 @@
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -107,6 +108,7 @@ private:
     }
 
     ClientImpl& parent_;
+    std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
   };
 
   struct PendingRequest : public PoolRequest {
