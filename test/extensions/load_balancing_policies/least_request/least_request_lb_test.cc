@@ -14,9 +14,10 @@ using testing::Return;
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config_;
+
   LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_,  runtime_,
                                random_,       50,      config_, simTime()};
-  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config_;
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr).host); }
