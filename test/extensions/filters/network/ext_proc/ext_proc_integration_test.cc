@@ -952,6 +952,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusCloseHandling) {
 
 // Test connection status CLOSE_RST handling in responses
 TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
+  initialize();
   // Create a new HTTP connection since the previous one was closed
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
   ASSERT_TRUE(tcp_client->write("client_data", false));
@@ -974,11 +975,12 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   processor_stream_->startGrpcStream();
   processor_stream_->sendGrpcMessage(response);
 
-  // Connection should be reset
-  tcp_client->waitForDisconnect();
-
   // Verify counters - should now have 1 close and 1 reset
   verifyCounters({{"connections_closed", 1}, {"connections_reset", 1}});
+
+  // Connection should be closed
+  ASSERT_FALSE(tcp_client->write("", true));
+  tcp_client->waitForDisconnect();
 }
 
 } // namespace ExtProc
