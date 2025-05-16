@@ -129,36 +129,32 @@ GenericSecretConfigProviderSharedPtr SecretManagerImpl::createInlineGenericSecre
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    Init::Manager& init_manager) {
-  return certificate_providers_.findOrCreate(sds_config_source, config_name,
-                                             secret_provider_context, init_manager);
+    Server::Configuration::ServerFactoryContext& server_context, Init::Manager& init_manager) {
+  return certificate_providers_.findOrCreate(sds_config_source, config_name, server_context,
+                                             init_manager);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    Init::Manager& init_manager) {
-  return validation_context_providers_.findOrCreate(sds_config_source, config_name,
-                                                    secret_provider_context, init_manager);
+    Server::Configuration::ServerFactoryContext& server_context, Init::Manager& init_manager) {
+  return validation_context_providers_.findOrCreate(sds_config_source, config_name, server_context,
+                                                    init_manager);
 }
 
 TlsSessionTicketKeysConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateTlsSessionTicketKeysContextProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    Init::Manager& init_manager) {
-  return session_ticket_keys_providers_.findOrCreate(sds_config_source, config_name,
-                                                     secret_provider_context, init_manager);
+    Server::Configuration::ServerFactoryContext& server_context, Init::Manager& init_manager) {
+  return session_ticket_keys_providers_.findOrCreate(sds_config_source, config_name, server_context,
+                                                     init_manager);
 }
 
 GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecretProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-    Init::Manager& init_manager) {
-  return generic_secret_providers_.findOrCreate(sds_config_source, config_name,
-                                                secret_provider_context, init_manager);
+    Server::Configuration::ServerFactoryContext& server_context, Init::Manager& init_manager) {
+  return generic_secret_providers_.findOrCreate(sds_config_source, config_name, server_context,
+                                                init_manager);
 }
 
 ProtobufTypes::MessagePtr
