@@ -149,12 +149,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "AWS libcrypto (AWS-LC)",
         project_desc = "OpenSSL compatible general-purpose crypto library",
         project_url = "https://github.com/aws/aws-lc",
-        version = "1.50.1",
-        sha256 = "d6b4ab11372e3421f73826266bd9fbeb84184acd5ddd51b8f23949d82847e686",
+        version = "1.51.2",
+        sha256 = "7df65427f92a4c3cd3db6923e1d395014e41b1fcc38671806c1e342cb6fa02f6",
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-04-30",
+        release_date = "2025-05-07",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     aspect_bazel_lib = dict(
@@ -1165,12 +1165,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
         version = "10.7.193.13",
-        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "2170df76ce5d7ecd7fb8d131370d210152f200273cba126f06d8b88fb53c9fbc",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
+        # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
+        strip_prefix = "v8-{version}",
+        sha256 = "6fb91b839e9c36ca4c151268f772e7a6a888a75bcb947f37be9758e49f485db7",
+        urls = ["https://github.com/v8/v8/archive/refs/tags/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-10-12",
+        release_date = "2022-09-28",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
