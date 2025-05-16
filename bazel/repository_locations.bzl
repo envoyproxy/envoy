@@ -1165,7 +1165,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
         version = "10.7.193.13",
-        # Follow thi sguide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
+        # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
         strip_prefix = "v8-{version}",
         sha256 = "6fb91b839e9c36ca4c151268f772e7a6a888a75bcb947f37be9758e49f485db7",
         urls = ["https://github.com/v8/v8/archive/refs/tags/{version}.tar.gz"],
