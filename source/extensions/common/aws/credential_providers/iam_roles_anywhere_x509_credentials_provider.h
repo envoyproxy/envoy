@@ -65,9 +65,10 @@ protected:
  */
 class IAMRolesAnywhereX509CredentialsProvider : public CachedX509CredentialsProviderBase {
 public:
-
-/**
- * @brief Constructs an IAM Roles Anywhere X509 credentials provider
+  /**
+   * @brief Constructs an IAM Roles Anywhere X509 credentials provider
+   *
+   * @param context The server factory context
    * @param certificate_data_source The Envoy DataSource for the signing certificate
    * @param private_key_data_source The Envoy DataSource for the matching private key
    * @param certificate_chain_data_source An optional DataSource for the certificate chain. If no
@@ -77,6 +78,7 @@ public:
   IAMRolesAnywhereX509CredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
       const envoy::config::core::v3::DataSource& certificate_data_source,
+      const envoy::config::core::v3::DataSource& private_key_data_source,
       DataSourceOptRef certificate_chain_data_source);
 
   // Friend class for testing private pem functions
@@ -102,7 +104,6 @@ private:
    * @brief Convert a PEM certificate to DER format
    *
    * @param [in] pem The PEM formatted certificate(s)
-
    * @param [out] output The DER + Base64 encoded certificate(s), comma separated
    * @param [in] is_chain If true, this is a certificate chain. We will parse a maximum of 5
    * certificates in a provided chain
@@ -115,12 +116,20 @@ private:
 
   /**
    * @brief Extract algorithm, serial and expiration values from a PEM formatted certificate
+   *
+   * @param [in] pem The PEM formatted certificate
+   * @param [out] algorithm The algorithm of the certificate
+   * @param [out] serial The serial of the certificate
+   * @param [out] time The expiration time of the certificate
+   */
+
   absl::Status
   pemToAlgorithmSerialExpiration(absl::string_view pem,
                                  X509Credentials::PublicKeySignatureAlgorithm& algorithm,
                                  std::string& serial, SystemTime& time);
 
   std::chrono::seconds getCacheDuration();
+};
 
 using IAMRolesAnywhereX509CredentialsProviderPtr =
     std::shared_ptr<IAMRolesAnywhereX509CredentialsProvider>;

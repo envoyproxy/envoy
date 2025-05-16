@@ -24,6 +24,14 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
           },
           true);
 
+  if (credential_provider_config.has_iam_roles_anywhere_credential_provider()) {
+    ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
+    add(factories.createIAMRolesAnywhereCredentialsProvider(
+        context, aws_cluster_manager_, region,
+        credential_provider_config.iam_roles_anywhere_credential_provider()));
+  }
+
+
   // Custom chain currently only supports file based and web identity credentials
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
@@ -264,6 +272,88 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
 
   storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
 
+  return credential_provider;
+};
+
+CredentialsProviderSharedPtr
+DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+        iam_roles_anywhere_config) const {
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  const auto cluster_host = Utility::getRolesAnywhereEndpoint(region);
+  const auto uri = cluster_host + ":443";
+
+  const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
+
+  auto status = aws_cluster_manager.ref()->addManagedCluster(
+      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+
+  auto roles_anywhere_certificate_provider =
+      std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
+          context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
+          iam_roles_anywhere_config.certificate_chain());
+  // Create our own x509 signer just for IAM Roles Anywhere
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region),
+          roles_anywhere_certificate_provider, context.mainThreadDispatcher().timeSource());
+
+  auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, std::move(roles_anywhere_signer), iam_roles_anywhere_config);
+  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+      cluster_name,
+      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+  if (handleOr.ok()) {
+
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
+  return credential_provider;
+};
+
+CredentialsProviderSharedPtr
+CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+        iam_roles_anywhere_config) const {
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  const auto cluster_host = Utility::getRolesAnywhereEndpoint(region);
+  const auto uri = cluster_host + ":443";
+
+  const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
+
+  const auto status = aws_cluster_manager.ref()->addManagedCluster(
+      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+
+  auto roles_anywhere_certificate_provider =
+      std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
+          context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
+          iam_roles_anywhere_config.certificate_chain());
+  // Create our own x509 signer just for IAM Roles Anywhere
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region),
+          roles_anywhere_certificate_provider, context.mainThreadDispatcher().timeSource());
+
+  auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, std::move(roles_anywhere_signer), iam_roles_anywhere_config);
+
+  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
+      cluster_name,
+      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+  if (handleOr.ok()) {
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
   return credential_provider;
 };
 
