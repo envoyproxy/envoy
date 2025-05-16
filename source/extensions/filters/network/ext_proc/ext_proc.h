@@ -34,7 +34,8 @@ namespace ExtProc {
   COUNTER(streams_grpc_close)                                                                      \
   COUNTER(connections_closed)                                                                      \
   COUNTER(failure_mode_allowed)                                                                    \
-  COUNTER(stream_open_failures)
+  COUNTER(stream_open_failures)                                                                    \
+  COUNTER(connections_reset)
 
 struct NetworkExtProcStats {
   ALL_NETWORK_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -156,7 +157,8 @@ private:
   void addDynamicMetadata(ProcessingRequest& req);
 
   Envoy::Network::FilterStatus handleStreamError();
-  void closeConnection(const std::string& reason);
+  void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
+  void handleConnectionStatus(const ProcessingResponse& response);
 
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
