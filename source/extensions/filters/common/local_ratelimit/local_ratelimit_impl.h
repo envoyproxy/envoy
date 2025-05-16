@@ -1,7 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <cstdint>
 #include <ratio>
 
 #include "envoy/event/dispatcher.h"
