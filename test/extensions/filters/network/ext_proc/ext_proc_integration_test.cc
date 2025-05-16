@@ -920,6 +920,68 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   tcp_client->close();
 }
 
+// Test connection status CLOSE handling in responses
+TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusCloseHandling) {
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+
+  // Create a response with CLOSE status
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CLOSE);
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified_data");
+  read_data->set_end_of_stream(false);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  // Verify counters
+  verifyCounters({{"connections_closed", 1}});
+
+  // Connection should be closed
+  ASSERT_FALSE(tcp_client->write("", true));
+  tcp_client->waitForDisconnect();
+}
+
+// Test connection status CLOSE_RST handling in responses
+TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ProcessingRequest request;
+  ASSERT_TRUE(grpc_upstream_->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+
+  // Create a response with CLOSE_RST status
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CLOSE_RST);
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified_data");
+  read_data->set_end_of_stream(false);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  // Verify counters - should now have 1 close in total and 1 reset
+  verifyCounters({{"connections_closed", 1}, {"connections_reset", 1}});
+
+  // Connection should be closed
+  ASSERT_FALSE(tcp_client->write("", true));
+  tcp_client->waitForDisconnect();
+}
+
 } // namespace ExtProc
 } // namespace NetworkFilters
 } // namespace Extensions
