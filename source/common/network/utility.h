@@ -361,6 +361,7 @@ public:
                                                TimeSource& time_source, bool allow_gro,
                                                bool allow_mmsg, uint32_t& packets_dropped);
 
+#if defined(__linux__)
   /**
    * Changes the calling thread's network namespace to the one referenced by the file at `netns`,
    * calls the function `f`, and returns its result after switching back to the original network
@@ -373,10 +374,6 @@ public:
   template <typename Func>
   static auto execInNetworkNamespace(Func&& f, const char* netns)
       -> absl::StatusOr<typename std::invoke_result_t<Func>> {
-#if !defined(__linux__)
-    static_assert(false, "Network namespaces are a Linux-only feature");
-#endif
-
     Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
 
     // Open the original netns fd, so that we can return to it.
@@ -417,6 +414,7 @@ public:
 
     return result;
   }
+#endif
 
 private:
   /**
