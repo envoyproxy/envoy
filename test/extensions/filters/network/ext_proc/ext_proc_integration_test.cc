@@ -975,7 +975,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   processor_stream_->startGrpcStream();
   processor_stream_->sendGrpcMessage(response);
 
-  // Verify counters - should now have 1 close and 1 reset
+  // Verify counters - should now have 1 close in total and 1 reset
   verifyCounters({{"connections_closed", 1}, {"connections_reset", 1}});
 
   // Connection should be closed
