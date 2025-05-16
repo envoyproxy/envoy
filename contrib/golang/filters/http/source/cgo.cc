@@ -37,10 +37,10 @@ std::vector<std::string> stringsFromGoSlice(void* slice_data, int slice_len) {
   if (slice_len == 0) {
     return list;
   }
-  auto strs = reinterpret_cast<char**>(slice_data);
+  auto strs = reinterpret_cast<GoString*>(slice_data);
   for (auto i = 0; i < slice_len; i += 2) {
-    auto key = std::string(strs[i + 0]);
-    auto value = std::string(strs[i + 1]);
+    auto key = std::string(strs[i + 0].p, strs[i + 0].n);
+    auto value = std::string(strs[i + 1].p, strs[i + 1].n);
     list.push_back(key);
     list.push_back(value);
   }

@@ -3,7 +3,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "ares.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/bridge/utility.h"
@@ -135,19 +134,6 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   Envoy::InternalEngine* internal_engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
   internal_engine->terminate();
   delete internal_engine;
-}
-
-extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initCares(
-    JNIEnv* env, jclass, jobject connectivity_manager) {
-#if defined(__ANDROID_API__)
-  Envoy::JNI::JniHelper jni_helper(env);
-  ares_library_init_jvm(jni_helper.getJavaVm());
-  ares_library_init_android(connectivity_manager);
-#else
-  // For suppressing unused parameters.
-  (void)env;
-  (void)connectivity_manager;
-#endif
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -1147,26 +1133,27 @@ javaObjectArrayToStringPairVector(Envoy::JNI::JniHelper& jni_helper, jobjectArra
   return ret;
 }
 
-void configureBuilder(
-    Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_seconds,
-    jboolean disable_dns_refresh_on_failure, jboolean disable_dns_refresh_on_network_change,
-    jlong dns_refresh_seconds, jlong dns_failure_refresh_seconds_base,
-    jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
-    jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jlong dns_cache_save_interval_seconds, jint dns_num_retries,
-    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
-    jstring http3_connection_options, jstring http3_client_connection_options,
-    jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
-    jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
-    jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
-    jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
-    jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards, jobjectArray cares_fallback_resolvers,
-    jlong h3_connection_keepalive_initial_interval_milliseconds,
-    Envoy::Platform::EngineBuilder& builder) {
+void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_seconds,
+                      jboolean disable_dns_refresh_on_failure,
+                      jboolean disable_dns_refresh_on_network_change, jlong dns_refresh_seconds,
+                      jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+                      jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+                      jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+                      jlong dns_cache_save_interval_seconds, jint dns_num_retries,
+                      jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
+                      jstring http3_connection_options, jstring http3_client_connection_options,
+                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+                      jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
+                      jboolean enable_interface_binding,
+                      jlong h2_connection_keepalive_idle_interval_milliseconds,
+                      jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
+                      jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
+                      jstring app_version, jstring app_id, jboolean trust_chain_verification,
+                      jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
+                      jstring upstream_tls_sni, jobjectArray runtime_guards,
+                      jlong h3_connection_keepalive_initial_interval_milliseconds,
+                      Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.setDisableDnsRefreshOnFailure(disable_dns_refresh_on_failure);
   builder.setDisableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change);
@@ -1208,13 +1195,6 @@ void configureBuilder(
     builder.addQuicCanonicalSuffix(suffix);
   }
   builder.setNumTimeoutsToTriggerPortMigration(num_timeouts_to_trigger_port_migration);
-  builder.setUseCares(use_cares == JNI_TRUE);
-  if (use_cares == JNI_TRUE) {
-    auto resolvers = javaObjectArrayToStringPairVector(jni_helper, cares_fallback_resolvers);
-    for (const auto& [host, port] : resolvers) {
-      builder.addCaresFallbackResolver(host, stoi(port));
-    }
-  }
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
@@ -1260,18 +1240,17 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
-    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
-    jstring http3_connection_options, jstring http3_client_connection_options,
-    jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jstring http3_connection_options,
+    jstring http3_client_connection_options, jobjectArray quic_hints,
+    jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+    jboolean enable_brotli_decompression, jint num_timeouts_to_trigger_port_migration,
+    jboolean enable_socket_tagging, jboolean enable_interface_binding,
+    jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards, jobjectArray cares_fallback_resolvers,
-    jlong h3_connection_keepalive_initial_interval_milliseconds) {
+    jobjectArray runtime_guards, jlong h3_connection_keepalive_initial_interval_milliseconds) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
@@ -1280,7 +1259,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       disable_dns_refresh_on_network_change, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
       dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
-      enable_drain_post_dns_refresh, enable_http3, use_cares, http3_connection_options,
+      enable_drain_post_dns_refresh, enable_http3, http3_connection_options,
       http3_client_connection_options, quic_hints, quic_canonical_suffixes,
       enable_gzip_decompression, enable_brotli_decompression,
       num_timeouts_to_trigger_port_migration, enable_socket_tagging, enable_interface_binding,
@@ -1288,7 +1267,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
       enable_platform_certificates_validation, upstream_tls_sni, runtime_guards,
-      cares_fallback_resolvers, h3_connection_keepalive_initial_interval_milliseconds, builder);
+      h3_connection_keepalive_initial_interval_milliseconds, builder);
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
 

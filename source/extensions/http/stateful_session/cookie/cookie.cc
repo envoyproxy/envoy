@@ -10,8 +10,7 @@ namespace StatefulSession {
 namespace Cookie {
 
 void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
-    const Upstream::HostDescription& host, Envoy::Http::ResponseHeaderMap& headers) {
-  absl::string_view host_address = host.address()->asStringView();
+    absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
     // Build proto message
     envoy::Cookie cookie;

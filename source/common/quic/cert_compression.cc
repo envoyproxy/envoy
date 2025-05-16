@@ -28,12 +28,9 @@ private:
 } // namespace
 
 void CertCompression::registerSslContext(SSL_CTX* ssl_ctx) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_support_certificate_compression")) {
-    auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
-                                                decompressZlib);
-    ASSERT(ret == 1);
-  }
+  auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
+                                              decompressZlib);
+  ASSERT(ret == 1);
 }
 
 int CertCompression::compressZlib(SSL*, CBB* out, const uint8_t* in, size_t in_len) {

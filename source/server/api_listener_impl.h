@@ -68,6 +68,7 @@ protected:
     void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
+    void disableClose(bool) override { IS_ENVOY_BUG("Unexpected call to disableClose"); }
     bool startUpstreamSecureTransport() override {
       IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
       return false;
@@ -77,7 +78,7 @@ protected:
       IS_ENVOY_BUG("Unexpected call to upstreamHost");
     }
     Network::Connection& connection() override { return connection_; }
-    const Network::Socket& socket() override { PANIC("not implemented"); }
+    const Network::ConnectionSocket& socket() override { PANIC("not implemented"); }
 
     // Synthetic class that acts as a stub for the connection backing the
     // Network::ReadFilterCallbacks.

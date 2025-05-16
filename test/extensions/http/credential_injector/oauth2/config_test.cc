@@ -1,7 +1,6 @@
 #include "source/extensions/http/injected_credentials/oauth2/config.h"
 
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "gtest/gtest.h"
 
@@ -41,11 +40,7 @@ TEST(Config, NullClientSecret) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
   OAuth2CredentialInjectorFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
-      transport_socket_factory_context;
   NiceMock<Init::MockManager> init_manager;
-  ON_CALL(server_factory_context, getTransportSocketFactoryContext())
-      .WillByDefault(ReturnRef(transport_socket_factory_context));
 
   EXPECT_THROW_WITH_REGEX(factory.createOauth2ClientCredentialInjector(
                               proto_config, "stats", server_factory_context, init_manager),

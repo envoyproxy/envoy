@@ -28,7 +28,7 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
       initial_streams = cached_concurrency;
     }
   }
-  uint64_t max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
+  uint32_t max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
       host->cluster().maxRequestsPerConnection());
   if (max_requests < initial_streams) {
     initial_streams = max_requests;

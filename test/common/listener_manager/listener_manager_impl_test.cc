@@ -3007,9 +3007,9 @@ dynamic_listeners:
 
   // Now have an external update with errors and make sure it gets dumped.
   ListenerManager::FailureStates non_empty_failure_state;
-  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
+  non_empty_failure_state.emplace_back(envoy::admin::v3::UpdateFailureState());
   auto& state = non_empty_failure_state.back();
-  state->set_details("foo");
+  state.set_details("foo");
   manager_->beginListenerUpdate();
   manager_->endListenerUpdate(std::move(non_empty_failure_state));
   checkConfigDump(R"EOF(
@@ -5887,11 +5887,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 
   // Unit test PerListenerFactoryContextImpl for coverage.
   ASSERT_TRUE(listener_factory_context != nullptr);
-  ListenerFactoryContextBaseImpl& parent_context =
-      static_cast<PerListenerFactoryContextImpl*>(listener_factory_context)->parentFactoryContext();
   EXPECT_EQ(&listener_factory_context->initManager(), &listener.initManager());
-  EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),
-            &parent_context.getTransportSocketFactoryContext());
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
