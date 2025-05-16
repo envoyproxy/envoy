@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
@@ -160,6 +162,29 @@ protected:
     EXPECT_EQ(expected_status, response->headers().getStatusValue());
     EXPECT_EQ(expected_body_size, response->body().size());
   }
+  void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& expected_status,
+                      size_t expected_body_size, const std::string& expected_limit,
+                      const std::string& expected_remaining, const std::string& expected_reset) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ(expected_status, response->headers().getStatusValue());
+    EXPECT_EQ(expected_body_size, response->body().size());
+    EXPECT_THAT(
+        response->headers(),
+        Http::HeaderValueOf(
+            Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
+            expected_limit));
+    EXPECT_THAT(
+        response->headers(),
+        Http::HeaderValueOf(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
+                                .XRateLimitRemaining,
+                            expected_remaining));
+    EXPECT_THAT(
+        response->headers(),
+        Http::HeaderValueOf(
+            Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+            expected_reset));
+  }
 
   void sendAndVerifyRequest(const std::string& cluster, const std::string& expected_status,
                             size_t expected_body_size) {
@@ -170,10 +195,28 @@ protected:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
   }
+  void sendAndVerifyRequest(const std::string& expected_limit,
+                            const std::string& expected_remaining,
+                            const std::string& expected_reset) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, 1);
+    verifyResponse(std::move(response), "200", 0, expected_limit, expected_remaining,
+                   expected_reset);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(0U, upstream_request_->bodyLength());
+  }
   void sendRateLimitedRequest(const std::string& cluster) {
     auto response = makeRequest(cluster);
     verifyResponse(std::move(response), "429",
                    18); // 18 is the expected body size for rate-limited responses.
+  }
+  void sendRateLimitedRequest(const std::string& expected_limit,
+                              const std::string& expected_remaining,
+                              const std::string& expected_reset) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+    verifyResponse(std::move(response), "429", 18, expected_limit, expected_remaining,
+                   expected_reset);
   }
 
   static constexpr absl::string_view filter_config_ =
@@ -212,9 +255,9 @@ typed_config:
   stat_prefix: http_local_rate_limiter
   enableXRatelimitHeaders: DRAFT_VERSION_03
   token_bucket:
-    max_tokens: 1
-    tokens_per_fill: 1
-    fill_interval: 1000s
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 4s
   filter_enabled:
     runtime_key: local_rate_limit_enabled
     default_value:
@@ -519,44 +562,28 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {
   EXPECT_EQ(18, response->body().size());
 }
 
-TEST_P(LocalRateLimitFilterIntegrationTest, LimitHeaderTest) {
-  initializeFilter(fmt::format(limit_header_filter_config_, "true"));
+TEST_P(LocalRateLimitFilterIntegrationTest, HeaderTest) {
+  initializeFilter(fmt::format(limit_header_filter_config_, "false"));
 
+  // The first request should be allowed and the response should contain
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
+  sendAndVerifyRequest("2", "1", "0");
+  cleanupUpstreamAndDownstream();
 
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, 1);
+  // Max tokens is 2, the second request should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("2", "0", "4");
+  cleanupUpstreamAndDownstream();
 
-  ASSERT_TRUE(response->waitForEndStream());
+  // The third request should be rate limited, x-ratelimit-reset should be 4s.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("2", "0", "4");
+  cleanupUpstreamAndDownstream();
 
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(0, response->body().size());
-  EXPECT_THAT(
-      response->headers(),
-      Http::HeaderValueOf(
-          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
-          "1"));
-
-  response = codec_client_->makeRequestWithBody(default_request_headers_, 0);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("429", response->headers().getStatusValue());
-  EXPECT_EQ(18, response->body().size());
-  EXPECT_THAT(
-      response->headers(),
-      Http::HeaderValueOf(
-          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
-          "0"));
-  EXPECT_THAT(
-      response->headers(),
-      Http::HeaderValueOf(
-          Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
-          "1000"));
+  // After 1s, the forth request should be rate limited, x-ratelimit-reset should be 3s.
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("2", "0", "3");
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnections) {
