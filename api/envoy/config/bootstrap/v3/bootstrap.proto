@@ -416,7 +416,8 @@ message Bootstrap {
 }
 
 message AllowListedRoutesArray {
-
+  // The list of routes that's allowed
+  // for admin Request
   repeated string routes = 1
       [(validate.rules).repeated = {items {string {min_len: 1}}}];
 }
