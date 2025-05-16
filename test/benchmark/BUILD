@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -20,5 +21,16 @@ envoy_cc_test_library(
         "//test/test_common:test_runtime_lib",
         "@com_github_google_benchmark//:benchmark",
         "@com_github_mirror_tclap//:tclap",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "header_map_benchmark_test",
+    srcs = ["header_map_benchmark_test.cc"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/http:header_map_optimized_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
