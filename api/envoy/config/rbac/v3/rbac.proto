@@ -297,7 +297,7 @@ message Permission {
     //   * A :ref:`listener filter <arch_overview_listener_filters>` may
     //     overwrite a connection's requested server name within Envoy.
     //
-    // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to setup SNI.
+    // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn how to setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
 
     // Extension for configuring custom matchers for RBAC.
