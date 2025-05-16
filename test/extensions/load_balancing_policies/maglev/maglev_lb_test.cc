@@ -48,21 +48,18 @@ TEST(MaglevTableLogMaglevTableTest, MaglevTableLogMaglevTableTest) {
   MaglevLoadBalancerStats stats = MaglevLoadBalancer::generateStats(*stats_store.rootScope());
 
   auto host1 = std::make_shared<NiceMock<MockHost>>();
-  auto host2 = std::make_shared<NiceMock<MockHost>>();
   const std::string hostname1 = "host1";
-  const std::string hostname2 = "host2";
   ON_CALL(*host1, hostname()).WillByDefault(testing::ReturnRef(hostname1));
-  ON_CALL(*host2, hostname()).WillByDefault(testing::ReturnRef(hostname2));
 
-  NormalizedHostWeightVector normalized_host_weights = {{host1, 0.5}, {host2, 0.5}};
+  NormalizedHostWeightVector normalized_host_weights = {{host1, 1}};
 
   {
-    OriginalMaglevTable table(normalized_host_weights, 0.5, 6, true, stats);
+    CompactMaglevTable table(normalized_host_weights, 1, 2, true, stats);
     table.logMaglevTable(true);
   }
 
   {
-    CompactMaglevTable table(normalized_host_weights, 0.5, 6, true, stats);
+    CompactMaglevTable table(normalized_host_weights, 1, 2, true, stats);
     table.logMaglevTable(true);
   }
 }
