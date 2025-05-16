@@ -208,7 +208,7 @@ message HttpConnectionManager {
     // The default value is false for now for backward compatibility.
     google.protobuf.BoolValue spawn_upstream_span = 10;
 
-    // Whether to use opentelemetry semantic conventions
+    // Whether to use open telemetry semantic conventions
     // Default to false. If it's enabled to true, legacy envoy
     // span attributes will be replaced with semantic conventions
     // according to [Semantic
