@@ -54,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -383,7 +383,7 @@ message Listener {
     // Used to represent a reverse connection listener which, instead of binding to a port and listening,
     // initiates reverse connections to a remote endpoint. The used sockets are cached on the remote
     // endpoint and can be used to send request to local services.
-    google.protobuf.Any reverse_connection_listener_config = 36;
+    google.protobuf.Any reverse_connection_listener_config = 37;
   }
 
   // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
