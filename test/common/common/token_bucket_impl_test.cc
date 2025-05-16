@@ -134,20 +134,22 @@ protected:
 
 // Verifies TokenBucket initialization.
 TEST_F(AtomicTokenBucketImplTest, Initialization) {
-  AtomicTokenBucketImpl token_bucket{1, time_system_, -1.0};
+  AtomicTokenBucketImpl token_bucket{1, time_system_,std::chrono::seconds(1), -1.0};
 
   EXPECT_EQ(1, token_bucket.fillRate());
   EXPECT_EQ(1, token_bucket.maxTokens());
   EXPECT_EQ(1, token_bucket.remainingTokens());
+  EXPECT_EQ(token_bucket.nextTokenAvailable(), std::chrono::milliseconds(0));
 
   EXPECT_EQ(1, token_bucket.consume(1, false));
   EXPECT_EQ(0, token_bucket.consume(1, false));
   EXPECT_EQ(false, token_bucket.consume());
+  EXPECT_EQ(token_bucket.nextTokenAvailable(), std::chrono::seconds(1));
 }
 
 // Verifies TokenBucket's maximum capacity.
 TEST_F(AtomicTokenBucketImplTest, MaxBucketSize) {
-  AtomicTokenBucketImpl token_bucket{3, time_system_, 1};
+  AtomicTokenBucketImpl token_bucket{3, time_system_, std::chrono::seconds(1), 1};
 
   EXPECT_EQ(1, token_bucket.fillRate());
   EXPECT_EQ(3, token_bucket.maxTokens());
@@ -161,7 +163,7 @@ TEST_F(AtomicTokenBucketImplTest, MaxBucketSize) {
 
 // Verifies that TokenBucket can consume tokens.
 TEST_F(AtomicTokenBucketImplTest, Consume) {
-  AtomicTokenBucketImpl token_bucket{10, time_system_, 1};
+  AtomicTokenBucketImpl token_bucket{10, time_system_,std::chrono::seconds(1),1};
 
   EXPECT_EQ(0, token_bucket.consume(20, false));
   EXPECT_EQ(9, token_bucket.consume(9, false));
@@ -182,7 +184,7 @@ TEST_F(AtomicTokenBucketImplTest, Consume) {
 
 // Verifies that TokenBucket can refill tokens.
 TEST_F(AtomicTokenBucketImplTest, Refill) {
-  AtomicTokenBucketImpl token_bucket{1, time_system_, 0.5};
+  AtomicTokenBucketImpl token_bucket{1, time_system_,std::chrono::seconds(1), 0.5};
   EXPECT_EQ(1, token_bucket.consume(1, false));
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(500));
@@ -195,7 +197,7 @@ TEST_F(AtomicTokenBucketImplTest, Refill) {
 
 // Test partial consumption of tokens.
 TEST_F(AtomicTokenBucketImplTest, PartialConsumption) {
-  AtomicTokenBucketImpl token_bucket{16, time_system_, 16};
+  AtomicTokenBucketImpl token_bucket{16, time_system_, std::chrono::seconds(1), 16};
   EXPECT_EQ(16, token_bucket.consume(18, true));
   time_system_.advanceTimeWait(std::chrono::milliseconds(62));
   EXPECT_EQ(0, token_bucket.consume(1, true));
@@ -207,7 +209,7 @@ TEST_F(AtomicTokenBucketImplTest, PartialConsumption) {
 TEST_F(AtomicTokenBucketImplTest, YearlyMinRefillRate) {
   constexpr uint64_t seconds_per_year = 365 * 24 * 60 * 60;
   // Set the fill rate to be 2 years.
-  AtomicTokenBucketImpl token_bucket{1, time_system_, 1.0 / (seconds_per_year * 2)};
+  AtomicTokenBucketImpl token_bucket{1,  time_system_,std::chrono::seconds(seconds_per_year), 1.0 / (seconds_per_year * 2)};
 
   // Consume first token.
   EXPECT_EQ(1, token_bucket.consume(1, false));
@@ -220,7 +222,7 @@ TEST_F(AtomicTokenBucketImplTest, YearlyMinRefillRate) {
 }
 
 TEST_F(AtomicTokenBucketImplTest, ConsumeNegativeTokens) {
-  AtomicTokenBucketImpl token_bucket{10, time_system_, 1};
+  AtomicTokenBucketImpl token_bucket{10, time_system_,std::chrono::seconds(1), 1};
 
   EXPECT_EQ(3, token_bucket.consume([](double) { return 3; }));
   EXPECT_EQ(7, token_bucket.remainingTokens());
@@ -229,7 +231,7 @@ TEST_F(AtomicTokenBucketImplTest, ConsumeNegativeTokens) {
 }
 
 TEST_F(AtomicTokenBucketImplTest, ConsumeSuperLargeTokens) {
-  AtomicTokenBucketImpl token_bucket{10, time_system_, 1};
+  AtomicTokenBucketImpl token_bucket{10, time_system_, std::chrono::seconds(1),1};
 
   EXPECT_EQ(100, token_bucket.consume([](double) { return 100; }));
   EXPECT_EQ(-90, token_bucket.remainingTokens());
@@ -239,7 +241,7 @@ TEST_F(AtomicTokenBucketImplTest, MultipleThreadsConsume) {
   // Real time source to ensure we will not fall into endless loop.
   Event::TestRealTimeSystem real_time_source;
 
-  AtomicTokenBucketImpl token_bucket{1200, time_system_, 1.0};
+  AtomicTokenBucketImpl token_bucket{1200, time_system_, std::chrono::seconds(1),1.0};
 
   // Exhaust all tokens.
   EXPECT_EQ(1200, token_bucket.consume(1200, false));
