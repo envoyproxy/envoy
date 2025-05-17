@@ -29,9 +29,7 @@ public:
     // The invalid intervals are generated with the command:
     // bazel -c opt run test/common/json:gen_excluded_unicodes |& grep -v 'contains invalid UTF-8'
 
-    // Avoid ranges where the protobuf serialization fails, returning an empty
-    // string. Nlohmann also fails (throws exceptions) in this range but
-    // sanitizer() will catch that an do simple escapes on the string.
+    // With protobuf v31.0, there are still some 3-byte intervals to exclude
     invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
     // Avoid differential testing of Unicode ranges generated from 4-byte utf-8

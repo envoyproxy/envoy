@@ -1,0 +1,24 @@
+diff --git a/validate/BUILD b/validate/BUILD
+index 8f56b1a..72f9b94 100644
+--- a/validate/BUILD
++++ b/validate/BUILD
+@@ -1,4 +1,5 @@
+-load("@rules_proto//proto:defs.bzl", "proto_library")
++load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
++load("@rules_proto//proto:defs.bzl", "proto_library") 
+ load("@rules_cc//cc:defs.bzl", "cc_library")
+ load("@rules_java//java:defs.bzl", "java_proto_library")
+ load("@rules_python//python:defs.bzl", "py_library")
+@@ -15,10 +16,11 @@ proto_library(
+ 
+ cc_proto_library(
+     name = "validate_cc",
++    visibility = ["//visibility:public"],
+     deps = [":validate_proto"],
+ )
+ 
+-cc_library(
++cc_library( 
+     name = "cc_validate",
+     srcs = ["validate.h"],
+     visibility = ["//visibility:public"],
