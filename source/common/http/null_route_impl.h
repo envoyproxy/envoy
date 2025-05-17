@@ -270,6 +270,9 @@ struct NullRouteImpl : public Router::Route {
   absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
   const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
+  const Router::NonForwardingActionEntry* nonForwardingActionEntry() const override {
+    return nullptr;
+  }
 
   std::unique_ptr<RouteEntryImpl> route_entry_;
   static const NullVirtualHost virtual_host_;

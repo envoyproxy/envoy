@@ -144,6 +144,7 @@ public:
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
+  const NonForwardingActionEntry* nonForwardingActionEntry() const override { return nullptr; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
@@ -647,6 +648,7 @@ using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>
 class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
                            public DirectResponseEntry,
+                           public NonForwardingActionEntry,
                            public PathMatchCriterion,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
@@ -661,6 +663,7 @@ protected:
 
 public:
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
+  virtual bool isNonForwarding() const { return false; }
 
   bool isRedirect() const;
 
@@ -670,6 +673,7 @@ public:
   validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
 
   // Router::RouteEntry
+
   const std::string& clusterName() const override;
   const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
   const RouteStatsContextOptRef routeStatsContext() const override {
@@ -815,6 +819,7 @@ public:
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
+  const NonForwardingActionEntry* nonForwardingActionEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
@@ -959,6 +964,10 @@ public:
       return parent_->perFilterConfigs(filter_name);
     };
     const std::string& routeName() const override { return parent_->routeName(); }
+
+    const NonForwardingActionEntry* nonForwardingActionEntry() const override {
+      return parent_->nonForwardingActionEntry();
+    }
 
   private:
     const RouteEntryAndRoute* parent_;
@@ -1454,6 +1463,53 @@ private:
                                     absl::Status& creation_status);
 
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
+};
+
+/**
+ * Route entry implementation for non-forwarding action.
+ */
+class NonForwardingRouteEntryImpl : public RouteEntryImplBase {
+public:
+  NonForwardingRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
+                              const envoy::config::route::v3::Route& route,
+                              Server::Configuration::ServerFactoryContext& factory_context,
+                              ProtobufMessage::ValidationVisitor& validator,
+                              absl::Status& creation_status);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return matcher_; }
+  PathMatchType matchType() const override { return path_match_type_; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+                               const StreamInfo::StreamInfo&) const override {}
+  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                  bool) const override {
+    return {};
+  }
+  void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
+
+  // Router::RouteEntry
+  const std::string& routeName() const override { return route_name_; }
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+    return {};
+  }
+
+  bool isNonForwarding() const override { return true; }
+
+  const NonForwardingActionEntry* nonForwardingActionEntry() const override { return this; }
+
+private:
+  std::string matcher_;
+  PathMatchType path_match_type_;
+  const std::string route_name_;
+  Regex::CompiledMatcherPtr regex_matcher_;
 };
 
 // Contextual information used to construct the route actions for a match tree.

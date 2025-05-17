@@ -112,6 +112,18 @@ public:
 };
 
 /**
+ * A routing primitive that specifies a non-forwarding action.
+ * This signifies that the request should not be forwarded upstream,
+ * but unlike DirectResponseEntry, the response is handled later in the filter chain.
+ */
+class NonForwardingActionEntry : public ResponseEntry {
+public:
+  ~NonForwardingActionEntry() override = default;
+
+  // Add methods here later if the NonForwardingAction proto gets fields.
+};
+
+/**
  * All route specific config returned by the method at
  *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
  * should be derived from this class.
@@ -1224,6 +1236,12 @@ public:
    * @return the route entry or nullptr if there is no matching route for the request.
    */
   virtual const RouteEntry* routeEntry() const PURE;
+
+  /**
+   * @return the non-forwarding action entry or nullptr if there is no non-forwarding action for the
+   * request.
+   */
+  virtual const NonForwardingActionEntry* nonForwardingActionEntry() const PURE;
 
   /**
    * @return the decorator or nullptr if not defined for the request.
