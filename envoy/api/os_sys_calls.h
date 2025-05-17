@@ -12,8 +12,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Api {
 

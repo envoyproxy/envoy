@@ -29,6 +29,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//envoy/network:listener_interface",
         "//envoy/server:api_listener_interface",
         "//envoy/server:filter_config_interface",
