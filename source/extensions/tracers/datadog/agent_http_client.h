@@ -9,6 +9,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "datadog/http_client.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -83,10 +84,15 @@ public:
   void drain(std::chrono::steady_clock::time_point) override;
 
   /**
+   * Implementation of the required config() method from datadog::tracing::HTTPClient.
+   */
+  std::string config() const override;
+
+  /**
    * Return a JSON representation of this object's configuration. This function
    * is used in the startup banner logged by \c dd-trace-cpp.
    */
-  nlohmann::json config_json() const override;
+  const nlohmann::json& config_json() const;
 
   // Http::AsyncClient::Callbacks
 
