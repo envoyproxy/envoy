@@ -300,6 +300,7 @@ private:
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
   bool spawnUpstreamSpan() const override;
+  bool useSemanticConventions() const override;
 
   void sendRequestFrameToUpstream();
 

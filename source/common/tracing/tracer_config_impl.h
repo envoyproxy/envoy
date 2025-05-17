@@ -75,6 +75,7 @@ public:
     verbose_ = tracing_config.verbose();
     max_path_tag_length_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, max_path_tag_length,
                                                            Tracing::DefaultMaxPathTagLength);
+    use_semantic_conventions_ = tracing_config.use_semantic_conventions();
   }
 
   ConnectionManagerTracingConfigImpl(Tracing::OperationName operation_name,
@@ -82,11 +83,13 @@ public:
                                      envoy::type::v3::FractionalPercent client_sampling,
                                      envoy::type::v3::FractionalPercent random_sampling,
                                      envoy::type::v3::FractionalPercent overall_sampling,
-                                     bool verbose, uint32_t max_path_tag_length)
+                                     bool verbose, uint32_t max_path_tag_length,
+                                     bool use_semantic_conventions)
       : operation_name_(operation_name), custom_tags_(custom_tags),
         client_sampling_(client_sampling), random_sampling_(random_sampling),
         overall_sampling_(overall_sampling), verbose_(verbose),
-        max_path_tag_length_(max_path_tag_length) {}
+        max_path_tag_length_(max_path_tag_length),
+        use_semantic_conventions_(use_semantic_conventions) {}
 
   ConnectionManagerTracingConfigImpl() = default;
 
@@ -105,6 +108,7 @@ public:
   bool verbose() const override { return verbose_; }
   uint32_t maxPathTagLength() const override { return max_path_tag_length_; }
   bool spawnUpstreamSpan() const override { return spawn_upstream_span_; }
+  bool useSemanticConventions() const override { return use_semantic_conventions_; }
 
   // TODO(wbpcode): keep this field be public for compatibility. Then the HCM needn't change much
   // code to use this config.
@@ -116,6 +120,7 @@ public:
   bool verbose_{};
   uint32_t max_path_tag_length_{};
   bool spawn_upstream_span_{};
+  bool use_semantic_conventions_{};
 };
 
 } // namespace Tracing

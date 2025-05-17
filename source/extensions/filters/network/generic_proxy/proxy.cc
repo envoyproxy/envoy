@@ -109,6 +109,11 @@ bool ActiveStream::spawnUpstreamSpan() const {
   return conn_manager_tracing_config_->spawnUpstreamSpan();
 }
 
+bool ActiveStream::useSemanticConventions() const {
+  ASSERT(conn_manager_tracing_config_.has_value());
+  return conn_manager_tracing_config_->useSemanticConventions();
+}
+
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {
   return parent_.downstreamConnection().dispatcher();
 }
