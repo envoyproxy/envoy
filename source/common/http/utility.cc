@@ -558,12 +558,6 @@ std::string Utility::stripQueryString(const HeaderString& path) {
   return {path_str.data(), query_offset != path_str.npos ? query_offset : path_str.size()};
 }
 
-std::string Utility::stripQueryParams(const absl::string_view& path) {
-  size_t query_offset = path.find('?');
-  return query_offset == absl::string_view::npos ? std::string(path)
-                                                 : std::string(path.substr(0, query_offset));
-}
-
 std::string Utility::QueryParamsMulti::replaceQueryString(const HeaderString& path) const {
   std::string new_path{Http::Utility::stripQueryString(path)};
 
@@ -1124,6 +1118,13 @@ std::string Utility::QueryParamsMulti::toString() const {
     }
   }
   return out;
+}
+
+absl::string_view Utility::stripQueryParamsAndAnchors(const absl::string_view& path) {
+  size_t query_offset = path.find('?');
+  size_t anchor_offset = path.find('#');
+  size_t end = std::min(query_offset, anchor_offset);
+  return end == absl::string_view::npos ? path : path.substr(0, end);
 }
 
 const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {

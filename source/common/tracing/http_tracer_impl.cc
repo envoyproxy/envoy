@@ -168,7 +168,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
       absl::string_view host_from_url;
       absl::string_view path;
       Http::Utility::extractHostPathFromUri(originalUrl, host_from_url, path);
-      span.setTag(Tracing::Tags::get().UrlPath, Http::Utility::stripQueryParams(path));
+      span.setTag(Tracing::Tags::get().UrlPath, Http::Utility::stripQueryParamsAndAnchors(path));
 
       // client address should be the first ip in xff header if present
       // if xff not present, it should be remote peer address

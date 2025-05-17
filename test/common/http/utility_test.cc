@@ -1389,6 +1389,22 @@ TEST(HttpUtility, TestPrepareHeaders) {
   EXPECT_EQ("dns.name", message->headers().getHostValue());
 }
 
+TEST(HttpUtility, stripQueryParamsAndAnchors) {
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/?"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/?x=1"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/?x=1&y=2"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/foo"), "/foo");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/foo?"), "/foo");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/foo/bar?p1=v1"), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/foo/bar/"), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/#"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/#a"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/#a#b"), "/");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/foo/bar#a"), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryParamsAndAnchors("/foo/bar?p1=v1#a"), "/foo/bar");
+}
+
 TEST(HttpUtility, ResetReasonToString) {
   EXPECT_EQ("local connection failure",
             Utility::resetReasonToString(Http::StreamResetReason::LocalConnectionFailure));
