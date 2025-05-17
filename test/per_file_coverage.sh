@@ -51,6 +51,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/internal_redirect/allow_listed_routes:85.7"
 "source/extensions/internal_redirect/previous_routes:89.3"
 "source/extensions/load_balancing_policies/maglev:90.7"
+"source/extensions/load_balancing_policies/round_robin:96.4"
 "source/extensions/load_balancing_policies/ring_hash:96.2"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"

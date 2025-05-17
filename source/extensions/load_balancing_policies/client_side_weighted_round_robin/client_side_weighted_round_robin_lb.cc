@@ -27,6 +27,13 @@ std::string getHostAddress(const Host* host) {
   }
   return host->address()->asString();
 }
+
+envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin
+getRoundRobinConfig(const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+  TypedRoundRobinLbConfig round_robin_config(common_config, Upstream::LegacyRoundRobinLbProto());
+  return round_robin_config.lb_config_;
+}
+
 } // namespace
 
 ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
@@ -52,8 +59,9 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim)
     : RoundRobinLoadBalancer(priority_set, local_priority_set, stats, runtime, random,
-                             common_config,
-                             /*round_robin_config=*/std::nullopt, time_source) {
+                             PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                 common_config, healthy_panic_threshold, 100, 50),
+                             getRoundRobinConfig(common_config), time_source) {
   if (tls_shim.has_value()) {
     apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) {
       refresh(priority);

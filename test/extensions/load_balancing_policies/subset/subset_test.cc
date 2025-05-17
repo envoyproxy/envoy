@@ -333,6 +333,14 @@ public:
   using HostURLMetadataMap = std::map<std::string, HostMetadata>;
 
   void initLbConfigAndLB(LoadBalancerSubsetInfoPtr subset_info = nullptr, bool zone_aware = false) {
+    if (child_lb_config_ == nullptr) {
+      // NOTE: the child lb config should never be null.
+      auto factory =
+          Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+      auto proto_message = factory->createEmptyConfigProto();
+      child_lb_config_ = factory->loadConfig(server_context_, *proto_message).value();
+    }
+
     lb_config_ = std::make_unique<SubsetLoadBalancerConfig>(
         [&]() -> LoadBalancerSubsetInfoPtr {
           if (subset_info == nullptr) {

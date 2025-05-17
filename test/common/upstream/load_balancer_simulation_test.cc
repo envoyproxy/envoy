@@ -109,11 +109,9 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ClusterLbStats lb_stats{stat_names, *stats_store.rootScope()};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
-  LeastRequestLoadBalancer lb_{
-      priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
-      *time_source};
+
+  LeastRequestLoadBalancer lb_{priority_set, nullptr, lb_stats, runtime,
+                               random,       50,      {},       *time_source};
 
   for (uint64_t i = 0; i < num_requests; i++) {
     host_hits[lb_.chooseHost(nullptr).host]++;
@@ -220,8 +218,7 @@ public:
            std::vector<uint32_t> healthy_destination_cluster) {
     local_priority_set_ = new PrioritySetImpl;
     // TODO(mattklein123): make load balancer per originating cluster host.
-    RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_,
-                          common_config_);
+    RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_, 50, {});
 
     HostsPerLocalitySharedPtr upstream_per_zone_hosts =
         generateHostsPerZone(healthy_destination_cluster);
@@ -339,7 +336,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
 TEST_F(DISABLED_SimulationTest, StrictlyEqualDistribution) {
