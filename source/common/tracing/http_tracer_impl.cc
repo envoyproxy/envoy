@@ -168,8 +168,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
       absl::string_view host_from_url;
       absl::string_view path;
       Http::Utility::extractHostPathFromUri(originalUrl, host_from_url, path);
-      std::string path_without_params = Http::Utility::stripQueryParams(path);
-      span.setTag(Tracing::Tags::get().UrlPath, path_without_params);
+      span.setTag(Tracing::Tags::get().UrlPath, Http::Utility::stripQueryParams(path));
 
       // client address should be the first ip in xff header if present
       // if xff not present, it should be remote peer address
@@ -179,7 +178,6 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
       if (original_client_address == nullptr) {
         final_client_address = peer_address_str;
       } else {
-        // final_client_address = original_client_address->asString();
         final_client_address = original_client_address->ip()->addressAsString();
       }
       span.setTag(Tracing::Tags::get().ClientAddress, final_client_address);
