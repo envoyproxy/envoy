@@ -63,6 +63,11 @@ public:
   bool initializeReadFilters() override;
 
   ConnectionSocketPtr moveSocket() override;
+  const ConnectionSocketPtr& getSocket() const override {
+    // socket is null if it has been moved.
+    RELEASE_ASSERT(socket_ != nullptr, "socket is null.");
+    return socket_;
+  }
   void setSocketReused(bool value) override { reuse_socket_ = value; }
   bool isSocketReused() override { return reuse_socket_; }
 

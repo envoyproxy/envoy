@@ -352,6 +352,11 @@ public:
   virtual ConnectionSocketPtr moveSocket() PURE;
 
   /**
+   * @return ConnectionSocketPtr& To get socket from current connection.
+   */
+  virtual const ConnectionSocketPtr& getSocket() const PURE;
+
+  /**
    *  Mark a connection as a reverse connection. The socket
    *  is cached and re-used for serving downstream requests.
    */
