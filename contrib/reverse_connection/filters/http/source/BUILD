@@ -3,17 +3,11 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
-    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
-
-# L7 HTTP filter that implements the reverse_conn microservice debugger
-# Public docs: docs/root/configuration/http_filters/reverse_conn_filter.rst
-
-envoy_extension_package()
 
 envoy_cc_library(
     name = "reverse_conn_filter_lib",

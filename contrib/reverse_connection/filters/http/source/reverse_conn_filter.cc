@@ -145,7 +145,7 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
     decoder_callbacks_->sendLocalReply(Http::Code::OK, ret.SerializeAsString(), nullptr,
                                        absl::nullopt, "");
   }
-  connection->setConnectionReused(true);
+  connection->setSocketReused(true);
   connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   saveDownstreamConnection(*connection, node_uuid, cluster_uuid);
   decoder_callbacks_->setReverseConnForceLocalReply(false);
@@ -304,7 +304,7 @@ void ReverseConnFilter::saveDownstreamConnection(Network::Connection& downstream
                                                  const std::string& cluster_id) {
   ENVOY_STREAM_LOG(debug, "Adding downstream connection socket to connection socket pool",
                    *decoder_callbacks_);
-  Network::ConnectionSocketPtr& downstream_socket = downstream_connection.getSocket();
+  Network::ConnectionSocketPtr downstream_socket = downstream_connection.moveSocket();
   downstream_socket->ioHandle().resetFileEvents();
   reverseConnectionHandler().addConnectionSocket(node_id, cluster_id, std::move(downstream_socket),
                                                  expects_proxy_protocol_, config_->pingInterval(),

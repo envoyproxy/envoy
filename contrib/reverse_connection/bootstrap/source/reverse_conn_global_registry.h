@@ -41,6 +41,7 @@ public:
 
   ~ReverseConnExtension() override = default;
   void onServerInitialized() override;
+  void onWorkerThreadInitialized() override {};
 
 private:
   Server::Configuration::ServerFactoryContext& server_context_;

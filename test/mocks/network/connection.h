@@ -85,6 +85,7 @@ public:
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));                                            \
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
+  MOCK_METHOD(Network::ConnectionSocketPtr&, getSocket, (), (const));                              \
   MOCK_METHOD(ConnectionSocketPtr, moveSocket, ());                                                \
   MOCK_METHOD(void, setSocketReused, (bool value));                                                \
   MOCK_METHOD(bool, isSocketReused, ());                                                           \

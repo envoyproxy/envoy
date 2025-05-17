@@ -2,12 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_extension_package",
+    "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_extension_package()
+envoy_contrib_package()
 
 envoy_cc_library(
     name = "reverse_connection_manager_interface",
@@ -86,4 +86,4 @@ envoy_cc_extension(
         "@envoy_api//contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha:pkg_cc_proto",
     ],
     alwayslink = 1,
-
+)
