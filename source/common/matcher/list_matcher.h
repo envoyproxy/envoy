@@ -15,21 +15,34 @@ template <class DataType> class ListMatcher : public MatchTree<DataType> {
 public:
   explicit ListMatcher(absl::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& matching_data) override {
+  using MatchResult = typename MatchTree<DataType>::MatchResult;
+
+  typename MatchTree<DataType>::MatchResult
+  match(const DataType& matching_data,
+        SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
     for (const auto& matcher : matchers_) {
-      const auto maybe_match = matcher.first->match(matching_data);
+      FieldMatchResult result = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
-      if (maybe_match.match_state_ == MatchState::UnableToMatch) {
-        return {MatchState::UnableToMatch, {}};
+      if (result.match_state_ == MatchState::UnableToMatch) {
+        return {MatchState::UnableToMatch, absl::nullopt};
+      }
+      if (!result.result()) {
+        continue;
       }
 
-      if (maybe_match.result()) {
-        return {MatchState::MatchComplete, matcher.second};
+      MatchResult processed_result = MatchTree<DataType>::handleRecursionAndSkips(
+          matcher.second, matching_data, skipped_match_cb);
+      // Continue to next matcher if the result is a no-match or is skipped.
+      if (processed_result.match_state_ != MatchState::MatchComplete ||
+          processed_result.on_match_.has_value()) {
+        return processed_result;
       }
     }
 
-    return {MatchState::MatchComplete, on_no_match_};
+    // Return on-no-match, after keep_matching and/or recursion handling.
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, matching_data,
+                                                        skipped_match_cb);
   }
 
   void addMatcher(FieldMatcherPtr<DataType>&& matcher, OnMatch<DataType> action) {
