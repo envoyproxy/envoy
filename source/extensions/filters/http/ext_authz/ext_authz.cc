@@ -554,6 +554,52 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         return;
       }
     }
+    for (const auto& [key, value] : response->headers_to_add_if_absent) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        if (auto header_entry = request_headers_->get(Http::LowerCaseString(key)); header_entry.empty()) {
+          ENVOY_STREAM_LOG(trace, "ext_authz filter added absent header(s) to the request:",
+                          *encoder_callbacks_);
+          request_headers_->addCopy(Http::LowerCaseString(key), value);
+        }
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
+        return;
+      }
+    }
+    for (const auto& [key, value] : response->headers_to_overwrite_if_exists) {
+      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
+          Filters::Common::MutationRules::CheckOperation::SET, key, value);
+      switch (check_result) {
+      case CheckResult::OK:
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
+        if (auto header_entry = request_headers_->get(Http::LowerCaseString(key)); !header_entry.empty()) {
+          ENVOY_STREAM_LOG(trace, "ext_authz filter added absent header(s) to the request:",
+                          *encoder_callbacks_);
+          request_headers_->setCopy(Http::LowerCaseString(key), value);
+        }
+        break;
+      case CheckResult::IGNORE:
+        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        break;
+      case CheckResult::FAIL:
+        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
+                         key, value);
+        rejectResponse();
+        return;
+      }
+    }
     for (const auto& [key, value] : response->headers_to_append) {
       CheckResult check_result = validateAndCheckDecoderHeaderMutation(
           Filters::Common::MutationRules::CheckOperation::APPEND, key, value);

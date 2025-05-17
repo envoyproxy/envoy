@@ -37,6 +37,10 @@ minor_behavior_changes:
   change: |
     Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
 
+- area: ext_authz
+  change: |
+    Implement support for ext_authz grpc check to use `append_action` when given in upstream header handling to support multi header fields
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: conn_pool
