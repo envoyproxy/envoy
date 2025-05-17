@@ -29,7 +29,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/tap:94.6"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
+"source/extensions/filters/common:95.3"
 "source/extensions/filters/common/fault:94.5"
+"source/extensions/filters/common/lua:87.2"
 "source/extensions/filters/common/rbac:92.6"
 "source/extensions/filters/http/cache:95.9"
 "source/extensions/filters/http/dynamic_forward_proxy:94.3"

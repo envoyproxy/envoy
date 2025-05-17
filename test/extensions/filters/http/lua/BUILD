@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -46,6 +47,7 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -56,11 +58,16 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.lua"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/lua:config",
+        "//source/extensions/filters/listener/proxy_protocol:config",
         "//test/config:v2_link_hacks",
+        "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
