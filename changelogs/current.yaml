@@ -151,6 +151,6 @@ new_features:
     a JA4 fingerprint hash from the Client Hello message.
 - area: aws
   change: |
-    implementation of `IAM Roles Anywhere support <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ in the AWS
-    common components, providing this capability to the AWS Lambda and AWS Request Signing extensions.
+    implementation of `IAM Roles Anywhere support <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ in the
+    AWS common components, providing this capability to the AWS Lambda and AWS Request Signing extensions.
 deprecated:
