@@ -36,6 +36,15 @@ minor_behavior_changes:
 - area: grpc-json-transcoding
   change: |
     Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
+- area: prefix_match_map
+  change: |
+    :ref:`prefix_match_map <envoy_v3_api_field_config.common.matcher.v3.Matcher.MatcherTree.prefix_match_map>`
+    now continues to search for a match if the first subtree match
+    does not find an action. This brings it in line with the behavior of ``matcher_list``.
+    This change can temporarily be reverted by setting the runtime guard
+    ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to false.
+    If the old behavior is desired more permanently, this can be achieved in config by setting
+    an ``on_no_match`` action that responds with 404 for each subtree.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
