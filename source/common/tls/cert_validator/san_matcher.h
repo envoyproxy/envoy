@@ -42,8 +42,8 @@ using Ssl::SanMatcherPtr;
 
 class StringSanMatcher : public SanMatcher {
 public:
-  bool match(const GENERAL_NAME* general_name) const override;
-  bool match(const GENERAL_NAME* general_name,
+  bool match(GENERAL_NAME const* general_name) const override;
+  bool match(GENERAL_NAME const* general_name,
              const StreamInfo::StreamInfo& stream_info) const override;
   ~StringSanMatcher() override = default;
 
@@ -72,7 +72,7 @@ private:
 // and the DNS matching semantics must be followed.
 class DnsExactStringSanMatcher : public SanMatcher {
 public:
-  bool match(const GENERAL_NAME* general_name) const override;
+  bool match(GENERAL_NAME const* general_name) const override;
   ~DnsExactStringSanMatcher() override = default;
 
   DnsExactStringSanMatcher(absl::string_view dns_exact_match) : dns_exact_match_(dns_exact_match) {}
