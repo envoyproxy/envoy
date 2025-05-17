@@ -40,6 +40,7 @@ public:
                                 unsigned /*hash_length*/) override {
     IS_ENVOY_BUG("Should not be reached");
   }
+  void refreshCertStatsWithExpirationTime() override {}
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override { return absl::nullopt; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override { return nullptr; }
   // Return empty string
