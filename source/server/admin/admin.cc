@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -106,13 +107,15 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
-                     bool ignore_global_conn_limit)
+                     bool ignore_global_conn_limit,
+                     absl::flat_hash_set<std::string> allow_listed_routes)
     : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
-      profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
-                                       "http.admin.", *server_.stats().rootScope())),
+      allow_listed_route_(allow_listed_routes), profile_path_(profile_path),
+      stats_(
+          Http::ConnectionManagerImpl::generateStats("http.admin.", *server_.stats().rootScope())),
       null_overload_manager_(server.threadLocal(), false),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
                                                                        *no_op_store_.rootScope())),
@@ -392,6 +395,12 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
   }
+  if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
+    ENVOY_LOG(info, "Admin Allow list filter check");
+    Buffer::OwnedImpl error_response;
+    error_response.add("route not allowed");
+    return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
+  }
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
@@ -509,13 +518,14 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
+
+  Buffer::OwnedImpl response;
   AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
   request_headers->setPath(path_and_query);
   filter.decodeHeaders(*request_headers, false);
-  Buffer::OwnedImpl response;
 
   Http::Code code = runCallback(response_headers, response, filter);
   Utility::populateFallbackResponseHeaders(code, response_headers);
