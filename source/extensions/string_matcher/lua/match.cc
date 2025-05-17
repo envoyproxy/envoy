@@ -34,7 +34,7 @@ LuaStringMatcher::LuaStringMatcher(const std::string& code) : state_(luaL_newsta
   matcher_func_ref_ = luaL_ref(state_.get(), LUA_REGISTRYINDEX);
 }
 
-bool LuaStringMatcher::match(const absl::string_view value) const {
+bool LuaStringMatcher::match(absl::string_view value) const {
   const int initial_depth = lua_gettop(state_.get());
 
   bool ret = [&]() {
@@ -88,7 +88,7 @@ public:
     });
   }
 
-  bool match(const absl::string_view value) const override { return (*tls_slot_)->match(value); }
+  bool match(absl::string_view value) const override { return (*tls_slot_)->match(value); }
 
 private:
   ThreadLocal::TypedSlotPtr<LuaStringMatcher> tls_slot_;
