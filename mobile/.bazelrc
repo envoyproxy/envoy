@@ -266,3 +266,8 @@ test:mobile-remote-ci-macos-ios-swift --build_tests_only
 
 build:mobile-remote-ci-macos-ios-obj-c --config=mobile-remote-ci-macos-ios
 test:mobile-remote-ci-macos-ios-obj-c --build_tests_only
+
+build:mobile-remote-ci-macos-ios-xcode16 --config=mobile-remote-ci-macos
+build:mobile-remote-ci-macos-ios-xcode16 --config=mobile-test-ios
+build:mobile-remote-ci-macos-ios-xcode16 --xcode_version=16.1
+build:mobile-remote-ci-macos-ios-xcode16 --macos_minimum_os=14.5
