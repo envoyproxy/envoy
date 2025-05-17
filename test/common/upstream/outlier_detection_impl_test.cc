@@ -103,7 +103,9 @@ public:
 
   void loadRq(HostSharedPtr host, int num_rq, int http_code) {
     for (int i = 0; i < num_rq; i++) {
-      host->outlierDetector().putHttpResponseCode(http_code);
+      host->outlierDetector().putResult(http_code >= 500 ? Result::ExtOriginRequestFailed
+                                                         : Result::ExtOriginRequestSuccess,
+                                        http_code);
     }
   }
 
@@ -1698,7 +1700,7 @@ TEST_F(OutlierDetectorImplTest, Overflow) {
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
-  hosts_[0]->outlierDetector().putHttpResponseCode(500);
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestFailed, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   loadRq(hosts_[1], 5, 500);
@@ -1777,7 +1779,7 @@ TEST_F(OutlierDetectorImplTest, EjectionActiveValueIsAccountedWithoutMetricStora
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
-  hosts_[0]->outlierDetector().putHttpResponseCode(500);
+  hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestFailed, 500);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   // Expect active helper_ has the value 1. However, helper is private and it cannot be tested.
