@@ -13,6 +13,7 @@ namespace Aws {
 using std::chrono::seconds;
 
 constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
+constexpr uint64_t X509_PRIVATE_KEY_MAX_BYTES{10240};
 constexpr uint64_t X509_CERTIFICATE_CHAIN_MAX_LENGTH{5};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
@@ -35,7 +36,6 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
       certificate_chain_data_source_(certificate_chain_data_source) {};
 
 absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
-
   is_initialized_ = true;
 
   absl::Status status = absl::InvalidArgumentError("IAM Roles Anywhere will not be enabled");
@@ -69,7 +69,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, 2048);
+      context_.api(), false, X509_PRIVATE_KEY_MAX_BYTES);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
@@ -109,7 +109,6 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   // We should not be able to get here with an empty certificate or one larger than the max size
   // defined in the header. This is a sanity check.
-
   if (!pem_size || pem_size > X509_CERTIFICATE_MAX_BYTES) {
     return absl::InvalidArgumentError("Invalid certificate size");
   }
