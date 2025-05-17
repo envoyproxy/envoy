@@ -565,7 +565,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {
 TEST_P(LocalRateLimitFilterIntegrationTest, HeaderTest) {
   initializeFilter(fmt::format(limit_header_filter_config_, "false"));
 
-  // The first request should be allowed and the response should contain
+  // The first request should be allowed.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendAndVerifyRequest("2", "1", "0");
   cleanupUpstreamAndDownstream();

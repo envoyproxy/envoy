@@ -113,7 +113,7 @@ std::chrono::milliseconds AtomicTokenBucketImpl::nextTokenAvailable() const {
     return std::chrono::milliseconds(0);
   }
 
-  // Calculate time since the last fill
+  // Calculate time since the last fill.
   double current_time = timeNowInSeconds();
   double time_since_last_fill = std::fmod(current_time, fill_interval_);
   double time_until_next_fill = fill_interval_ - time_since_last_fill;
