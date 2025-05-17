@@ -371,6 +371,10 @@ private:
   calculateLocalityPercentages(const HostsPerLocality& local_hosts_per_locality,
                                const HostsPerLocality& upstream_hosts_per_locality);
 
+  absl::FixedArray<LocalityPercentages>
+  calculateLocalityPercentagesWithWeight(const HostsPerLocality& local_hosts_per_locality,
+                              const HostsPerLocality& upstream_hosts_per_locality);
+
   /**
    * Regenerate locality aware routing structures for fast decisions on upstream locality selection.
    */
@@ -429,6 +433,7 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
   const bool fail_traffic_on_panic_ : 1;
+  const bool use_host_weight_: 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;
