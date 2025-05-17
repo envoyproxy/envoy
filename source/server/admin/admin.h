@@ -379,6 +379,11 @@ private:
       return parent_.socket_factories_;
     }
     bool bindToPort() const override { return true; }
+    Network::ReverseConnectionListenerConfigOptRef
+    reverseConnectionListenerConfig() const override {
+      ENVOY_LOG(info, "Reverse connection config is not supported for Admin listener.");
+      return Network::ReverseConnectionListenerConfigOptRef();
+    }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
@@ -386,6 +391,9 @@ private:
     Stats::Scope& listenerScope() override { return scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
+    const std::string& versionInfo() const override {
+      PANIC("Not implemented for Admin listener.");
+    }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
       return parent_.listener_info_;
     }
