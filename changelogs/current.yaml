@@ -127,6 +127,10 @@ new_features:
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
 - area: http
   change: |
+    Added a new ``setDowstreamSocketOption`` function to the ``StreamDecoderFilterCallbacks`` interface that allows
+    setting a socket option on an existing dowstream connection.
+- area: http
+  change: |
     Add :ref:`response trailers mutations
     <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_trailers_mutations>` and
     :ref:`quest trailers mutations

@@ -803,6 +803,12 @@ public:
   virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
 
   /**
+   * @param the option to set on the socket.
+   * @return true, if the option was set successfully.
+   */
+  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) PURE;
+
+  /**
    * Set override host to be used by the upstream load balancing. If the target host exists in the
    * host list of the routed cluster, the host should be selected first.
    * @param host The override host address.

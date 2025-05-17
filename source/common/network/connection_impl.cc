@@ -921,6 +921,18 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
+bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstSharedPtr option) {
+  if (socket_ == nullptr) {
+    return false;
+  }
+  if (option == nullptr) {
+    return false;
+  }
+  return option->setOption(
+      *socket_,
+      envoy::config::core::v3::SocketOption::SocketState::SocketOption_SocketState_STATE_LISTENING);
+}
+
 absl::string_view ConnectionImpl::transportFailureReason() const {
   if (!failure_reason_.empty()) {
     return failure_reason_;
