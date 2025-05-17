@@ -1,12 +1,14 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
-#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
+
 #include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -286,8 +288,8 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
 
 CredentialsProviderSharedPtr
 DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
         iam_roles_anywhere_config) const {
 
@@ -305,7 +307,9 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
           context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
-          iam_roles_anywhere_config.has_certificate_chain() ? makeOptRef(iam_roles_anywhere_config.certificate_chain()) : absl::nullopt);
+          iam_roles_anywhere_config.has_certificate_chain()
+              ? makeOptRef(iam_roles_anywhere_config.certificate_chain())
+              : absl::nullopt);
   status = roles_anywhere_certificate_provider->initialize();
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider");
@@ -333,8 +337,8 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
 CredentialsProviderSharedPtr
 CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
         iam_roles_anywhere_config) const {
 
@@ -352,7 +356,9 @@ CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
           context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
-          iam_roles_anywhere_config.has_certificate_chain() ? makeOptRef(iam_roles_anywhere_config.certificate_chain()) : absl::nullopt);
+          iam_roles_anywhere_config.has_certificate_chain()
+              ? makeOptRef(iam_roles_anywhere_config.certificate_chain())
+              : absl::nullopt);
   status = roles_anywhere_certificate_provider->initialize();
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider");

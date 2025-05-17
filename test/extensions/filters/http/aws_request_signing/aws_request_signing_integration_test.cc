@@ -621,28 +621,27 @@ TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-      auto cert_env = std::string("CERT");
-    TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
-    auto pkey_env = std::string("PKEY");
-    TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
+  auto cert_env = std::string("CERT");
+  TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
+  auto pkey_env = std::string("PKEY");
+  TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
 
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE);
   initialize();
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
                                  "amazonaws_com.credential_refreshes_performed",
                                  1);
-
-                                }
+}
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
-      auto cert_env = std::string("CERT");
-    TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
-    auto pkey_env = std::string("PKEY");
-    TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
+  auto cert_env = std::string("CERT");
+  TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
+  auto pkey_env = std::string("PKEY");
+  TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
   // Set system time for these tests to ensure certs do not expire
 
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM);

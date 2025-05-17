@@ -4,13 +4,14 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
+
+#include "source/common/common/base64.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
+
+#include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
-#include "test/extensions/common/aws/mocks.h"
-#include "source/common/common/base64.h"
-
-#include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
@@ -22,51 +23,50 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
+// Example certificates generated for test cases
 
-  // Example certificates generated for test cases
+// Test ECDSA signed certificate - Issued from Root CA
+// Certificate:
+//     Data:
+//         Version: 3 (0x2)
+//         Serial Number:
+//             03:ec:7e:dc:37:a7:57:d3:f6:9a:30:9a:7d:91:a5:16
+//         Signature Algorithm: ecdsa-with-SHA256
+//         Issuer: CN = test-ecdsa-p256
+//         Validity
+//             Not Before: Nov 11 21:42:11 2024 GMT
+//             Not After : Nov 11 22:42:11 2025 GMT
+//         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-ecdsa.test
+//         Subject Public Key Info:
+//                 Public-Key: (256 bit)
+//                 pub:
+//                     04:2e:1d:a1:d1:7c:db:e0:4e:38:82:bc:7d:7c:33:
+//                     5e:7f:e4:01:02:fd:70:f0:47:19:50:90:99:68:8c:
+//                     50:5f:de:42:31:0e:83:2f:f1:f6:7a:f9:21:be:a2:
+//                     60:7d:bd:01:fa:89:c4:28:62:b4:b0:cd:5b:a2:5d:
+//                     33:24:fb:85:d9
+//                 ASN1 OID: prime256v1
+//                 NIST CURVE: P-256
+//         X509v3 extensions:
+//             X509v3 Basic Constraints:
+//                 CA:FALSE
+//             X509v3 Authority Key Identifier:
+//                 32:89:A1:4A:00:AC:C1:96:76:5D:D8:D4:D4:CE:18:8D:1B:77:5A:4B
+//             X509v3 Subject Key Identifier:
+//                 37:EC:2F:8B:31:1C:42:FF:79:6E:2F:40:FA:22:DC:FB:2F:C4:76:A1
+//             X509v3 Key Usage: critical
+//                 Digital Signature, Key
+//             X509v3 Extended Key Usage:
+//                 TLS Web Server Authentication, TLS Web Client Authentication
+//     Signature Algorithm: ecdsa-with-SHA256
+//     Signature Value:
+//         30:44:02:20:0e:4c:50:b6:3a:ba:e4:c4:3f:bb:0b:6f:86:7a:
+//         2a:83:0d:0c:69:3b:1c:ba:cf:25:36:10:30:f0:1d:15:cb:cc:
+//         02:20:48:25:16:2f:32:e4:20:40:c9:a4:57:a0:c1:99:7a:d9:
+//         a6:b9:33:95:d1:be:ad:d1:69:c2:c9:6a:1d:2d:89:ef
+//
 
-  // Test ECDSA signed certificate - Issued from Root CA
-  // Certificate:
-  //     Data:
-  //         Version: 3 (0x2)
-  //         Serial Number:
-  //             03:ec:7e:dc:37:a7:57:d3:f6:9a:30:9a:7d:91:a5:16
-  //         Signature Algorithm: ecdsa-with-SHA256
-  //         Issuer: CN = test-ecdsa-p256
-  //         Validity
-  //             Not Before: Nov 11 21:42:11 2024 GMT
-  //             Not After : Nov 11 22:42:11 2025 GMT
-  //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-ecdsa.test
-  //         Subject Public Key Info:
-  //                 Public-Key: (256 bit)
-  //                 pub:
-  //                     04:2e:1d:a1:d1:7c:db:e0:4e:38:82:bc:7d:7c:33:
-  //                     5e:7f:e4:01:02:fd:70:f0:47:19:50:90:99:68:8c:
-  //                     50:5f:de:42:31:0e:83:2f:f1:f6:7a:f9:21:be:a2:
-  //                     60:7d:bd:01:fa:89:c4:28:62:b4:b0:cd:5b:a2:5d:
-  //                     33:24:fb:85:d9
-  //                 ASN1 OID: prime256v1
-  //                 NIST CURVE: P-256
-  //         X509v3 extensions:
-  //             X509v3 Basic Constraints:
-  //                 CA:FALSE
-  //             X509v3 Authority Key Identifier:
-  //                 32:89:A1:4A:00:AC:C1:96:76:5D:D8:D4:D4:CE:18:8D:1B:77:5A:4B
-  //             X509v3 Subject Key Identifier:
-  //                 37:EC:2F:8B:31:1C:42:FF:79:6E:2F:40:FA:22:DC:FB:2F:C4:76:A1
-  //             X509v3 Key Usage: critical
-  //                 Digital Signature, Key
-  //             X509v3 Extended Key Usage:
-  //                 TLS Web Server Authentication, TLS Web Client Authentication
-  //     Signature Algorithm: ecdsa-with-SHA256
-  //     Signature Value:
-  //         30:44:02:20:0e:4c:50:b6:3a:ba:e4:c4:3f:bb:0b:6f:86:7a:
-  //         2a:83:0d:0c:69:3b:1c:ba:cf:25:36:10:30:f0:1d:15:cb:cc:
-  //         02:20:48:25:16:2f:32:e4:20:40:c9:a4:57:a0:c1:99:7a:d9:
-  //         a6:b9:33:95:d1:be:ad:d1:69:c2:c9:6a:1d:2d:89:ef
-  //
-
-  std::string server_root_cert_ecdsa_der_b64 = R"EOF(
+std::string server_root_cert_ecdsa_der_b64 = R"EOF(
 MIIB7zCCAZagAwIBAgIQA+x+3DenV9P2mjCafZGlFjAKBggqhkjOPQQDAjAaMRgwFgYDVQQDDA90
 ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTExMjE0MjExWhcNMjUxMTExMjI0MjExWjBcMQswCQYDVQQG
 EwJYWDEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRk
@@ -78,7 +78,7 @@ BQUHAwEGCCsGAQUFBwMCMAoGCCqGSM49BAMCA0cAMEQCIA5MULY6uuTEP7sLb4Z6KoMNDGk7HLrP
 JTYQMPAdFcvMAiBIJRYvMuQgQMmkV6DBmXrZprkzldG+rdFpwslqHS2J7w==
 )EOF";
 
-  std::string server_root_cert_ecdsa_pem = R"EOF(
+std::string server_root_cert_ecdsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIB7zCCAZagAwIBAgIQA+x+3DenV9P2mjCafZGlFjAKBggqhkjOPQQDAjAaMRgw
 FgYDVQQDDA90ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTExMjE0MjExWhcNMjUxMTEx
@@ -94,7 +94,7 @@ mXrZprkzldG+rdFpwslqHS2J7w==
 -----END CERTIFICATE-----
 )EOF";
 
-  std::string server_root_private_key_ecdsa_pem = R"EOF(
+std::string server_root_private_key_ecdsa_pem = R"EOF(
 -----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIC96bc9hG8Aa3vHDAogZOkndTg0XmyWR7hw7i5dqGdcwoAoGCCqGSM49
 AwEHoUQDQgAELh2h0Xzb4E44grx9fDNef+QBAv1w8EcZUJCZaIxQX95CMQ6DL/H2
@@ -102,43 +102,43 @@ evkhvqJgfb0B+onEKGK0sM1bol0zJPuF2Q==
 -----END EC PRIVATE KEY-----
 )EOF";
 
-  // Test ECDSA signed certificate - Issued from Subordinate CA
-  // Certificate:
-  //     Data:
-  //         Version: 3 (0x2)
-  //         Serial Number:
-  //             39:21:bc:e7:f3:15:1a:4b:7f:ef:54:ef:ef:54:c4:09:a5:03:0f:3a
-  //         Signature Algorithm: ecdsa-with-SHA256
-  //         Issuer: C = XX, L = Default City, O = Default Company Ltd, CN =
-  //         test-ecdsa-p256-subordinate Validity
-  //             Not Before: Nov 17 10:44:05 2024 GMT
-  //             Not After : Nov 17 10:44:05 2025 GMT
-  //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN =
-  //         test-ecdsa-p256-subordinate Subject Public Key Info:
-  //                 Public-Key: (256 bit)
-  //                 pub:
-  //                     04:49:81:46:65:f7:22:74:e4:a8:16:6e:0e:ef:cf:
-  //                     f0:b8:a3:50:75:e4:82:c9:9d:c5:f1:a9:50:73:3b:
-  //                     c1:42:a7:e6:7e:47:dd:4e:bc:e9:33:f9:1a:c0:ad:
-  //                     09:20:f6:35:6c:fc:01:1a:2e:d0:f0:8b:e7:b2:7d:
-  //                     d8:02:91:74:d8
-  //                 ASN1 OID: prime256v1
-  //                 NIST CURVE: P-256
-  //         X509v3 extensions:
-  //             X509v3 Subject Key Identifier:
-  //                 53:A2:C6:B8:5A:AA:37:4B:67:9B:E9:20:1E:C2:F3:01:7C:BC:0A:CD
-  //             X509v3 Authority Key Identifier:
-  //                 53:A2:C6:B8:5A:AA:37:4B:67:9B:E9:20:1E:C2:F3:01:7C:BC:0A:CD
-  //             X509v3 Basic Constraints: critical
-  //                 CA:TRUE
-  //     Signature Algorithm: ecdsa-with-SHA256
-  //     Signature Value:
-  //         30:45:02:20:2f:ab:3c:58:06:04:4b:c5:00:01:56:46:e8:b5:
-  //         c2:f6:84:20:58:e0:30:97:74:3d:e8:6a:43:e5:61:68:55:34:
-  //         02:21:00:89:1e:c6:1a:67:e0:b1:e1:20:4b:a2:a5:28:30:18:
-  //         6f:22:63:24:85:2a:4d:ee:9a:92:75:02:d1:31:53:2b:70
+// Test ECDSA signed certificate - Issued from Subordinate CA
+// Certificate:
+//     Data:
+//         Version: 3 (0x2)
+//         Serial Number:
+//             39:21:bc:e7:f3:15:1a:4b:7f:ef:54:ef:ef:54:c4:09:a5:03:0f:3a
+//         Signature Algorithm: ecdsa-with-SHA256
+//         Issuer: C = XX, L = Default City, O = Default Company Ltd, CN =
+//         test-ecdsa-p256-subordinate Validity
+//             Not Before: Nov 17 10:44:05 2024 GMT
+//             Not After : Nov 17 10:44:05 2025 GMT
+//         Subject: C = XX, L = Default City, O = Default Company Ltd, CN =
+//         test-ecdsa-p256-subordinate Subject Public Key Info:
+//                 Public-Key: (256 bit)
+//                 pub:
+//                     04:49:81:46:65:f7:22:74:e4:a8:16:6e:0e:ef:cf:
+//                     f0:b8:a3:50:75:e4:82:c9:9d:c5:f1:a9:50:73:3b:
+//                     c1:42:a7:e6:7e:47:dd:4e:bc:e9:33:f9:1a:c0:ad:
+//                     09:20:f6:35:6c:fc:01:1a:2e:d0:f0:8b:e7:b2:7d:
+//                     d8:02:91:74:d8
+//                 ASN1 OID: prime256v1
+//                 NIST CURVE: P-256
+//         X509v3 extensions:
+//             X509v3 Subject Key Identifier:
+//                 53:A2:C6:B8:5A:AA:37:4B:67:9B:E9:20:1E:C2:F3:01:7C:BC:0A:CD
+//             X509v3 Authority Key Identifier:
+//                 53:A2:C6:B8:5A:AA:37:4B:67:9B:E9:20:1E:C2:F3:01:7C:BC:0A:CD
+//             X509v3 Basic Constraints: critical
+//                 CA:TRUE
+//     Signature Algorithm: ecdsa-with-SHA256
+//     Signature Value:
+//         30:45:02:20:2f:ab:3c:58:06:04:4b:c5:00:01:56:46:e8:b5:
+//         c2:f6:84:20:58:e0:30:97:74:3d:e8:6a:43:e5:61:68:55:34:
+//         02:21:00:89:1e:c6:1a:67:e0:b1:e1:20:4b:a2:a5:28:30:18:
+//         6f:22:63:24:85:2a:4d:ee:9a:92:75:02:d1:31:53:2b:70
 
-  std::string server_subordinate_cert_ecdsa_pem = R"EOF(
+std::string server_subordinate_cert_ecdsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIICJTCCAcugAwIBAgIUOSG85/MVGkt/71Tv71TECaUDDzowCgYIKoZIzj0EAwIw
 aDELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwT
@@ -155,7 +155,7 @@ SAAwRQIgL6s8WAYES8UAAVZG6LXC9oQgWOAwl3Q96GpD5WFoVTQCIQCJHsYaZ+Cx
 -----END CERTIFICATE-----
 )EOF";
 
-  std::string server_subordinate_cert_ecdsa_der_b64 = R"EOF(
+std::string server_subordinate_cert_ecdsa_der_b64 = R"EOF(
 MIICJTCCAcugAwIBAgIUOSG85/MVGkt/71Tv71TECaUDDzowCgYIKoZIzj0EAwIwaDELMAkGA1UE
 BhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UECgwTRGVmYXVsdCBDb21wYW55IEx0
 ZDEkMCIGA1UEAwwbdGVzdC1lY2RzYS1wMjU2LXN1Ym9yZGluYXRlMB4XDTI0MTExNzEwNDQwNVoX
@@ -168,7 +168,7 @@ EwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIgL6s8WAYES8UAAVZG6LXC9oQgWOAwl3Q96GpD
 5WFoVTQCIQCJHsYaZ+Cx4SBLoqUoMBhvImMkhSpN7pqSdQLRMVMrcA==
 )EOF";
 
-  std::string server_subordinate_private_key_ecdsa_pem = R"EOF(
+std::string server_subordinate_private_key_ecdsa_pem = R"EOF(
 -----BEGIN EC PARAMETERS-----
 BggqhkjOPQMBBw==
 -----END EC PARAMETERS-----
@@ -179,7 +179,7 @@ M/kawK0JIPY1bPwBGi7Q8Ivnsn3YApF02A==
 -----END EC PRIVATE KEY-----
 )EOF";
 
-  std::string server_subordinate_chain_ecdsa_pem = R"EOF(
+std::string server_subordinate_chain_ecdsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIBpDCCAUqgAwIBAgIQEtGBpKhUy68xOvOSxGaJKDAKBggqhkjOPQQDAjAaMRgw
 FgYDVQQDDA90ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTE3MDkzOTUyWhcNMjUxMTIx
@@ -203,7 +203,7 @@ pbvDxRwtAiEA2586MbVLvM9wZ0cw+GqfDPzJVQiJUIZouRZ5V3XdQFY=
 -----END CERTIFICATE-----
 )EOF";
 
-  std::string server_subordinate_chain_ecdsa_der_b64 = R"EOF(
+std::string server_subordinate_chain_ecdsa_der_b64 = R"EOF(
 MIIBpDCCAUqgAwIBAgIQEtGBpKhUy68xOvOSxGaJKDAKBggqhkjOPQQDAjAaMRgwFgYDVQQDDA90
 ZXN0LWVjZHNhLXAyNTYwHhcNMjQxMTE3MDkzOTUyWhcNMjUxMTIxMTAzOTE0WjAmMSQwIgYDVQQD
 DBt0ZXN0LWVjZHNhLXAyNTYtc3Vib3JkaW5hdGUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQp
@@ -220,71 +220,71 @@ BAQDAgGGMAoGCCqGSM49BAMCA0gAMEUCIDp85MaWSMiOi4Gu7p/vW5L0fTchzwu6o6BUpbvDxRwt
 AiEA2586MbVLvM9wZ0cw+GqfDPzJVQiJUIZouRZ5V3XdQFY=
 )EOF";
 
-  // Test RSA signed certificate - Issued from Root CA
-  // Certificate:
-  //     Data:
-  //         Version: 3 (0x2)
-  //         Serial Number:
-  //             63:2d:25:2d:cd:9a:7f:8e:ff:bb:9d:a2:d3:a4:42:a8
-  //         Signature Algorithm: sha256WithRSAEncryption
-  //         Issuer: CN = test-rsa
-  //         Validity
-  //             Not Before: Nov 17 23:23:37 2024 GMT
-  //             Not After : Nov 18 00:23:37 2025 GMT
-  //         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-rsa.test
-  //         Subject Public Key Info:
-  //             Public Key Algorithm: rsaEncryption
-  //                 Public-Key: (2048 bit)
-  //                 Modulus:
-  //                     00:aa:30:47:af:04:3f:40:ca:9f:a4:40:bf:ee:5e:
-  //                     c8:01:66:4e:08:6f:6a:ab:b6:2d:8d:43:01:48:ff:
-  //                     9c:2d:10:2d:fe:a9:2d:5d:8d:06:bf:bf:af:35:7a:
-  //                     9e:4c:af:e7:68:a6:2a:2e:fe:af:29:c7:a9:d7:fb:
-  //                     74:47:59:1c:80:5f:40:79:f2:36:07:51:a6:a7:f8:
-  //                     80:7f:ee:d7:94:6d:fa:5c:a0:2e:32:c6:64:d1:22:
-  //                     e0:dd:4b:e7:ab:04:2d:87:d7:21:da:e6:70:70:03:
-  //                     e6:0d:a7:e2:94:eb:26:fc:65:5b:5b:49:36:5b:90:
-  //                     9b:91:68:a0:75:00:51:1c:fd:a3:fe:b2:e9:11:82:
-  //                     fa:71:79:2e:a9:15:4f:54:3b:60:06:87:6d:58:28:
-  //                     e3:3b:c2:79:e9:ee:4d:8e:55:e2:19:cb:90:63:9a:
-  //                     46:97:3b:04:2e:f8:fa:00:87:a6:e5:a6:a3:7b:05:
-  //                     d0:fc:9d:41:90:87:3b:a1:ca:bd:7f:9a:87:50:76:
-  //                     d0:15:78:87:a2:c1:6d:6b:88:a6:50:c4:69:5e:77:
-  //                     eb:6f:2e:e3:2b:77:c5:a2:02:64:83:d4:f0:5a:5b:
-  //                     aa:7a:9a:df:82:94:d9:2b:ea:0c:d7:06:df:6b:14:
-  //                     0f:2b:c9:c6:17:f9:af:79:02:26:a6:42:92:a8:aa:
-  //                     84:49
-  //                 Exponent: 65537 (0x10001)
-  //         X509v3 extensions:
-  //             X509v3 Basic Constraints:
-  //                 CA:FALSE
-  //             X509v3 Authority Key Identifier:
-  //                 41:E2:65:FF:60:32:8D:5F:D9:EC:A0:A5:D3:FA:EC:B0:DE:A6:C2:CF
-  //             X509v3 Subject Key Identifier:
-  //                 A1:4A:95:75:4D:81:4E:51:FB:D9:62:46:E2:3F:2C:02:79:AD:97:51
-  //             X509v3 Key Usage: critical
-  //                 Digital Signature, Key
-  //             X509v3 Extended Key Usage:
-  //                 TLS Web Server Authentication, TLS Web Client Authentication
-  //     Signature Algorithm: sha256WithRSAEncryption
-  //     Signature Value:
-  //         01:db:ce:a7:d0:ff:79:dc:71:48:a6:aa:08:20:b1:42:c3:28:
-  //         41:6d:88:d5:1a:2c:04:27:c4:a0:ef:8b:5a:f9:8e:d2:e9:56:
-  //         4b:4a:fd:1a:8f:5f:09:3e:a1:30:6b:b0:d1:be:09:e6:29:5e:
-  //         94:05:99:85:fe:74:f5:91:50:c4:ca:27:2f:b6:67:3c:56:aa:
-  //         cb:f8:7b:14:71:32:9f:28:ca:ad:3c:80:4c:a6:ec:5f:6d:8e:
-  //         ec:a0:54:bb:cf:23:64:6e:81:65:50:fb:4f:ad:4e:d0:3e:3c:
-  //         f6:f0:bb:02:2d:ab:a1:a0:e2:f0:87:96:61:66:b1:8e:4b:5d:
-  //         f4:08:95:5c:13:a2:12:9e:8b:08:93:bd:77:e4:2e:e8:27:83:
-  //         23:e8:67:c6:23:22:fb:ad:e8:b6:06:23:a4:8d:94:29:d4:c7:
-  //         f3:3f:54:73:60:cf:fd:c5:f2:10:df:1e:48:d0:53:c7:c4:ae:
-  //         e7:15:2c:e5:30:0b:b0:3d:d7:7c:24:c5:eb:88:39:05:5f:02:
-  //         15:d5:da:c9:80:77:3d:51:c4:0c:b2:3c:e3:83:51:08:8d:ed:
-  //         69:15:f6:52:da:2c:e3:83:0a:81:7b:9b:f4:bb:4f:b1:a2:63:
-  //         cf:a8:1e:1b:ce:4d:d2:97:f5:38:d1:c1:15:c1:06:43:e9:1a:
-  //         c8:91:41:09
+// Test RSA signed certificate - Issued from Root CA
+// Certificate:
+//     Data:
+//         Version: 3 (0x2)
+//         Serial Number:
+//             63:2d:25:2d:cd:9a:7f:8e:ff:bb:9d:a2:d3:a4:42:a8
+//         Signature Algorithm: sha256WithRSAEncryption
+//         Issuer: CN = test-rsa
+//         Validity
+//             Not Before: Nov 17 23:23:37 2024 GMT
+//             Not After : Nov 18 00:23:37 2025 GMT
+//         Subject: C = XX, L = Default City, O = Default Company Ltd, CN = test-rsa.test
+//         Subject Public Key Info:
+//             Public Key Algorithm: rsaEncryption
+//                 Public-Key: (2048 bit)
+//                 Modulus:
+//                     00:aa:30:47:af:04:3f:40:ca:9f:a4:40:bf:ee:5e:
+//                     c8:01:66:4e:08:6f:6a:ab:b6:2d:8d:43:01:48:ff:
+//                     9c:2d:10:2d:fe:a9:2d:5d:8d:06:bf:bf:af:35:7a:
+//                     9e:4c:af:e7:68:a6:2a:2e:fe:af:29:c7:a9:d7:fb:
+//                     74:47:59:1c:80:5f:40:79:f2:36:07:51:a6:a7:f8:
+//                     80:7f:ee:d7:94:6d:fa:5c:a0:2e:32:c6:64:d1:22:
+//                     e0:dd:4b:e7:ab:04:2d:87:d7:21:da:e6:70:70:03:
+//                     e6:0d:a7:e2:94:eb:26:fc:65:5b:5b:49:36:5b:90:
+//                     9b:91:68:a0:75:00:51:1c:fd:a3:fe:b2:e9:11:82:
+//                     fa:71:79:2e:a9:15:4f:54:3b:60:06:87:6d:58:28:
+//                     e3:3b:c2:79:e9:ee:4d:8e:55:e2:19:cb:90:63:9a:
+//                     46:97:3b:04:2e:f8:fa:00:87:a6:e5:a6:a3:7b:05:
+//                     d0:fc:9d:41:90:87:3b:a1:ca:bd:7f:9a:87:50:76:
+//                     d0:15:78:87:a2:c1:6d:6b:88:a6:50:c4:69:5e:77:
+//                     eb:6f:2e:e3:2b:77:c5:a2:02:64:83:d4:f0:5a:5b:
+//                     aa:7a:9a:df:82:94:d9:2b:ea:0c:d7:06:df:6b:14:
+//                     0f:2b:c9:c6:17:f9:af:79:02:26:a6:42:92:a8:aa:
+//                     84:49
+//                 Exponent: 65537 (0x10001)
+//         X509v3 extensions:
+//             X509v3 Basic Constraints:
+//                 CA:FALSE
+//             X509v3 Authority Key Identifier:
+//                 41:E2:65:FF:60:32:8D:5F:D9:EC:A0:A5:D3:FA:EC:B0:DE:A6:C2:CF
+//             X509v3 Subject Key Identifier:
+//                 A1:4A:95:75:4D:81:4E:51:FB:D9:62:46:E2:3F:2C:02:79:AD:97:51
+//             X509v3 Key Usage: critical
+//                 Digital Signature, Key
+//             X509v3 Extended Key Usage:
+//                 TLS Web Server Authentication, TLS Web Client Authentication
+//     Signature Algorithm: sha256WithRSAEncryption
+//     Signature Value:
+//         01:db:ce:a7:d0:ff:79:dc:71:48:a6:aa:08:20:b1:42:c3:28:
+//         41:6d:88:d5:1a:2c:04:27:c4:a0:ef:8b:5a:f9:8e:d2:e9:56:
+//         4b:4a:fd:1a:8f:5f:09:3e:a1:30:6b:b0:d1:be:09:e6:29:5e:
+//         94:05:99:85:fe:74:f5:91:50:c4:ca:27:2f:b6:67:3c:56:aa:
+//         cb:f8:7b:14:71:32:9f:28:ca:ad:3c:80:4c:a6:ec:5f:6d:8e:
+//         ec:a0:54:bb:cf:23:64:6e:81:65:50:fb:4f:ad:4e:d0:3e:3c:
+//         f6:f0:bb:02:2d:ab:a1:a0:e2:f0:87:96:61:66:b1:8e:4b:5d:
+//         f4:08:95:5c:13:a2:12:9e:8b:08:93:bd:77:e4:2e:e8:27:83:
+//         23:e8:67:c6:23:22:fb:ad:e8:b6:06:23:a4:8d:94:29:d4:c7:
+//         f3:3f:54:73:60:cf:fd:c5:f2:10:df:1e:48:d0:53:c7:c4:ae:
+//         e7:15:2c:e5:30:0b:b0:3d:d7:7c:24:c5:eb:88:39:05:5f:02:
+//         15:d5:da:c9:80:77:3d:51:c4:0c:b2:3c:e3:83:51:08:8d:ed:
+//         69:15:f6:52:da:2c:e3:83:0a:81:7b:9b:f4:bb:4f:b1:a2:63:
+//         cf:a8:1e:1b:ce:4d:d2:97:f5:38:d1:c1:15:c1:06:43:e9:1a:
+//         c8:91:41:09
 
-  std::string server_root_cert_rsa_pem = R"EOF(
+std::string server_root_cert_rsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT
 MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz
@@ -308,7 +308,7 @@ Y8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=
 -----END CERTIFICATE-----
 )EOF";
 
-  std::string server_root_chain_rsa_pem = R"EOF(
+std::string server_root_chain_rsa_pem = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIC8zCCAdugAwIBAgIRAKPuvF4B35jaiV9QrXSH9hIwDQYJKoZIhvcNAQELBQAw
 EzERMA8GA1UEAwwIdGVzdC1yc2EwHhcNMjQxMTE3MjMyMzMzWhcNMzQxMTE4MDAy
@@ -329,7 +329,7 @@ WgTQAfHx04TA8rljw5lyGxOZJQ3WIvsc4qCn2Q1Dv+AjpLNZq411
 -----END CERTIFICATE-----
 )EOF";
 
-  std::string server_root_chain_rsa_der_b64 = R"EOF(
+std::string server_root_chain_rsa_der_b64 = R"EOF(
 MIIC8zCCAdugAwIBAgIRAKPuvF4B35jaiV9QrXSH9hIwDQYJKoZIhvcNAQELBQAwEzERMA8GA1UE
 AwwIdGVzdC1yc2EwHhcNMjQxMTE3MjMyMzMzWhcNMzQxMTE4MDAyMzMxWjATMREwDwYDVQQDDAh0
 ZXN0LXJzYTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAK+Om/cFBnAM8hytvuKf+sIj
@@ -346,7 +346,7 @@ EpCWSbf9DMkaeHx6Sw85UjovZU2KgedQHkQ0bhsXqY1PDlP3WgTQAfHx04TA8rljw5lyGxOZJQ3W
 Ivsc4qCn2Q1Dv+AjpLNZq411
 )EOF";
 
-  std::string server_root_cert_rsa_der_b64 = R"EOF(
+std::string server_root_cert_rsa_der_b64 = R"EOF(
 MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADATMREwDwYDVQQD
 DAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIzMzdaMFoxCzAJBgNVBAYTAlhY
 MRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFjAU
@@ -365,7 +365,7 @@ z/3F8hDfHkjQU8fErucVLOUwC7A913wkxeuIOQVfAhXV2smAdz1RxAyyPOODUQiN7WkV9lLaLOOD
 CoF7m/S7T7GiY8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=
 )EOF";
 
-  std::string server_root_private_key_rsa_pem = R"EOF(
+std::string server_root_private_key_rsa_pem = R"EOF(
 -----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCqMEevBD9Ayp+k
 QL/uXsgBZk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX
@@ -435,7 +435,6 @@ public:
   Event::DispatcherPtr dispatcher_;
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-
 };
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidSource) {
@@ -537,7 +536,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, UnsupportedAlgorithm) {
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_chain))
       .WillRepeatedly(Return(server_subordinate_chain_ecdsa_pem));
 
-
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
@@ -576,7 +574,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, MissingSerial) {
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_chain))
       .WillRepeatedly(Return(server_subordinate_chain_ecdsa_pem));
 
-
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
       context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto status = provider->initialize();
@@ -587,7 +584,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, MissingSerial) {
 }
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
-  
+
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
@@ -842,7 +839,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.certificateExpiration(), b);
 }
 
-TEST(emptyPem,pemToAlgorithmSerialExpiration) {
+TEST(EmptyPem, PemToAlgorithmSerialExpiration) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
@@ -852,33 +849,33 @@ TEST(emptyPem,pemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration("", algorithm, serial, time);
   EXPECT_FALSE(status.ok());
 }
 
-TEST(PemTooLarge,pemToAlgorithmSerialExpiration) {
+TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  std::string large_cert(2048+10, 'a');
+  std::string large_cert(2048 + 10, 'a');
 
   X509Credentials::PublicKeySignatureAlgorithm algorithm;
   std::string serial;
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(large_cert, algorithm, serial, time);
   EXPECT_FALSE(status.ok());
 }
 
-TEST(JunkPem,pemToAlgorithmSerialExpiration) {
+TEST(JunkPem, PemToAlgorithmSerialExpiration) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
@@ -890,28 +887,28 @@ TEST(JunkPem,pemToAlgorithmSerialExpiration) {
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
   EXPECT_FALSE(status.ok());
 }
 
-TEST(ValidPemWithAppendedJunk,pemToAlgorithmSerialExpiration) {
+TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string junk_pem;
   junk_pem.append(server_root_cert_rsa_pem);
-  junk_pem.append(std::string(100,'a'));
+  junk_pem.append(std::string(100, 'a'));
 
   X509Credentials::PublicKeySignatureAlgorithm algorithm;
   std::string serial;
   SystemTime time;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
@@ -921,8 +918,7 @@ TEST(ValidPemWithAppendedJunk,pemToAlgorithmSerialExpiration) {
   EXPECT_EQ(time, SystemTime(std::chrono::seconds(1763425417)));
 }
 
-
-TEST(SingleCertTooLarge,pemToDerB64) {
+TEST(SingleCertTooLarge, PemToDerB64) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
@@ -932,14 +928,14 @@ TEST(SingleCertTooLarge,pemToDerB64) {
   std::string out_cert;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
   EXPECT_FALSE(status.ok());
 }
 
-TEST(ChainTooLarge,pemToDerB64) {
+TEST(ChainTooLarge, PemToDerB64) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
@@ -950,35 +946,35 @@ TEST(ChainTooLarge,pemToDerB64) {
   std::string out_chain;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
 
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_chain, out_chain, true);
   EXPECT_FALSE(status.ok());
 }
 
-TEST(ChainParse,pemToDerB64) {
+TEST(ChainParse, PemToDerB64) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   std::string converted_pem = "MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT"
-"MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz"
-"MzdaMFoxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNV"
-"BAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFjAUBgNVBAMMDXRlc3QtcnNhLnRlc3Qw"
-"ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqMEevBD9Ayp+kQL/uXsgB"
-"Zk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX+3RHWRyA"
-"X0B58jYHUaan+IB/7teUbfpcoC4yxmTRIuDdS+erBC2H1yHa5nBwA+YNp+KU6yb8"
-"ZVtbSTZbkJuRaKB1AFEc/aP+sukRgvpxeS6pFU9UO2AGh21YKOM7wnnp7k2OVeIZ"
-"y5BjmkaXOwQu+PoAh6blpqN7BdD8nUGQhzuhyr1/modQdtAVeIeiwW1riKZQxGle"
-"d+tvLuMrd8WiAmSD1PBaW6p6mt+ClNkr6gzXBt9rFA8rycYX+a95AiamQpKoqoRJ"
-"AgMBAAGjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUQeJl/2AyjV/Z7KCl0/rs"
-"sN6mws8wHQYDVR0OBBYEFKFKlXVNgU5R+9liRuI/LAJ5rZdRMA4GA1UdDwEB/wQE"
-"AwIFoDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDQYJKoZIhvcNAQEL"
-"BQADggEBAAHbzqfQ/3nccUimqgggsULDKEFtiNUaLAQnxKDvi1r5jtLpVktK/RqP"
-"Xwk+oTBrsNG+CeYpXpQFmYX+dPWRUMTKJy+2ZzxWqsv4exRxMp8oyq08gEym7F9t"
-"juygVLvPI2RugWVQ+0+tTtA+PPbwuwItq6Gg4vCHlmFmsY5LXfQIlVwTohKeiwiT"
-"vXfkLugngyPoZ8YjIvut6LYGI6SNlCnUx/M/VHNgz/3F8hDfHkjQU8fErucVLOUw"
-"C7A913wkxeuIOQVfAhXV2smAdz1RxAyyPOODUQiN7WkV9lLaLOODCoF7m/S7T7Gi"
-"Y8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=";
+                              "MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz"
+                              "MzdaMFoxCzAJBgNVBAYTAlhYMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNV"
+                              "BAoME0RlZmF1bHQgQ29tcGFueSBMdGQxFjAUBgNVBAMMDXRlc3QtcnNhLnRlc3Qw"
+                              "ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqMEevBD9Ayp+kQL/uXsgB"
+                              "Zk4Ib2qrti2NQwFI/5wtEC3+qS1djQa/v681ep5Mr+dopiou/q8px6nX+3RHWRyA"
+                              "X0B58jYHUaan+IB/7teUbfpcoC4yxmTRIuDdS+erBC2H1yHa5nBwA+YNp+KU6yb8"
+                              "ZVtbSTZbkJuRaKB1AFEc/aP+sukRgvpxeS6pFU9UO2AGh21YKOM7wnnp7k2OVeIZ"
+                              "y5BjmkaXOwQu+PoAh6blpqN7BdD8nUGQhzuhyr1/modQdtAVeIeiwW1riKZQxGle"
+                              "d+tvLuMrd8WiAmSD1PBaW6p6mt+ClNkr6gzXBt9rFA8rycYX+a95AiamQpKoqoRJ"
+                              "AgMBAAGjfDB6MAkGA1UdEwQCMAAwHwYDVR0jBBgwFoAUQeJl/2AyjV/Z7KCl0/rs"
+                              "sN6mws8wHQYDVR0OBBYEFKFKlXVNgU5R+9liRuI/LAJ5rZdRMA4GA1UdDwEB/wQE"
+                              "AwIFoDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDQYJKoZIhvcNAQEL"
+                              "BQADggEBAAHbzqfQ/3nccUimqgggsULDKEFtiNUaLAQnxKDvi1r5jtLpVktK/RqP"
+                              "Xwk+oTBrsNG+CeYpXpQFmYX+dPWRUMTKJy+2ZzxWqsv4exRxMp8oyq08gEym7F9t"
+                              "juygVLvPI2RugWVQ+0+tTtA+PPbwuwItq6Gg4vCHlmFmsY5LXfQIlVwTohKeiwiT"
+                              "vXfkLugngyPoZ8YjIvut6LYGI6SNlCnUx/M/VHNgz/3F8hDfHkjQU8fErucVLOUw"
+                              "C7A913wkxeuIOQVfAhXV2smAdz1RxAyyPOODUQiN7WkV9lLaLOODCoF7m/S7T7Gi"
+                              "Y8+oHhvOTdKX9TjRwRXBBkPpGsiRQQk=";
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
@@ -987,23 +983,21 @@ TEST(ChainParse,pemToDerB64) {
 
   // One legitimate certificate and junk appended to the chain
   chain.append(server_root_cert_rsa_pem);
-  chain.append(std::string(4000,'a'));
+  chain.append(std::string(4000, 'a'));
 
   std::string out_chain;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-  context, certificate_data_source, private_key_data_source, absl::nullopt);
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
   auto status = provider->initialize();
   EXPECT_FALSE(status.ok());
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   status = provider_friend.pemToDerB64(chain, out_chain, true);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(out_chain, converted_pem);
-
 }
 
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions
 } // namespace Envoy
-

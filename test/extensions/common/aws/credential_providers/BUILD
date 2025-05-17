@@ -104,15 +104,15 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",
-        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
-        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
-        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "//test/extensions/common/aws:aws_mocks",
-
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 
@@ -123,14 +123,13 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
+        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:test_runtime_lib",
-        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
-        "//source/extensions/common/aws/signers:iam_roles_anywhere_sigv4_signer_impl_lib",
-        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "//test/extensions/common/aws:aws_mocks",
-
     ],
 )

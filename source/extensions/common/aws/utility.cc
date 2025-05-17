@@ -313,7 +313,6 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
   return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
-
 /**
  * This function generates an RolesAnywhere Endpoint from a region string.
  */
