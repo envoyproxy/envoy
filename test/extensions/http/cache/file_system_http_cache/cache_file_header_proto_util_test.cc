@@ -137,6 +137,14 @@ TEST(CacheFileHeaderProtoUtil, MakeCacheFileHeaderProtoFromBuffer) {
   EXPECT_THAT(header_proto, ProtoEqIgnoreRepeatedFieldOrdering(header_proto_from_buffer));
 }
 
+TEST(CacheFileHeaderProtoUtil, MakeCacheFileTrailerProtoFromBuffer) {
+  CacheFileTrailer trailer_proto;
+  TestUtility::loadFromYaml(test_trailer_proto, trailer_proto);
+  Buffer::OwnedImpl buffer = bufferFromProto(trailer_proto);
+  CacheFileTrailer trailer_proto_from_buffer = makeCacheFileTrailerProto(buffer);
+  EXPECT_THAT(trailer_proto, ProtoEqIgnoreRepeatedFieldOrdering(trailer_proto_from_buffer));
+}
+
 TEST(CacheFileHeaderProtoUtil, UpdateProtoFromHeadersAndMetadata) {
   CacheFileHeader header_proto;
   TestUtility::loadFromYaml(test_header_proto, header_proto);
