@@ -16,8 +16,20 @@ namespace NetworkFilters {
 namespace RBAC {
 namespace {
 
-std::string rbac_config;
+const std::string FILTER_STATE_SETTER_CONFIG = R"EOF(
+name: test-filter-state-setter
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+    object_key: "test_key"
+    factory_key: "envoy.string"
+    format_string:
+      text_format_source:
+        inline_string: "deny_value"
+    read_only: false
+)EOF";
 
+std::string rbac_config;
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
@@ -282,6 +294,75 @@ typed_config:
   // Note the whitespace in the policy id is replaced by '_'.
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr("rbac_access_denied_matched_policy[deny_all]"));
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, FilterStateMatcherDenied) {
+  auto config = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  matcher:
+    matcher_tree:
+      input:
+        name: filter_state
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+          key: test_key
+      exact_match_map:
+        map:
+          "deny_value":
+            action:
+              name: envoy.filters.rbac.action
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+                name: deny-request
+                action: DENY
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow-request
+          action: ALLOW
+)EOF";
+  config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::config::listener::v3::Filter filter;
+    TestUtility::loadFromYaml(config, filter);
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    ASSERT_GT(l->filter_chains_size(), 0);
+    ASSERT_GT(l->filter_chains(0).filters_size(), 0);
+
+    // Save all original filters
+    std::vector<envoy::config::listener::v3::Filter> original_filters;
+    for (int i = 0; i < l->filter_chains(0).filters_size(); i++) {
+      original_filters.push_back(*l->mutable_filter_chains(0)->mutable_filters(i));
+    }
+
+    // Clear the existing filters
+    l->mutable_filter_chains(0)->clear_filters();
+
+    // Add the Set State filter at position 0
+    envoy::config::listener::v3::Filter set_state_filter;
+    TestUtility::loadFromYaml(FILTER_STATE_SETTER_CONFIG, set_state_filter);
+    l->mutable_filter_chains(0)->add_filters()->Swap(&set_state_filter);
+
+    // Re-add all original filters after our new ones
+    for (auto& original_filter : original_filters) {
+      *l->mutable_filter_chains(0)->add_filters() = original_filter;
+    }
+
+    // Swap the RBAC filter config at position 1
+    l->mutable_filter_chains(0)->mutable_filters(1)->Swap(&filter);
+  });
+  BaseIntegrationTest::initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
 }
 
 } // namespace RBAC

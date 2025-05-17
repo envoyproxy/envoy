@@ -20,16 +20,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // .. attention::
 //
-//   This resolver uses a single background thread to do resolutions. As such, it is not currently
-//   advised for use in situations requiring a high resolution rate. A thread pool can be added
-//   in the future if needed.
-//
-// .. attention::
-//
 //   Resolutions currently use a hard coded TTL of 60s because the getaddrinfo() API does not
 //   provide the actual TTL. Configuration for this can be added in the future if needed.
 message GetAddrInfoDnsResolverConfig {
   // Specifies the number of retries before the resolver gives up. If not specified, the resolver will
   // retry indefinitely until it succeeds or the DNS query times out.
   google.protobuf.UInt32Value num_retries = 1;
+
+  // Specifies the number of threads used to resolve pending DNS queries. If not specified, one thread is used.
+  google.protobuf.UInt32Value num_resolver_threads = 2;
 }

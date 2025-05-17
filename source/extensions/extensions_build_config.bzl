@@ -51,7 +51,6 @@ EXTENSIONS = {
     #
 
     "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
-    "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
     # WASM
@@ -254,6 +253,7 @@ EXTENSIONS = {
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
     "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
     "envoy.resource_monitors.cpu_utilization":          "//source/extensions/resource_monitors/cpu_utilization:config",
+    "envoy.resource_monitors.cgroup_memory":          "//source/extensions/resource_monitors/cgroup_memory:config",
 
     #
     # Stat sinks
@@ -299,9 +299,11 @@ EXTENSIONS = {
     # OpenTelemetry tracer samplers
     #
 
-    "envoy.tracers.opentelemetry.samplers.always_on":         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
-    "envoy.tracers.opentelemetry.samplers.dynatrace":         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
-    "envoy.tracers.opentelemetry.samplers.cel":               "//source/extensions/tracers/opentelemetry/samplers/cel:config",
+    "envoy.tracers.opentelemetry.samplers.cel":                           "//source/extensions/tracers/opentelemetry/samplers/cel:config",
+    "envoy.tracers.opentelemetry.samplers.always_on":                     "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
+    "envoy.tracers.opentelemetry.samplers.dynatrace":                     "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
+    "envoy.tracers.opentelemetry.samplers.parent_based":                  "//source/extensions/tracers/opentelemetry/samplers/parent_based:config",
+    "envoy.tracers.opentelemetry.samplers.trace_id_ratio_based":          "//source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based:config",
 
     #
     # Transport sockets
@@ -405,6 +407,7 @@ EXTENSIONS = {
     #
 
     "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
+    "envoy.http.stateful_session.envelope":              "//source/extensions/http/stateful_session/envelope:config",
     "envoy.http.stateful_session.header":                "//source/extensions/http/stateful_session/header:config",
 
     #
@@ -516,6 +519,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.subset":            "//source/extensions/load_balancing_policies/subset:config",
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
+    "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
 
     #
     # HTTP Early Header Mutation

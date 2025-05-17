@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/cached_credentials_provider_base.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -10,7 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
 constexpr char TOKEN[] = "Token";
@@ -31,19 +29,18 @@ struct MetadataCredentialsProviderStats {
  */
 using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
-using ServerFactoryContextOptRef = OptRef<Server::Configuration::ServerFactoryContext>;
 
-class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
+class MetadataCredentialsProviderBase : public CredentialsProvider,
+                                        public Logger::Loggable<Logger::Id::aws>,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
-  using CurlMetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(Api::Api& api, ServerFactoryContextOptRef context,
-                                  AwsClusterManagerOptRef aws_cluster_manager,
+  MetadataCredentialsProviderBase(Api::Api& api,
+                                  Server::Configuration::ServerFactoryContext& context,
+                                  AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
-                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                   std::chrono::seconds initialization_timer);
@@ -86,11 +83,11 @@ protected:
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
 
+  virtual void refresh() PURE;
+
   Api::Api& api_;
   // The optional server factory context.
-  ServerFactoryContextOptRef context_;
-  // Store the method to fetch metadata from libcurl (deprecated)
-  CurlMetadataFetcher fetch_metadata_using_curl_;
+  Server::Configuration::ServerFactoryContext& context_;
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
@@ -114,8 +111,6 @@ protected:
   std::string continue_on_async_fetch_failure_reason_ = "";
   // Last update time to determine expiration.
   SystemTime last_updated_;
-  // Cache credentials when using libcurl.
-  Credentials cached_credentials_;
   // The expiration time received in any returned token
   absl::optional<SystemTime> expiration_time_;
   // Tls slot
@@ -125,7 +120,7 @@ protected:
   // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
   // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
-  AwsClusterManagerOptRef aws_cluster_manager_;
+  AwsClusterManagerPtr aws_cluster_manager_;
   // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
   // Are credentials pending?

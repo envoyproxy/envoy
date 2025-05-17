@@ -17,6 +17,7 @@
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
+using test::integration::filters::LoggingTestFilterConfig;
 using testing::AssertionResult;
 using testing::Not;
 using testing::TestWithParam;
@@ -161,13 +162,14 @@ public:
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
 
       if (emitFilterStateStats()) {
-        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id("envoy.filters.http.ext_authz");
         logging_filter_config.set_upstream_cluster_name("ext_authz_cluster");
         logging_filter_config.set_expect_stats(opts.expect_stats_override.value_or(true));
         logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
                                                                    Grpc::ClientType::EnvoyGrpc);
         logging_filter_config.set_expect_response_bytes(opts.stats_expect_response_bytes);
+        logging_filter_config.set_expect_grpc_status(ext_authz_grpc_status_);
 
         // Set the same filter metadata to the ext authz filter and the logging test filter.
         *(*logging_filter_config.mutable_filter_metadata()->mutable_fields())["foo"]
@@ -655,6 +657,7 @@ attributes:
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
   IntegrationStreamDecoderPtr response_;
+  LoggingTestFilterConfig::GrpcStatus ext_authz_grpc_status_ = LoggingTestFilterConfig::OK;
 
   Buffer::OwnedImpl request_body_;
   const uint64_t response_size_ = 512;
@@ -1190,6 +1193,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   opts.stats_expect_response_bytes = false;
   opts.failure_mode_allow = false;
   opts.timeout_ms = 1;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
   initializeConfig(opts);
 
   // Use h1, set up the test.
@@ -1268,6 +1272,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   init_opts.stats_expect_response_bytes = false;
   init_opts.failure_mode_allow = true;
   init_opts.timeout_ms = 1;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
   initializeConfig(init_opts);
 
   // Use h1, set up the test.
