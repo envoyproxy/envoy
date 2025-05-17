@@ -34,7 +34,6 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
         credential_provider_config.iam_roles_anywhere_credential_provider()));
   }
 
-
   // Custom chain currently only supports file based and web identity credentials
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
@@ -106,6 +105,13 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       context, credential_provider_config.credentials_file_provider()));
 
   auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
+
+  if (credential_provider_config.has_iam_roles_anywhere_credential_provider()) {
+    ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
+    add(factories.createIAMRolesAnywhereCredentialsProvider(
+        context, aws_cluster_manager_, region,
+        credential_provider_config.iam_roles_anywhere_credential_provider()));
+  }
 
   // Configure defaults if nothing is set in the config
   if (!web_identity.has_web_identity_token_data_source()) {
@@ -299,7 +305,13 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
           context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
-          iam_roles_anywhere_config.certificate_chain());
+          iam_roles_anywhere_config.has_certificate_chain() ? makeOptRef(iam_roles_anywhere_config.certificate_chain()) : absl::nullopt);
+  status = roles_anywhere_certificate_provider->initialize();
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider");
+    return nullptr;
+  }
+
   // Create our own x509 signer just for IAM Roles Anywhere
   auto roles_anywhere_signer =
       std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
@@ -334,13 +346,19 @@ CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
   const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
 
-  const auto status = aws_cluster_manager->addManagedCluster(
+  auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
           context, iam_roles_anywhere_config.certificate(), iam_roles_anywhere_config.private_key(),
-          iam_roles_anywhere_config.certificate_chain());
+          iam_roles_anywhere_config.has_certificate_chain() ? makeOptRef(iam_roles_anywhere_config.certificate_chain()) : absl::nullopt);
+  status = roles_anywhere_certificate_provider->initialize();
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider");
+    return nullptr;
+  }
+
   // Create our own x509 signer just for IAM Roles Anywhere
   auto roles_anywhere_signer =
       std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(

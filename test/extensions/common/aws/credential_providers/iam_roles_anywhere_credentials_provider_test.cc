@@ -134,7 +134,8 @@ public:
                        << "\n";
     }
     if (!expected_message_.bodyAsString().empty()) {
-      if (const std::string body = expected_message_.bodyAsString(); !body.empty()) {
+      const std::string body = expected_message_.bodyAsString();
+      if (body != message.bodyAsString() && !body.empty()) {
         equal = 0;
         *result_listener << "\n"
                          << TestUtility::addLeftAndRightPadding("Expected message body:") << "\n"

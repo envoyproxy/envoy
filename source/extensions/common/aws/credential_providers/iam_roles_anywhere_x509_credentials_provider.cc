@@ -13,6 +13,7 @@ namespace Aws {
 using std::chrono::seconds;
 
 constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
+constexpr uint64_t X509_PRIVATE_KEY_MAX_BYTES{10240};
 constexpr uint64_t X509_CERTIFICATE_CHAIN_MAX_LENGTH{5};
 
 void CachedX509CredentialsProviderBase::refreshIfNeeded() {
@@ -68,7 +69,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
-      context_.api(), false, 2048);
+      context_.api(), false, X509_PRIVATE_KEY_MAX_BYTES);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
