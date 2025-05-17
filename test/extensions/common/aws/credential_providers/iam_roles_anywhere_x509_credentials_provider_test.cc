@@ -587,7 +587,6 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   api_ = Api::createApiForTest();
   dispatcher_ = setupDispatcher();
 

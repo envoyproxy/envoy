@@ -982,6 +982,86 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, Coverage) {
   timer_->invokeCallback();
 }
 
+TEST_F(IamRolesAnywhereCredentialsProviderTest, OtherSigningMethods) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  X509Credentials creds =
+      X509Credentials("cert", X509Credentials::PublicKeySignatureAlgorithm::RSA, "serial", "chain",
+                      "pem", context_.timeSystem().systemTime());
+
+  EXPECT_CALL(*mock_credentials_provider, getCredentials()).WillRepeatedly(Return(creds));
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          mock_credentials_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
+  // Will fail because credentials are invalid
+  EXPECT_FALSE(status.ok());
+  Http::TestRequestHeaderMapImpl headers2{};
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signUnsignedPayload(headers2, "ap-southeast-2");
+  // Will fail because credentials are invalid
+  EXPECT_FALSE(status.ok());
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, NoMethodOrPath) {
+  auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  X509Credentials creds =
+      X509Credentials("cert", X509Credentials::PublicKeySignatureAlgorithm::RSA, "serial", "chain",
+                      "pem", context_.timeSystem().systemTime());
+
+  EXPECT_CALL(*mock_credentials_provider, getCredentials()).WillRepeatedly(Return(creds));
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          mock_credentials_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  // No Method
+  Http::TestRequestHeaderMapImpl headers2{};
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signUnsignedPayload(headers2, "ap-southeast-2");
+  EXPECT_FALSE(status.ok());
+  // No Path
+  Http::TestRequestHeaderMapImpl headers3{};
+  headers.setMethod("GET");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signUnsignedPayload(headers3, "ap-southeast-2");
+  EXPECT_FALSE(status.ok());
+}
+TEST_F(IamRolesAnywhereCredentialsProviderTest, NoCredentials) {
+  auto roles_anywhere_certificate_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  EXPECT_CALL(*roles_anywhere_certificate_provider, getCredentials())
+      .WillRepeatedly(Return(X509Credentials()));
+
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
+  EXPECT_FALSE(status.ok());
+}
+
 TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
 
   // Setup timer.

@@ -173,6 +173,7 @@ public:
       : provider_(provider) {}
 
   void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
+
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 
@@ -230,6 +231,13 @@ private:
               (const X509Credentials& x509_credentials, const absl::string_view canonical_request,
                const absl::string_view long_date, const absl::string_view credential_scope),
               (const));
+};
+
+class MockX509CredentialsProvider : public X509CredentialsProvider {
+public:
+  ~MockX509CredentialsProvider() override = default;
+
+  MOCK_METHOD(X509Credentials, getCredentials, ());
 };
 
 } // namespace Aws
