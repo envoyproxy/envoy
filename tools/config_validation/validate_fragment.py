@@ -30,7 +30,7 @@ def validate_fragment(type_name, fragment, descriptor_path):
 
 
 def validate_yaml(type_name, content, descriptor_path):
-    ProtobufValidator(descriptor_path).validate_yaml(content, message_type)
+    ProtobufValidator(descriptor_path).validate_yaml(content, type_name)
 
 
 def parse_args():
