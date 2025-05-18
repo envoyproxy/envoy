@@ -137,6 +137,19 @@ HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&&
   return header_option_vector;
 }
 
+HeaderValueOptionVector TestCommon::makeHeaderValueAction(KeyValueActionVector&& headers) {
+  HeaderValueOptionVector header_option_vector{};
+  for (const auto& header : headers) {
+    envoy::config::core::v3::HeaderValueOption header_value_option;
+    auto* mutable_header = header_value_option.mutable_header();
+    mutable_header->set_key(header.key);
+    mutable_header->set_value(header.value);
+    header_value_option.set_append_action(header.append_action);
+    header_option_vector.push_back(header_value_option);
+  }
+  return header_option_vector;
+}
+
 Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& headers,
                                                          const std::string& body) {
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(

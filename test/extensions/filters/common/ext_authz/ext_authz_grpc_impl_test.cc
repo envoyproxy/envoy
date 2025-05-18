@@ -476,6 +476,53 @@ ok_response:
                      span_);
 }
 
+// Test the client when an OK response is received with multi header fields.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithMultiHeader) {
+  initialize();
+
+  const auto expected_headers = TestCommon::makeHeaderValueAction({
+    {"append-if-exists-or-add", "aaa", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+    {"append-if-exists-or-add", "bbb", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+    // not added twice
+    {"append-if-exists-or-add", "bbb", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+    {"overwrite-if-exists-or-add", "aaa", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+    {"overwrite-if-exists-or-add", "bbb", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}
+  });
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = check_response->mutable_status();
+
+  const auto grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok;
+  status->set_code(grpc_status);
+
+  for (auto& header : expected_headers) {
+    auto* item = check_response->mutable_ok_response()->mutable_headers()->Add();
+    item->CopyFrom(header);
+  }
+
+  auto expected_authz_response = Response{
+      .status = CheckStatus::OK,
+      .headers_to_set =
+          UnsafeHeaderVector{{"overwrite-if-exists-or-add", "bbb"}},
+      .headers_to_add =
+          UnsafeHeaderVector{{"append-if-exists-or-add", "aaa"},{"append-if-exists-or-add", "bbb"}},
+      .status_code = Http::Code::OK,
+      .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+  };
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzOkResponse(expected_authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
