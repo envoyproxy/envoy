@@ -481,12 +481,21 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithMultiHeader) {
   initialize();
 
   const auto expected_headers = TestCommon::makeHeaderValueAction({
-    {"append-if-exists-or-add", "aaa", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
-    {"append-if-exists-or-add", "bbb", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
-    // not added twice
-    {"append-if-exists-or-add", "bbb", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
-    {"overwrite-if-exists-or-add", "aaa", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
-    {"overwrite-if-exists-or-add", "bbb", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}
+      {"append-if-exists-or-add", "aaa",
+       envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+      {"append-if-exists-or-add", "bbb",
+       envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+      // not added twice
+      {"append-if-exists-or-add", "bbb",
+       envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+      // overwritten by next one
+      {"overwrite-if-exists-or-add", "aaa",
+       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+      {"overwrite-if-exists-or-add", "bbb",
+       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+      {"add-if-absent", "aaa", envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT},
+      {"overwrite-if-exists", "aaa",
+       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
   });
 
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
@@ -502,10 +511,11 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithMultiHeader) {
 
   auto expected_authz_response = Response{
       .status = CheckStatus::OK,
-      .headers_to_set =
-          UnsafeHeaderVector{{"overwrite-if-exists-or-add", "bbb"}},
-      .headers_to_add =
-          UnsafeHeaderVector{{"append-if-exists-or-add", "aaa"},{"append-if-exists-or-add", "bbb"}},
+      .headers_to_set = UnsafeHeaderVector{{"overwrite-if-exists-or-add", "bbb"}},
+      .headers_to_add = UnsafeHeaderVector{{"append-if-exists-or-add", "aaa"},
+                                           {"append-if-exists-or-add", "bbb"}},
+      .headers_to_add_if_absent = UnsafeHeaderVector{{"add-if-absent", "aaa"}},
+      .headers_to_overwrite_if_exists = UnsafeHeaderVector{{"overwrite-if-exists", "aaa"}},
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
   };

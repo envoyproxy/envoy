@@ -30,8 +30,7 @@ void copyHeaderFieldIntoResponse(
       switch (header.append_action()) {
         PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        response->headers_to_add.emplace_back(header.header().key(),
-                                              header.header().value());
+        response->headers_to_add.emplace_back(header.header().key(), header.header().value());
         break;
       case Router::HeaderValueOption::ADD_IF_ABSENT:
         response->headers_to_add_if_absent.emplace_back(header.header().key(),
@@ -42,8 +41,7 @@ void copyHeaderFieldIntoResponse(
                                                               header.header().value());
         break;
       case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        response->headers_to_set.emplace_back(header.header().key(),
-                                              header.header().value());
+        response->headers_to_set.emplace_back(header.header().key(), header.header().value());
         break;
       }
     }

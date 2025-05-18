@@ -560,9 +560,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       switch (check_result) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        if (auto header_entry = request_headers_->get(Http::LowerCaseString(key)); header_entry.empty()) {
+        if (auto header_entry = request_headers_->get(Http::LowerCaseString(key));
+            header_entry.empty()) {
           ENVOY_STREAM_LOG(trace, "ext_authz filter added absent header(s) to the request:",
-                          *encoder_callbacks_);
+                           *encoder_callbacks_);
           request_headers_->addCopy(Http::LowerCaseString(key), value);
         }
         break;
@@ -583,9 +584,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       switch (check_result) {
       case CheckResult::OK:
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        if (auto header_entry = request_headers_->get(Http::LowerCaseString(key)); !header_entry.empty()) {
+        if (auto header_entry = request_headers_->get(Http::LowerCaseString(key));
+            !header_entry.empty()) {
           ENVOY_STREAM_LOG(trace, "ext_authz filter added absent header(s) to the request:",
-                          *encoder_callbacks_);
+                           *encoder_callbacks_);
           request_headers_->setCopy(Http::LowerCaseString(key), value);
         }
         break;

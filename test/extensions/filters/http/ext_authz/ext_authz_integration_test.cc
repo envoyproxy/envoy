@@ -1174,8 +1174,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
 
   // Send back an ext_authz response with response_headers_to_add set.
   sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Headers{}, Headers{},
-      Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+      Headers{}, Headers{}, Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+      Http::TestRequestHeaderMapImpl{},
       Headers{{"downstream2", "should-be-added"}, {"set-cookie", "cookie2=gingerbread"}},
       Headers{{"replaceable", "set-by-ext-authz"}},
       Headers{{"downstream3", "should-be-added"}, {"set-cookie", "cookie3=peanutbutter"}},
@@ -1250,7 +1250,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
   // After the first failure, a second request is expected due to configured retries.
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1),
                          true /*connection_already_established*/);
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Headers{},  Headers{},
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Headers{}, Headers{},
                        Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
                        Headers{}, Headers{}, Headers{}, Headers{});
 
@@ -1351,8 +1351,8 @@ TEST_P(ExtAuthzGrpcIntegrationTest, FailureModeAllowNonUtf8) {
 
   // Send back an ext_authz response with response_headers_to_add set.
   sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Headers{}, Headers{},
-      Http::TestRequestHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{},
+      Headers{}, Headers{}, Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+      Http::TestRequestHeaderMapImpl{},
       Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
       Headers{{"replaceable", "by-ext-authz"}}, Headers{}, Headers{});
 
