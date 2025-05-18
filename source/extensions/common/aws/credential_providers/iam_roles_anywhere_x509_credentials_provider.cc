@@ -127,14 +127,10 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   }
 
   X509_ALGOR* alg;
+  // Param_status will in fact always return 1
   int param_status =
       X509_PUBKEY_get0_param(nullptr, nullptr, nullptr, &alg, X509_get_X509_PUBKEY(cert.get()));
-  if (param_status != 1) {
-    error_code = ERR_peek_last_error();
-    ERR_error_string(error_code, error_data);
-    return absl::InvalidArgumentError(
-        fmt::format("Invalid certificate - X509_PUBKEY_get0_param failed: {}", error_data));
-  }
+  ASSERT(param_status == 1);
 
   int nid = OBJ_obj2nid(alg->algorithm);
 
@@ -226,16 +222,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
     ERR_clear_error();
 
     int der_length = i2d_X509(cert.get(), &cert_in_der);
-    if (!(der_length > 0 && cert_in_der != nullptr)) {
 
-      error_code = ERR_peek_last_error();
-      ERR_error_string(error_code, error_data);
-
-      return absl::InvalidArgumentError(
-          is_chain ? fmt::format("Certificate chain PEM #{} could not be converted to DER: {}",
-                                 cert_count, error_data)
-                   : fmt::format("Certificate could not be converted to DER: {}", error_data));
-    }
+    ASSERT(der_length > 0);
+    ASSERT(cert_in_der != nullptr);
 
     output.append(Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length));
     output.append(",");
@@ -244,9 +233,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
     cert_count++;
   }
 
-  if (!cert_count) {
-    return absl::InvalidArgumentError("No certificates found in PEM data");
-  }
+  ASSERT(cert_count > 0);
 
   // Remove trailing comma
   output.erase(output.size() - 1);
