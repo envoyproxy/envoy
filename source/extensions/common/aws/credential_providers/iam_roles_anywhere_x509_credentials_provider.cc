@@ -233,7 +233,9 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToDerB64(absl::string_v
     cert_count++;
   }
 
-  ASSERT(cert_count > 0);
+  if (!cert_count) {
+    return absl::InvalidArgumentError("No certificates found in PEM data");
+  }
 
   // Remove trailing comma
   output.erase(output.size() - 1);
