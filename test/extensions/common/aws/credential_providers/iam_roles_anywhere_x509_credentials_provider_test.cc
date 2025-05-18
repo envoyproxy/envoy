@@ -14,10 +14,13 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::StartsWith;
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -396,6 +399,43 @@ RBqAC6sxyAYn2wbzuyINJdSLpehQKDkKxEnO4QLodClHYV1F9AlAfbSLmIlRFv/y
 -----END PRIVATE KEY-----
 )EOF";
 
+std::string expired_cert = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIF7zCCA9egAwIBAgIUZlijw8JRJV0gqlBTR3Ub3GnsihYwDQYJKoZIhvcNAQEL
+BQAwgYYxCzAJBgNVBAYTAlhYMRIwEAYDVQQIDAlTdGF0ZU5hbWUxETAPBgNVBAcM
+CENpdHlOYW1lMRQwEgYDVQQKDAtDb21wYW55TmFtZTEbMBkGA1UECwwSQ29tcGFu
+eVNlY3Rpb25OYW1lMR0wGwYDVQQDDBRDb21tb25OYW1lT3JIb3N0bmFtZTAeFw0w
+ODAxMDEwMDAwMDBaFw0wODAxMDIwMDAwMDBaMIGGMQswCQYDVQQGEwJYWDESMBAG
+A1UECAwJU3RhdGVOYW1lMREwDwYDVQQHDAhDaXR5TmFtZTEUMBIGA1UECgwLQ29t
+cGFueU5hbWUxGzAZBgNVBAsMEkNvbXBhbnlTZWN0aW9uTmFtZTEdMBsGA1UEAwwU
+Q29tbW9uTmFtZU9ySG9zdG5hbWUwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIK
+AoICAQCk6SS4i4AnoC5EbCJoNi8KTNqY3jr8EaKLZpq5hGRLxck4scfJtFj/1xca
+8oIvKzqlYhk9PzR7446KS8DIti918O5qeL19jCjtIFgZA9FrK0zY7eh6PjVzFJH1
+9dFIwxcwAkOjl2YrOwePeOgSC6SwbZOyLjW71WP1hJ7I7W29N9S0Hb5USQLEx4WE
+ziOMXAuR984VRH254B9xBmbXQzG2xVZ7Tdbw6+OyzzzT0UBBhDy8ZoHNNehkbp3l
+v2zhNT8SH7WTJzh4mYO5jOf5DhpM8vPYS2xBh12DukRwlKJInmWHwNGBUuN470AT
+rjIj4bcgS823OXO1lx1ejQTFJrNr6jHNV7F495XWHWf2bzzSPqWP9Z4xVQvWlK9m
+03QfoXp26qanmJwaSg47y6ZZBQOrIxCzedWDevkZKV4fIf+nZjuOt5JdDue6Cyp4
+LLkjO3jzQBt79p9TLlEa5Ssuj4peCAUaF/sKL6Wsh8UVPBS1HK1Z8x30E1GXIR5R
+YJ9xwyzikF4jmiAeoLWlOl7zYpe/XNq1hHrsSWeyfE3rzvQ1RWidy1e4VN3+MlAn
+tDyxWFkbH6qJ1gYtnCNCF7VBkWEmnjMl6kRpnKKrT5c0vC9xIX6ZFT89/B4sRY5m
+szZY8GK0a7yyUVon/m52+/ixyP9QXcycGjV+064mI+gWu+7yuwIDAQABo1MwUTAd
+BgNVHQ4EFgQU4KY4hK7TOi/iRjD78Ne4RocsZ2wwHwYDVR0jBBgwFoAU4KY4hK7T
+Oi/iRjD78Ne4RocsZ2wwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOC
+AgEAUuQQzp+wwsqOC4nHN/PqEopqBObvAARxywdnyAkC23vUHHftrvOVIuTCgSMJ
+g0c8uUQzF+/XITikfVJsa/B+hOIUqg8Ej6WKuQjJvWXAP59flc7Gts+UyTjJ9xer
+IuZ/2XIM3haTWfYsBuvyQqR5PG8MsrH29PL6OSC8nweYQMn8fF5heb9QabvMMq8e
+XJRw135DvL8PobqdO1j0fxs4paHjx9jScPzeo6VOs9mqT1jtXbdwwNOcqbyG9yOT
+c/HhogFYXPlfuX8aP/FO9GHVivwkdfZvXkkYft2RqnYrx5EzVOxXi/l13lDXUhqs
+qM107UyLUfdRX0Vbol8NpOb1/Y6ariD2FUUj6BeJndO+SpCIFmBo4Jn8sLW6nHvR
+OuJKUOnD1EArbJqZtySyMd/QyvZKGS0fqZr9Yr1sjOLpERjPmLYjpc/Rc9OmInMa
+Xr1kZIW0r1VApjaQFXDlmVajhkvoVRxGqWzmOxRohdxxHT7qb38T7Eq2tCDcawNr
+cBMv+uVPviiOF1EbpmwSSt3zaZ7dQaVvV+ETbKk8DGtEOiKip6UxIi7oMbl2rtn6
+mL1pEttiJKykCM3v6V/q/C2NCHtnTpxoYDktE6pVIBYT1wft6ah2IFdLr4Ug3pft
+LTuaBIrw2gmfFpfDIQ9mYQjL9KgIcc0k6lvzwAuw39xvl2s=
+-----END CERTIFICATE-----
+)EOF";
+
 class IAMRolesAnywhereX509CredentialsProviderTest : public testing::Test {
 public:
   ~IAMRolesAnywhereX509CredentialsProviderTest() override = default;
@@ -581,6 +621,55 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, MissingSerial) {
   auto credentials = provider->getCredentials();
 
   EXPECT_FALSE(credentials.certificateDerB64().has_value());
+}
+
+TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadChainFailed) {
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  api_ = Api::createApiForTest();
+  ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  dispatcher_ = api_->allocateDispatcher("test_thread");
+  // Filesystem - Certs issued from a subordinate to test certificate chain. Verify that we read and
+  // convert these correctly.
+  auto filename_cert = TestEnvironment::writeStringToFileForTest("cert", missing_serial);
+  certificate_data_source.set_filename(filename_cert);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_cert))
+      .WillRepeatedly(Return(missing_serial));
+  auto filename_pkey =
+      TestEnvironment::writeStringToFileForTest("pkey", server_subordinate_private_key_ecdsa_pem);
+  private_key_data_source.set_filename(filename_pkey);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_pkey))
+      .WillRepeatedly(Return(server_subordinate_private_key_ecdsa_pem));
+  // No chain is set in the data source
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
+  auto status = provider->initialize();
+  EXPECT_FALSE(status.ok());
+}
+
+TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadPrivateKeyFailed) {
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  api_ = Api::createApiForTest();
+  ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
+  dispatcher_ = api_->allocateDispatcher("test_thread");
+  // Filesystem - Certs issued from a subordinate to test certificate chain. Verify that we read and
+  // convert these correctly.
+  auto filename_cert = TestEnvironment::writeStringToFileForTest("cert", missing_serial);
+  certificate_data_source.set_filename(filename_cert);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_cert))
+      .WillRepeatedly(Return(missing_serial));
+  auto filename_chain =
+      TestEnvironment::writeStringToFileForTest("chain", server_subordinate_chain_ecdsa_pem);
+  cert_chain_data_source.set_filename(filename_chain);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename_chain))
+      .WillRepeatedly(Return(server_subordinate_chain_ecdsa_pem));
+
+  // No private key is set in the data source
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
+  auto status = provider->initialize();
+  EXPECT_FALSE(status.ok());
 }
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
@@ -853,6 +942,26 @@ TEST(EmptyPem, PemToAlgorithmSerialExpiration) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration("", algorithm, serial, time);
   EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Invalid certificate size");
+}
+
+TEST(ExpiredPem, PemToAlgorithmSerialExpiration) {
+
+  envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
+      cert_chain_data_source;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  X509Credentials::PublicKeySignatureAlgorithm algorithm;
+  std::string serial;
+  SystemTime time;
+
+  auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
+      context, certificate_data_source, private_key_data_source, absl::nullopt);
+
+  auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
+  auto status =
+      provider_friend.pemToAlgorithmSerialExpiration(expired_cert, algorithm, serial, time);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Certificate has already expired");
 }
 
 TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
@@ -860,7 +969,7 @@ TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  std::string large_cert(2048 + 10, 'a');
+  std::string large_cert(10240 + 10, 'a');
 
   X509Credentials::PublicKeySignatureAlgorithm algorithm;
   std::string serial;
@@ -872,6 +981,7 @@ TEST(PemTooLarge, PemToAlgorithmSerialExpiration) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(large_cert, algorithm, serial, time);
   EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Invalid certificate size");
 }
 
 TEST(JunkPem, PemToAlgorithmSerialExpiration) {
@@ -891,6 +1001,7 @@ TEST(JunkPem, PemToAlgorithmSerialExpiration) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToAlgorithmSerialExpiration(junk_pem, algorithm, serial, time);
   EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), StartsWith("Invalid certificate - PEM read x509 failed"));
 }
 
 TEST(ValidPemWithAppendedJunk, PemToAlgorithmSerialExpiration) {
@@ -922,7 +1033,7 @@ TEST(SingleCertTooLarge, PemToDerB64) {
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  std::string in_cert(3000, 'a');
+  std::string in_cert(11000, 'a');
 
   std::string out_cert;
 
@@ -932,6 +1043,7 @@ TEST(SingleCertTooLarge, PemToDerB64) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, false);
   EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Invalid certificate size");
 }
 
 TEST(ChainTooLarge, PemToDerB64) {
@@ -940,7 +1052,7 @@ TEST(ChainTooLarge, PemToDerB64) {
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   // This buffer is the size of 6 max size certificates, we only allow 5
-  std::string in_chain(2048 * 6, 'a');
+  std::string in_chain(10240 * 6, 'a');
 
   std::string out_chain;
 
@@ -950,6 +1062,7 @@ TEST(ChainTooLarge, PemToDerB64) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_chain, out_chain, true);
   EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Invalid certificate chain size");
 }
 
 TEST(ChainParse, PemToDerB64) {

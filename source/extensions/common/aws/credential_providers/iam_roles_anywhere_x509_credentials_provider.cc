@@ -12,7 +12,7 @@ namespace Aws {
 
 using std::chrono::seconds;
 
-constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{2048};
+constexpr uint64_t X509_CERTIFICATE_MAX_BYTES{10240};
 constexpr uint64_t X509_PRIVATE_KEY_MAX_BYTES{10240};
 constexpr uint64_t X509_CERTIFICATE_CHAIN_MAX_LENGTH{5};
 
@@ -150,9 +150,6 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   }
 
   ser = X509_get_serialNumber(cert.get());
-  if (ser == nullptr) {
-    return absl::InvalidArgumentError("Certificate serial number could not be extracted");
-  }
 
   bnser = ASN1_INTEGER_to_BN(ser, nullptr);
   // Asserts here as we cannot stub OpenSSL
