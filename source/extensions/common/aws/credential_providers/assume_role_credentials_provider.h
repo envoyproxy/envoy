@@ -40,7 +40,7 @@ private:
   void extractCredentials(const std::string&& credential_document_value);
 
   void continueRefresh();
-  
+
   const std::string role_arn_;
   const std::string role_session_name_;
   const std::string region_;

@@ -24,6 +24,7 @@ constexpr char EXPIRATION[] = "Expiration";
 constexpr char CREDENTIALS[] = "Credentials";
 constexpr char STS_SERVICE_NAME[] = "sts";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
+constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 
 /**
  * AWS credentials containers

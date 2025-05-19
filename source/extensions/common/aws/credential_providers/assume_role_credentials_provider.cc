@@ -53,9 +53,8 @@ void AssumeRoleCredentialsProvider::onMetadataError(Failure reason) {
 void AssumeRoleCredentialsProvider::refresh() {
   // We can have assumerole credentials pending at this point, as the signers credential provider
   // chain is potentially async
-  if (assume_role_signer_->addCallbackIfCredentialsPending(
-          [this](){ continueRefresh(); })
-           == false) {
+  if (assume_role_signer_->addCallbackIfCredentialsPending([this]() { continueRefresh(); }) ==
+      false) {
     // We're not pending credentials, so sign immediately
     return continueRefresh();
   } else {
@@ -72,7 +71,10 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
-  message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",Envoy::Http::Utility::PercentEncoding::encode(role_arn_),Envoy::Http::Utility::PercentEncoding::encode(role_session_name_)));
+  message.headers().setPath(
+      fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
+                  Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
+                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_)));
   // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);

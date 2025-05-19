@@ -55,7 +55,7 @@ messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
 }
 
 class AssumeRoleCredentialsProviderTest : public testing::Test {
-// };
+  // };
 public:
   AssumeRoleCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)), raw_metadata_fetcher_(new MockMetadataFetcher) {
@@ -68,8 +68,7 @@ public:
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     std::string token_file_path;
-    envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider =
-        {};
+    envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider = {};
 
     cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
     cred_provider.set_role_session_name("role-session-name");
@@ -87,13 +86,14 @@ public:
     TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
 
     defaults.mutable_environment_credential_provider()->CopyFrom(env_provider);
-    
-      auto credentials_provider_chain =
-  std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-      context_, "region", defaults);
+
+    auto credentials_provider_chain =
+        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+            context_, "region", defaults);
 
     auto signer = std::make_unique<SigV4SignerImpl>(
-        STS_SERVICE_NAME, "region", credentials_provider_chain, context_, Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+        STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
+        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
 
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
@@ -107,17 +107,21 @@ public:
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
     Http::TestRequestHeaderMapImpl headers{
-        {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/arn&RoleSessionName=role-session-name"},
+        {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/"
+                  "arn&RoleSessionName=role-session-name"},
         {":authority", "sts.region.amazonaws.com"},
         {":scheme", "https"},
         {":method", "GET"},
         {"Accept", "application/json"},
-      {"x-amz-content-sha256","e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
-      {"x-amz-security-token", "token"},
-{"x-amz-date", "20180102T030405Z"},
-{"authorization", "AWS4-HMAC-SHA256 Credential=akid/20180102/region/sts/aws4_request, SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, Signature=b7927f7ac39f5b2cc34d3adf38228fc665ebe2780f5c3a006e1ec0c87e45b07c"}
-    };
-    
+        {"x-amz-content-sha256",
+         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        {"x-amz-security-token", "token"},
+        {"x-amz-date", "20180102T030405Z"},
+        {"authorization",
+         "AWS4-HMAC-SHA256 Credential=akid/20180102/region/sts/aws4_request, "
+         "SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, "
+         "Signature=b7927f7ac39f5b2cc34d3adf38228fc665ebe2780f5c3a006e1ec0c87e45b07c"}};
+
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
         .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
                                    Http::RequestMessage&, Tracing::Span&,
@@ -639,7 +643,6 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
-
 }
 
 } // namespace Aws

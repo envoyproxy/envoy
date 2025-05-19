@@ -9,7 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
 
 #define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \

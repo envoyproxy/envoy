@@ -12,8 +12,8 @@ namespace Common {
 namespace Aws {
 
 InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
-     Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name)
     : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,

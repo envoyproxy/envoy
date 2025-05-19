@@ -11,7 +11,16 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
-using std::chrono::seconds;
+
+namespace {
+// IAM Roles Anywhere credential strings
+constexpr absl::string_view CREDENTIAL_SET = "credentialSet";
+constexpr absl::string_view CREDENTIALS_LOWER = "credentials";
+constexpr absl::string_view ACCESS_KEY_ID_LOWER = "accessKeyId";
+constexpr absl::string_view SECRET_ACCESS_KEY_LOWER = "secretAccessKey";
+constexpr absl::string_view EXPIRATION_LOWER = "expiration";
+constexpr absl::string_view SESSION_TOKEN_LOWER = "sessionToken";
+} // namespace
 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
@@ -22,7 +31,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
         iam_roles_anywhere_config)
 
-    : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(iam_roles_anywhere_config.role_arn()),
@@ -164,7 +173,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     }
   }
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   stats_->credential_refreshes_succeeded_.inc();
