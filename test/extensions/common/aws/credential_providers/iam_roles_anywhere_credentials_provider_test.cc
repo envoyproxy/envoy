@@ -174,7 +174,7 @@ public:
   ~IamRolesAnywhereCredentialsProviderTest() override = default;
 
   void setupProvider(std::string cert, std::string pkey, std::string chain = "",
-                     std::string session = "session", uint16_t duration = 3600) {
+                     std::string session = "session", uint16_t duration = 3600, bool override_cluster = false) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     auto cert_env = std::string("CERT");
@@ -221,9 +221,9 @@ public:
     iam_roles_anywhere_config_.set_profile_arn("arn:profile-arn");
     iam_roles_anywhere_config_.set_trust_anchor_arn("arn:trust-anchor-arn");
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    absl::StatusOr return_val = absl::InvalidArgumentError("error");
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
-        .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com:443"));
-
+        .WillRepeatedly(Return(override_cluster? return_val : "rolesanywhere.ap-southeast-2.amazonaws.com:443"));
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
 
@@ -467,6 +467,34 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "");
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  auto creds = provider_->getCredentials();
+}
+
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, BrokenClusterManager) {
+
+  // This is what we expect to see requested by the signer
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+
+  expectDocument(201, "", message);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "session", 3600,"testcluster.xxx");
+
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
