@@ -1064,7 +1064,6 @@ TEST(JunkPemChain, PemToDerB64) {
   EXPECT_EQ(status.message(), "No certificates found in PEM data");
 }
 
-
 TEST(JunkCertStartLine, PemToDerB64) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
@@ -1084,14 +1083,13 @@ TEST(JunkCertStartLine, PemToDerB64) {
   EXPECT_THAT(status.message(), StartsWith("Certificate could not be parsed"));
 }
 
-
 TEST(JunkChainStartLine, PemToDerB64) {
 
   envoy::config::core::v3::DataSource certificate_data_source, private_key_data_source,
       cert_chain_data_source;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string in_cert("-----BEGIN CERTIFICATE-----\n"
-"");
+                      "");
   in_cert.append("000000000");
 
   std::string out_cert;
@@ -1102,7 +1100,7 @@ TEST(JunkChainStartLine, PemToDerB64) {
   auto provider_friend = IAMRolesAnywhereX509CredentialsProviderFriend(std::move(provider));
   auto status = provider_friend.pemToDerB64(in_cert, out_cert, true);
   EXPECT_FALSE(status.ok());
-  EXPECT_THAT(status.message(),StartsWith( "Certificate chain PEM #0 could not be parsed));
+  EXPECT_THAT(status.message(), StartsWith("Certificate chain PEM #0 could not be parsed"));
 }
 
 TEST(SingleCertTooLarge, PemToDerB64) {
