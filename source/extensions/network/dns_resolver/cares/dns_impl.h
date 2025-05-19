@@ -61,8 +61,7 @@ public:
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
   // Network::DnsResolver
-  ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                             ResolveCb callback) override;
+  ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) override;
   void resetNetworking() override { reinitializeChannel(); }
 
 private:
@@ -126,22 +125,21 @@ private:
                         ares_channel channel, const std::string& dns_name*/
   struct PendingSrvResolution : public PendingResolution {
     PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
-                         const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                         DnsResolverImpl& parent)
-        : PendingResolution(parent, callback, dispatcher, channel, dns_name),
-          dns_lookup_family_(dns_lookup_family), resolver_(parent) {}
+                         const std::string& dns_name, DnsResolverImpl& parent)
+        : PendingResolution(parent, callback, dispatcher, channel,
+                            dns_name) /*, resolver_(parent)*/ {}
 
     /**
-     * c-ares ares_query() query callback for initiation.
+     * c-ares ares_query_dnsrec() query callback for initiation.
+     * @param arg argument we passed in ares_query_dnsrec, currently we'll pass `this`.
      * @param status the status of the call to ares_query().
      * @param timeouts the number of times the request timed out.
-     * @param buf the result buffer.
-     * @param len the result buffer length.
+     * @param dnsrec the result buffer.
      */
-    void onAresSrvStartCallback(int status, int timeouts, unsigned char* buf, int len);
+    void onAresSrvCallback(ares_status_t status, size_t timeouts, const ares_dns_record_t* dnsrec);
 
     /**
-     * c-ares ares_query() query callback for completion.
+     * c-ares ares_query_dnsrec() query callback for completion.
      * @param srv_records a list of SRV records.
      */
     void onAresSrvFinishCallback(std::list<DnsResponse>&& srv_records);
@@ -149,10 +147,15 @@ private:
     // wrapper function of call to ares_query().
     void startResolution();
 
-    // The DnsLookupFamily for the SRV record.
-    const DnsLookupFamily dns_lookup_family_;
+  private:
+    bool isResponseWithNoRecords(int status);
+
+    // keeping the type/name according to c-ares API
+    // this query ID is filled by ares_query_dnsrec()
+    unsigned short ares_query_id_ = 0;
+
     // The resolver instance.
-    DnsResolverImpl& resolver_;
+    // DnsResolverImpl& resolver_;
   };
 
   class AddrInfoPendingResolution final : public PendingResolution {

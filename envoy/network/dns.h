@@ -71,10 +71,18 @@ struct AddrInfoResponse {
  * DNS SRV record response.
  */
 struct SrvResponse {
-  const std::string host_;
-  const uint16_t port_;
-  const uint16_t priority_;
-  const uint16_t weight_;
+  // keepping in order as RFC defines
+  // https://www.ietf.org/rfc/rfc2782.txt
+  uint16_t priority_;
+  uint16_t weight_;
+  uint16_t port_;
+  std::string target_;
+
+  std::chrono::seconds ttl_;
+
+  std::string asString() const {
+    return fmt::format("{} {} {} {}", priority_, weight_, port_, target_);
+  }
 };
 
 enum class RecordType { A, AAAA, SRV };
@@ -88,8 +96,13 @@ public:
             address,
             std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
                                           std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
-  DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
-      : response_(SrvResponse{host, port, priority, weight}) {}
+
+  DnsResponse(uint16_t priority, uint16_t weight, uint16_t port, const std::string& target,
+              const std::chrono::seconds ttl)
+      : response_(SrvResponse{
+            priority, weight, port, target,
+            std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
+                                          std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
 
   const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
 
@@ -137,13 +150,11 @@ public:
   /**
    * Initiate an async DNS resolution for an SRV record.
    * @param dns_name supplies the DNS name to lookup.
-   * @param dns_lookup_family the DNS IP version lookup policy.
    * @param callback supplies the callback to invoke when the resolution is complete.
    * @return if non-null, a handle that can be used to cancel the resolution.
    *         This is only valid until the invocation of callback or ~DnsResolver().
    */
-  virtual ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                                     ResolveCb callback) PURE;
+  virtual ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) PURE;
   /**
    * Tell the resolver to reset networking, typically in response to a network switch (e.g., from
    * WiFi to cellular). What the resolver does is resolver dependent but might involve creating

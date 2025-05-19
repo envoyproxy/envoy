@@ -3,14 +3,19 @@ syntax = "proto3";
 package envoy.extensions.clusters.dns_srv.v3;
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.dns_srv.v3";
+option java_outer_classname = "ClusterProto";
+option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dns_srv/v3;dns_srvv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster Configuration Via SRV record]
+// This cluster adds support for `DNS SRV <https://en.wikipedia.org/wiki/SRV_record>` discovery clusters.
 //
-//
+// This cluster type is used to discover endpoints via DNS SRV records. The cluster will resolve the
+// SRV name specified in the configuration, and will use the resolved endpoints as cluster endpoints.
 //
 // Example:
 //
@@ -21,9 +26,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //     cluster_type:
 //       name: envoy.clusters.dns_srv
 //       typed_config:
-//     	  "@type": "type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.Cluster"
-//     	  srv_names:
-//            - srv_name: _unique_name._tcp.example.com
+//     	  "@type": "type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig"
+//     	  srv_name: _unique_name._tcp.example.com
 //     respect_dns_ttl: true
 //     typed_dns_resolver_config:
 //       name: envoy.network.dns_resolver.cares
@@ -35,11 +39,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //               port_value: 8600
 // [#extension: envoy.clusters.dns_srv]
 
-// [#next-free-field: 2]
-message Cluster {
-  repeated SrvName srv_names = 1;
-}
-
-message SrvName {
-  string srv_name = 1;
+message DnsSrvClusterConfig {
+  string srv_name = 1 [(validate.rules).string = {min_len: 1}];
 }

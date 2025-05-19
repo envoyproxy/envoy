@@ -200,6 +200,7 @@ FUZZERS
 delims
 dereferencing
 differentially
+dnsrec
 dnsresolvers
 endpos
 eps
