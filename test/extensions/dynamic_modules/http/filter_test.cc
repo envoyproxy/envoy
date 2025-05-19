@@ -60,6 +60,17 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+TEST(DynamicModulesTest, ConfigInitializationFailure) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "config_init_failure", "", std::move(dynamic_module.value()), context);
+  EXPECT_FALSE(filter_config_or_status.ok());
+  EXPECT_THAT(filter_config_or_status.status().message(),
+              testing::HasSubstr("Failed to initialize dynamic module"));
+}
+
 TEST(DynamicModulesTest, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
