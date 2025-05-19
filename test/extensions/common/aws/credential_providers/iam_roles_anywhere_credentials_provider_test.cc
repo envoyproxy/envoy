@@ -510,6 +510,8 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BrokenClusterManager) {
   timer_->invokeCallback();
 
   auto creds = provider_->getCredentials();
+  EXPECT_EQ(creds.hasCredentials(), false);
+  delete (raw_metadata_fetcher_);
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomSessionName) {
