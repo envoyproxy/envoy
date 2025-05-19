@@ -185,7 +185,7 @@ message HostHealthStatus {
   //
   // .. note::
   //
-  //   Currently, only `HEALTHY` and `UNHEALTHY` are supported.
+  //   Currently, only ``HEALTHY`` and ``UNHEALTHY`` are supported.
   //
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   config.core.v3.HealthStatus eds_health_status = 3;
