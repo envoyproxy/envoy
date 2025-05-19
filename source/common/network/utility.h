@@ -10,9 +10,12 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/api/os_sys_calls_impl_linux.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/statusor.h"
+
+#if defined(__linux__)
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#endif
 
 #include "absl/strings/string_view.h"
 
