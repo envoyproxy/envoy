@@ -52,7 +52,6 @@ protected:
 
 private:
   TrieLookupTable<std::shared_ptr<OnMatch<DataType>>> children_;
-  bool retry_shorter_;
 };
 
 } // namespace Matcher
