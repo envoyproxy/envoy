@@ -145,6 +145,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
     return absl::InvalidArgumentError("Invalid certificate public key signature algorithm");
   }
 
+  // Serial number is mandatory and no error code is returned from this function
   ser = X509_get_serialNumber(cert.get());
 
   bnser = ASN1_INTEGER_to_BN(ser, nullptr);
