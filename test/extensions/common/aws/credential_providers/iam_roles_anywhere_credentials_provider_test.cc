@@ -174,7 +174,8 @@ public:
   ~IamRolesAnywhereCredentialsProviderTest() override = default;
 
   void setupProvider(std::string cert, std::string pkey, std::string chain = "",
-                     std::string session = "session", uint16_t duration = 3600, bool override_cluster = false) {
+                     std::string session = "session", uint16_t duration = 3600,
+                     bool override_cluster = false) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     auto cert_env = std::string("CERT");
@@ -221,9 +222,10 @@ public:
     iam_roles_anywhere_config_.set_profile_arn("arn:profile-arn");
     iam_roles_anywhere_config_.set_trust_anchor_arn("arn:trust-anchor-arn");
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    absl::StatusOr return_val = absl::InvalidArgumentError("error");
+    absl::StatusOr<std::string> return_val = absl::InvalidArgumentError("error");
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
-        .WillRepeatedly(Return(override_cluster? return_val : "rolesanywhere.ap-southeast-2.amazonaws.com:443"));
+        .WillRepeatedly(Return(
+            override_cluster ? return_val : "rolesanywhere.ap-southeast-2.amazonaws.com:443"));
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
 
@@ -245,6 +247,7 @@ public:
         },
         "ap-southeast-2", refresh_state, initialization_timer, std::move(roles_anywhere_signer),
         iam_roles_anywhere_config_);
+    EXPECT_EQ(provider_->providerName(), "IAMRolesAnywhereCredentialsProvider");
   }
 
   Event::DispatcherPtr setupDispatcher() {
@@ -481,7 +484,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   auto creds = provider_->getCredentials();
 }
 
-
 TEST_F(IamRolesAnywhereCredentialsProviderTest, BrokenClusterManager) {
 
   // This is what we expect to see requested by the signer
@@ -493,7 +495,8 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BrokenClusterManager) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "session", 3600,"testcluster.xxx");
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "session", 3600,
+                "testcluster.xxx");
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
@@ -1034,6 +1037,35 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
   EXPECT_FALSE(creds.accessKeyId().has_value());
   EXPECT_FALSE(creds.secretAccessKey().has_value());
   EXPECT_FALSE(creds.sessionToken().has_value());
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, TestCancel) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+
+  expectDocument(200, std::move(R"EOF(
+not json
+)EOF"),
+                 message);
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  auto mock_fetcher = std::make_unique<MockMetadataFetcher>();
+
+  EXPECT_CALL(*mock_fetcher, cancel);
+  EXPECT_CALL(*mock_fetcher, fetch(_, _, _));
+  // Ensure we have a metadata fetcher configured, so we expect this to receive a cancel
+  provider_friend.setMetadataFetcher(std::move(mock_fetcher));
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  delete (raw_metadata_fetcher_);
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
