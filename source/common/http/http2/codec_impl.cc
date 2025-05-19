@@ -249,8 +249,6 @@ ConnectionImpl::StreamImpl::buildHeaders(const HeaderMap& headers) {
   std::vector<http2::adapter::Header> out;
   out.reserve(headers.size());
   headers.iterate([&out](const HeaderEntry& header) -> HeaderMap::Iterate {
-    std::cerr << "-> `" << header.key().getStringView() << "` : `" << header.value().getStringView()
-              << "`\n";
     out.push_back({getRep(header.key()), getRep(header.value())});
     return HeaderMap::Iterate::Continue;
   });
@@ -1783,7 +1781,6 @@ OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId str
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
   // TODO PERF: Can reference count here to avoid copies.
-  std::cerr << "`" << name_view << "` : `" << value_view << "`\n";
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
   HeaderString value;
