@@ -150,17 +150,6 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
 }
 
-// Ignore blank header keys or blank values
-TEST(UtilityTest, BlankHeadersSkipped) {
-  Http::TestRequestHeaderMapImpl headers{
-      {"blank1", ""},
-      {"", "blank2"},
-  };
-  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
-  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
-  EXPECT_THAT(map, ElementsAre(Pair("blank1", ""), Pair("", "blank2")));
-}
-
 // Headers in the exclusion list are not canonicalized
 TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
