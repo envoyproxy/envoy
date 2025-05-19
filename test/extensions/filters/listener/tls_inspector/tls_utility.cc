@@ -41,6 +41,59 @@ std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_
   return buf;
 }
 
+std::vector<uint8_t> generateClientHelloWithoutExtensions(uint16_t tls_max_version) {
+  std::vector<uint8_t> client_hello = {
+      0x16,             // Content Type: Handshake
+      0x03, 0x01,       // Version: TLS 1.0 for backward compatibility
+      0x00, 0x00,       // Length (to be filled)
+      0x01,             // Handshake Type: ClientHello
+      0x00, 0x00, 0x00, // Length (to be filled)
+  };
+
+  // Add client version (use tls_max_version)
+  client_hello.push_back((tls_max_version >> 8) & 0xFF);
+  client_hello.push_back(tls_max_version & 0xFF);
+
+  // Random (32 bytes)
+  for (int i = 0; i < 32; i++) {
+    client_hello.push_back(i);
+  }
+
+  client_hello.push_back(0x00); // Session ID Length
+
+  // Add cipher suites
+  client_hello.push_back(0x00); // Cipher Suites Length (high byte)
+  client_hello.push_back(0x04); // Cipher Suites Length (low byte)
+
+  // Add appropriate ciphers based on version
+  if (tls_max_version >= TLS1_3_VERSION) {
+    client_hello.push_back(0x13);
+    client_hello.push_back(0x01); // TLS_AES_128_GCM_SHA256
+    client_hello.push_back(0x13);
+    client_hello.push_back(0x02); // TLS_AES_256_GCM_SHA384
+  } else {
+    client_hello.push_back(0xc0);
+    client_hello.push_back(0x2f); // TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    client_hello.push_back(0xc0);
+    client_hello.push_back(0x30); // TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+  }
+
+  client_hello.push_back(0x01); // Compression Methods Length
+  client_hello.push_back(0x00); // Compression Method: null
+
+  // Update lengths
+  size_t record_length = client_hello.size() - 5;
+  client_hello[3] = (record_length >> 8) & 0xFF;
+  client_hello[4] = record_length & 0xFF;
+
+  size_t handshake_length = record_length - 4;
+  client_hello[6] = (handshake_length >> 16) & 0xFF;
+  client_hello[7] = (handshake_length >> 8) & 0xFF;
+  client_hello[8] = handshake_length & 0xFF;
+
+  return client_hello;
+}
+
 std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint) {
   // fingerprint should have this format:
   //  SSLVersion,Cipher,SSLExtension,EllipticCurve,EllipticCurvePointFormat
@@ -209,6 +262,52 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
                              std::end(clienthello));
 
   return clienthello_message;
+}
+
+std::vector<uint8_t> generateClientHelloEmptyExtensions(uint16_t tls_max_version) {
+  std::vector<uint8_t> client_hello = {
+      0x16,             // Content Type: Handshake
+      0x03, 0x01,       // Version: TLS 1.0 for backward compatibility
+      0x00, 0x00,       // Length (to be filled)
+      0x01,             // Handshake Type: ClientHello
+      0x00, 0x00, 0x00, // Length (to be filled)
+  };
+
+  // Add client version (use tls_max_version)
+  client_hello.push_back((tls_max_version >> 8) & 0xFF);
+  client_hello.push_back(tls_max_version & 0xFF);
+
+  // Random (32 bytes)
+  for (int i = 0; i < 32; i++) {
+    client_hello.push_back(i);
+  }
+
+  client_hello.push_back(0x00); // Session ID Length
+
+  // Add cipher suites
+  client_hello.push_back(0x00); // Cipher Suites Length (high byte)
+  client_hello.push_back(0x02); // Cipher Suites Length (low byte)
+  client_hello.push_back(0x13); // TLS_AES_128_GCM_SHA256
+  client_hello.push_back(0x01);
+
+  client_hello.push_back(0x01); // Compression Methods Length
+  client_hello.push_back(0x00); // Compression Method: null
+
+  // Add empty extensions section
+  client_hello.push_back(0x00); // Extensions Length (high byte)
+  client_hello.push_back(0x00); // Extensions Length (low byte)
+
+  // Update lengths
+  size_t record_length = client_hello.size() - 5;
+  client_hello[3] = (record_length >> 8) & 0xFF;
+  client_hello[4] = record_length & 0xFF;
+
+  size_t handshake_length = record_length - 4;
+  client_hello[6] = (handshake_length >> 16) & 0xFF;
+  client_hello[7] = (handshake_length >> 8) & 0xFF;
+  client_hello[8] = handshake_length & 0xFF;
+
+  return client_hello;
 }
 
 } // namespace Test
