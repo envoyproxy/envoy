@@ -12,14 +12,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-// IAM Roles Anywhere credential strings
-constexpr char CREDENTIAL_SET[] = "credentialSet";
-constexpr char CREDENTIALS_LOWER[] = "credentials";
-constexpr char ACCESS_KEY_ID_LOWER[] = "accessKeyId";
-constexpr char SECRET_ACCESS_KEY_LOWER[] = "secretAccessKey";
-constexpr char EXPIRATION_LOWER[] = "expiration";
-constexpr char SESSION_TOKEN_LOWER[] = "sessionToken";
-
 constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
 
 /**
@@ -64,7 +56,7 @@ public:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer,
-      envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
           iam_roles_anywhere_config);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface

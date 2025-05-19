@@ -49,7 +49,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   ValidationClusterManagerFactory factory(
       *server.server_factory_context_, stats_store, tls, http_context,
       [dns_resolver]() -> Network::DnsResolverSharedPtr { return dns_resolver; },
-      ssl_context_manager, secret_manager, quic_stat_names, server);
+      ssl_context_manager, quic_stat_names, server);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = *factory.clusterManagerFromProto(bootstrap);

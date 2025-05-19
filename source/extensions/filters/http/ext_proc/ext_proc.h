@@ -431,7 +431,7 @@ public:
     return config_with_hash_key_.config();
   }
 
-  ExtProcFilterStats& stats() { return stats_; }
+  const ExtProcFilterStats& stats() const { return stats_; }
   ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
 
   void onDestroy() override;
@@ -558,7 +558,7 @@ private:
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
-  ExtProcFilterStats stats_;
+  const ExtProcFilterStats& stats_;
   ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;

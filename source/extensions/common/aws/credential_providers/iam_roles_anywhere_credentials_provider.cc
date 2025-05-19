@@ -19,7 +19,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     absl::string_view region, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     std::unique_ptr<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer> roles_anywhere_signer,
-    envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
         iam_roles_anywhere_config)
 
     : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name,
@@ -29,12 +29,10 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       role_session_name_(iam_roles_anywhere_config.role_session_name()),
       profile_arn_(iam_roles_anywhere_config.profile_arn()),
       trust_anchor_arn_(iam_roles_anywhere_config.trust_anchor_arn()), region_(region),
-      roles_anywhere_signer_(std::move(roles_anywhere_signer)) {
-
-  session_duration_ = PROTOBUF_GET_SECONDS_OR_DEFAULT(
-      iam_roles_anywhere_config, session_duration,
-      Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
-}
+      session_duration_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          iam_roles_anywhere_config, session_duration,
+          Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration)),
+      roles_anywhere_signer_(std::move(roles_anywhere_signer)) {}
 
 void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   ENVOY_LOG(debug, "AWS IAM Roles Anywhere fetch success, calling callback func");
@@ -51,6 +49,12 @@ void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
 void IAMRolesAnywhereCredentialsProvider::refresh() {
 
   const auto uri = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
+  if (!uri.ok()) {
+    ENVOY_LOG(error, "AWS Cluster Manager Unable to find cluster {}", cluster_name_);
+    credentialsRetrievalError();
+    return;
+  }
+
   ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}",
             uri.value());
 
@@ -61,8 +65,8 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 
-  auto json_message = std::make_unique<ProtobufWkt::Struct>();
-  auto& fields = *json_message->mutable_fields();
+  auto json_message = ProtobufWkt::Struct();
+  auto& fields = *json_message.mutable_fields();
   fields["profileArn"].set_string_value(profile_arn_);
   fields["roleArn"].set_string_value(role_arn_);
   fields["trustAnchorArn"].set_string_value(trust_anchor_arn_);
@@ -74,12 +78,12 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
     fields["roleSessionName"].set_string_value(role_session_name_);
   }
 
-  auto body_data = Json::Factory::loadFromProtobufStruct(*json_message);
+  auto body_data = Json::Factory::loadFromProtobufStruct(json_message);
 
   message.body().add(body_data->asJsonString());
   ENVOY_LOG(debug, "IAM Roles Anywhere /sessions payload: {}", body_data->asJsonString());
 
-  auto status = roles_anywhere_signer_->sign(message, true, region_);
+  const auto status = roles_anywhere_signer_->sign(message, true, region_);
   if (!status.ok()) {
     ENVOY_LOG(debug, status.message());
     credentialsRetrievalError();
@@ -118,7 +122,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   auto credentialset_object_or_error =
-      document_json_or_error.value()->getObjectArray(CREDENTIAL_SET, false);
+      document_json_or_error.value()->getObjectArray(std::string(CREDENTIAL_SET), false);
   if (!credentialset_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credentialset_object_or_error.status().message());
@@ -128,7 +132,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
 
   // We only consider the first credential returned in a CredentialSet
   auto credential_object_or_error =
-      credentialset_object_or_error.value()[0]->getObject(CREDENTIALS_LOWER);
+      credentialset_object_or_error.value()[0]->getObject(std::string(CREDENTIALS_LOWER));
   if (!credential_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credential_object_or_error.status().message());
@@ -136,12 +140,12 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     return;
   }
 
-  const auto access_key_id = Utility::getStringFromJsonOrDefault(credential_object_or_error.value(),
-                                                                 ACCESS_KEY_ID_LOWER, "");
+  const auto access_key_id = Utility::getStringFromJsonOrDefault(
+      credential_object_or_error.value(), std::string(ACCESS_KEY_ID_LOWER), "");
   const auto secret_access_key = Utility::getStringFromJsonOrDefault(
-      credential_object_or_error.value(), SECRET_ACCESS_KEY_LOWER, "");
-  const auto session_token = Utility::getStringFromJsonOrDefault(credential_object_or_error.value(),
-                                                                 SESSION_TOKEN_LOWER, "");
+      credential_object_or_error.value(), std::string(SECRET_ACCESS_KEY_LOWER), "");
+  const auto session_token = Utility::getStringFromJsonOrDefault(
+      credential_object_or_error.value(), std::string(SESSION_TOKEN_LOWER), "");
 
   ENVOY_LOG(debug,
             "Found following AWS credentials from rolesanywhere service: {}={}, {}={}, {}={}",
@@ -149,8 +153,8 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
             secret_access_key.empty() ? "" : "*****", SESSION_TOKEN_LOWER,
             session_token.empty() ? "" : "*****");
 
-  const auto expiration_str =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), EXPIRATION_LOWER, "");
+  const auto expiration_str = Utility::getStringFromJsonOrDefault(
+      credential_object_or_error.value(), std::string(EXPIRATION_LOWER), "");
 
   if (!expiration_str.empty()) {
     absl::Time expiration_time;

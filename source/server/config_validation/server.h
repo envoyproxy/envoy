@@ -121,6 +121,9 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_context_.staticValidationVisitor();
+  }
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }

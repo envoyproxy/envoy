@@ -1,5 +1,4 @@
 #pragma once
-// #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
 
@@ -20,10 +19,9 @@ public:
   static constexpr absl::string_view X509SigV4ECDSA{"AWS4-X509-ECDSA-SHA256"};
 };
 
-/**
+/*
  * Implementation of the Signature V4 signing process using X509 Credentials for IAM Roles Anywhere.
  * See https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html
- *
  */
 class IAMRolesAnywhereSigV4Signer : public IAMRolesAnywhereSignerBaseImpl {
 

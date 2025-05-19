@@ -52,7 +52,10 @@ absl::Status ActionValidationVisitor::performDataInputValidation(
                                                  v3::DynamicMetadataInput::descriptor()
                                                      ->full_name())},
       {TypeUtil::descriptorFullNameToTypeUrl(
-          xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name())}};
+          xds::type::matcher::v3::HttpAttributesCelMatchInput::descriptor()->full_name())},
+      {TypeUtil::descriptorFullNameToTypeUrl(
+          envoy::extensions::matching::common_inputs::network::v3::FilterStateInput::descriptor()
+              ->full_name())}};
   if (allowed_inputs_set.contains(type_url)) {
     return absl::OkStatus();
   }
