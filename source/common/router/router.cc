@@ -730,9 +730,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
-  const auto* debug_config =
-      callbacks_->streamInfo().filterState()->getDataReadOnly<DebugConfig>(DebugConfig::key());
-  if (debug_config != nullptr && debug_config->do_not_forward_) {
+  if (auto* debug_config =
+          callbacks_->streamInfo().filterState()->getDataReadOnly<DebugConfig>(DebugConfig::key());
+      debug_config != nullptr && debug_config->do_not_forward_) {
     callbacks_->sendLocalReply(
         Http::Code::NoContent, "",
         [this](Http::ResponseHeaderMap& headers) {
