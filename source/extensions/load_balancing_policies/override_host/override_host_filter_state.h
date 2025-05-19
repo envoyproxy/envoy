@@ -31,7 +31,7 @@ public:
 
 private:
   const std::string host_list_;
-  absl::InlinedVector<const absl::string_view, 8> selected_hosts_;
+  absl::InlinedVector<absl::string_view, 8> selected_hosts_;
   uint64_t host_index_ = 0;
 };
 

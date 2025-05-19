@@ -215,6 +215,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
   // This is checked by config validation.
   ASSERT(!config_.overrideHostSources().empty());
 
+  // Use single string to store all selected hosts to avoid multiple heap allocations.
   std::string selected_hosts;
   selected_hosts.reserve(256);
 
@@ -243,7 +244,6 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext
     }
   }
 
-  std::cout << selected_hosts << std::endl;
   ENVOY_LOG(trace, "Selected endpoints: {}", selected_hosts);
   return selected_hosts;
 }
