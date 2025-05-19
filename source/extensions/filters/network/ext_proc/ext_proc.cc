@@ -85,7 +85,7 @@ Network::FilterStatus NetworkExtProcFilter::handleStreamError() {
     return Network::FilterStatus::Continue;
   } else {
     // In strict mode, close the connection and stop processing
-    closeConnection("ext_proc_stream_error");
+    closeConnection("ext_proc_stream_error", Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
   }
 }
@@ -198,6 +198,12 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
   ENVOY_CONN_LOG(debug, "Received response from external processor", read_callbacks_->connection());
   stats_.stream_msgs_received_.inc();
 
+  // Handle connection status before processing data
+  handleConnectionStatus(*response);
+  if (processing_complete_) {
+    return;
+  }
+
   if (response->has_read_data()) {
     const auto& data = response->read_data();
     ENVOY_CONN_LOG(trace, "Processing READ data response: {} bytes, end_stream={}",
@@ -234,7 +240,7 @@ void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,
   if (!config_->failureModeAllow()) {
     ENVOY_CONN_LOG(debug, "Closing connection since failure model allow is not enabled",
                    read_callbacks_->connection());
-    closeConnection("ext_proc_grpc_error");
+    closeConnection("ext_proc_grpc_error", Network::ConnectionCloseType::FlushWrite);
     return;
   }
 
@@ -261,14 +267,53 @@ void NetworkExtProcFilter::closeStream() {
   stream_ = nullptr;
 }
 
-void NetworkExtProcFilter::closeConnection(const std::string& reason) {
-  ENVOY_CONN_LOG(info, "Closing connection: {}", read_callbacks_->connection(), reason);
+void NetworkExtProcFilter::closeConnection(const std::string& reason,
+                                           Network::ConnectionCloseType close_type) {
+  ENVOY_CONN_LOG(
+      info, "Closing connection: {}, close_type: {}", read_callbacks_->connection(), reason,
+      close_type == Network::ConnectionCloseType::FlushWrite ? "FlushWrite" : "AbortReset");
 
   // Ensure all callbacks are enabled before closing
   read_callbacks_->disableClose(false);
   write_callbacks_->disableClose(false);
-  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite, reason);
+  read_callbacks_->connection().close(close_type, reason);
+
+  // Track different types of closures in stats
+  if (close_type == Network::ConnectionCloseType::AbortReset) {
+    stats_.connections_reset_.inc();
+  }
   stats_.connections_closed_.inc();
+}
+
+void NetworkExtProcFilter::handleConnectionStatus(const ProcessingResponse& response) {
+  switch (response.connection_status()) {
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CONTINUE:
+    ENVOY_CONN_LOG(debug, "External processor requested to continue connection",
+                   read_callbacks_->connection());
+    break;
+
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE:
+    // Close the connection with normal FIN
+    ENVOY_CONN_LOG(info, "External processor requested to close connection with FIN",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_close_requested", Network::ConnectionCloseType::FlushWrite);
+    processing_complete_ = true;
+    break;
+
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE_RST:
+    // Immediately reset the connection
+    ENVOY_CONN_LOG(info, "External processor requested to reset connection",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_reset_requested", Network::ConnectionCloseType::AbortReset);
+    processing_complete_ = true;
+    break;
+
+  default:
+    // Unknown status, log a warning and continue
+    ENVOY_CONN_LOG(warn, "Unknown connection status from external processor.",
+                   read_callbacks_->connection());
+    break;
+  }
 }
 
 void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {
