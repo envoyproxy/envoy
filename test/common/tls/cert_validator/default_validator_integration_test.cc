@@ -182,8 +182,8 @@ REGISTER_FACTORY(TestSanListenerFilterFactory,
 
 class CustomSanStringMatcher : public Matchers::StringMatcher {
 public:
-  bool match(const absl::string_view) const override { return false; }
-  bool match(const absl::string_view, const StringMatcher::Context& context) const override {
+  bool match(absl::string_view) const override { return false; }
+  bool match(absl::string_view, const StringMatcher::Context& context) const override {
     return context.stream_info_ &&
            context.stream_info_->filterState().hasDataWithName("test_san_filter_state");
   }

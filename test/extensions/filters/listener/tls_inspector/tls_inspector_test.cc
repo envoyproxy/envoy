@@ -95,6 +95,8 @@ public:
 
   void testJA3(const std::string& fingerprint, bool expect_server_name = true,
                const std::string& hash = {}, bool expect_alpn = true);
+  void testJA4(const std::string& expected_ja4, const std::string& sni = "",
+               const std::string& alpn = "");
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
@@ -483,6 +485,441 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(max_size, filter_->maxReadBytes());
   EXPECT_FALSE(io_handle_->isOpen());
+}
+
+void TlsInspectorTest::testJA4(const std::string& expected_ja4, const std::string& sni,
+                               const std::string& alpn) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), sni, alpn);
+
+  init();
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
+
+  if (!sni.empty()) {
+    EXPECT_CALL(socket_, setRequestedServerName(absl::string_view(sni)));
+  }
+
+  if (alpn.empty() || alpn[0] == 0) {
+    // No ALPN extension at all or empty ALPN list
+    EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  } else {
+    // Normal ALPN list
+    std::vector<absl::string_view> alpn_protos;
+    size_t start = 0;
+    while (start < alpn.size()) {
+      size_t len = static_cast<size_t>(alpn[start]);
+      alpn_protos.push_back(absl::string_view(alpn.data() + start + 1, len));
+      start += len + 1;
+    }
+    EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::ContainerEq(alpn_protos)));
+  }
+
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+const absl::flat_hash_map<uint16_t, std::string> basic_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i040500_cefcabfea53d_950472255fe9"},
+    {TLS1_1_VERSION, "t11i040500_cefcabfea53d_950472255fe9"},
+    {TLS1_2_VERSION, "t12i100600_a8cf61a50a39_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13i030500_55b375c5d22e_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4Basic) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                                max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                   ? "t13i130900_f57a46bbacb6_78e6aca7449b"
+                                   : basic_test_version_to_ja4_.at(min_version);
+
+  testJA4(expected_value);
+}
+
+const absl::flat_hash_map<uint16_t, std::string> sni_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10d040600_cefcabfea53d_950472255fe9"},
+    {TLS1_1_VERSION, "t11d040600_cefcabfea53d_950472255fe9"},
+    {TLS1_2_VERSION, "t12d100700_a8cf61a50a39_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13d030600_55b375c5d22e_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4WithSNI) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                                max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                   ? "t13d131000_f57a46bbacb6_78e6aca7449b"
+                                   : sni_test_version_to_ja4_.at(min_version);
+
+  testJA4(expected_value, "example.com");
+}
+
+const absl::flat_hash_map<uint16_t, std::string> alpn_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i0406h2_cefcabfea53d_950472255fe9"},
+    {TLS1_1_VERSION, "t11i0406h2_cefcabfea53d_950472255fe9"},
+    {TLS1_2_VERSION, "t12i1007h2_a8cf61a50a39_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13i0306h2_55b375c5d22e_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4WithALPN) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                                max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                   ? "t13i1310h2_f57a46bbacb6_78e6aca7449b"
+                                   : alpn_test_version_to_ja4_.at(min_version);
+
+  testJA4(expected_value, "", "\x02h2\x08http/1.1");
+}
+
+const absl::flat_hash_map<uint16_t, std::string> alpn_sni_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10d0407h2_cefcabfea53d_950472255fe9"},
+    {TLS1_1_VERSION, "t11d0407h2_cefcabfea53d_950472255fe9"},
+    {TLS1_2_VERSION, "t12d1008h2_a8cf61a50a39_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13d0307h2_55b375c5d22e_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4WithSNIAndALPN) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                                max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                   ? "t13d1312h2_f57a46bbacb6_ef7df7f74e48"
+                                   : alpn_sni_test_version_to_ja4_.at(min_version);
+
+  testJA4(expected_value, "example.com", "\x02h2\x08http/1.1");
+}
+
+const absl::flat_hash_map<uint16_t, std::string> alpn_single_char_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i0406hh_cefcabfea53d_950472255fe9"},
+    {TLS1_1_VERSION, "t11i0406hh_cefcabfea53d_950472255fe9"},
+    {TLS1_2_VERSION, "t12i1007hh_a8cf61a50a39_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13i0306hh_55b375c5d22e_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4WithSingleCharacterALPN) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  // Create single character ALPN
+  std::string alpn;
+  alpn.push_back(0x01); // length
+  alpn.push_back('h');  // single character
+
+  std::string expected_ja4 = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                              max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                 ? "t13i1310hh_f57a46bbacb6_78e6aca7449b" // same char repeated
+                                 : alpn_single_char_test_version_to_ja4_.at(min_version);
+
+  testJA4(expected_ja4, "", alpn);
+}
+
+const absl::flat_hash_map<uint16_t, std::string> no_alpn_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i040500_cefcabfea53d_950472255fe9"},
+    {TLS1_1_VERSION, "t11i040500_cefcabfea53d_950472255fe9"},
+    {TLS1_2_VERSION, "t12i100600_a8cf61a50a39_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13i030500_55b375c5d22e_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4WithEmptyALPN) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  // Create empty ALPN list
+  std::string alpn;
+  alpn.push_back(0x00); // zero length
+
+  std::string expected_ja4 = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                              max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                 ? "t13i130900_f57a46bbacb6_78e6aca7449b" // "00" for empty ALPN
+                                 : no_alpn_test_version_to_ja4_.at(min_version);
+
+  testJA4(expected_ja4, "", alpn);
+}
+
+TEST_P(TlsInspectorTest, JA4MalformedClientHello) {
+  init();
+  std::vector<uint8_t> malformed_hello(50, 0); // Invalid ClientHello
+  mockSysCallForPeek(malformed_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(_)).Times(0);
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+}
+
+const absl::flat_hash_map<uint16_t, std::string> no_ext_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i020000_04659ec43a24_000000000000"},
+    {TLS1_1_VERSION, "t11i020000_04659ec43a24_000000000000"},
+    {TLS1_2_VERSION, "t12i020000_04659ec43a24_000000000000"},
+    {TLS1_3_VERSION, "t13i020000_62ed6f6ca7ad_000000000000"}};
+
+TEST_P(TlsInspectorTest, JA4WithNoExtensions) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  // Generate ClientHello with no extensions
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHelloWithoutExtensions(std::get<1>(GetParam()));
+
+  init();
+  mockSysCallForPeek(client_hello);
+
+  std::string expected_ja4 = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                              max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                 ? "t13i020000_62ed6f6ca7ad_000000000000" // "00" for empty ALPN
+                                 : no_ext_test_version_to_ja4_.at(min_version);
+
+  EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+TEST_P(TlsInspectorTest, JA4VersionFallback) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  // Create ClientHello without supported_versions extension
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(TLS1_2_VERSION, TLS1_2_VERSION, "", "");
+
+  init();
+  mockSysCallForPeek(client_hello);
+
+  // Should fall back to ClientHello version field
+  std::string expected_ja4 = "t12i100600_a8cf61a50a39_0f3b2bcde21d";
+  EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);           // No SNI in this test
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0); // No ALPN in this test
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+const absl::flat_hash_map<uint16_t, std::string> empty_ext_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i010000_0f2cb44170f4_000000000000"},
+    {TLS1_1_VERSION, "t11i010000_0f2cb44170f4_000000000000"},
+    {TLS1_2_VERSION, "t12i010000_0f2cb44170f4_000000000000"},
+    {TLS1_3_VERSION, "t13i010000_0f2cb44170f4_000000000000"}};
+
+TEST_P(TlsInspectorTest, JA4EmptyExtensionsList) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloEmptyExtensions(max_version);
+
+  init();
+  mockSysCallForPeek(client_hello);
+
+  // Set up proper expectations for socket calls
+  std::string expected_ja4 = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                              max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                 ? "t13i010000_0f2cb44170f4_000000000000"
+                                 : empty_ext_test_version_to_ja4_.at(min_version);
+  EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+const absl::flat_hash_map<uint16_t, std::string> max_ciphers_test_version_to_ja4_ = {
+    {TLS1_VERSION, "t10i990500_f254cf4fa23b_950472255fe9"},
+    {TLS1_1_VERSION, "t11i990500_f254cf4fa23b_950472255fe9"},
+    {TLS1_2_VERSION, "t12i990600_f254cf4fa23b_0f3b2bcde21d"},
+    {TLS1_3_VERSION, "t13i990500_b33cacf22aea_678be4e4848e"}};
+
+TEST_P(TlsInspectorTest, JA4MaxValuesCiphers) {
+  const uint16_t min_version = std::get<0>(GetParam());
+  const uint16_t max_version = std::get<1>(GetParam());
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  // Start with basic ClientHello
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
+
+  // First, find the cipher suites section
+  size_t session_id_len_pos = 43; // 5(record) + 4(handshake) + 2(version) + 32(random)
+  uint8_t session_id_len = client_hello[session_id_len_pos];
+  size_t cipher_suites_len_pos = session_id_len_pos + 1 + session_id_len;
+
+  // Get the original cipher suites length
+  uint16_t original_cipher_length =
+      (client_hello[cipher_suites_len_pos] << 8) | client_hello[cipher_suites_len_pos + 1];
+
+  // Create new cipher suites
+  std::vector<uint8_t> new_ciphers;
+  const uint16_t num_ciphers = 100;
+  uint16_t cipher_length = num_ciphers * 2;
+
+  // Add length prefix
+  new_ciphers.push_back((cipher_length >> 8) & 0xFF);
+  new_ciphers.push_back(cipher_length & 0xFF);
+
+  // Add cipher suites
+  for (uint16_t i = 0; i < num_ciphers; i++) {
+    if (std::get<1>(GetParam()) >= TLS1_3_VERSION) {
+      // Use a variety of TLS 1.3 ciphers
+      switch (i % 5) {
+      case 0:
+        new_ciphers.push_back(0x13);
+        new_ciphers.push_back(0x01); // TLS_AES_128_GCM_SHA256
+        break;
+      case 1:
+        new_ciphers.push_back(0x13);
+        new_ciphers.push_back(0x02); // TLS_AES_256_GCM_SHA384
+        break;
+      case 2:
+        new_ciphers.push_back(0x13);
+        new_ciphers.push_back(0x03); // TLS_CHACHA20_POLY1305_SHA256
+        break;
+      case 3:
+        new_ciphers.push_back(0x13);
+        new_ciphers.push_back(0x04); // TLS_AES_128_CCM_SHA256
+        break;
+      case 4:
+        new_ciphers.push_back(0x13);
+        new_ciphers.push_back(0x05); // TLS_AES_128_CCM_8_SHA256
+        break;
+      }
+    } else {
+      // Use a variety of TLS 1.2 ciphers
+      switch (i % 5) {
+      case 0:
+        new_ciphers.push_back(0xc0);
+        new_ciphers.push_back(0x2f); // TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        break;
+      case 1:
+        new_ciphers.push_back(0xc0);
+        new_ciphers.push_back(0x30); // TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        break;
+      case 2:
+        new_ciphers.push_back(0xc0);
+        new_ciphers.push_back(0x2b); // TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        break;
+      case 3:
+        new_ciphers.push_back(0xc0);
+        new_ciphers.push_back(0x2c); // TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        break;
+      case 4:
+        new_ciphers.push_back(0xcc);
+        new_ciphers.push_back(0xa9); // TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        break;
+      }
+    }
+  }
+
+  // Create modified ClientHello
+  std::vector<uint8_t> modified_hello;
+
+  // Copy up to cipher suites
+  modified_hello.insert(modified_hello.end(), client_hello.begin(),
+                        client_hello.begin() + cipher_suites_len_pos);
+
+  // Add new cipher suites
+  modified_hello.insert(modified_hello.end(), new_ciphers.begin(), new_ciphers.end());
+
+  // Copy remaining data after original cipher suites
+  modified_hello.insert(modified_hello.end(),
+                        client_hello.begin() + cipher_suites_len_pos + 2 + original_cipher_length,
+                        client_hello.end());
+
+  // Update record layer length
+  size_t record_length = modified_hello.size() - 5;
+  modified_hello[3] = (record_length >> 8) & 0xFF;
+  modified_hello[4] = record_length & 0xFF;
+
+  // Update handshake message length
+  size_t handshake_length = record_length - 4;
+  modified_hello[6] = (handshake_length >> 16) & 0xFF;
+  modified_hello[7] = (handshake_length >> 8) & 0xFF;
+  modified_hello[8] = handshake_length & 0xFF;
+
+  init();
+  mockSysCallForPeek(modified_hello);
+
+  // Set up proper expectations for socket calls
+  std::string expected_ja4 = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+                              max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+                                 ? "t13i990900_b33cacf22aea_78e6aca7449b"
+                                 : max_ciphers_test_version_to_ja4_.at(min_version);
+
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setJA4Hash(expected_ja4));
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+}
+
+TEST_P(TlsInspectorTest, JA4NonAlphanumericALPN) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  // Create ALPN with non-alphanumeric characters at start and end
+  std::string special_alpn;
+  special_alpn.push_back(0x03); // Length 3
+  special_alpn.push_back('*');  // Special char at start
+  special_alpn.push_back('2');  // Middle char
+  special_alpn.push_back(')');  // Special char at end
+
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), "", special_alpn);
+
+  init();
+  mockSysCallForPeek(client_hello);
+
+  // This should trigger the code path that converts non-alphanumeric chars to hex
+  EXPECT_CALL(socket_, setJA4Hash(testing::_));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+
+  // No server name in this test, so shouldn't call this method
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+
+  std::vector<absl::string_view> expected_alpn = {"*2)"};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::ContainerEq(expected_alpn)));
+
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
 
 } // namespace
