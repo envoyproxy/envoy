@@ -68,7 +68,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              proto_config.filter_name(), config, std::move(dynamic_module.value()));
+              proto_config.per_route_config_name(), config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +

@@ -71,7 +71,7 @@ message DynamicModuleFilterPerRoute {
   // When Envoy receives this configuration, it passes the filter_name to the dynamic module's HTTP per-route filter config init function
   // together with the filter_config.
   // That way a module can decide which in-module filter implementation to use based on the name at load time.
-  string filter_name = 2;
+  string per_route_config_name = 2;
 
   // The configuration for the filter chosen by filter_name. This is passed to the module's HTTP per-route filter initialization function.
   // Together with the filter_name, the module can decide which in-module filter implementation to use and

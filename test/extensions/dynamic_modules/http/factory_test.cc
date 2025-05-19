@@ -195,7 +195,7 @@ filter_config:
     const std::string yaml = fmt::format(R"EOF(
 dynamic_module_config:
     name: {}
-filter_name: foo
+per_route_config_name: foo
 filter_config:
     "@type": "type.googleapis.com/google.protobuf.StringValue"
     value: "bar"

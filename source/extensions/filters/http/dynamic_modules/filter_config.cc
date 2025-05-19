@@ -25,7 +25,7 @@ DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() 
 }
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
-newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
+newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
                                    const absl::string_view filter_config,
                                    Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
   auto constructor =
@@ -38,8 +38,9 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
       "envoy_dynamic_module_on_http_filter_per_route_config_destroy");
   RETURN_IF_NOT_OK_REF(destroy.status());
 
-  const void* filter_config_envoy_ptr = (*constructor.value())(
-      filter_name.data(), filter_name.size(), filter_config.data(), filter_config.size());
+  const void* filter_config_envoy_ptr =
+      (*constructor.value())(per_route_config_name.data(), per_route_config_name.size(),
+                             filter_config.data(), filter_config.size());
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize per-route dynamic module");
   }
