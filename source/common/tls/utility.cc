@@ -188,15 +188,14 @@ Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName 
 
 } // namespace
 
-const ASN1_TIME& Utility::epochASN1Time() {
-  static thread_local CSmartPtr<ASN1_TIME, ASN1_TIME_free> epoch([]() -> ASN1_TIME* {
-    ASN1_TIME* epoch_time = ASN1_TIME_new();
-    const time_t epoch_time_t = 0;
-    RELEASE_ASSERT(ASN1_TIME_set(epoch_time, epoch_time_t) != nullptr, "");
-    return epoch_time;
-  }());
-
-  return *epoch.get();
+const ASN1_TIME& epochASN1Time() {
+  static ASN1_TIME* e = []() -> ASN1_TIME* {
+    ASN1_TIME* epoch = ASN1_TIME_new();
+    const time_t epoch_time = 0;
+    RELEASE_ASSERT(ASN1_TIME_set(epoch, epoch_time) != nullptr, "");
+    return epoch;
+  }();
+  return *e;
 }
 
 inline bssl::UniquePtr<ASN1_TIME> currentASN1Time(TimeSource& time_source) {

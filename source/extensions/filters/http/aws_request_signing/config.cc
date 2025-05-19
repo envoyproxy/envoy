@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
-#include <elf.h>
-
 #include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 namespace Envoy {
