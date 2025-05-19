@@ -113,18 +113,19 @@ public:
     //
     // The following code does P picks, by first emulating p'_i picks for each
     // entry, and then executing the leftover P - sum(p'_i) picks.
-    double weights_sum = std::accumulate(
-        entries.cbegin(), entries.cend(), 0.0,
-        [&aug_calculate_weight](double sum_so_far, const std::shared_ptr<C>& entry) {
-          return sum_so_far + aug_calculate_weight(*entry);
-        });
+    std::vector<double> weights;
+    weights.reserve(entries.size());
+    std::transform(entries.cbegin(), entries.cend(), std::back_inserter(weights),
+                   [&aug_calculate_weight](const std::shared_ptr<C>& entry) {
+                     return aug_calculate_weight(*entry);
+                   });
+    const double weights_sum = std::accumulate(weights.cbegin(), weights.cend(), 0.0);
     std::vector<uint32_t> floor_picks;
     floor_picks.reserve(entries.size());
-    std::transform(entries.cbegin(), entries.cend(), std::back_inserter(floor_picks),
-                   [picks, weights_sum, &aug_calculate_weight](const std::shared_ptr<C>& entry) {
+    std::transform(weights.cbegin(), weights.cend(), std::back_inserter(floor_picks),
+                   [picks, weights_sum](const double& weight) {
                      // Getting the lower-bound by casting to an integer.
-                     return static_cast<uint32_t>(aug_calculate_weight(*entry) * picks /
-                                                  weights_sum);
+                     return static_cast<uint32_t>(weight * picks / weights_sum);
                    });
 
     // Pre-compute the priority-queue entries to use an O(N) initialization c'tor.
@@ -136,7 +137,7 @@ public:
     for (size_t i = 0; i < entries.size(); ++i) {
       // Add the entry with p'_i picks. As there were p'_i picks, the entry's
       // next deadline is (p'_i + 1) / w_i.
-      const double weight = aug_calculate_weight(*entries[i]);
+      const double weight = weights[i];
       // While validating the algorithm there were a few cases where the math
       // and floating-point arithmetic did not agree (specifically floor(A*B)
       // was greater than A*B). The following if statement solves the problem by
