@@ -7,11 +7,11 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
-#include "source/common/api/os_sys_calls_impl_linux.h"
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/common/cleanup.h"
 #include "envoy/network/listener.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/statusor.h"
 
 #include "absl/strings/string_view.h"
@@ -382,7 +382,7 @@ public:
     int og_netns_fd = og_netns_fd_result.return_value_;
     if (og_netns_fd_result.errno_ != 0) {
       return absl::InternalError(fmt::format("failed to open netns file {}: {}", curr_netns_file,
-                                             strerror(og_netns_fd_result.errno_)));
+                                             errorDetails(og_netns_fd_result.errno_)));
     }
     Cleanup cleanup_og_fd([&og_netns_fd, &posix]() { posix.close(og_netns_fd); });
 
@@ -390,16 +390,16 @@ public:
     auto netns_fd_result = posix.open(netns, O_RDONLY);
     const int netns_fd = netns_fd_result.return_value_;
     if (netns_fd <= 0) {
-      return absl::InternalError(
-          fmt::format("failed to open netns file {}: {}", netns, strerror(netns_fd_result.errno_)));
+      return absl::InternalError(fmt::format("failed to open netns file {}: {}", netns,
+                                             errorDetails(netns_fd_result.errno_)));
     }
     Cleanup cleanup_netns_fd([&posix, &netns_fd]() { posix.close(netns_fd); });
 
     // Change the network namespace of this thread.
     auto setns_result = Api::LinuxOsSysCallsSingleton().get().setns(netns_fd, CLONE_NEWNET);
     if (setns_result.return_value_ != 0) {
-      return absl::InternalError(
-          fmt::format("failed to set netns to {} (fd={}): {}", netns, netns_fd, strerror(errno)));
+      return absl::InternalError(fmt::format("failed to set netns to {} (fd={}): {}", netns,
+                                             netns_fd, errorDetails(errno)));
     }
 
     // Calling function from the specified network namespace.
@@ -408,8 +408,8 @@ public:
     // Restore the original network namespace before returning the function result.
     setns_result = Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
     if (setns_result.return_value_ != 0) {
-      return absl::InternalError(
-          fmt::format("failed to restore original netns (fd={}): {}", netns_fd, strerror(errno)));
+      return absl::InternalError(fmt::format("failed to restore original netns (fd={}): {}",
+                                             netns_fd, errorDetails(errno)));
     }
 
     return result;

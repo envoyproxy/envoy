@@ -808,6 +808,7 @@ fdstat
 filename
 filenames
 fileno
+filepath
 filesystem
 firefox
 fixdate
@@ -1045,6 +1046,7 @@ netblocks
 netfilter
 netlink
 netmask
+netns
 NLB
 NLMSG
 nonblocking
