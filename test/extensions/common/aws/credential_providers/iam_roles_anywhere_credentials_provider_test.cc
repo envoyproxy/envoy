@@ -1036,12 +1036,16 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
 TEST_F(IamRolesAnywhereCredentialsProviderTest, TestCancel) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
 
   expectDocument(200, std::move(R"EOF(
 not json
-)EOF"));
+)EOF"),
+                 message);
 
-  setupProvider();
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   // Kick off a refresh

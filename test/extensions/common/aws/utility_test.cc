@@ -193,6 +193,32 @@ content-hash)",
             request);
 }
 
+TEST(UtilityTest, CanonicalRequestNoPathDontNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request = Utility::createCanonicalRequest(
+      "GET", "", headers, "content-hash", false, false);
+  EXPECT_EQ(R"(GET
+/
+
+
+
+content-hash)",
+            request);
+}
+
+TEST(UtilityTest, CanonicalRequestNoPathNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request = Utility::createCanonicalRequest(
+      "GET", "", headers, "content-hash", true, false);
+  EXPECT_EQ(R"(GET
+/
+
+
+
+content-hash)",
+            request);
+}
+
 TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const std::map<std::string, std::string> headers;
   const auto request = Utility::createCanonicalRequest(

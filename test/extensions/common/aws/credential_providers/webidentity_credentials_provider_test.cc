@@ -380,7 +380,7 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
 
 TEST_F(WebIdentityCredentialsProviderTest, ExpiredTokenException) {
   // Setup timer.
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(400, std::move(R"EOF(
 {
