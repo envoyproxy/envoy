@@ -195,8 +195,8 @@ content-hash)",
 
 TEST(UtilityTest, CanonicalRequestNoPathDontNormalizeURI) {
   std::map<std::string, std::string> headers;
-  const auto request = Utility::createCanonicalRequest(
-      "GET", "", headers, "content-hash", false, false);
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", false, false);
   EXPECT_EQ(R"(GET
 /
 
@@ -208,8 +208,8 @@ content-hash)",
 
 TEST(UtilityTest, CanonicalRequestNoPathNormalizeURI) {
   std::map<std::string, std::string> headers;
-  const auto request = Utility::createCanonicalRequest(
-      "GET", "", headers, "content-hash", true, false);
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", true, false);
   EXPECT_EQ(R"(GET
 /
 
