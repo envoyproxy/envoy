@@ -29,7 +29,7 @@ public:
   /**
    * Initializes the xDS-Manager.
    * This should be called after the cluster-manager is created.
-   * @param boostrap - the bootstrap config of Envoy.
+   * @param bootstrap - the bootstrap config of Envoy.
    * @param cm - a pointer to a valid cluster manager.
    * @return Ok if the initialization was successful, or an error otherwise.
    */
@@ -40,7 +40,7 @@ public:
    * Initializes the ADS connections.
    * This should be called after the cluster-manager was created, and the
    * primiary clusters were initialized.
-   * @param boostrap - the bootstrap config of Envoy.
+   * @param bootstrap - the bootstrap config of Envoy.
    * @return Ok if the initialization was successful, or an error otherwise.
    */
   virtual absl::Status
