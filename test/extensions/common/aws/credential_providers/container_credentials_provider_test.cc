@@ -136,15 +136,7 @@ public:
                                    Http::RequestMessage&, Tracing::Span&,
                                    MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
-            if (!document.empty()) {
-              receiver.onMetadataSuccess(std::move(document));
-            } else {
-              EXPECT_CALL(
-                  *raw_metadata_fetcher_,
-                  failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata)))
-                  .WillRepeatedly(testing::Return("InvalidMetadata"));
-              receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::InvalidMetadata);
-            }
+            receiver.onMetadataSuccess(std::move(document));
           } else {
             EXPECT_CALL(*raw_metadata_fetcher_,
                         failureToString(Eq(MetadataFetcher::MetadataReceiver::Failure::Network)))
