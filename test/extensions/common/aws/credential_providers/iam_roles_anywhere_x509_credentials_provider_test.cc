@@ -399,6 +399,18 @@ RBqAC6sxyAYn2wbzuyINJdSLpehQKDkKxEnO4QLodClHYV1F9AlAfbSLmIlRFv/y
 -----END PRIVATE KEY-----
 )EOF";
 
+// Expired certificate generated with OpenSSL
+// Certificate:
+//     Data:
+//         Version: 3 (0x2)
+//         Serial Number:
+//             66:58:a3:c3:c2:51:25:5d:20:aa:50:53:47:75:1b:dc:69:ec:8a:16
+//         Signature Algorithm: sha256WithRSAEncryption
+//         Issuer: C=XX, ST=StateName, L=CityName, O=CompanyName, OU=CompanySectionName,
+//         CN=CommonNameOrHostname Validity
+//             Not Before: Jan  1 00:00:00 2008 GMT
+//             Not After : Jan  2 00:00:00 2008 GMT
+
 std::string expired_cert = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIF7zCCA9egAwIBAgIUZlijw8JRJV0gqlBTR3Ub3GnsihYwDQYJKoZIhvcNAQEL
@@ -532,6 +544,23 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, PrivateKeyInvalidPath) {
   EXPECT_FALSE(status.ok());
   EXPECT_FALSE(provider->getCredentials().certificatePrivateKey().has_value());
 }
+
+// Invalid cert algorithm generated with OpenSSL. IAM Roles Anywhere does not
+// support this public key algorithm
+//
+// Certificate:
+//     Data:
+//         Version: 3 (0x2)
+//         Serial Number:
+//             31:23:a6:e3:2f:23:89:13:91:c2:5b:69:0a:ff:45:4a
+//         Signature Algorithm: sha256WithRSAEncryption
+//         Issuer: CN=test-rsa
+//         Validity
+//             Not Before: Nov 24 20:48:11 2024 GMT
+//             Not After : Nov 24 21:48:10 2025 GMT
+//         Subject: C=XX, L=Default City, O=Default Company Ltd, CN=invalid-algorithm
+//         Subject Public Key Info:
+//             Public Key Algorithm: ED448
 
 std::string invalid_cert_algorithm = R"EOF(
 -----BEGIN CERTIFICATE-----
