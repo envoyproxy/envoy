@@ -127,7 +127,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
   }
 
   X509_ALGOR* alg;
-  // Param_status will in fact always return 1
+  // X509_PUBKEY_get0_param will in fact always return 1
   int param_status =
       X509_PUBKEY_get0_param(nullptr, nullptr, nullptr, &alg, X509_get_X509_PUBKEY(cert.get()));
   ASSERT(param_status == 1);
