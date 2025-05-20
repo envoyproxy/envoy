@@ -8,7 +8,6 @@ namespace Envoy {
 namespace {
 // The minimal fill rate will be one second every year.
 constexpr double kMinFillRate = 1.0 / (365 * 24 * 60 * 60);
-constexpr auto MILLISECONDS_PER_SECOND = 1000;
 
 } // namespace
 
@@ -60,16 +59,13 @@ void TokenBucketImpl::maybeReset(uint64_t num_tokens) {
 }
 
 AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
-                                             std::chrono::milliseconds fill_interval,
                                              double fill_rate, bool init_fill)
-    : AtomicTokenBucketImpl::AtomicTokenBucketImpl(max_tokens, time_source, fill_interval,
-                                                   fill_rate, (init_fill) ? max_tokens : 0) {}
+    : AtomicTokenBucketImpl::AtomicTokenBucketImpl(max_tokens, time_source, fill_rate,
+                                                   (init_fill) ? max_tokens : 0) {}
 
 AtomicTokenBucketImpl::AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
-                                             std::chrono::milliseconds fill_interval,
                                              double fill_rate, uint64_t initial_tokens)
     : max_tokens_(max_tokens), fill_rate_(std::max(std::abs(fill_rate), kMinFillRate)),
-      fill_interval_(std::chrono::duration<double>(fill_interval).count()),
       time_source_(time_source) {
   auto time_in_seconds = timeNowInSeconds();
   if (initial_tokens) {
@@ -115,10 +111,8 @@ std::chrono::milliseconds AtomicTokenBucketImpl::nextTokenAvailable() const {
 
   // Calculate time since the last fill.
   double current_time = timeNowInSeconds();
-  double time_since_last_fill = std::fmod(current_time, fill_interval_);
-  double time_until_next_fill = fill_interval_ - time_since_last_fill;
   return std::chrono::milliseconds(
-      static_cast<uint64_t>(time_until_next_fill * MILLISECONDS_PER_SECOND));
+      static_cast<uint64_t>(1 / fill_rate_ * 1000 - (current_time - time_in_seconds_.load())));
 }
 
 } // namespace Envoy

@@ -251,9 +251,8 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
                                 ? max_tokens * (existing_token_bucket->remainingTokens() /
                                                 existing_token_bucket->maxTokens())
                                 : max_tokens;
-  return std::make_shared<AtomicTokenBucketImpl>(
-      max_tokens, time_source, std::chrono::milliseconds(fill_interval_sec * 1000),
-      fill_rate_per_sec, initial_tokens);
+  return std::make_shared<AtomicTokenBucketImpl>(max_tokens, time_source, fill_rate_per_sec,
+                                                 initial_tokens);
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {

@@ -598,8 +598,7 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketAllow) {
   token_bucket->mutable_fill_interval()->set_seconds(60);
   // 100 available tokens so the test doesn't get throttled.
   std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter =
-      std::make_shared<AtomicTokenBucketImpl>(100, dispatcher_.timeSource(),
-                                              std::chrono::seconds(60), 100 / 60);
+      std::make_shared<AtomicTokenBucketImpl>(100, dispatcher_.timeSource(), 100 / 60);
 
   RateLimitQuotaResponse::BucketAction no_assignment_action;
   no_assignment_action.mutable_quota_assignment_action()
@@ -644,8 +643,7 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
   token_bucket->mutable_tokens_per_fill()->set_value(1);
   token_bucket->mutable_fill_interval()->set_seconds(60);
   std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter =
-      std::make_shared<AtomicTokenBucketImpl>(1, dispatcher_.timeSource(), std::chrono::seconds(60),
-                                              1 / 60);
+      std::make_shared<AtomicTokenBucketImpl>(1, dispatcher_.timeSource(), 1 / 60);
   // All subsequent requests should deny for 60 (mock) seconds.
   EXPECT_TRUE(token_bucket_limiter->consume());
 

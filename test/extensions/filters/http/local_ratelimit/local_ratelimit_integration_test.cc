@@ -572,18 +572,18 @@ TEST_P(LocalRateLimitFilterIntegrationTest, HeaderTest) {
 
   // Max tokens is 2, the second request should be allowed.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  sendAndVerifyRequest("2", "0", "4");
+  sendAndVerifyRequest("2", "0", "2");
   cleanupUpstreamAndDownstream();
 
-  // The third request should be rate limited, x-ratelimit-reset should be 4s.
+  // The third request should be rate limited, x-ratelimit-reset should be 2s.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  sendRateLimitedRequest("2", "0", "4");
+  sendRateLimitedRequest("2", "0", "2");
   cleanupUpstreamAndDownstream();
 
-  // After 1s, the forth request should be rate limited, x-ratelimit-reset should be 3s.
+  // After 1s, the forth request should be rate limited, x-ratelimit-reset should be 1s.
   simTime().advanceTimeWait(std::chrono::seconds(1));
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  sendRateLimitedRequest("2", "0", "3");
+  sendRateLimitedRequest("2", "0", "1");
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnections) {
