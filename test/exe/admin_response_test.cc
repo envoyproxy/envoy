@@ -162,7 +162,7 @@ TEST_F(AdminStreamingTest, RequestGetAndQuitForNotAllowedRoute) {
   AdminResponseSharedPtr response = streamingResponse("/status");
   ResponseData response_data = runStreamingRequest(response);
   EXPECT_EQ(1, response_data.num_chunks_);
-  EXPECT_EQ(36,response_data.num_bytes_);
+  EXPECT_EQ(36, response_data.num_bytes_);
   EXPECT_EQ(Http::Code::Forbidden, response_data.code_);
   EXPECT_EQ("text/plain; charset=UTF-8", response_data.content_type_);
   EXPECT_TRUE(quitAndWait());

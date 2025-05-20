@@ -1,9 +1,9 @@
 admin:
   allow_listed_routes:
-    - "/quitquitquit"
-    - "/stats"
-    - "/contention"
-    - "/stream"
+  - "/quitquitquit"
+  - "/stats"
+  - "/contention"
+  - "/stream"
   access_log:
   - name: envoy.access_loggers.file
     typed_config:
