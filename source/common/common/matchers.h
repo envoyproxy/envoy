@@ -85,6 +85,9 @@ private:
 
 class UniversalStringMatcher : public StringMatcher {
 public:
+  // To avoid hiding other implementations of match.
+  using StringMatcher::match;
+
   bool match(absl::string_view) const override { return true; }
 };
 
