@@ -737,12 +737,16 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     } else {
       ENVOY_STREAM_LOG(trace, "Header processing still in progress -- holding body data",
                        *decoder_callbacks_);
-      // We don't know what to do with the body until the response comes back.
-      // We must buffer it in case we need it when that happens. Watermark will be raised when the
-      // buffered data reaches the buffer's watermark limit. When end_stream is true, we need to
-      // StopIterationAndWatermark as well to stop the ActiveStream from returning error when the
-      // last chunk added to stream buffer exceeds the buffer limit.
       state.setPaused(true);
+      // Buffer the body when waiting for header response.
+      // For BUFFERED mode, return StopIterationAndBuffer so when buffered data reaches
+      // the per-connection-limit, Envoy will a send a 413: payload-too-large local reply.
+      // For non-BUFFERED mode, return StopIterationAndWatermark so watermark can be raised
+      // when the buffered data reaches the per-connection-limit. The watermark will be cleared
+      // during the header response handling at which Envoy will send the buffered data out.
+      if (state.bodyMode() == ProcessingMode::BUFFERED) {
+        return FilterDataStatus::StopIterationAndBuffer;
+      }
       return FilterDataStatus::StopIterationAndWatermark;
     }
   }
@@ -1100,6 +1104,10 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
   if (logging_info_->clusterInfo() == nullptr) {
     logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
   }
+
+  // Response code details should actually be set as many times as possible, since it's
+  // the *final* response code details that will give the most useful information.
+  logging_info_->setHttpResponseCodeDetails(stream_info->responseCodeDetails());
 }
 
 void Filter::logStreamInfo() {
@@ -1496,10 +1504,7 @@ void Filter::onMessageTimeout() {
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
 
-    errorResponse.mutable_status()->set_code(
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_timeout_error")
-            ? StatusCode::GatewayTimeout
-            : StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }

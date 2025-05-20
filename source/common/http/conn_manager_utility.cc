@@ -38,7 +38,7 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
 } // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
-  const std::string next_protocol = connection.nextProtocol();
+  std::string next_protocol = connection.nextProtocol();
   if (!next_protocol.empty()) {
     return next_protocol;
   }

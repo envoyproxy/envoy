@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifiers.matcher.v3;
+
+import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifiers.matcher.v3";
+option java_outer_classname = "MatcherProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifiers/matcher/v3;matcherv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Matcher Based Cluster Specifier]
+// [#extension: envoy.router.cluster_specifier_plugin.matcher]
+// [#not-implemented-hide:]
+
+message MatcherClusterSpecifier {
+  // The matcher for cluster selection after the route has been selected. This is used when the
+  // route has multiple clusters (like multiple clusters for different users) and the matcher
+  // is used to select the cluster to use for the request.
+  xds.type.matcher.v3.Matcher cluster_matcher = 1 [(validate.rules).message = {required: true}];
+}

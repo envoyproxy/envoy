@@ -1404,15 +1404,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     absl::optional<std::string> result;
                     if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
-                      if (Runtime::runtimeFeatureEnabled(
-                              "envoy.reloadable_features.sanitize_sni_in_access_"
-                              "log")) {
-                        result = StringUtil::sanitizeInvalidHostname(
-                            stream_info.downstreamAddressProvider().requestedServerName());
-                      } else {
-                        result = std::string(
-                            stream_info.downstreamAddressProvider().requestedServerName());
-                      }
+                      result = StringUtil::sanitizeInvalidHostname(
+                          stream_info.downstreamAddressProvider().requestedServerName());
                     }
                     return result;
                   });
@@ -1733,6 +1726,18 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     absl::optional<std::string> result;
                     if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
                       result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
+                    }
+                    return result;
+                  });
+            }}},
+          {"TLS_JA4_FINGERPRINT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    absl::optional<std::string> result;
+                    if (!stream_info.downstreamAddressProvider().ja4Hash().empty()) {
+                      result = std::string(stream_info.downstreamAddressProvider().ja4Hash());
                     }
                     return result;
                   });

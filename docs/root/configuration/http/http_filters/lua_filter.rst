@@ -476,8 +476,13 @@ body. May be nil.
   local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. ``envoy.filters.http.lua``. Below is an example of a ``metadata`` in a
-:ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
+under the :ref:`filter config name
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+If no entry could be find by the filter config name, then filter canonical name
+i.e. ``envoy.filters.http.lua`` will be used as alternative. But note this downgrade will be
+deprecated in the future.
+
+Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
@@ -575,6 +580,40 @@ Example:
   function envoy_on_request(request_handle)
     -- Clear the route cache
     request_handle:clearRouteCache()
+  end
+
+.. _config_http_filters_lua_stream_handle_api_filter_context:
+
+``filterContext()``
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local filter_context = handle:filterContext()
+
+Returns the filter context that configured in the the
+:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`.
+
+For example, given the following filter context in the route entry:
+
+.. code-block:: yaml
+
+  typed_per_filter_config:
+    "lua-filter-name":
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      filter_context:
+        key: xxxxxx
+
+The filter context can be accessed in the related Lua script as follows:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Get the filter context
+    local filter_context = request_handle:filterContext()
+
+    -- Access the filter context data
+    local value = filter_context["key"]
   end
 
 ``importPublicKey()``

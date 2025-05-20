@@ -106,6 +106,27 @@ cannot locate that specific endpoint at the aggregate level. As a result, Statef
 aggregate clusters, because the final cluster choice is made without direct knowledge of the specific endpoint which
 doesn't exist at the top level.
 
+Circuit Breakers
+^^^^^^^^^^^^^^^^
+
+In general, an aggregate cluster should be thought of as a cluster that groups the endpoints of the underlying clusters
+together for load balancing purposes only, not for circuit breaking which is handled at the level of the underlying clusters,
+not at the level of the aggregate cluster itself. This allows the aggregate cluster to maintain its failover capabilities
+whilst respecting the circuit breaker limits of each underlying cluster. This is intentional as the underlying clusters
+are accessible through multiple paths (directly or via the aggregate cluster) and configuring aggregate cluster circuit
+breakers would effectively double the circuit breaker limits rendering them useless.
+
+When the configured limit is reached on the underlying cluster(s) only the underlying cluster(s)' circuit breaker opens.
+When an underlying cluster's circuit breaker opens, requests routed through the aggregate cluster to that underlying cluster
+will be rejected. The aggregate cluster's circuit breaker remains closed at all times, regardless of whether the circuit
+breaker(s) limits on the underlying cluster(s) are reached or not.
+
+As an exception, the only circuit breaker configured at the aggregate cluster level is :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>`
+because when Envoy processes a retry request, it needs to determine whether the retry limit has been exceeded before
+the aggregate cluster is able to choose the underlying cluster to use. When the configured limit is reached the aggregate
+cluster's circuit breaker opens, and subsequent requests to the aggregate cluster path cannot retry, even though the
+underlying cluster's retry budget is still available.
+
 Load Balancing Example
 ----------------------
 

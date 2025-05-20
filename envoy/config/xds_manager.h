@@ -29,12 +29,22 @@ public:
   /**
    * Initializes the xDS-Manager.
    * This should be called after the cluster-manager is created.
-   * @param boostrap - the bootstrap config of Envoy.
+   * @param bootstrap - the bootstrap config of Envoy.
    * @param cm - a pointer to a valid cluster manager.
    * @return Ok if the initialization was successful, or an error otherwise.
    */
   virtual absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                   Upstream::ClusterManager* cm) PURE;
+
+  /**
+   * Initializes the ADS connections.
+   * This should be called after the cluster-manager was created, and the
+   * primiary clusters were initialized.
+   * @param bootstrap - the bootstrap config of Envoy.
+   * @return Ok if the initialization was successful, or an error otherwise.
+   */
+  virtual absl::Status
+  initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   /**
    * Shuts down the xDS-Manager and all the configured connections to the config
@@ -53,22 +63,14 @@ public:
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) PURE;
 
   /**
-   * Returns the XdsConfigTracker if defined by the bootstrap.
-   * The object will be initialized (if configured) after the call to initialize().
-   * TODO(adisuissa): this method will be removed once all the ADS-related objects
-   * are moved out of the cluster-manager to the xds-manager.
-   * @return the XdsConfigTracker if defined, or nullopt if not.
+   * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
+   * of xDS. This is treated somewhat as a special case in ClusterManager, since it does not relate
+   * logically to the management of clusters but instead is required early in ClusterManager/server
+   * initialization and in various sites that need ClusterManager for xDS API interfacing.
+   *
+   * @return GrpcMux& ADS API provider referencee.
    */
-  virtual OptRef<XdsConfigTracker> xdsConfigTracker() PURE;
-
-  /**
-   * Returns the XdsResourcesDelegate if defined by the bootstrap.
-   * The object will be initialized (if configured) after the call to initialize().
-   * TODO(adisuissa): this method will be removed once all the ADS-related objects
-   * are moved out of the cluster-manager to the xds-manager.
-   * @return the XdsResourcesDelegate if defined, or nullopt if not.
-   */
-  virtual XdsResourcesDelegateOptRef xdsResourcesDelegate() PURE;
+  virtual Config::GrpcMuxSharedPtr adsMux() PURE;
 
   /**
    * Obtain the subscription factory for the cluster manager. Since subscriptions may have an

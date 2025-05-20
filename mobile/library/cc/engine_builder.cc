@@ -15,8 +15,6 @@
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
-#else
-#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #endif
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
@@ -52,17 +50,6 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
-#if !defined(__APPLE__)
-EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
-  use_cares_ = use_cares;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addCaresFallbackResolver(std::string host, int port) {
-  cares_fallback_resolvers_.emplace_back(std::move(host), port);
-  return *this;
-}
-#endif
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -135,6 +122,11 @@ EngineBuilder& EngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setGetaddrinfoNumThreads(uint32_t num_threads) {
+  getaddrinfo_num_threads_ = num_threads;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
   // Add a default port of 443 for all hosts. We'll eventually change this API so it takes a single
   // {host, pair} and it can be called multiple times.
@@ -142,6 +134,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   for (const std::string& hostname : hostnames) {
     dns_preresolve_hostnames_.push_back({hostname /* host */, 443 /* port */});
   }
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
+    const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
+  socket_options_ = socket_options;
   return *this;
 }
 
@@ -512,31 +510,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
 #else
-  if (use_cares_) {
-    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
-    if (!cares_fallback_resolvers_.empty()) {
-      for (const auto& [host, port] : cares_fallback_resolvers_) {
-        auto* address = resolver_config.add_resolvers();
-        address->mutable_socket_address()->set_address(host);
-        address->mutable_socket_address()->set_port_value(port);
-      }
-      resolver_config.set_use_resolvers_as_fallback(true);
-    }
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.cares");
-    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-        resolver_config);
-  } else {
-    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-        resolver_config;
-    if (dns_num_retries_.has_value()) {
-      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
-    }
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.getaddrinfo");
-    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-        resolver_config);
+  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+      resolver_config;
+  if (dns_num_retries_.has_value()) {
+    resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
   }
+  resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
+  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+      "envoy.network.dns_resolver.getaddrinfo");
+  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+      resolver_config);
 #endif
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
@@ -817,6 +800,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           absl::StrCat("SO_NET_SERVICE_TYPE = ", ios_network_service_type_));
     }
 #endif
+    for (const auto& socket_option : socket_options_) {
+      envoy::config::core::v3::SocketOption* sock_opt =
+          base_cluster->mutable_upstream_bind_config()->add_socket_options();
+      sock_opt->CopyFrom(socket_option);
+    }
   }
 
   // Set up stats.

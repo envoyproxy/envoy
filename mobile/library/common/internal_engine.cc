@@ -381,7 +381,9 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
     // The IP version to remove flag must be set first before refreshing the DNS cache so that
     // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
     // removed.
@@ -409,7 +411,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     cache_manager.forEachThreadLocalCache(reset_status);
   }
   if (!disable_dns_refresh_on_network_change_) {
-    connectivity_manager_->refreshDns(configuration, true);
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  } else if (Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.drain_pools_on_network_change")) {
+    ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+    connectivity_manager_->clusterManager().drainConnections(
+        [](const Upstream::Host&) { return true; });
   }
 }
 
