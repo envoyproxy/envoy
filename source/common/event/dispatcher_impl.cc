@@ -18,6 +18,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
+#include "source/common/network/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
@@ -167,13 +168,36 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
 
   auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
       std::string(address->addressType()));
+
   // The target address is usually offered by EDS and the EDS api should reject the unsupported
   // address.
   // TODO(lambdai): Return a closed connection if the factory is not found. Note that the caller
   // expects a non-null connection as of today so we cannot gracefully handle unsupported address
   // type.
-  return factory->createClientConnection(*this, address, source_address,
-                                         std::move(transport_socket), options, transport_options);
+
+#if defined(__linux__)
+  constexpr bool is_linux = true;
+#else
+  constexpr bool is_linux = false;
+#endif
+
+  // For Linux, the source address' network namespace is relevant for client connections, since that
+  // is where the netns would be specified.
+  Network::ClientConnectionPtr conn;
+  if (is_linux && source_address->networkNamespace().has_value()) {
+    auto f = [&]() -> absl::StatusOr<Network::ClientConnectionPtr> {
+      return factory->createClientConnection(
+          *this, address, source_address, std::move(transport_socket), options, transport_options);
+    };
+    auto result = Network::Utility::execInNetworkNamespace(
+        std::move(f), source_address->networkNamespace()->c_str());
+    conn = result->value_or(nullptr);
+  } else {
+    conn = factory->createClientConnection(*this, address, source_address,
+                                           std::move(transport_socket), options, transport_options);
+  }
+
+  return conn;
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

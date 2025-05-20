@@ -311,6 +311,58 @@ parseBindConfig(::Envoy::OptRef<const envoy::config::core::v3::BindConfig> bind_
   return upstream_local_addresses;
 }
 
+namespace {
+absl::Status verifyBindConfig(absl::optional<std::string> cluster_name,
+                              OptRef<const envoy::config::core::v3::BindConfig> bind_config) {
+  if (!bind_config.has_value()) {
+    // No config to verify.
+    return absl::OkStatus();
+  }
+
+  if (bind_config->additional_source_addresses_size() > 0 &&
+      bind_config->extra_source_addresses_size() > 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Can't specify both `extra_source_addresses` and `additional_source_addresses` "
+                    "in the {}'s upstream binding config",
+                    !(cluster_name.has_value()) ? "Bootstrap"
+                                                : fmt::format("Cluster {}", cluster_name.value())));
+  }
+
+  if (!bind_config->has_source_address() && (bind_config->extra_source_addresses_size() > 0 ||
+                                             bind_config->additional_source_addresses_size() > 0)) {
+    return absl::InvalidArgumentError(
+        fmt::format("{}'s upstream binding config has extra/additional source addresses but no "
+                    "source_address. Extra/additional addresses cannot be specified if "
+                    "source_address is not set.",
+                    !(cluster_name.has_value()) ? "Bootstrap"
+                                                : fmt::format("Cluster {}", cluster_name.value())));
+  }
+
+#if !defined(__linux__)
+  auto fail_status = absl::InvalidArgumentError(fmt::format(
+      "{}'s upstream binding config contains addresses with network namespace filepaths, but the "
+      "OS is not Linux. Network namespaces can only be used on Linux.",
+      !(cluster_name.has_value()) ? "Bootstrap" : fmt::format("Cluster {}", cluster_name.value())));
+  if (bind_config->has_source_address() &&
+      !bind_config->source_address().network_namespace_filepath().empty()) {
+    return fail_status;
+  };
+  for (const auto& addr : bind_config->extra_source_addresses()) {
+    if (addr.has_address() && !addr.address().network_namespace_filepath().empty()) {
+      return fail_status;
+    }
+  }
+  for (const auto& addr : bind_config->additional_source_addresses()) {
+    if (!addr.network_namespace_filepath().empty()) {
+      return fail_status;
+    }
+  }
+#endif
+
+  return absl::OkStatus();
+}
+} // namespace
+
 absl::StatusOr<Envoy::Upstream::UpstreamLocalAddressSelectorConstSharedPtr>
 createUpstreamLocalAddressSelector(
     const envoy::config::cluster::v3::Cluster& cluster_config,
@@ -328,27 +380,10 @@ createUpstreamLocalAddressSelector(
   }
 
   // Verify that bind config is valid.
-  if (bind_config.has_value()) {
-    if (bind_config->additional_source_addresses_size() > 0 &&
-        bind_config->extra_source_addresses_size() > 0) {
-      return absl::InvalidArgumentError(fmt::format(
-          "Can't specify both `extra_source_addresses` and `additional_source_addresses` "
-          "in the {}'s upstream binding config",
-          !(cluster_name.has_value()) ? "Bootstrap"
-                                      : fmt::format("Cluster {}", cluster_name.value())));
-    }
-
-    if (!bind_config->has_source_address() &&
-        (bind_config->extra_source_addresses_size() > 0 ||
-         bind_config->additional_source_addresses_size() > 0)) {
-      return absl::InvalidArgumentError(fmt::format(
-          "{}'s upstream binding config has extra/additional source addresses but no "
-          "source_address. Extra/additional addresses cannot be specified if "
-          "source_address is not set.",
-          !(cluster_name.has_value()) ? "Bootstrap"
-                                      : fmt::format("Cluster {}", cluster_name.value())));
-    }
+  if (auto status = verifyBindConfig(cluster_name, bind_config); !status.ok()) {
+    return status;
   }
+
   UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
   const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
       bind_config.has_value() && bind_config->has_local_address_selector()
