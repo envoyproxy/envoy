@@ -107,7 +107,7 @@ public:
 template <class DataType> struct OnMatch {
   const ActionFactoryCb action_cb_;
   const MatchTreeSharedPtr<DataType> matcher_;
-  bool keep_matching_;
+  bool keep_matching_{};
 };
 template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
 
