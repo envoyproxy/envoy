@@ -68,6 +68,32 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
+
+// class AwsIamAuthenticatorCredentials {
+
+//   absl::optional<std::string> getPassword() { return password_ };
+//   absl::optional<std::string> password_;
+// }
+
+class AwsIamAuthenticatorBase: public Singleton::Instance {
+  public:
+  // AwsIamAuthenticatorBase() = default;
+  // ~AwsIamAuthenticatorBase() = default;
+
+  absl::StatusOr<absl::optional<std::string>>getCredentials();
+  absl::optional<std::string> getPassword() { return password_; };
+
+  absl::optional<std::string> password_;
+
+};
+
+class AwsIamAuthenticatorImpl: public AwsIamAuthenticatorBase {
+  public:
+    AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context, absl::string_view service_name, absl::string_view region);
+};
+
+using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
+
 /*
  * This class implements support for the topology part of `Redis Cluster
  * <https://redis.io/topics/cluster-spec>`_. Specifically, it allows Envoy to maintain an internal
@@ -136,6 +162,8 @@ private:
   void onClusterSlotUpdate(ClusterSlotsSharedPtr&&);
 
   void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
+
+  void initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, absl::string_view service_name, absl::string_view region);
 
   const envoy::config::endpoint::v3::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
@@ -305,6 +333,7 @@ private:
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
+  AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

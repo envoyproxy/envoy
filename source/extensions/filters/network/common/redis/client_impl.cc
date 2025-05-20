@@ -1,8 +1,6 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -322,17 +320,17 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                          redis_command_stats, scope, is_transaction_client);
 
 
-  Http::RequestMessageImpl message;
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
-  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  message.headers().setHost(host->hostname());
-  message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_username)));
-  // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
-  message.headers().setReference(Http::CustomHeaders::get().Accept,
-                                 Http::Headers::get().ContentTypeValues.Json);
+  // Http::RequestMessageImpl message;
+  // message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
+  // message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  // message.headers().setHost(host->hostname());
+  // message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_username)));
+  // // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
+  // message.headers().setReference(Http::CustomHeaders::get().Accept,
+  //                                Http::Headers::get().ContentTypeValues.Json);
 
-                                 std::string region = "ap-southeast-2";
-  auto status = aws_iam_auth_signer_->sign(message, true, region);
+  //                                std::string region = "ap-southeast-2";
+  // auto status = aws_iam_auth_signer_->sign(message, true, region);
 
   client->initialize(auth_username, auth_password);
   return client;

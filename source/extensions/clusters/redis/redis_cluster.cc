@@ -2,12 +2,15 @@
 
 #include <cstdint>
 #include <memory>
+#include "source/extensions/filters/network/redis_proxy/config.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/common/http/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -89,6 +92,16 @@ RedisCluster::RedisCluster(
           *this, host.socket_address().address(), host.socket_address().port_value()));
     }
   }
+
+  auto options = info_->extensionProtocolOptionsTyped<NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl>(
+        NetworkFilters::NetworkFilterNames::get().RedisProxy);
+        
+  //   if (options) {
+  //     return options->authUsername(api);
+  //   }
+
+  initAwsIamAuthenticator(context.serverFactoryContext(), "elasticache", "ap-southeast-2");
+
 }
 
 void RedisCluster::startPreInit() {
@@ -240,6 +253,44 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           parent_.redis_discovery_session_->startResolveRedis();
         }
       });
+
+}
+
+SINGLETON_MANAGER_REGISTRATION(aws_iam_authenticator);
+
+void RedisCluster::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, absl::string_view service_name, absl::string_view region) {
+  aws_iam_authenticator_ =
+  context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
+      SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
+      [&context, &service_name, &region]() {
+        return std::make_shared<AwsIamAuthenticatorImpl>(context, service_name, region);
+      },
+      true);
+}
+
+AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context, absl::string_view service_name, absl::string_view region)
+{
+
+  Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
+
+  credentials_provider_chain =
+        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
+                                                                                  absl::nullopt);
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+        service_name, region, credentials_provider_chain, context,
+        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+
+  Http::RequestMessageImpl message;
+  // message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
+  // message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  // message.headers().setHost(host->hostname());
+  // message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_username)));
+  // // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
+  // message.headers().setReference(Http::CustomHeaders::get().Accept,
+  //                                Http::Headers::get().ContentTypeValues.Json);
+
+  //                                std::string region = "ap-southeast-2";
+  // auto status = aws_iam_auth_signer_->sign(message, true, region);
 }
 
 // RedisCluster

@@ -65,5 +65,6 @@ envoy_cc_extension(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/redis/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "//source/extensions/filters/network/redis_proxy:config_interface"
     ],
 )
