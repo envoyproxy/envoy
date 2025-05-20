@@ -1,6 +1,6 @@
 #include "source/extensions/clusters/dns_srv/dns_srv_cluster.h"
 
-#include <sys/_types/_intptr_t.h>
+// #include <sys/_types/_intptr_t.h>
 
 #include <algorithm>
 #include <chrono>
@@ -255,7 +255,7 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
       srv_record_hostname_, dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
-        ENVOY_LOG(debug, "Resolved target '{}', details: {}, status: {}", srv_record_hostname_,
+        ENVOY_LOG(debug, "Resolved target '{}', details: '{}', status: {}", srv_record_hostname_,
                   details, static_cast<int>(status));
 
         active_dns_query_ = nullptr;
@@ -291,6 +291,12 @@ DnsSrvClusterFactory::createClusterWithConfig(
   if (proto_config.srv_names_size() > 1) {
     return absl::InvalidArgumentError("SRV DNS Cluster can only contain one DNS record (so far)");
   }
+
+  if (proto_config.srv_names_size() < 1) {
+    return absl::InvalidArgumentError("SRV DNS Cluster must contain exactly one DNS record");
+  }
+
+  // TODO: Validate the name of the record
 
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::make_pair(std::shared_ptr<DnsSrvCluster>(new DnsSrvCluster(
