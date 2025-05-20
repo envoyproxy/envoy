@@ -270,6 +270,13 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   quitAndWait();
 }
 
+TEST_P(AdminRequestTest, AdminRequestGetNotAllowedRoutes) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/status", "GET"), HasSubstr("request to route /status not allowed"));
+  quitAndWait();
+}
+
 // no signals on Windows -- could probably make this work with GenerateConsoleCtrlEvent
 #ifndef WIN32
 // This test is identical to the above one, except that instead of using an admin /quitquitquit,
