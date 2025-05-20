@@ -22,22 +22,48 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
 
-#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Tracing {
 
-// TODO(perf): Avoid string creations/copies in this entire file.
-static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
-  return info.responseCode() ? std::to_string(info.responseCode().value()) : "0";
+// Pre-allocate common response codes to minimize string creations.
+namespace {
+constexpr absl::string_view HttpResponseCode0   = "0";
+constexpr absl::string_view HttpResponseCode200 = "200";
+constexpr absl::string_view HttpResponseCode404 = "404";
+constexpr absl::string_view HttpResponseCode500 = "500";
+constexpr absl::string_view HttpResponseCode502 = "502";
+constexpr absl::string_view HttpResponseCode503 = "503";
+constexpr absl::string_view DefaultValue = "-";
+} // namespace
+
+// Helper for building response code string without excess allocations.
+static absl::string_view buildResponseCode(const StreamInfo::StreamInfo& info,
+                                           std::string& out_buffer) {
+  if (!info.responseCode()) {
+    return HttpResponseCode0;
+  }
+  const uint64_t code = info.responseCode().value();
+  switch (code) {
+  case 200: return HttpResponseCode200;
+  case 404: return HttpResponseCode404;
+  case 500: return HttpResponseCode500;
+  case 502: return HttpResponseCode502;
+  case 503: return HttpResponseCode503;
+  default:
+    // Only allocate if code is uncommon
+    out_buffer = std::to_string(code);
+    return out_buffer;
+  }
 }
 
 static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
-                                        const char* default_value) {
-  return header ? header->value().getStringView() : default_value;
+                                        absl::string_view default_value) {
+  return (header != nullptr) ? header->value().getStringView() : default_value;
 }
 
-static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
+static void addTagIfNotNull(Span& span, absl::string_view tag, const Http::HeaderEntry* entry) {
   if (entry != nullptr) {
     span.setTag(tag, entry->value().getStringView());
   }
@@ -145,8 +171,8 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
         Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength()));
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
-                valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
-    span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
+                valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), DefaultValue));
+    span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), DefaultValue));
     span.setTag(
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
@@ -154,8 +180,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     const auto& remote_address = stream_info.downstreamAddressProvider().directRemoteAddress();
 
     if (remote_address->type() == Network::Address::Type::Ip) {
-      const auto remote_ip = remote_address->ip();
-      span.setTag(Tracing::Tags::get().PeerAddress, remote_ip->addressAsString());
+      span.setTag(Tracing::Tags::get().PeerAddress, remote_address->ip()->addressAsString());
     } else {
       span.setTag(Tracing::Tags::get().PeerAddress, remote_address->logicalName());
     }
@@ -227,8 +252,11 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
                 cluster_info.value()->observabilityName());
   }
 
-  // Post response data.
-  span.setTag(Tracing::Tags::get().HttpStatusCode, buildResponseCode(stream_info));
+  // Build the HTTP status code (avoid repeated string allocations).
+  std::string temp_code_buffer;
+  const absl::string_view response_code_str = buildResponseCode(stream_info, temp_code_buffer);
+  span.setTag(Tracing::Tags::get().HttpStatusCode, response_code_str);
+
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
