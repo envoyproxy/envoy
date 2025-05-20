@@ -12,10 +12,11 @@
 namespace Envoy {
 namespace Network {
 
+using ::envoy::config::core::v3::SocketOption;
+
 // Socket::Option
-bool SocketOptionImpl::setOption(Socket& socket,
-                                 envoy::config::core::v3::SocketOption::SocketState state) const {
-  if (in_state_ == state) {
+bool SocketOptionImpl::setOption(Socket& socket, SocketOption::SocketState state) const {
+  if (in_state_ == state || state == SocketOption::STATE_ANY) {
     if (!optname_.hasValue()) {
       ENVOY_LOG(warn, "Failed to set unsupported option on socket");
       return false;
@@ -47,8 +48,7 @@ void SocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
 }
 
 absl::optional<Socket::Option::Details>
-SocketOptionImpl::getOptionDetails(const Socket&,
-                                   envoy::config::core::v3::SocketOption::SocketState state) const {
+SocketOptionImpl::getOptionDetails(const Socket&, SocketOption::SocketState state) const {
   if (state != in_state_ || !isSupported()) {
     return absl::nullopt;
   }

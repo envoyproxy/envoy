@@ -7,7 +7,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
@@ -55,7 +54,6 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "conn_manager_config.h"
 
 namespace Envoy {
 namespace Http {

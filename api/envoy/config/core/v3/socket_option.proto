@@ -49,6 +49,9 @@ message SocketOption {
 
     // Socket options are applied after calling listen()
     STATE_LISTENING = 2;
+
+    // Socket options are applied in any state.
+    STATE_ANY = 3;
   }
 
   // The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.

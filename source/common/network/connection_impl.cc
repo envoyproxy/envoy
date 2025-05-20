@@ -922,15 +922,7 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 }
 
 bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstSharedPtr option) {
-  if (socket_ == nullptr) {
-    return false;
-  }
-  if (option == nullptr) {
-    return false;
-  }
-  return option->setOption(
-      *socket_,
-      envoy::config::core::v3::SocketOption::SocketState::SocketOption_SocketState_STATE_LISTENING);
+  return option->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_ANY);
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
