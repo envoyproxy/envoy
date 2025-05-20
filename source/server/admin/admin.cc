@@ -396,9 +396,9 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
     query_index = path_and_query.size();
   }
   if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
-    ENVOY_LOG(info, "Admin Allow list filter check");
+    ENVOY_LOG(info, fmt::format( "Admin Allow list filter check for {}", path_and_query));
     Buffer::OwnedImpl error_response;
-    error_response.add("route not allowed");
+    error_response.add(fmt::format("request to route {} not allowed", path_and_query));
     return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
   }
 
