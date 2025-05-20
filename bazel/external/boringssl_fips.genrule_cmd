@@ -113,7 +113,7 @@ ninja
 ninja run_tests
 
 # Verify correctness of the FIPS build.
-if [[ `tool/bssl isfips` != "1" ]]; then
+if [[ `./bssl isfips` != "1" ]]; then
   echo "ERROR: BoringSSL tool didn't report FIPS build."
   exit 1
 fi
