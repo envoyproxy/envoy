@@ -411,6 +411,9 @@ public:
               Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher, context) {}
 
+  // To avoid hiding other implementations of match.
+  using StringMatcher::match;
+
   static PathMatcherConstSharedPtr
   createExact(const std::string& exact, bool ignore_case,
               Server::Configuration::CommonFactoryContext& context);
