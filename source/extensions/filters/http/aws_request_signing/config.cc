@@ -112,7 +112,7 @@ AwsRequestSigningFilterFactory::createSigner(
       // Custom credential provider chain
       if (has_credential_provider_settings) {
         credentials_provider =
-            std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
+            std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
                 server_context, region, config.credential_provider());
       }
     } else {
@@ -121,14 +121,14 @@ AwsRequestSigningFilterFactory::createSigner(
         credential_provider_config = config.credential_provider();
       }
       credentials_provider =
-          std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-              server_context.api(), server_context, region, credential_provider_config);
+          std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+              server_context, region, credential_provider_config);
     }
   } else {
     // No credential provider settings provided, so make the default credentials provider chain
     credentials_provider =
-        std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-            server_context.api(), server_context, region, credential_provider_config);
+        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+            server_context, region, credential_provider_config);
   }
 
   if (!credentials_provider.ok()) {

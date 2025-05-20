@@ -289,11 +289,9 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFa
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(cache_name);
   message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
-  // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
-  message.headers().setReference(Http::CustomHeaders::get().Accept,
-                                 Http::Headers::get().ContentTypeValues.Json);
 
   auto status = signer->sign(message, true, region);
+  ENVOY_LOG_MISC(debug, "signer path {}", message.headers().getPathValue());
 }
 
 // RedisCluster
