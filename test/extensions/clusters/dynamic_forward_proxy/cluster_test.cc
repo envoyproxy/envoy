@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
@@ -648,6 +649,14 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
 }
 
 class ClusterFactoryTest : public testing::Test {
+public:
+  ClusterFactoryTest()
+      : registered_dns_factory_(dns_resolver_factory_),
+        dns_resolver_(new Network::MockDnsResolver()) {
+    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+        .WillRepeatedly(Return(dns_resolver_));
+  }
+
 protected:
   void createCluster(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
@@ -674,6 +683,9 @@ private:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver_;
 };
 
 TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {

@@ -123,9 +123,8 @@ envoy_cc_library(
     srcs = ["debug_config.cc"],
     hdrs = ["debug_config.h"],
     deps = [
-        "//envoy/http:header_map_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
-        "//source/common/common:macros",
     ],
 )
 

@@ -768,6 +768,7 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -802,6 +803,7 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -849,6 +851,7 @@ TEST_F(RouterTest, DropOverloadDropped) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::CoreResponseFlag::DropOverLoad));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1157,66 +1160,18 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-// Append cluster with default header name.
-TEST_F(RouterTest, AppendCluster0) { testAppendCluster(absl::nullopt); }
-
-// Append cluster with custom header name.
-TEST_F(RouterTest, AppendCluster1) {
-  testAppendCluster(absl::make_optional(Http::LowerCaseString("x-custom-cluster")));
-}
-
-// Append hostname and address with default header names.
-TEST_F(RouterTest, AppendUpstreamHost00) { testAppendUpstreamHost(absl::nullopt, absl::nullopt); }
-
-// Append hostname and address with custom host address header name.
-TEST_F(RouterTest, AppendUpstreamHost01) {
-  testAppendUpstreamHost(
-      absl::nullopt, absl::make_optional(Http::LowerCaseString("x-custom-upstream-host-address")));
-}
-
-// Append hostname and address with custom hostname header name.
-TEST_F(RouterTest, AppendUpstreamHost10) {
-  testAppendUpstreamHost(absl::make_optional(Http::LowerCaseString("x-custom-upstream-hostname")),
-                         absl::nullopt);
-}
-
-// Append hostname and address with custom header names.
-TEST_F(RouterTest, AppendUpstreamHost11) {
-  testAppendUpstreamHost(
-      absl::make_optional(Http::LowerCaseString("x-custom-upstream-hostname")),
-      absl::make_optional(Http::LowerCaseString("x-custom-upstream-host-address")));
-}
-
-// Do not forward, with default not-forwarded header name
-TEST_F(RouterTest, DoNotForward0) { testDoNotForward(absl::nullopt); }
-
-// Do not forward, with custom not-forwarded header name
-TEST_F(RouterTest, DoNotForward1) {
-  testDoNotForward(absl::make_optional(Http::LowerCaseString("x-custom-not-forwarded")));
-}
-
 // Validate that all DebugConfig options play nicely with each other.
 TEST_F(RouterTest, AllDebugConfig) {
-  auto debug_config = std::make_unique<DebugConfig>(
-      /* append_cluster */ true,
-      /* cluster_header */ absl::nullopt,
-      /* append_upstream_host */ true,
-      /* hostname_header */ absl::nullopt,
-      /* host_address_header */ absl::nullopt,
-      /* do_not_forward */ true,
-      /* not_forwarded_header */ absl::nullopt);
+  auto debug_config = DebugConfigFactory().createFromBytes("true");
   callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
                                                  StreamInfo::FilterState::StateType::ReadOnly,
                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.thread_local_cluster_.conn_pool_.host_->hostname_ = "scooby.doo";
 
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "204"},
-      {"x-envoy-cluster", "fake_cluster"},
-      {"x-envoy-upstream-hostname", "scooby.doo"},
-      {"x-envoy-upstream-host-address", "10.0.0.5:9211"},
-      {"x-envoy-not-forwarded", "true"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "204"},
+                                                   {"x-envoy-not-forwarded", "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3308,6 +3263,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _));
   router_->retry_state_->callback_();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   // Pool failure for the first try, so only 1 upstream request was made.

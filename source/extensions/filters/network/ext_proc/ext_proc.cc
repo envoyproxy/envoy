@@ -7,8 +7,8 @@ namespace ExtProc {
 
 NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
                                            ExternalProcessorClientPtr&& client)
-    : config_(config), client_(std::move(client)), config_with_hash_key_(config_->grpcService()),
-      downstream_callbacks_(*this) {}
+    : config_(config), stats_(config->stats()), client_(std::move(client)),
+      config_with_hash_key_(config_->grpcService()), downstream_callbacks_(*this) {}
 
 NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
 
@@ -81,10 +81,11 @@ Network::FilterStatus NetworkExtProcFilter::handleStreamError() {
 
   if (config_->failureModeAllow()) {
     // In failure allow mode, continue processing despite stream errors
+    stats_.failure_mode_allowed_.inc();
     return Network::FilterStatus::Continue;
   } else {
     // In strict mode, close the connection and stop processing
-    closeConnection("ext_proc_stream_error");
+    closeConnection("ext_proc_stream_error", Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
   }
 }
@@ -140,10 +141,12 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
   if (stream_object == nullptr) {
     ENVOY_CONN_LOG(error, "Failed to create gRPC stream to external processor",
                    read_callbacks_->connection());
+    stats_.stream_open_failures_.inc();
     return StreamOpenState::Error;
   }
 
   stream_ = std::move(stream_object);
+  stats_.streams_started_.inc();
   return StreamOpenState::Ok;
 }
 
@@ -161,19 +164,23 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
 
   // Prepare the request message
   ProcessingRequest request;
+  addDynamicMetadata(request);
 
   if (is_read) {
     auto* read_data = request.mutable_read_data();
     read_data->set_data(data.toString());
     read_data->set_end_of_stream(end_stream);
+    stats_.read_data_sent_.inc();
   } else {
     auto* write_data = request.mutable_write_data();
     write_data->set_data(data.toString());
     write_data->set_end_of_stream(end_stream);
+    stats_.write_data_sent_.inc();
   }
 
   // Send to external processor
   stream_->send(std::move(request), false);
+  stats_.stream_msgs_sent_.inc();
 
   // Clear data buffer after sending
   data.drain(data.length());
@@ -183,11 +190,19 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
   if (processing_complete_) {
     ENVOY_CONN_LOG(debug, "Ignoring response message: processing already completed",
                    read_callbacks_->connection());
+    stats_.spurious_msgs_received_.inc();
     return;
   }
 
   auto response = std::move(res);
   ENVOY_CONN_LOG(debug, "Received response from external processor", read_callbacks_->connection());
+  stats_.stream_msgs_received_.inc();
+
+  // Handle connection status before processing data
+  handleConnectionStatus(*response);
+  if (processing_complete_) {
+    return;
+  }
 
   if (response->has_read_data()) {
     const auto& data = response->read_data();
@@ -197,6 +212,7 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     Buffer::OwnedImpl buffer(data.data());
     read_callbacks_->injectReadDataToFilterChain(buffer, data.end_of_stream());
     updateCloseCallbackStatus(false, true);
+    stats_.read_data_injected_.inc();
   } else if (response->has_write_data()) {
     const auto& data = response->write_data();
     ENVOY_CONN_LOG(trace, "Processing WRITE data response: {} bytes, end_stream={}",
@@ -204,8 +220,10 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     Buffer::OwnedImpl buffer(data.data());
     write_callbacks_->injectWriteDataToFilterChain(buffer, data.end_of_stream());
     updateCloseCallbackStatus(false, false);
+    stats_.write_data_injected_.inc();
   } else {
     ENVOY_CONN_LOG(debug, "Response contained no data, continuing", read_callbacks_->connection());
+    stats_.empty_response_received_.inc();
   }
 }
 
@@ -216,19 +234,23 @@ void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,
   // Mark processing as complete to avoid further gRPC calls
   processing_complete_ = true;
   closeStream();
+  stats_.streams_grpc_error_.inc();
 
   // If failure mode is not to allow, close the connection
   if (!config_->failureModeAllow()) {
     ENVOY_CONN_LOG(debug, "Closing connection since failure model allow is not enabled",
                    read_callbacks_->connection());
-    closeConnection("ext_proc_grpc_error");
+    closeConnection("ext_proc_grpc_error", Network::ConnectionCloseType::FlushWrite);
     return;
   }
+
+  stats_.failure_mode_allowed_.inc();
 }
 
 void NetworkExtProcFilter::onGrpcClose() {
   ENVOY_CONN_LOG(debug, "gRPC stream closed by peer", read_callbacks_->connection());
   processing_complete_ = true;
+  stats_.streams_grpc_close_.inc();
   closeStream();
 }
 
@@ -238,17 +260,93 @@ void NetworkExtProcFilter::closeStream() {
   }
 
   bool closed = stream_->close();
+  if (closed) {
+    stats_.streams_closed_.inc();
+  }
   ENVOY_CONN_LOG(debug, "Stream closed: {}", read_callbacks_->connection(), closed);
   stream_ = nullptr;
 }
 
-void NetworkExtProcFilter::closeConnection(const std::string& reason) {
-  ENVOY_CONN_LOG(info, "Closing connection: {}", read_callbacks_->connection(), reason);
+void NetworkExtProcFilter::closeConnection(const std::string& reason,
+                                           Network::ConnectionCloseType close_type) {
+  ENVOY_CONN_LOG(
+      info, "Closing connection: {}, close_type: {}", read_callbacks_->connection(), reason,
+      close_type == Network::ConnectionCloseType::FlushWrite ? "FlushWrite" : "AbortReset");
 
   // Ensure all callbacks are enabled before closing
   read_callbacks_->disableClose(false);
   write_callbacks_->disableClose(false);
-  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite, reason);
+  read_callbacks_->connection().close(close_type, reason);
+
+  // Track different types of closures in stats
+  if (close_type == Network::ConnectionCloseType::AbortReset) {
+    stats_.connections_reset_.inc();
+  }
+  stats_.connections_closed_.inc();
+}
+
+void NetworkExtProcFilter::handleConnectionStatus(const ProcessingResponse& response) {
+  switch (response.connection_status()) {
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CONTINUE:
+    ENVOY_CONN_LOG(debug, "External processor requested to continue connection",
+                   read_callbacks_->connection());
+    break;
+
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE:
+    // Close the connection with normal FIN
+    ENVOY_CONN_LOG(info, "External processor requested to close connection with FIN",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_close_requested", Network::ConnectionCloseType::FlushWrite);
+    processing_complete_ = true;
+    break;
+
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE_RST:
+    // Immediately reset the connection
+    ENVOY_CONN_LOG(info, "External processor requested to reset connection",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_reset_requested", Network::ConnectionCloseType::AbortReset);
+    processing_complete_ = true;
+    break;
+
+  default:
+    // Unknown status, log a warning and continue
+    ENVOY_CONN_LOG(warn, "Unknown connection status from external processor.",
+                   read_callbacks_->connection());
+    break;
+  }
+}
+
+void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {
+  if (config_->untypedForwardingMetadataNamespaces().empty() &&
+      config_->typedForwardingMetadataNamespaces().empty()) {
+    return;
+  }
+
+  envoy::config::core::v3::Metadata forwarding_metadata;
+
+  const auto& dynamic_metadata = read_callbacks_->connection().streamInfo().dynamicMetadata();
+  const auto& connection_metadata = dynamic_metadata.filter_metadata();
+  const auto& connection_typed_metadata = dynamic_metadata.typed_filter_metadata();
+
+  for (const auto& context_key : config_->untypedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = connection_metadata.find(context_key);
+        metadata_it != connection_metadata.end()) {
+      (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+    }
+  }
+
+  for (const auto& context_key : config_->typedForwardingMetadataNamespaces()) {
+    if (const auto metadata_it = connection_typed_metadata.find(context_key);
+        metadata_it != connection_typed_metadata.end()) {
+      (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+          metadata_it->second;
+    }
+  }
+
+  if (!forwarding_metadata.filter_metadata().empty() ||
+      !forwarding_metadata.typed_filter_metadata().empty()) {
+    *req.mutable_metadata() = std::move(forwarding_metadata);
+  }
 }
 
 } // namespace ExtProc
