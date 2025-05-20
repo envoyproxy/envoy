@@ -29,7 +29,7 @@ namespace Tracing {
 
 // Pre-allocate common response codes to minimize string creations.
 namespace {
-constexpr absl::string_view HttpResponseCode0   = "0";
+constexpr absl::string_view HttpResponseCode0 = "0";
 constexpr absl::string_view HttpResponseCode200 = "200";
 constexpr absl::string_view HttpResponseCode404 = "404";
 constexpr absl::string_view HttpResponseCode500 = "500";
@@ -46,11 +46,16 @@ static absl::string_view buildResponseCode(const StreamInfo::StreamInfo& info,
   }
   const uint64_t code = info.responseCode().value();
   switch (code) {
-  case 200: return HttpResponseCode200;
-  case 404: return HttpResponseCode404;
-  case 500: return HttpResponseCode500;
-  case 502: return HttpResponseCode502;
-  case 503: return HttpResponseCode503;
+  case 200:
+    return HttpResponseCode200;
+  case 404:
+    return HttpResponseCode404;
+  case 500:
+    return HttpResponseCode500;
+  case 502:
+    return HttpResponseCode502;
+  case 503:
+    return HttpResponseCode503;
   default:
     // Only allocate if code is uncommon
     out_buffer = std::to_string(code);
@@ -172,7 +177,8 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), DefaultValue));
-    span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), DefaultValue));
+    span.setTag(Tracing::Tags::get().UserAgent,
+                valueOrDefault(request_headers->UserAgent(), DefaultValue));
     span.setTag(
         Tracing::Tags::get().HttpProtocol,
         Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
