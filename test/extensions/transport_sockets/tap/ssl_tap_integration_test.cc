@@ -80,6 +80,21 @@ public:
     auto* output_sink = output_config->mutable_sinks()->Add();
     output_sink->set_format(format_);
     output_sink->mutable_file_per_tap()->set_path_prefix(path_prefix_);
+    auto* socket_tap_config = tap_config.mutable_socket_tap_config();
+    // Only for streaming trace
+    socket_tap_config->set_set_connection_per_event(set_connection_per_event_);
+
+    // stats for both streaming and buffered trace
+    if (pegging_counter_) {
+      socket_tap_config->set_pegging_counter(true);
+      socket_tap_config->set_stats_prefix("tranTapPrefix");
+    }
+
+    // Only for buffered trace
+    if (sending_tapped_msg_on_configured_size_) {
+      socket_tap_config->set_sending_tapped_msg_on_configured_size(true);
+      socket_tap_config->mutable_min_buffered_bytes()->set_value(min_buffered_bytes_);
+    }
     tap_config.mutable_transport_socket()->MergeFrom(inner_transport);
     return tap_config;
   }
@@ -91,6 +106,10 @@ public:
   absl::optional<uint64_t> max_tx_bytes_;
   bool upstream_tap_{};
   bool streaming_tap_{};
+  bool set_connection_per_event_{false};
+  bool pegging_counter_{false};
+  bool sending_tapped_msg_on_configured_size_{false};
+  unsigned int min_buffered_bytes_{2048};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SslTapIntegrationTest,
@@ -323,6 +342,39 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   EXPECT_TRUE(traces[1].socket_streamed_trace_segment().event().write().data().truncated());
   EXPECT_EQ(traces[2].socket_streamed_trace_segment().event().read().data().as_bytes(), "HTTP/");
   EXPECT_TRUE(traces[2].socket_streamed_trace_segment().event().read().data().truncated());
+}
+
+TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTapPegCounter) {
+  bool local_upstream_tap = upstream_tap_;
+  upstream_tap_ = false;
+  bool local_streaming_tap_ = streaming_tap_;
+  streaming_tap_ = true;
+  bool local_pegging_counter = pegging_counter_;
+  pegging_counter_ = true;
+
+  format_ = envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection({});
+  };
+
+  // Disable for this test because it uses connection IDs, which disrupts the accounting below
+  // leading to the wrong path for the `pb_text` being used.
+  skip_tag_extraction_rule_check_ = true;
+
+  // const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 2;
+  testRouterRequestAndResponseWithBody(512, 1024, false, false, &creator);
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_read_submit", 1);
+  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_write_submit", 1);
+  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_close_submit", 1);
+  test_server_.reset();
+
+  // restore the value
+  upstream_tap_ = local_upstream_tap;
+  streaming_tap_ = local_streaming_tap_;
+  pegging_counter_ = local_pegging_counter;
 }
 
 } // namespace Ssl

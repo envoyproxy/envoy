@@ -15,11 +15,17 @@ namespace TapCommon = Extensions::Common::Tap;
 PerSocketTapperImpl::PerSocketTapperImpl(
     SocketTapConfigSharedPtr config,
     const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
-    const Network::Connection& connection)
+    const TransportTapStats& stats, const Network::Connection& connection)
     : config_(std::move(config)),
       sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),
       connection_(connection), statuses_(config_->createMatchStatusVector()),
-      should_output_conn_info_per_event_(tap_config.set_connection_per_event()) {
+      should_output_conn_info_per_event_(tap_config.set_connection_per_event()),
+      should_peg_counter_(tap_config.pegging_counter()),
+      should_sending_tapped_msg_on_configured_size_(
+          tap_config.sending_tapped_msg_on_configured_size()),
+      min_sending_buffered_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(tap_config, min_buffered_bytes, DefaultMinBufferedBytes)),
+      stats_(stats) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
     // TODO(mattklein123): For IP client connections, local address will not be populated until
@@ -41,6 +47,16 @@ void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3::Connection& c
                                              *connection.mutable_remote_address());
 }
 
+void PerSocketTapperImpl::pegCloseSubmitCounter(const bool isStreaming) {
+  if (!should_peg_counter_) {
+    return;
+  }
+  if (isStreaming) {
+    stats_.streamed_close_submit_.inc();
+  } else {
+    stats_.buffered_close_submit_.inc();
+  }
+}
 void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
   if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
@@ -52,10 +68,12 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
     initStreamingEvent(event);
     event.mutable_closed();
     sink_handle_->submitTrace(std::move(trace));
+    pegCloseSubmitCounter(true);
   } else {
     makeBufferedTraceIfNeeded();
     fillConnectionInfo(*buffered_trace_->mutable_socket_buffered_trace()->mutable_connection());
     sink_handle_->submitTrace(std::move(buffered_trace_));
+    pegCloseSubmitCounter(false);
   }
 
   // Here we explicitly reset the sink_handle_ to release any sink resources and force a flush
@@ -79,6 +97,52 @@ void PerSocketTapperImpl::initStreamingEvent(envoy::data::tap::v3::SocketEvent& 
   }
 }
 
+void PerSocketTapperImpl::pegReadWriteSubmitCounter(const bool isStreaming, const bool isRead) {
+  if (!should_peg_counter_) {
+    return;
+  }
+  if (isStreaming) {
+    if (isRead) {
+      stats_.streamed_read_submit_.inc();
+    } else {
+      stats_.streamed_write_submit_.inc();
+    }
+  } else {
+    if (isRead) {
+      stats_.buffered_read_submit_.inc();
+    } else {
+      stats_.buffered_write_submit_.inc();
+    }
+  }
+}
+
+void PerSocketTapperImpl::handleSendingTappedMsgPerConfigSize(
+    const Buffer::Instance& data, const uint32_t totalBytes,
+    envoy::data::tap::v3::SocketEvent& event, const bool isRead) {
+
+  uint32_t buffer_start_offset = 0;
+  if (isRead) {
+    buffer_start_offset = data.length() - totalBytes;
+    TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(), totalBytes,
+                                              data, buffer_start_offset, totalBytes);
+    current_buffered_rx_tx_bytes_ += event.read().data().as_bytes().size();
+  } else {
+    TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(), totalBytes,
+                                              data, buffer_start_offset, totalBytes);
+    current_buffered_rx_tx_bytes_ += event.write().data().as_bytes().size();
+  }
+
+  if (current_buffered_rx_tx_bytes_ >= min_sending_buffered_bytes_) {
+    fillConnectionInfo(*buffered_trace_->mutable_socket_buffered_trace()->mutable_connection());
+    sink_handle_->submitTrace(std::move(buffered_trace_));
+    buffered_trace_.reset();
+    current_buffered_rx_tx_bytes_ = 0;
+
+    // It is always false for buffered trace.
+    pegReadWriteSubmitCounter(false, isRead);
+  }
+}
+
 void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_read) {
   if (!config_->rootMatcher().matchStatus(statuses_).matches_) {
     return;
@@ -92,6 +156,7 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
                                               config_->maxBufferedRxBytes(), data,
                                               data.length() - bytes_read, bytes_read);
     sink_handle_->submitTrace(std::move(trace));
+    pegReadWriteSubmitCounter(true, true);
   } else {
     if (buffered_trace_ != nullptr && buffered_trace_->socket_buffered_trace().read_truncated()) {
       return;
@@ -100,13 +165,17 @@ void PerSocketTapperImpl::onRead(const Buffer::Instance& data, uint32_t bytes_re
     makeBufferedTraceIfNeeded();
     auto& event = *buffered_trace_->mutable_socket_buffered_trace()->add_events();
     initEvent(event);
-    ASSERT(rx_bytes_buffered_ <= config_->maxBufferedRxBytes());
-    buffered_trace_->mutable_socket_buffered_trace()->set_read_truncated(
-        TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(),
-                                                  config_->maxBufferedRxBytes() -
-                                                      rx_bytes_buffered_,
-                                                  data, data.length() - bytes_read, bytes_read));
-    rx_bytes_buffered_ += event.read().data().as_bytes().size();
+    if (should_sending_tapped_msg_on_configured_size_) {
+      handleSendingTappedMsgPerConfigSize(data, bytes_read, event, true);
+    } else {
+      ASSERT(rx_bytes_buffered_ <= config_->maxBufferedRxBytes());
+      buffered_trace_->mutable_socket_buffered_trace()->set_read_truncated(
+          TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(),
+                                                    config_->maxBufferedRxBytes() -
+                                                        rx_bytes_buffered_,
+                                                    data, data.length() - bytes_read, bytes_read));
+      rx_bytes_buffered_ += event.read().data().as_bytes().size();
+    }
   }
 }
 
@@ -125,6 +194,7 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
                                               bytes_written);
     event.mutable_write()->set_end_stream(end_stream);
     sink_handle_->submitTrace(std::move(trace));
+    pegReadWriteSubmitCounter(true, false);
   } else {
     if (buffered_trace_ != nullptr && buffered_trace_->socket_buffered_trace().write_truncated()) {
       return;
@@ -133,13 +203,17 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
     makeBufferedTraceIfNeeded();
     auto& event = *buffered_trace_->mutable_socket_buffered_trace()->add_events();
     initEvent(event);
-    ASSERT(tx_bytes_buffered_ <= config_->maxBufferedTxBytes());
-    buffered_trace_->mutable_socket_buffered_trace()->set_write_truncated(
-        TapCommon::Utility::addBufferToProtoBytes(
-            *event.mutable_write()->mutable_data(),
-            config_->maxBufferedTxBytes() - tx_bytes_buffered_, data, 0, bytes_written));
-    tx_bytes_buffered_ += event.write().data().as_bytes().size();
     event.mutable_write()->set_end_stream(end_stream);
+    if (should_sending_tapped_msg_on_configured_size_) {
+      handleSendingTappedMsgPerConfigSize(data, bytes_written, event, false);
+    } else {
+      ASSERT(tx_bytes_buffered_ <= config_->maxBufferedTxBytes());
+      buffered_trace_->mutable_socket_buffered_trace()->set_write_truncated(
+          TapCommon::Utility::addBufferToProtoBytes(
+              *event.mutable_write()->mutable_data(),
+              config_->maxBufferedTxBytes() - tx_bytes_buffered_, data, 0, bytes_written));
+      tx_bytes_buffered_ += event.write().data().as_bytes().size();
+    }
   }
 }
 
