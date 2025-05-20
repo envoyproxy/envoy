@@ -45,6 +45,9 @@ constexpr const char* CookieDeleteFormatString =
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
+constexpr const char* OIDCLogoutUrlFormatString =
+    "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
+
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 constexpr absl::string_view queryParamsError = "error";
@@ -62,6 +65,7 @@ constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
 constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
+constexpr absl::string_view OAUTH2_SCOPE_OPENID = "openid";
 
 constexpr absl::string_view SameSiteLax = ";SameSite=Lax";
 constexpr absl::string_view SameSiteStrict = ";SameSite=Strict";
@@ -400,6 +404,7 @@ FilterConfig::FilterConfig(
     const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
+      end_session_endpoint_(proto_config.end_session_endpoint()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
@@ -466,6 +471,19 @@ FilterConfig::FilterConfig(
     throw EnvoyException(
         fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
                     authorization_endpoint_));
+  }
+  if (!end_session_endpoint_.empty()) {
+    bool is_oidc = false;
+    for (const auto& scope : proto_config.auth_scopes()) {
+      if (scope == OAUTH2_SCOPE_OPENID) {
+        is_oidc = true;
+        break;
+      }
+    }
+    if (!is_oidc) {
+      throw EnvoyException(
+          "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
+    }
   }
 
   if (proto_config.has_retry_policy()) {
@@ -842,9 +860,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
-
-  const std::string new_path = absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
-
   std::string cookie_domain;
   if (!config_->cookieDomain().empty()) {
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
@@ -874,7 +889,22 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().code_verifier_),
                    cookie_domain));
-  response_headers->setLocation(new_path);
+
+  const std::string post_logout_redirect_url =
+      absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
+  // If the end session endpoint is set, redirect to it to log out the user from the OpenID
+  // provider.
+  if (!config_->endSessionEndpoint().empty()) {
+    const std::string id_token =
+        Http::Utility::parseCookieValue(headers, config_->cookieNames().id_token_);
+    const std::string oidc_logout_url = fmt::format(
+        OIDCLogoutUrlFormatString, config_->endSessionEndpoint(), id_token, config_->clientId(),
+        Http::Utility::PercentEncoding::encode(post_logout_redirect_url, ":/=&?"));
+    response_headers->setLocation(oidc_logout_url);
+  } else {
+    response_headers->setLocation(post_logout_redirect_url);
+  }
+
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
   return Http::FilterHeadersStatus::StopIteration;
