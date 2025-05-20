@@ -44,7 +44,7 @@ static absl::string_view buildResponseCode(const StreamInfo::StreamInfo& info,
   if (!info.responseCode()) {
     return HttpResponseCode0;
   }
-  const uint64_t code = info.responseCode().value();
+  const uint16_t code = info.responseCode().value();
   switch (code) {
   case 200:
     return HttpResponseCode200;
