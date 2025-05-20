@@ -456,7 +456,7 @@ message Admin {
 
   // Optional routes list for admin which are accessible
   // if not specified, the allow list check will be skippped
-  AllowListedRoutesArray allow_listed_routes = 7;
+  repeated string allow_listed_routes = 7;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
