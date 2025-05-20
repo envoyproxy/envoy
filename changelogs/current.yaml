@@ -36,6 +36,11 @@ minor_behavior_changes:
 - area: grpc-json-transcoding
   change: |
     Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
+- area: http
+  change: |
+   :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
+   :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
+   will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -86,6 +91,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed runtime guard ``envoy_reloadable_features_boolean_to_string_fix`` and legacy code paths.
+- area: logging
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.logging_with_fast_json_formatter`` and legacy code paths.
 - area: sni
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san`` and legacy code paths.
@@ -122,10 +130,29 @@ new_features:
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+- area: http
+  change: |
+    Add :ref:`response trailers mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_trailers_mutations>` and
+    :ref:`quest trailers mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_trailers_mutations>`
+    to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+    for adding/removing trailers from the request and the response.
 - area: url_template
   change: |
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+- area: rbac filter
+  change: |
+    allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
+- area: rbac filter
+  change: |
+    allow listed ``FilterStateInput`` to be used with the xDS matcher in the Network RBAC filter.
+- area: tls_inspector filter
+  change: |
+    added :ref:`enable_ja4_fingerprinting
+    <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
+    a JA4 fingerprint hash from the Client Hello message.
 
 deprecated:

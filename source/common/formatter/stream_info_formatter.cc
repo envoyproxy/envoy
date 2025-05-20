@@ -1730,6 +1730,18 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return result;
                   });
             }}},
+          {"TLS_JA4_FINGERPRINT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    absl::optional<std::string> result;
+                    if (!stream_info.downstreamAddressProvider().ja4Hash().empty()) {
+                      result = std::string(stream_info.downstreamAddressProvider().ja4Hash());
+                    }
+                    return result;
+                  });
+            }}},
           {"UNIQUE_ID",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, const absl::optional<size_t>&) {
