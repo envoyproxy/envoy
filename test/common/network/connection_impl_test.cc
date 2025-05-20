@@ -2582,7 +2582,7 @@ TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   setUpBasicConnection();
 
   auto option = std::make_shared<MockSocketOption>();
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
 
   EXPECT_TRUE(client_connection_->setSocketOption(option));
