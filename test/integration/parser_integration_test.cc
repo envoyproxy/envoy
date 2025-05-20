@@ -65,7 +65,7 @@ TEST_F(ParserIntegrationTest, NewlinesBetweenRequestsAreIgnored) {
       "\r\nPOST / HTTP/1.1\r\nHost: foo.lyft.com\r\nContent-Length: 4\r\n\r\naaaa"));
   // If the decoder doesn't correctly handle unexpected newlines, the second
   // response is likely to be `400 Bad Request` instead of `200 OK`.
-  EXPECT_TCP_RESPONSE(tcp_client_, testing::ContainsRegex("200 OK(\n|.)*200 OK"));
+  EXPECT_TCP_RESPONSE(tcp_client_, testing::ContainsRegex("(?s)200 OK.*200 OK"));
 }
 
 TEST_F(ParserIntegrationRuntimeAllowNewlinesFalseTest,
@@ -77,7 +77,7 @@ TEST_F(ParserIntegrationRuntimeAllowNewlinesFalseTest,
       "\r\nPOST / HTTP/1.1\r\nHost: foo.lyft.com\r\nContent-Length: 4\r\n\r\naaaa"));
   // If the decoder doesn't correctly handle unexpected newlines, the second
   // response is likely to be `400 Bad Request` instead of `200 OK`.
-  EXPECT_TCP_RESPONSE(tcp_client_, testing::ContainsRegex("200 OK(\n|.)*400 Bad Request"));
+  EXPECT_TCP_RESPONSE(tcp_client_, testing::ContainsRegex("(?s)200 OK.*400 Bad Request"));
 }
 
 } // namespace Envoy

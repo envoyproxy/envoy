@@ -15,8 +15,6 @@
 
 #if defined(__APPLE__)
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
-#else
-#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #endif
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
@@ -52,17 +50,6 @@ EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   return *this;
 }
 
-#if !defined(__APPLE__)
-EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
-  use_cares_ = use_cares;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addCaresFallbackResolver(std::string host, int port) {
-  cares_fallback_resolvers_.emplace_back(std::move(host), port);
-  return *this;
-}
-#endif
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -523,32 +510,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
 #else
-  if (use_cares_) {
-    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
-    if (!cares_fallback_resolvers_.empty()) {
-      for (const auto& [host, port] : cares_fallback_resolvers_) {
-        auto* address = resolver_config.add_resolvers();
-        address->mutable_socket_address()->set_address(host);
-        address->mutable_socket_address()->set_port_value(port);
-      }
-      resolver_config.set_use_resolvers_as_fallback(true);
-    }
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.cares");
-    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-        resolver_config);
-  } else {
-    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-        resolver_config;
-    if (dns_num_retries_.has_value()) {
-      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
-    }
-    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
-    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-        "envoy.network.dns_resolver.getaddrinfo");
-    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-        resolver_config);
+  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+      resolver_config;
+  if (dns_num_retries_.has_value()) {
+    resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
   }
+  resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
+  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+      "envoy.network.dns_resolver.getaddrinfo");
+  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+      resolver_config);
 #endif
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {

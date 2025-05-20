@@ -62,7 +62,6 @@ RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
 RUNTIME_GUARD(envoy_reloadable_features_local_reply_traverses_filter_chain_after_1xx);
-RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_mmdb_files_reload_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
@@ -141,7 +140,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_filter_unusable_ip_version);
 // TODO(alyssawilk): evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
-// TODO(alyssawilk): evaluate and make this a config knob or remove.
+// TODO(abeyad): Remove this; it's used in experiments but has no associated source code usage.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_pools_on_network_change);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
@@ -170,6 +169,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
+// TODO(abeyad): Evaluate and either remove or make the default.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_conn_pools_on_network_change);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

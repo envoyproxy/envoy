@@ -27,8 +27,6 @@ public:
     return ClusterUpdateCallbacksHandlePtr{addThreadLocalClusterUpdateCallbacks_(callbacks)};
   }
 
-  ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
-
   void initializeClusters(const std::vector<std::string>& active_cluster_names,
                           const std::vector<std::string>& warming_cluster_names);
 
@@ -107,7 +105,6 @@ public:
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   absl::optional<std::string> local_cluster_name_;
-  NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
