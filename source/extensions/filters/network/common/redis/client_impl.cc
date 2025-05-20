@@ -319,7 +319,6 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
       ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
                          redis_command_stats, scope, is_transaction_client);
 
-
   // Http::RequestMessageImpl message;
   // message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   // message.headers().setMethod(Http::Headers::get().MethodValues.Get);

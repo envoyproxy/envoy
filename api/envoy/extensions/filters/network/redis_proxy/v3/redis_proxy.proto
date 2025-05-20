@@ -391,8 +391,22 @@ message RedisProtocolOptions {
   AwsIam aws_iam = 3;
 }
 
+// [#next-free-field: 6]
 message AwsIam {
   common.aws.v3.AwsCredentialProvider credential_provider = 1;
+
+  string cache_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  string service_name = 3;
+
+  string region = 4;
+
+  // Number os seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
+  // Expiration of the authentication token will trigger generation of a new token on the next request.
+  google.protobuf.Duration expiration_time = 5 [(validate.rules).duration = {
+    lte {seconds: 900}
+    gte {}
+  }];
 }
 
 // RedisExternalAuthProvider specifies a gRPC service that can be used to authenticate Redis clients.

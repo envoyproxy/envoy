@@ -91,7 +91,7 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   //   const auto cluster_name = stsClusterName(region);
 
   //   ENVOY_LOG(debug,
-  //             "Using assumerole credentials provider with STS endpoint: {} and session name: {}",
+  //             "Using assume role credentials provider with STS endpoint: {} and session name: {}",
   //             sts_endpoint, assume_role_config.role_session_name());
   //   add(factories.createAssumeRoleCredentialsProvider(context, aws_cluster_manager_, region,
   //                                                     assume_role_config));
@@ -176,9 +176,9 @@ SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 
 // CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCredentialsProvider(
-//     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
-//     absl::string_view region,
-//     const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config) {
+//     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr
+//     aws_cluster_manager, absl::string_view region, const
+//     envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config) {
 
 //   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
 //   const auto initialization_timer = std::chrono::seconds(2);
@@ -192,7 +192,8 @@ SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 //   CredentialsProviderChainSharedPtr credentials_provider_chain;
 
 //   if (assume_role_config.has_credential_provider()) {
-//     // If a custom chain has been configured in the assume role provider, ensure we do not allow the
+//     // If a custom chain has been configured in the assume role provider, ensure we do not allow
+//     the
 //     // user to specify another assume role provider.
 
 //     envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config;
@@ -203,7 +204,8 @@ SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 //             context, region, credential_provider_config);
 //   } else {
 //     credentials_provider_chain =
-//         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
+//         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context,
+//         region,
 //                                                                                   absl::nullopt);
 //   }
 

@@ -11,6 +11,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -99,9 +100,10 @@ RedisCluster::RedisCluster(
   //   if (options) {
   //     return options->authUsername(api);
   //   }
-
-  initAwsIamAuthenticator(context.serverFactoryContext(), "elasticache", "ap-southeast-2");
-
+  if(options->hasAwsIam())
+  {
+    initAwsIamAuthenticator(context.serverFactoryContext(), options->authUsername(context.serverFactoryContext().api()), options->cacheName() , options->serviceName(), options->region()), options->expirationTime();
+  }
 }
 
 void RedisCluster::startPreInit() {
@@ -258,17 +260,19 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 
 SINGLETON_MANAGER_REGISTRATION(aws_iam_authenticator);
 
-void RedisCluster::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, absl::string_view service_name, absl::string_view region) {
+void RedisCluster::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, std::string auth_user, absl::string_view cache_name, 
+  absl::string_view service_name, absl::string_view region, uint16_t expiration_time) {
   aws_iam_authenticator_ =
   context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
-      [&context, &service_name, &region]() {
-        return std::make_shared<AwsIamAuthenticatorImpl>(context, service_name, region);
+      [&]() {
+        return std::make_shared<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name, region, expiration_time);
       },
       true);
 }
 
-AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context, absl::string_view service_name, absl::string_view region)
+AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context, std::string auth_user,
+  absl::string_view cache_name, absl::string_view service_name, absl::string_view region, uint16_t expiration_time)
 {
 
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
@@ -278,19 +282,18 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFa
                                                                                   absl::nullopt);
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         service_name, region, credentials_provider_chain, context,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time);
 
-  Http::RequestMessageImpl message;
-  // message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
-  // message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  // message.headers().setHost(host->hostname());
-  // message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_username)));
-  // // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
-  // message.headers().setReference(Http::CustomHeaders::get().Accept,
-  //                                Http::Headers::get().ContentTypeValues.Json);
+  Http::RequestMessageImpl message; 
+  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  message.headers().setHost(cache_name);
+  message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
+  // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
+  message.headers().setReference(Http::CustomHeaders::get().Accept,
+                                 Http::Headers::get().ContentTypeValues.Json);
 
-  //                                std::string region = "ap-southeast-2";
-  // auto status = aws_iam_auth_signer_->sign(message, true, region);
+  auto status = signer->sign(message, true, region);
 }
 
 // RedisCluster

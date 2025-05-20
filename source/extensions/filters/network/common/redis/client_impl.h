@@ -14,9 +14,9 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
-#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -59,12 +59,12 @@ envoy_cc_extension(
         "//source/extensions/filters/network/common/redis:codec_interface",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
+        "//source/extensions/filters/network/redis_proxy:config_interface",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/redis/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
-        "//source/extensions/filters/network/redis_proxy:config_interface"
     ],
 )

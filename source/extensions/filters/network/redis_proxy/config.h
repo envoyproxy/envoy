@@ -18,13 +18,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
+  namespace {
+static constexpr uint16_t AwsIamDefaultExpiration = 5;
+  }
+
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
           proto_config)
-      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()), proto_config_(proto_config) {
-  }
+      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()),
+        proto_config_(proto_config) {}
 
   std::string authUsername(Api::Api& api) const {
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
@@ -34,21 +38,70 @@ public:
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
   }
 
-  std::string iamAuthPassword() const {
-    if (proto_config_.has_aws_iam())
-    {
-      return "test";
-    }
-    return EMPTY_STRING;
-  };
+  uint16_t expirationTime() const {
 
-  std::string iamAuthUsername() const {
-    if (proto_config_.has_aws_iam())
-    {
-      return proto_config_.aws_iam().username();
+    return PROTOBUF_GET_SECONDS_OR_DEFAULT(
+      proto_config_.aws_iam(), expiration_time,
+      AwsIamDefaultExpiration);
+  }
+
+  static const uint16_t expirationTime(const Upstream::ClusterInfoConstSharedPtr info) {
+        auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+        return options->expirationTime();
+  }
+
+  bool hasAwsIam() const { return proto_config_.has_aws_iam(); }
+
+  static bool hasAwsIam(const Upstream::ClusterInfoConstSharedPtr info) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->hasAwsIam();
+    }
+    return false;
+  }
+
+
+  static std::string cacheName(const Upstream::ClusterInfoConstSharedPtr info) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->cacheName();
     }
     return EMPTY_STRING;
-  };
+  }
+
+  std::string cacheName() const {
+    return proto_config_.aws_iam().cache_name();
+  }
+
+  static std::string serviceName(const Upstream::ClusterInfoConstSharedPtr info) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->serviceName();
+    }
+    return EMPTY_STRING;
+  }
+
+  std::string serviceName() const {
+    return proto_config_.aws_iam().service_name();
+  }
+
+
+  static const std::string region(const Upstream::ClusterInfoConstSharedPtr info) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->region();
+    }
+    return EMPTY_STRING;
+  }
+
+  std::string region() const {
+    return proto_config_.aws_iam().region();
+  }
 
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
                                         Api::Api& api) {
@@ -70,24 +123,6 @@ public:
     return EMPTY_STRING;
   }
 
-  static const std::string iamAuthPassword(const Upstream::ClusterInfoConstSharedPtr info ) {
-  auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->iamAuthPassword();
-    }
-    return EMPTY_STRING;
-  }
-
-  static const std::string iamAuthUsername(const Upstream::ClusterInfoConstSharedPtr info ) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->iamAuthUsername();
-    }
-    return EMPTY_STRING;
-  }
-  
 private:
   envoy::config::core::v3::DataSource auth_username_;
   envoy::config::core::v3::DataSource auth_password_;
