@@ -2636,11 +2636,9 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
             cluster->info()->loadBalancerFactory().name());
-  auto slow_start_config =
-      dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
-          cluster->info()->loadBalancerConfig().ptr())
-          ->lbConfig()
-          ->slow_start_config();
+  auto slow_start_config = dynamic_cast<const Upstream::TypedRoundRobinLbConfig*>(
+                               cluster->info()->loadBalancerConfig().ptr())
+                               ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2683,10 +2681,9 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
             cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
-          const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
+          const Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
-          ->lbConfig()
-          ->slow_start_config();
+          ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));

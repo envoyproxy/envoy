@@ -47,6 +47,10 @@ jobs:
       args: >-
         //test/common/...
         //test/cc/...
+      env:
+        GENHTML_ARGS: >-
+          --erase-functions=__cxx_global_var_init
+          --ignore-errors "category,corrupt,inconsistent"
       command: ../test/run_envoy_bazel_coverage.sh
       request: ${{ needs.load.outputs.request }}
       source:

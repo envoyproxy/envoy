@@ -16,8 +16,8 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 absl::Status ActionValidationVisitor::performDataInputValidation(
-    const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
-  static absl::flat_hash_set<std::string> allowed_inputs_set{
+    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+  static const absl::flat_hash_set<std::string> allowed_inputs_set{
       {TypeUtil::descriptorFullNameToTypeUrl(
           envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput::descriptor()
               ->full_name())},
@@ -74,32 +74,36 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     return Network::FilterStatus::StopIteration;
   }
 
-  ENVOY_LOG(
-      debug,
-      "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
-      "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
-      callbacks_->connection().requestedServerName(),
-      callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
-      callbacks_->connection()
-          .streamInfo()
-          .downstreamAddressProvider()
-          .directRemoteAddress()
-          ->asString(),
-      callbacks_->connection().streamInfo().downstreamAddressProvider().remoteAddress()->asString(),
-      callbacks_->connection().streamInfo().downstreamAddressProvider().localAddress()->asString(),
-      callbacks_->connection().ssl()
-          ? "uriSanPeerCertificate: " +
-                absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +
-                ", dnsSanPeerCertificate: " +
-                absl::StrJoin(callbacks_->connection().ssl()->dnsSansPeerCertificate(), ",") +
-                ", subjectPeerCertificate: " +
-                callbacks_->connection().ssl()->subjectPeerCertificate()
-          : "none",
-      callbacks_->connection().streamInfo().dynamicMetadata().DebugString());
+  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
+    const auto& connection = callbacks_->connection();
+    const auto& stream_info = connection.streamInfo();
+    const auto& downstream_addr_provider = stream_info.downstreamAddressProvider();
+
+    std::string ssl_info;
+    if (connection.ssl()) {
+      ssl_info = "uriSanPeerCertificate: " +
+                 absl::StrJoin(connection.ssl()->uriSanPeerCertificate(), ",") +
+                 ", dnsSanPeerCertificate: " +
+                 absl::StrJoin(connection.ssl()->dnsSansPeerCertificate(), ",") +
+                 ", subjectPeerCertificate: " + connection.ssl()->subjectPeerCertificate();
+    } else {
+      ssl_info = "none";
+    }
+
+    ENVOY_LOG(debug,
+              "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
+              "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
+              connection.requestedServerName(),
+              connection.connectionInfoProvider().remoteAddress()->asString(),
+              downstream_addr_provider.directRemoteAddress()->asString(),
+              downstream_addr_provider.remoteAddress()->asString(),
+              downstream_addr_provider.localAddress()->asString(), ssl_info,
+              stream_info.dynamicMetadata().DebugString());
+  }
 
   std::string log_policy_id = "none";
-  // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
-  // run the check once and skip it for subsequent onData calls.
+  // When the enforcement type is continuous always do the RBAC checks. If it is a one-time check,
+  // run the check once and skip it for later onData calls.
   if (config_->enforcementType() ==
       envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS) {
     shadow_engine_result_ =
@@ -127,8 +131,8 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     callbacks_->connection().streamInfo().setConnectionTerminationDetails(
         Filters::Common::RBAC::responseDetail(log_policy_id));
 
-    std::chrono::milliseconds duration = config_->delayDenyMs();
-    if (duration > std::chrono::milliseconds(0)) {
+    if (const std::chrono::milliseconds duration = config_->delayDenyMs();
+        duration > std::chrono::milliseconds(0)) {
       ENVOY_LOG(debug, "connection will be delay denied in {}ms", duration.count());
       delay_timer_ = callbacks_->connection().dispatcher().createTimer(
           [this]() -> void { closeConnection(); });
@@ -146,7 +150,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   return Network::FilterStatus::Continue;
 }
 
-void RoleBasedAccessControlFilter::closeConnection() {
+void RoleBasedAccessControlFilter::closeConnection() const {
   callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "rbac_deny_close");
 }
 
@@ -164,52 +168,57 @@ void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_result,
-                                                      std::string shadow_policy_id) {
+void RoleBasedAccessControlFilter::setDynamicMetadata(const std::string& shadow_engine_result,
+                                                      const std::string& shadow_policy_id) const {
   ProtobufWkt::Struct metrics;
   auto& fields = *metrics.mutable_fields();
   if (!shadow_policy_id.empty()) {
-    *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = shadow_policy_id;
+    fields[config_->shadowEffectivePolicyIdField()].set_string_value(shadow_policy_id);
   }
-  *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_engine_result;
+  fields[config_->shadowEngineResultField()].set_string_value(shadow_engine_result);
   callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
 }
 
-Result RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
+Result
+RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) const {
   const auto engine = config_->engine(mode);
-  std::string effective_policy_id;
-  if (engine != nullptr) {
-    // Check authorization decision and do Action operations
-    bool allowed = engine->handleAction(
-        callbacks_->connection(), callbacks_->connection().streamInfo(), &effective_policy_id);
-    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
-    if (allowed) {
-      if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);
-        config_->stats().shadow_allowed_.inc();
-        setDynamicMetadata(
-            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
-            effective_policy_id);
-      } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
-        config_->stats().allowed_.inc();
-      }
-      return Result{Allow, effective_policy_id};
-    } else {
-      if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
-        ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
-        config_->stats().shadow_denied_.inc();
-        setDynamicMetadata(
-            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
-            effective_policy_id);
-      } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-        ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
-        config_->stats().denied_.inc();
-      }
-      return Result{Deny, log_policy_id};
-    }
+  if (engine == nullptr) {
+    return Result{None, "none"};
   }
-  return Result{None, "none"};
+
+  // Check authorization decision and do Action operations
+  std::string effective_policy_id;
+  bool allowed = engine->handleAction(callbacks_->connection(),
+                                      callbacks_->connection().streamInfo(), &effective_policy_id);
+
+  const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+  const bool is_shadow = (mode == Filters::Common::RBAC::EnforcementMode::Shadow);
+
+  if (allowed) {
+    if (is_shadow) {
+      ENVOY_LOG(debug, "shadow allowed, matched policy {}", log_policy_id);
+      config_->stats().shadow_allowed_.inc();
+      setDynamicMetadata(
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed,
+          effective_policy_id);
+    } else {
+      ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
+      config_->stats().allowed_.inc();
+    }
+    return Result{Allow, effective_policy_id};
+  } else {
+    if (is_shadow) {
+      ENVOY_LOG(debug, "shadow denied, matched policy {}", log_policy_id);
+      config_->stats().shadow_denied_.inc();
+      setDynamicMetadata(
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied,
+          effective_policy_id);
+    } else {
+      ENVOY_LOG(debug, "enforced denied, matched policy {}", log_policy_id);
+      config_->stats().denied_.inc();
+    }
+    return Result{Deny, log_policy_id};
+  }
 }
 
 } // namespace RBACFilter
