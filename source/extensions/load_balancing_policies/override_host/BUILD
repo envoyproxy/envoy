@@ -65,13 +65,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "least_request_lb_lib",
-    srcs = ["least_request_lb.cc"],
-    hdrs = ["least_request_lb.h"],
-    deps = ["//source/extensions/load_balancing_policies/common:load_balancer_lib"],
-)
-
-envoy_cc_library(
     name = "override_host_filter_state",
     hdrs = ["override_host_filter_state.h"],
     deps = [

@@ -1535,6 +1535,13 @@ envoy.http.stateful_session.header:
   status: alpha
   type_urls:
   - envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
+envoy.http.stateful_session.envelope:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.stateful_session.envelope.v3.EnvelopeSessionState
 envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input

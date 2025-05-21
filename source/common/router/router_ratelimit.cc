@@ -56,8 +56,6 @@ bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntr
   return true;
 }
 
-const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
-
 bool DynamicMetadataRateLimitOverride::populateOverride(
     RateLimit::Descriptor& descriptor, const envoy::config::core::v3::Metadata* metadata) const {
   const ProtobufWkt::Value& metadata_value =
@@ -380,7 +378,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
                                                    const Http::RequestHeaderMap& headers,
                                                    const StreamInfo::StreamInfo& info) const {
   RateLimit::Descriptor descriptor;
-  bool result =
+  const bool result =
       populateDescriptor(actions_, descriptor.entries_, local_service_cluster, headers, info);
 
   if (limit_override_) {
@@ -397,30 +395,56 @@ void RateLimitPolicyEntryImpl::populateLocalDescriptors(
     const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
     const StreamInfo::StreamInfo& info) const {
   RateLimit::LocalDescriptor descriptor({});
-  bool result =
+  const bool result =
       populateDescriptor(actions_, descriptor.entries_, local_service_cluster, headers, info);
   if (result) {
     descriptors.emplace_back(descriptor);
   }
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl()
-    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {}
+namespace {
+// Initializes the ``RateLimitPolicyImpl::rate_limit_entries_`` vector.
+std::vector<RateLimitPolicyEntryImpl> initRateLimitEntries(
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status) {
+  std::vector<RateLimitPolicyEntryImpl> entries;
+  entries.reserve(rate_limits.size());
+  for (const auto& rate_limit : rate_limits) {
+    entries.emplace_back(rate_limit, context, creation_status);
+    // If the entry is invalid, the function returns no policy entries, and
+    // changes the creation_status to the error.
+    if (!creation_status.ok()) {
+      return {};
+    }
+  }
+  return entries;
+}
+
+// The maximum stage number supported. This value should match the maximum stage number in
+// Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA and
+// Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
+static constexpr uint64_t MAX_STAGE_NUMBER = 10UL;
+
+// Initializes the ``RateLimitPolicyImpl::rate_limit_entries_reference_`` vector.
+std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
+initRateLimitEntriesReference(const std::vector<RateLimitPolicyEntryImpl>& rate_limit_entries) {
+  std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>> references(
+      MAX_STAGE_NUMBER + 1);
+  for (const auto& entry : rate_limit_entries) {
+    const uint64_t stage = entry.stage();
+    // The stage value is validated by PGV.
+    ASSERT(stage < references.size());
+    references[stage].emplace_back(std::ref(entry));
+  }
+  return references;
+}
+} // namespace
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
-    : RateLimitPolicyImpl() {
-  creation_status = absl::OkStatus();
-  for (const auto& rate_limit : rate_limits) {
-    std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, context, creation_status));
-    uint64_t stage = rate_limit_policy_entry->stage();
-    ASSERT(stage < rate_limit_entries_reference_.size());
-    rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
-    rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
-  }
-}
+    : rate_limit_entries_(initRateLimitEntries(rate_limits, context, creation_status)),
+      rate_limit_entries_reference_(initRateLimitEntriesReference(rate_limit_entries_)) {}
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
 RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {

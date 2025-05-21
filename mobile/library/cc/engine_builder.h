@@ -125,10 +125,6 @@ public:
   // value will be used.
   EngineBuilder& respectSystemProxySettings(bool value, int refresh_interval_secs = 10);
   EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
-#else
-  // Only android supports c_ares
-  EngineBuilder& setUseCares(bool use_cares);
-  EngineBuilder& addCaresFallbackResolver(std::string host, int port);
 #endif
 
   // This is separated from build() for the sake of testability
@@ -185,10 +181,6 @@ private:
   bool enforce_trust_chain_verification_ = true;
   std::string upstream_tls_sni_;
   bool enable_http3_ = true;
-#if !defined(__APPLE__)
-  bool use_cares_ = false;
-  std::vector<std::pair<std::string, int>> cares_fallback_resolvers_;
-#endif
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
