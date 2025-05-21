@@ -1,3 +1,4 @@
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_impl_base_test.h"
@@ -11,28 +12,22 @@ using testing::ReturnRef;
 
 class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  void init(bool need_local_cluster, bool locality_weight_aware = false,
-            bool use_legacy_constructor = true) {
+  void init(bool need_local_cluster, bool locality_weight_aware = false) {
     if (need_local_cluster) {
       local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
     }
 
     if (locality_weight_aware) {
-      common_config_.mutable_locality_weighted_lb_config();
+      round_robin_lb_config_.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
     }
 
-    if (use_legacy_constructor) {
-      lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(),
-                                                     stats_, runtime_, random_, common_config_,
-                                                     round_robin_lb_config_, simTime());
-    } else {
-      uint32_t threshold = PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_config_, healthy_panic_threshold, 100, 50);
-      lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(),
-                                                     stats_, runtime_, random_, threshold,
-                                                     round_robin_lb_policy_, simTime());
-    }
+    uint32_t threshold = PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        common_config_, healthy_panic_threshold, 100, 50);
+
+    lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
+                                                   runtime_, random_, threshold,
+                                                   round_robin_lb_config_, simTime());
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -58,6 +53,8 @@ public:
   std::shared_ptr<LoadBalancer> lb_;
   HostsPerLocalityConstSharedPtr empty_locality_;
   HostVector empty_host_vector_;
+
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin_lb_config_;
 };
 
 // For the tests which mutate primary and failover host sets explicitly, only
@@ -132,7 +129,9 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
-  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->set_fail_traffic_on_panic(true);
 
   init(false);
   // With both the primary and failover hosts unhealthy, we should select no host.
@@ -492,7 +491,7 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
   for (int i = 0; i < 10; ++i) {
     EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
     RoundRobinLoadBalancer lb(priority_set_, local_priority_set_.get(), stats_, runtime_, random_,
-                              common_config_, round_robin_lb_config_, simTime());
+                              50, round_robin_lb_config_, simTime());
     const auto& host = lb.chooseHost(nullptr).host;
     host_picked_count_map[host]++;
   }
@@ -543,8 +542,9 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
                       makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
                       makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
 
-  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
-
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->set_fail_traffic_on_panic(true);
   init(false);
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
@@ -648,8 +648,14 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_routing_enabled()
+      ->set_value(98);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_min_cluster_size()
+      ->set_value(7);
   init(true);
   updateHosts(hosts, hosts_per_locality);
 
@@ -715,8 +721,14 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality_a;
   common_config_.mutable_healthy_panic_threshold()->set_value(50);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(100);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(2);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_routing_enabled()
+      ->set_value(100);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_min_cluster_size()
+      ->set_value(2);
   init(true);
   updateHosts(hosts, local_hosts_per_locality_a);
 
@@ -843,8 +855,14 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareResidualsMismatched) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(50);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(100);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(6);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_routing_enabled()
+      ->set_value(100);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_min_cluster_size()
+      ->set_value(6);
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
@@ -923,8 +941,14 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(100);
-  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
-  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(3);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_routing_enabled()
+      ->set_value(98);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_min_cluster_size()
+      ->set_value(3);
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 
@@ -1260,11 +1284,11 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareForceLocalityDirect) {
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
 
   common_config_.mutable_healthy_panic_threshold()->set_value(50);
-  round_robin_lb_policy_.mutable_locality_lb_config()
+  round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
       ->mutable_routing_enabled()
       ->set_value(100);
-  round_robin_lb_policy_.mutable_locality_lb_config()
+  round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
       ->mutable_min_cluster_size()
       ->set_value(3);
@@ -1277,7 +1301,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareForceLocalityDirect) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 3))
       .WillRepeatedly(Return(3));
 
-  init(true, false, false);
+  init(true, false);
   updateHosts(hosts, local_hosts_per_locality);
 
   // Expect zone-aware routing residual mode due to zone c upstream host
@@ -1285,13 +1309,13 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareForceLocalityDirect) {
   EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
 
-  round_robin_lb_policy_.mutable_locality_lb_config()
+  round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
       ->mutable_force_local_zone()
       ->mutable_min_size()
       ->set_value(2);
 
-  init(true, false, false);
+  init(true, false);
   updateHosts(hosts, local_hosts_per_locality);
 
   // Expect zone-aware routing residual mode when force_local_zone_min_size is
@@ -1299,13 +1323,13 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareForceLocalityDirect) {
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
   EXPECT_EQ(2U, stats_.lb_zone_routing_sampled_.value());
-  round_robin_lb_policy_.mutable_locality_lb_config()
+  round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
       ->mutable_force_local_zone()
       ->mutable_min_size()
       ->set_value(1);
 
-  init(true, false, false);
+  init(true, false);
   updateHosts(hosts, local_hosts_per_locality);
 
   // Expect zone-aware routing direct mode when force_local_zone is enabled
@@ -1599,7 +1623,9 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPanic) {
-  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->set_fail_traffic_on_panic(true);
 
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
@@ -2092,6 +2118,68 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+}
+
+TEST(TypedRoundRobinLbConfigTest, TypedRoundRobinLbConfig) {
+  {
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    envoy::config::cluster::v3::Cluster::RoundRobinLbConfig legacy;
+
+    TypedRoundRobinLbConfig typed_config(common, legacy);
+
+    EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
+  }
+
+  {
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    envoy::config::cluster::v3::Cluster::RoundRobinLbConfig legacy;
+
+    legacy.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
+    legacy.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
+    legacy.mutable_slow_start_config()->mutable_aggression()->set_default_value(2.0);
+    legacy.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(0.2);
+
+    common.mutable_locality_weighted_lb_config();
+
+    TypedRoundRobinLbConfig typed_config(common, legacy);
+
+    EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
+    EXPECT_TRUE(typed_config.lb_config_.has_slow_start_config());
+
+    EXPECT_TRUE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.locality_lb_config().has_zone_aware_lb_config());
+
+    EXPECT_TRUE(typed_config.lb_config_.slow_start_config().has_slow_start_window());
+    EXPECT_TRUE(typed_config.lb_config_.slow_start_config().has_aggression());
+    EXPECT_TRUE(typed_config.lb_config_.slow_start_config().has_min_weight_percent());
+    EXPECT_EQ(typed_config.lb_config_.slow_start_config().slow_start_window().seconds(), 10);
+    EXPECT_EQ(typed_config.lb_config_.slow_start_config().aggression().runtime_key(), "aggression");
+    EXPECT_DOUBLE_EQ(typed_config.lb_config_.slow_start_config().aggression().default_value(), 2.0);
+    EXPECT_DOUBLE_EQ(typed_config.lb_config_.slow_start_config().min_weight_percent().value(), 0.2);
+  }
+
+  {
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    envoy::config::cluster::v3::Cluster::RoundRobinLbConfig legacy;
+
+    common.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(3);
+    common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
+    common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+
+    TypedRoundRobinLbConfig typed_config(common, legacy);
+
+    EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
+    EXPECT_FALSE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
+    EXPECT_TRUE(typed_config.lb_config_.locality_lb_config().has_zone_aware_lb_config());
+
+    const auto& zone_aware_lb_config =
+        typed_config.lb_config_.locality_lb_config().zone_aware_lb_config();
+    EXPECT_EQ(zone_aware_lb_config.min_cluster_size().value(), 3);
+    EXPECT_DOUBLE_EQ(zone_aware_lb_config.routing_enabled().value(), 23.0);
+    EXPECT_TRUE(zone_aware_lb_config.fail_traffic_on_panic());
+  }
 }
 
 } // namespace
