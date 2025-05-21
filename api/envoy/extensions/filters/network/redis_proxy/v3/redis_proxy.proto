@@ -389,6 +389,7 @@ message RedisProtocolOptions {
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 
   AwsIam aws_iam = 3;
+
 }
 
 // [#next-free-field: 6]
@@ -401,7 +402,7 @@ message AwsIam {
 
   string region = 4;
 
-  // Number os seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
+  // Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
   // Expiration of the authentication token will trigger generation of a new token on the next request.
   google.protobuf.Duration expiration_time = 5 [(validate.rules).duration = {
     lte {seconds: 900}

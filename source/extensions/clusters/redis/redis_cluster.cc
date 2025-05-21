@@ -2,16 +2,12 @@
 
 #include <cstdint>
 #include <memory>
-#include "source/extensions/filters/network/redis_proxy/config.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
-#include "source/extensions/common/aws/credential_provider_chains.h"
-#include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -92,17 +88,6 @@ RedisCluster::RedisCluster(
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
           *this, host.socket_address().address(), host.socket_address().port_value()));
     }
-  }
-
-  auto options = info_->extensionProtocolOptionsTyped<NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl>(
-        NetworkFilters::NetworkFilterNames::get().RedisProxy);
-        
-  //   if (options) {
-  //     return options->authUsername(api);
-  //   }
-  if(options->hasAwsIam())
-  {
-    initAwsIamAuthenticator(context.serverFactoryContext(), options->authUsername(context.serverFactoryContext().api()), options->cacheName() , options->serviceName(), options->region()), options->expirationTime();
   }
 }
 
@@ -255,43 +240,6 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           parent_.redis_discovery_session_->startResolveRedis();
         }
       });
-
-}
-
-SINGLETON_MANAGER_REGISTRATION(aws_iam_authenticator);
-
-void RedisCluster::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, std::string auth_user, absl::string_view cache_name, 
-  absl::string_view service_name, absl::string_view region, uint16_t expiration_time) {
-  aws_iam_authenticator_ =
-  context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
-      [&]() {
-        return std::make_shared<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name, region, expiration_time);
-      },
-      true);
-}
-
-AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context, std::string auth_user,
-  absl::string_view cache_name, absl::string_view service_name, absl::string_view region, uint16_t expiration_time)
-{
-
-  Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
-
-  credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
-                                                                                  absl::nullopt);
-  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        service_name, region, credentials_provider_chain, context,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time);
-
-  Http::RequestMessageImpl message; 
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
-  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  message.headers().setHost(cache_name);
-  message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
-
-  auto status = signer->sign(message, true, region);
-  ENVOY_LOG_MISC(debug, "signer path {}", message.headers().getPathValue());
 }
 
 // RedisCluster

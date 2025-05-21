@@ -18,6 +18,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
+
   namespace {
 static constexpr uint16_t AwsIamDefaultExpiration = 5;
   }
@@ -26,11 +27,12 @@ class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
-          proto_config)
-      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()),
-        proto_config_(proto_config) {}
+        proto_config)
+      : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()) {
+   proto_config_.MergeFrom(proto_config);
+  }
 
-  std::string authUsername(Api::Api& api) const {
+  std::string authUsername(ABSL_ATTRIBUTE_UNUSED Api::Api& api) const {
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
   }
 
@@ -45,7 +47,7 @@ public:
       AwsIamDefaultExpiration);
   }
 
-  static const uint16_t expirationTime(const Upstream::ClusterInfoConstSharedPtr info) {
+  static uint16_t expirationTime(const Upstream::ClusterInfoConstSharedPtr info) {
         auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
         return options->expirationTime();
@@ -126,7 +128,7 @@ public:
 private:
   envoy::config::core::v3::DataSource auth_username_;
   envoy::config::core::v3::DataSource auth_password_;
-  const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions& proto_config_;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions proto_config_;
 };
 
 /**
@@ -150,6 +152,8 @@ private:
       Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
+
+
 };
 
 } // namespace RedisProxy

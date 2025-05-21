@@ -14,6 +14,10 @@
 
 #include "absl/container/flat_hash_set.h"
 
+#include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -74,9 +78,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
+    
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
-    auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
+    auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(server_context,
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
