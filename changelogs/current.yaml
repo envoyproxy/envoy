@@ -286,5 +286,12 @@ new_features:
     Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
     They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
     and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
+- area: dfp
+  change: |
+    Added :ref:`allow_dynamic_host_from_filter_state
+    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
+    flag to HTTP Dynamic Forward Proxy filter. When enabled, the filter will check for ``envoy.upstream.dynamic_host`` and
+    ``envoy.upstream.dynamic_port`` filter state values before using the HTTP Host header, providing consistency with SNI
+    and UDP DFP filters. When disabled (default), maintains backward compatibility by using the HTTP Host header directly.
 
 deprecated:
