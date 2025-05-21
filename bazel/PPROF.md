@@ -13,6 +13,7 @@
          * [Bazel Configuration](#bazel-configuration)
    * [Methodology](#methodology)
    * [Analyzing with pprof](#analyzing-with-pprof)
+      * [Installing Go-based pprof for gperftools 2.16+](#installing-go-based-pprof-for-gperftools-216)
    * [Alternatives to gperftools](#alternatives-to-gperftools)
       * [On-CPU analysis](#on-cpu-analysis)
       * [Memory analysis](#memory-analysis)
@@ -36,25 +37,48 @@ inside
 
 Build the static binary using bazel:
 
-    $ bazel build --define tcmalloc=gperftools //source/exe:envoy-static
+```
+bazel build --define tcmalloc=gperftools //source/exe:envoy-static
+```
 
 ### Collecting the profile
 
-To collect a heap profile, run a statically-linked Envoy with `pprof`
+Set the `HEAPPROFILE` or `CPUPROFILE` environment variables, and run your binary:
 
-and run the binary with a `CPUPROFILE` or `HEAPPROFILE` environment variable, like so:
+```
+# Collect CPU profile
+CPUPROFILE=/tmp/envoy.prof bazel-bin/source/exe/envoy-static <options>
 
-    $ CPUPROFILE=/tmp/mybin.cpuprof bazel-bin/source/exe/envoy-static <args>
-    $ HEAPPROFILE=/tmp/mybin.heapprof bazel-bin/source/exe/envoy-static <args>
+# Collect heap profile
+HEAPPROFILE=/tmp/envoy.heap bazel-bin/source/exe/envoy-static <options>
+```
 
 `CPUPROFILE` or `HEAPPROFILE` sets a location for the profiler output. (See *Methodology*.)
 
-There are several other environment variables that can be set to tweak the behavior of gperftools. See https://gperftools.github.io/gperftools/ for more details.
+Alternatively, you can use programmatic profiling if you've instrumented your code, preferably using the static build for best chances of succeeding.
+
+```c++
+// includes
+#include "source/common/profiler/profiler.h"
+...
+Function(...) {
+    if (!Profiler::Cpu::startProfiler(profile_path)) {
+       // Error handling
+    }
+    ...
+    Do expensive stuff in one or more threads.
+    ...
+
+    // Stop the profiler and dump output to the `profile_path` specified when profile was started.
+    Profiler::Cpu::stopProfiler();
+}
+```
+
+There are several other environment variables that can be set to tweak the behavior of gperftools. See https://
+gperftools.github.io/gperftools/ for more details.
 
 ### Analyzing the profile
-
 [pprof](https://github.com/google/pprof) can be used to symbolize CPU and heap profiles. For example:
-
     $ pprof -text bazel-bin/source/exe/envoy-static /tmp/mybin.cpuprof
 
 ## Collecting CPU or heap profile for the full execution of a test target
@@ -161,7 +185,29 @@ identifiers.
 
 # Analyzing with `pprof`
 
-[pprof](https://github.com/google/pprof) can read these heap files in a
+## Installing Go-based pprof for gperftools 2.16+
+
+Starting from gperftools 2.16, the Perl-based pprof script has been removed in favor of the Go-based pprof implementation. If you're using gperftools 2.16 or newer, you need to install the Go-based pprof:
+
+1. Make sure you have Go installed on your system
+2. Install pprof using Go:
+   ```
+   go install github.com/google/pprof@latest
+   ```
+3. The binary will be installed to `$HOME/go/bin/pprof`. Make sure this directory is in your PATH.
+
+The Envoy build system will attempt to automatically detect and install the Go-based pprof if it's needed and Go is available on your system.
+
+When upgrading to gperftools 2.16+, if you see errors like:
+```
+Cannot convert addresses to symbols in output below.
+Reason: Cannot find 'pprof' (is PPROF_PATH set correctly?)
+If you cannot fix this, try running pprof directly.
+```
+
+This indicates you need to install the Go-based pprof as described above.
+
+[pprof](https://github.com/google/pprof) can read heap files in a
 number of ways. Most convenient for first-order inspection might be `pprof -top`
 or `pprof -text`:
 
