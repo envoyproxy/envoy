@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //     cluster_type:
 //       name: envoy.clusters.dns_srv
 //       typed_config:
-//     	  "@type": "type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.Cluster"
+//     	  "@type": "type.googleapis.com/envoy.extensions.clusters.dns_srv.v3.DnsSrvClusterConfig"
 //     	  srv_names:
 //            - srv_name: _unique_name._tcp.example.com
 //     respect_dns_ttl: true
@@ -36,7 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.clusters.dns_srv]
 
 // [#next-free-field: 2]
-message Cluster {
+message DnsSrvClusterConfig {
   repeated SrvName srv_names = 1;
 }
 
