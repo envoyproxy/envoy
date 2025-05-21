@@ -85,9 +85,9 @@ public:
     Envoy::Extensions::Common::Aws::SignerPtr signer_;
     uint16_t expiration_time_;
     std::string auth_user_;
-    absl::string_view cache_name_;
-    absl::string_view service_name_;
-    absl::string_view region_;
+    std::string cache_name_;
+    std::string service_name_;
+    std::string region_;
     Server::Configuration::ServerFactoryContext& context_;
     Envoy::Event::TimerPtr cache_duration_timer_;
 

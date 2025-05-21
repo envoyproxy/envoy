@@ -137,7 +137,8 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,  std::string auth_user, absl::string_view cache_name,
                           absl::string_view service_name, absl::string_view region, uint16_t expiration_time):
-                          expiration_time_(expiration_time), auth_user_(auth_user), cache_name_(cache_name), service_name_(service_name),region_(region),context_(context)
+                          expiration_time_(expiration_time), auth_user_(auth_user), cache_name_(std::string(cache_name)),
+                          service_name_(std::string(service_name)),region_(std::string(region)),context_(context)
 {
 
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
