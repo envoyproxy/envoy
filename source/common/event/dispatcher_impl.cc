@@ -185,13 +185,19 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
   // is where the netns would be specified.
   Network::ClientConnectionPtr conn;
   if (is_linux && source_address->networkNamespace().has_value()) {
-    auto f = [&]() -> absl::StatusOr<Network::ClientConnectionPtr> {
-      return factory->createClientConnection(
+    auto f = [&]() -> bool {
+      conn = factory->createClientConnection(
           *this, address, source_address, std::move(transport_socket), options, transport_options);
+      // The function has to return something because absl::StatusOr cannot wrap a void func.
+      return true;
     };
     auto result = Network::Utility::execInNetworkNamespace(
         std::move(f), source_address->networkNamespace()->c_str());
-    conn = result->value_or(nullptr);
+    if (!result.ok()) {
+      ENVOY_LOG(error, "failed to create connection in network namespace {}: {}",
+                source_address->networkNamespace().value(), result.status().ToString());
+      return nullptr;
+    }
   } else {
     conn = factory->createClientConnection(*this, address, source_address,
                                            std::move(transport_socket), options, transport_options);
