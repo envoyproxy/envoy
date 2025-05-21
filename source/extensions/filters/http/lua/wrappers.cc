@@ -199,16 +199,18 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
 int ConnectionStreamInfoWrapper::luaConnectionDynamicTypedMetadata(lua_State* state) {
   const std::string filter_name = getStringViewFromLuaString(state, 2).data();
 
+  // Get the typed metadata from the filter state
+  const auto& typed_metadata =
+      connection_stream_info_.filterState()->getDataReadOnly<ProtobufWkt::Struct>(filter_name);
+
+  if (!typed_metadata) {
+    // Return nil instead of an empty table
+    lua_pushnil(state);
+    return 1;
+  }
+
   // Create the metadata table for the filter
   lua_createtable(state, 0, 2);
-
-  // Get the typed metadata from the filter state
-  const auto& typed_metadata = 
-      connection_stream_info_.filterState()->getDataReadOnly<ProtobufWkt::Struct>(filter_name);
-  
-  if (!typed_metadata) {
-    return 1; // Return the empty table
-  }
 
   // Convert the typed metadata to a Lua table and add it to the result
   Filters::Common::Lua::ProtobufConverterUtils::pushLuaTableFromMessage(state, *typed_metadata);

@@ -19,9 +19,7 @@ namespace Lua {
  * entry message type with two fields: 'key' of type K and 'value' of type V.
  *
  * References:
- * - https://protobuf.dev/reference/proto3-spec/#map-field: "map<key_type, value_type> map_field =
- * N;"
- * - https://protobuf.dev/programming-guides/proto3/#maps: "The map syntax is equivalent to..."
+ * - https://protobuf.dev/programming-guides/encoding/#maps
  * - https://developers.google.com/protocol-buffers/docs/proto3#maps
  */
 namespace ProtobufMap {

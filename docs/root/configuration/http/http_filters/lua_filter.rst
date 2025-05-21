@@ -996,7 +996,7 @@ Connection stream info object API
 
 Returns dynamic metadata for a given filter name. Dynamic metadata provides type-safe access to metadata values that are stored as protocol buffer messages. This is particularly useful when working with filters that store structured data.
 
-*filterName* is a string that supplies the filter name, e.g. *envoy.lb*. Returns a Lua table containing the unpacked protocol buffer message. Returns an empty table if no dynamic metadata exists for the given filter name or if the metadata cannot be unpacked.
+*filterName* is a string that supplies the filter name, e.g. *envoy.lb*. Returns a Lua table containing the unpacked protocol buffer message. Returns nil if no dynamic metadata exists for the given filter name or if the metadata cannot be unpacked.
 
 **Type Conversion Details:**
 The following rules apply when converting protocol buffer messages into Lua tables:
@@ -1009,11 +1009,14 @@ The following rules apply when converting protocol buffer messages into Lua tabl
 - Optional fields that are not set are returned as nil.
 
 **Error Handling:**
-This method ensures type-safe access to metadata but will throw a Lua error in the following scenarios:
+This method ensures type-safe access to metadata but returns nil in the following scenarios:
 
-- If the specified filter name does not exist.
-- If the metadata exists but cannot be unpacked.
-- If the protocol buffer message is malformed.
+- If the specified filter name does not exist. For example, trying to access
+  ``dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")`` when the proxy protocol filter isn't configured.
+- If the metadata exists but cannot be unpacked. It could happen if the filter state exists but is stored as a different
+  type than ``ProtobufWkt::Struct``.
+- If the protocol buffer message is malformed. It could happen when the data in the filter state is corrupted or
+  partially written.
 
 **Common Use Cases:**
 
@@ -1025,13 +1028,15 @@ This method ensures type-safe access to metadata but will throw a Lua error in t
     -- Access proxy protocol typed metadata
     local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
 
-    -- Check if TLV data exists
-    if typed_meta.typed_metadata then
+    -- Check if metadata exists
+    if typed_meta then
       -- Access specific TLV values
       local tlv_type_authority = typed_meta.typed_metadata.tlv_type_authority  -- Authority identifier from proxy protocol TLV
       local tlv_value = typed_meta.typed_metadata.tlv_value                    -- Value from the proxy protocol TLV data
-      
+
       request_handle:logInfo(string.format("TLV Authority: %s, Value: %s", tlv_type_authority or "none", tlv_value or "none"))
+    else
+      request_handle:logInfo("No proxy protocol metadata available")
     end
   end
 
@@ -1042,23 +1047,28 @@ This method ensures type-safe access to metadata but will throw a Lua error in t
   function envoy_on_request(request_handle)
     local metadata = request_handle:connectionStreamInfo():dynamicTypedMetadata("custom.filter")
 
-    -- Safely access potentially nested fields
-    if metadata.config then
-      -- Access nested configuration
-      if metadata.config.rules then
-        for _, rule in ipairs(metadata.config.rules) do
-          if rule.name and rule.value then
-            request_handle:logInfo(string.format("Rule: %s = %s", rule.name, rule.value))
+    -- Check if metadata exists before accessing
+    if metadata then
+      -- Safely access potentially nested fields
+      if metadata.config then
+        -- Access nested configuration
+        if metadata.config.rules then
+          for _, rule in ipairs(metadata.config.rules) do
+            if rule.name and rule.value then
+              request_handle:logInfo(string.format("Rule: %s = %s", rule.name, rule.value))
+            end
+          end
+        end
+
+        -- Access map fields
+        if metadata.config.properties then
+          for key, value in pairs(metadata.config.properties) do
+            request_handle:logInfo(string.format("Property: %s = %s", key, value))
           end
         end
       end
-
-      -- Access map fields
-      if metadata.config.properties then
-        for key, value in pairs(metadata.config.properties) do
-          request_handle:logInfo(string.format("Property: %s = %s", key, value))
-        end
-      end
+    else
+      request_handle:logInfo("No metadata available for custom.filter")
     end
   end
 
