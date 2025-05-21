@@ -14,6 +14,11 @@ SslStats generateSslStats(Stats::Scope& store) {
                         POOL_HISTOGRAM_PREFIX(store, prefix))};
 }
 
+CertStats generateCertStats(Stats::Scope& scope, std::string cert_name) {
+  std::string prefix_cert_name(absl::StrCat("ssl.certificate.", cert_name, "."));
+  return {ALL_CERT_STATS(POOL_GAUGE_PREFIX(scope, prefix_cert_name))};
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
