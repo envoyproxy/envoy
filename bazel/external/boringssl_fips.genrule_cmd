@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -evxo pipefail
 
 export CXXFLAGS=''
 export LDFLAGS=''
@@ -113,12 +113,12 @@ ninja
 ninja run_tests
 
 # Verify correctness of the FIPS build.
-if [[ `tool/bssl isfips` != "1" ]]; then
+if [[ `./bssl isfips` != "1" ]]; then
   echo "ERROR: BoringSSL tool didn't report FIPS build."
   exit 1
 fi
 
 # Move compiled libraries to the expected destinations.
 popd
-mv $ROOT/build/crypto/libcrypto.a $1
-mv $ROOT/build/ssl/libssl.a $2
+mv $ROOT/build/libcrypto.a $1
+mv $ROOT/build/libssl.a $2

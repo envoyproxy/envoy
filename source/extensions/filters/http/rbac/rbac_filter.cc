@@ -172,7 +172,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   auto& fields = *metrics.mutable_fields();
 
   if (shadow_engine != nullptr) {
-    std::string shadow_resp_code =
+    absl::string_view shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
     if (shadow_engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
                                     &effective_policy_id)) {
@@ -204,12 +204,14 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
     std::string effective_policy_id;
-    bool allowed = engine->handleAction(*callbacks_->connection(), headers,
-                                        callbacks_->streamInfo(), &effective_policy_id);
-    const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
+    const bool allowed = engine->handleAction(*callbacks_->connection(), headers,
+                                              callbacks_->streamInfo(), &effective_policy_id);
+    absl::string_view log_policy_id = effective_policy_id;
     if (!effective_policy_id.empty()) {
       *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
           effective_policy_id;
+    } else {
+      log_policy_id = "none";
     }
     if (allowed) {
       ENVOY_LOG(debug, "enforced allowed, matched policy {}", log_policy_id);
