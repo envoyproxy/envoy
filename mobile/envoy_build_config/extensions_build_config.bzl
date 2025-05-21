@@ -4,7 +4,6 @@ EXTENSION_CONFIG_VISIBILITY = ["//visibility:public"]
 EXTENSION_PACKAGE_VISIBILITY = ["//visibility:public"]
 EXTENSIONS = {
     "envoy.clusters.dynamic_forward_proxy":                "//source/extensions/clusters/dynamic_forward_proxy:cluster",
-    "envoy.clusters.dns_srv":                              "//source/extensions/clusters/dns_srv:cluster",
     "envoy.clusters.static":                               "//source/extensions/clusters/static:static_cluster_lib",
     "envoy.filters.connection_pools.http.generic":         "//source/extensions/upstreams/http/generic:config",
     "envoy.filters.http.alternate_protocols_cache":        "//source/extensions/filters/http/alternate_protocols_cache:config",

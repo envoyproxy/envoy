@@ -488,7 +488,6 @@ ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name,
     // in DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback()).
     pending_srv_res->owned_ = true;
     return pending_srv_res.release();
-    return nullptr;
   }
 }
 

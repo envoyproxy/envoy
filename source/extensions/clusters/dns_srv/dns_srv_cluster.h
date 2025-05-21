@@ -65,8 +65,8 @@ private:
   using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
 
   // One SRV-record may return several hostnames
-  // We will need to resolve all of the hostnames to IPs. Potentially,
-  // There can be several hostnames for each hostname.
+  // We will need to resolve all of the hostnames to IPs.
+  // Potentially, there can be several IPs for each hostname.
   struct ResolveList {
     ResolveList(DnsSrvCluster& parent);
     void addTarget(ResolveTargetPtr new_target);
