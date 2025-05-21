@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <iostream>
 
 namespace Envoy {
 
@@ -111,8 +112,9 @@ std::chrono::milliseconds AtomicTokenBucketImpl::nextTokenAvailable() const {
 
   // Calculate time since the last fill.
   double current_time = timeNowInSeconds();
+  double last_time = time_in_seconds_.load();
   return std::chrono::milliseconds(
-      static_cast<uint64_t>(1 / fill_rate_ * 1000 - (current_time - time_in_seconds_.load())));
+      static_cast<uint64_t>(((1 / fill_rate_ - (current_time - last_time)) * 1000)));
 }
 
 } // namespace Envoy
