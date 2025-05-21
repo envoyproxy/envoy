@@ -196,41 +196,25 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
   return 1;
 }
 
-int ConnectionStreamInfoWrapper::luaConnectionTypedMetadata(lua_State* state) {
-  const char* filter_name = luaL_checkstring(state, 2);
+int ConnectionStreamInfoWrapper::luaConnectionDynamicTypedMetadata(lua_State* state) {
+  const std::string filter_name = getStringViewFromLuaString(state, 2).data();
 
-  const auto& typed_metadata = connection_stream_info_.dynamicMetadata().typed_filter_metadata();
-  const auto it = typed_metadata.find(filter_name);
+  // Create the metadata table for the filter
+  lua_createtable(state, 0, 2);
 
-  if (it == typed_metadata.end()) {
-    lua_pushnil(state);
-    return 1;
+  // Get the typed metadata from the filter state
+  const auto& typed_metadata = 
+      connection_stream_info_.filterState()->getDataReadOnly<ProtobufWkt::Struct>(filter_name);
+  
+  if (!typed_metadata) {
+    return 1; // Return the empty table
   }
 
-  // Try to unpack the Any message into a new message
-  const std::string& type_url = it->second.type_url();
-  const std::string concrete_type_name{TypeUtil::typeUrlToDescriptorFullName(type_url)};
+  // Convert the typed metadata to a Lua table and add it to the result
+  Filters::Common::Lua::ProtobufConverterUtils::pushLuaTableFromMessage(state, *typed_metadata);
+  lua_setfield(state, -2, "typed_metadata");
 
-  const auto* descriptor =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
-  if (descriptor == nullptr) {
-    luaL_error(state,
-               absl::StrFormat("could not find descriptor for type URL: %s", type_url).c_str());
-  }
-
-  Protobuf::DynamicMessageFactory message_factory;
-  std::unique_ptr<Protobuf::Message> concrete_message(
-      message_factory.GetPrototype(descriptor)->New());
-
-  auto unpack_status = MessageUtil::unpackTo(it->second, *concrete_message);
-  if (!unpack_status.ok()) {
-    luaL_error(state, absl::StrFormat("failed to unpack typed metadata message: %s",
-                                      unpack_status.ToString())
-                          .c_str());
-  }
-
-  Filters::Common::Lua::ProtobufConverterUtils::pushLuaTableFromMessage(state, *concrete_message);
-  return 1;
+  return 1; // Return the table
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {

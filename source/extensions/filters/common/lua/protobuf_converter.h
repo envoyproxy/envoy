@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "lua.hpp"
 
@@ -9,6 +10,27 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Lua {
+
+/**
+ * Standard field names used in protobuf map entries.
+ *
+ * In the Protobuf specification, maps are represented as repeated messages with special field
+ * names. When a map<K,V> field is defined, the protocol buffer compiler generates a special map
+ * entry message type with two fields: 'key' of type K and 'value' of type V.
+ *
+ * References:
+ * - https://protobuf.dev/reference/proto3-spec/#map-field: "map<key_type, value_type> map_field =
+ * N;"
+ * - https://protobuf.dev/programming-guides/proto3/#maps: "The map syntax is equivalent to..."
+ * - https://developers.google.com/protocol-buffers/docs/proto3#maps
+ */
+namespace ProtobufMap {
+// Standard field name for the key in a map entry message
+constexpr absl::string_view KEY_FIELD_NAME = "key";
+
+// Standard field name for the value in a map entry message
+constexpr absl::string_view VALUE_FIELD_NAME = "value";
+} // namespace ProtobufMap
 
 /**
  * Utility class for converting protobuf messages to Lua tables
@@ -25,34 +47,39 @@ public:
    */
   static void pushLuaTableFromMessage(lua_State* state, const Protobuf::Message& message);
 
-private:
   /**
-   * Helper function to push a protobuf field value onto the Lua stack
+   * Push a Lua value onto the stack that represents the value of a field
    * @param state the Lua state
-   * @param message the protobuf message containing the field
+   * @param message the protobuf reflectable message containing the field
    * @param field the field descriptor
    *
-   * Pushes a Lua value onto the stack that represents the field value.
-   * The data type pushed depends on the field's type in the protobuf.
+   * This function inspects the field type and extracts the appropriate value,
+   * then pushes that value onto the Lua stack.
    */
-  static void pushLuaValueFromField(lua_State* state, const Protobuf::Message& message,
+  static void pushLuaValueFromField(lua_State* state, const Protobuf::ReflectableMessage& message,
                                     const Protobuf::FieldDescriptor* field);
 
   /**
-   * Helper function to push a Lua representation of a map field
+   * Push a Lua table onto the stack that represents a protobuf map field
    * @param state the Lua state
-   * @param message the protobuf message
+   * @param message the protobuf reflectable message containing the map field
    * @param field the map field descriptor
+   *
+   * This function converts a protobuf map field into a Lua table and
+   * pushes it onto the Lua stack.
    */
   static void pushLuaTableFromMapField(lua_State* state,
                                        const Protobuf::ReflectableMessage& message,
                                        const Protobuf::FieldDescriptor* field);
 
   /**
-   * Helper function to push a Lua array from a repeated field
+   * Push a Lua array onto the stack that represents a repeated field
    * @param state the Lua state
-   * @param message the protobuf message
+   * @param message the protobuf reflectable message containing the repeated field
    * @param field the repeated field descriptor
+   *
+   * This function converts a protobuf repeated field into a Lua array and
+   * pushes it onto the Lua stack.
    */
   static void pushLuaArrayFromRepeatedField(lua_State* state,
                                             const Protobuf::ReflectableMessage& message,

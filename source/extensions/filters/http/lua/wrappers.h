@@ -366,7 +366,7 @@ public:
       : connection_stream_info_{connection_stream_info} {}
   static ExportedFunctions exportedFunctions() {
     return {{"dynamicMetadata", static_luaConnectionDynamicMetadata},
-            {"typedMetadata", static_luaConnectionTypedMetadata}};
+            {"dynamicTypedMetadata", static_luaConnectionDynamicTypedMetadata}};
   }
 
 private:
@@ -380,7 +380,7 @@ private:
    * Get reference to stream info typed metadata object.
    * @return typed metadata wrapped as a Lua table.
    */
-  DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionTypedMetadata);
+  DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicTypedMetadata);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { connection_dynamic_metadata_wrapper_.reset(); }
