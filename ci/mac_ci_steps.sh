@@ -2,6 +2,10 @@
 
 set -e
 
+# https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
+XCODE_VERSION=16.1
+export XCODE_VERSION
+
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 

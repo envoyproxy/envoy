@@ -17,6 +17,7 @@ HOMEBREW_RETRY_INTERVAL=3
 
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
 XCODE_VERSION=16.1
+export XCODE_VERSION
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
