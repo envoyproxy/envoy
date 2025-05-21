@@ -207,6 +207,8 @@ TEST_F(EdfSchedulerTest, SchedulerWithChangingWeights) {
   }
 
   int call_count = 0;
+  // Expect no assert in `createWithPicks` even though entry weights are
+  // increasing with each call.
   EdfScheduler<uint32_t> sched = EdfScheduler<uint32_t>::createWithPicks(
       entries,
       [&call_count](const uint32_t& entry) {

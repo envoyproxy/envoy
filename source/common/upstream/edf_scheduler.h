@@ -106,6 +106,13 @@ public:
       return calculate_weight(entry) + 1e-13;
     };
 
+    // Take a snapshot of entry weights so they remain consistent during scheduling.
+    std::vector<double> weights;
+    weights.reserve(entries.size());
+    std::transform(entries.cbegin(), entries.cend(), std::back_inserter(weights),
+                   [&aug_calculate_weight](const std::shared_ptr<C>& entry) {
+                     return aug_calculate_weight(*entry);
+                   });
     // Let weights {w_1, w_2, ..., w_N} be the per-entry weight where (w_i > 0),
     // W = sum(w_i), and P be the number of times to "pick" from the scheduler.
     // Let p'_i = floor(P * w_i/W), then the number of times each entry is being
@@ -113,12 +120,6 @@ public:
     //
     // The following code does P picks, by first emulating p'_i picks for each
     // entry, and then executing the leftover P - sum(p'_i) picks.
-    std::vector<double> weights;
-    weights.reserve(entries.size());
-    std::transform(entries.cbegin(), entries.cend(), std::back_inserter(weights),
-                   [&aug_calculate_weight](const std::shared_ptr<C>& entry) {
-                     return aug_calculate_weight(*entry);
-                   });
     const double weights_sum = std::accumulate(weights.cbegin(), weights.cend(), 0.0);
     std::vector<uint32_t> floor_picks;
     floor_picks.reserve(entries.size());
