@@ -46,6 +46,16 @@ public:
   static void pushLuaTableFromMessage(lua_State* state, const Protobuf::Message& message);
 
   /**
+   * Push a Lua table onto the stack that contains the converted protobuf message
+   * @param state the Lua state
+   * @param message the protobuf reflectable message to convert
+   *
+   * This function creates a new Lua table containing the fields of the protobuf message
+   * and pushes it onto the Lua stack. The caller is responsible for managing the stack.
+   */
+  static void pushLuaTableFromMessage(lua_State* state, const Protobuf::ReflectableMessage& message);
+
+  /**
    * Push a Lua value onto the stack that represents the value of a field
    * @param state the Lua state
    * @param message the protobuf reflectable message containing the field

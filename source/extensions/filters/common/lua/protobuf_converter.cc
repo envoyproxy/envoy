@@ -77,6 +77,11 @@ ProtobufConverterUtils::createReflectableMessage(const Protobuf::Message& messag
 void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
                                                      const Protobuf::Message& message) {
   auto reflectable = Envoy::createReflectableMessage(message);
+  pushLuaTableFromMessage(state, reflectable);
+}
+
+void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
+                                                     const Protobuf::ReflectableMessage& reflectable) {
   const auto* descriptor = reflectable.message().GetDescriptor();
   const auto* reflection = reflectable.message().GetReflection();
 

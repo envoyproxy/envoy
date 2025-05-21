@@ -200,9 +200,9 @@ int ConnectionStreamInfoWrapper::luaConnectionDynamicTypedMetadata(lua_State* st
   const std::string filter_name = getStringViewFromLuaString(state, 2).data();
 
   // Get the typed metadata from the filter state
-  const auto& typed_metadata =
+  const auto& typed_metadata = 
       connection_stream_info_.filterState()->getDataReadOnly<ProtobufWkt::Struct>(filter_name);
-
+  
   if (!typed_metadata) {
     // Return nil instead of an empty table
     lua_pushnil(state);
